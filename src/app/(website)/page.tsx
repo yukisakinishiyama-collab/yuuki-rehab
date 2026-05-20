@@ -14,7 +14,6 @@ import {
   ArrowRight,
   Users,
   Zap,
-  Heart,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -97,18 +96,24 @@ const blogPosts = [
     category: 'スポーツ障害',
     title: '足首捻挫の「正しい」初期対応とは？RICEからPOLICEへ',
     href: '/blog',
+    emoji: '🦶',
+    color: 'from-orange-500 to-red-500',
   },
   {
     date: '2026.04.28',
     category: 'リハビリ',
     title: 'ACL術後リハビリの流れと、競技復帰の判断基準について',
     href: '/blog',
+    emoji: '🏃',
+    color: 'from-blue-600 to-indigo-700',
   },
   {
     date: '2026.04.15',
     category: '成長期障害',
     title: 'オスグッド病を抱えながらスポーツを続けるために知っておくこと',
     href: '/blog',
+    emoji: '🌱',
+    color: 'from-green-500 to-teal-600',
   },
 ]
 
@@ -387,8 +392,9 @@ export default function HomePage() {
                 href={post.href}
                 className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="h-40 bg-gradient-to-br from-blue-800 to-blue-600 flex items-center justify-center">
-                  <Heart size={40} className="text-white/30" />
+                <div className={`h-40 bg-gradient-to-br ${post.color} flex flex-col items-center justify-center gap-2`}>
+                  <span className="text-5xl">{post.emoji}</span>
+                  <span className="bg-black/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">{post.category}</span>
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-2">

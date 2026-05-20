@@ -15,6 +15,8 @@ const posts = [
     title: '足首捻挫の「正しい」初期対応とは？RICEからPOLICEへ',
     excerpt: '足首を捻ったとき、まず何をするべきか。従来のRICE処置から、現在推奨されるPOLICEアプローチへの変化と、なぜ早期の運動が回復を促すのかを解説します。',
     tags: ['足首', '捻挫', '初期対応'],
+    emoji: '🦶',
+    color: 'from-orange-500 to-red-500',
   },
   {
     id: 2,
@@ -23,6 +25,8 @@ const posts = [
     title: 'ACL術後リハビリの流れと、競技復帰の判断基準について',
     excerpt: '前十字靱帯（ACL）再建術後のリハビリは「何ヶ月したら復帰」ではありません。科学的な復帰基準（LSI・ホップテストなど）と段階的な進め方を詳しく説明します。',
     tags: ['ACL', '術後', '競技復帰'],
+    emoji: '🏃',
+    color: 'from-blue-600 to-indigo-700',
   },
   {
     id: 3,
@@ -31,6 +35,8 @@ const posts = [
     title: 'オスグッド病を抱えながらスポーツを続けるために知っておくこと',
     excerpt: 'オスグッド病＝安静、というのは過去の話。適切な管理と運動療法で、痛みをコントロールしながらスポーツを続ける方法を保護者・選手向けに解説します。',
     tags: ['オスグッド', '成長期', '中学生'],
+    emoji: '🌱',
+    color: 'from-green-500 to-teal-600',
   },
   {
     id: 4,
@@ -39,6 +45,8 @@ const posts = [
     title: 'なぜ「安静だけ」では治らないのか？運動療法が必要な理由',
     excerpt: 'スポーツ障害・慢性痛に対して、なぜ運動療法が有効なのかをエビデンスとともに解説。「動かすのが怖い」という方にも読んでほしい内容です。',
     tags: ['運動療法', 'エビデンス', 'リハビリ'],
+    emoji: '💪',
+    color: 'from-teal-500 to-cyan-600',
   },
   {
     id: 5,
@@ -47,6 +55,8 @@ const posts = [
     title: 'シンスプリントと疲労骨折の違いと見分け方',
     excerpt: 'すねの痛みが続いているとき、シンスプリントなのか疲労骨折なのかは自己判断が難しいケースがあります。違いと、それぞれの対処法を解説します。',
     tags: ['シンスプリント', '疲労骨折', '陸上'],
+    emoji: '🏅',
+    color: 'from-sky-500 to-blue-600',
   },
   {
     id: 6,
@@ -55,6 +65,8 @@ const posts = [
     title: '「痛みが取れた＝スポーツ復帰OK」ではない理由',
     excerpt: '痛みが消えても、筋力・動作パターンが回復していなければ再受傷リスクは高いまま。競技復帰に必要な評価項目と準備について解説します。',
     tags: ['競技復帰', '再発予防', 'スポーツ'],
+    emoji: '⭐',
+    color: 'from-purple-600 to-indigo-700',
   },
 ]
 
@@ -94,8 +106,9 @@ export default function BlogPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {posts.map((post) => (
               <article key={post.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-40 bg-gradient-to-br from-blue-800 to-navy flex items-end p-5">
-                  <span className="bg-blue-500/30 text-blue-200 text-xs font-bold px-2.5 py-1 rounded-full">{post.category}</span>
+                <div className={`h-40 bg-gradient-to-br ${post.color} flex flex-col items-center justify-center gap-2 relative`}>
+                  <span className="text-5xl">{post.emoji}</span>
+                  <span className="bg-black/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">{post.category}</span>
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
