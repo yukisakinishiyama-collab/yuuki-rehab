@@ -154,7 +154,7 @@ export default function HomePage() {
               </Link>
             </div>
             <div className="flex flex-wrap gap-4 mt-10 text-sm text-blue-200">
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={16} className="text-sky-400" /> 完全予約制</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={16} className="text-sky-400" /> 予約優先制</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 size={16} className="text-sky-400" /> 丁寧な説明</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 size={16} className="text-sky-400" /> 医療機関と連携</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 size={16} className="text-sky-400" /> 運動療法重視</span>
@@ -471,7 +471,7 @@ export default function HomePage() {
               LINEで予約・相談する
             </a>
           </div>
-          <p className="text-blue-300 text-xs mt-6">完全予約制 / 初診の方もお気軽にどうぞ</p>
+          <p className="text-blue-300 text-xs mt-6">予約優先制 / 初診の方もお気軽にどうぞ</p>
         </div>
       </section>
     </div>
