@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     locale: 'ja_JP',
     type: 'website',
   },
+  verification: {
+    google: 'P8U9O0cyM1sx_kiQpAJzg5uiQ2tEB2Q1BqoxU_qSbA8',
+  },
 }
 
 export default function WebsiteLayout({ children }: { children: React.ReactNode }) {
