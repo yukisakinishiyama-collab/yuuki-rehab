@@ -1,4 +1,5 @@
 ﻿import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   Activity,
@@ -343,6 +344,35 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===== 院長紹介 ===== */}
+      <section className="py-16 md:py-24 bg-slate-50">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <span className="text-blue-700 text-sm font-bold tracking-widest uppercase">About</span>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">院長<span className="text-blue-700">紹介</span></h2>
+          </div>
+          <div className="flex flex-col md:flex-row gap-8 items-center bg-white rounded-2xl shadow-sm p-8">
+            <div className="shrink-0">
+              <Image
+                src="/doctor.jpg"
+                alt="ゆうき整骨院 院長"
+                width={200}
+                height={200}
+                className="rounded-2xl object-cover w-48 h-48 md:w-56 md:h-56"
+              />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-blue-700 mb-1 tracking-widest uppercase">Director</p>
+              <h3 className="text-2xl font-bold text-slate-900 mb-1">西山 勇樹</h3>
+              <p className="text-slate-500 text-sm mb-4">柔道整復師</p>
+              <p className="text-slate-700 leading-relaxed text-sm">
+                スポーツ障害・術前術後リハビリを専門とし、学生アスリートから社会人まで幅広く対応しています。「痛みを取るだけでなく、再発しない体づくり」を目指し、運動療法と動作改善を重視した施術を行っています。医療機関と連携しながら、科学的根拠に基づいたリハビリプログラムを提供します。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== BLOG PREVIEW ===== */}
       <section className="py-16 md:py-24 bg-slate-50">
         <div className="max-w-6xl mx-auto px-4">
@@ -431,17 +461,28 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl overflow-hidden shadow-md h-64 md:h-full min-h-64">
-              <iframe
-                src="https://maps.google.com/maps?q=山口県下関市彦島江の浦町9丁目1-14&hl=ja&z=16&output=embed"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                title="ゆうき整骨院 地図"
-              />
+            <div className="space-y-4">
+              <div className="rounded-2xl overflow-hidden shadow-md h-56">
+                <Image
+                  src="/clinic.jpg"
+                  alt="ゆうき整骨院 外観"
+                  width={600}
+                  height={300}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="rounded-2xl overflow-hidden shadow-md h-56">
+                <iframe
+                  src="https://maps.google.com/maps?q=山口県下関市彦島江の浦町9丁目1-14&hl=ja&z=16&output=embed"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="ゆうき整骨院 地図"
+                />
+              </div>
             </div>
           </div>
         </div>
