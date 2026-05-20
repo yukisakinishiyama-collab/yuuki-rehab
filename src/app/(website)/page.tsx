@@ -511,6 +511,19 @@ export default function HomePage() {
               </svg>
               LINEで予約・相談する
             </a>
+            <a
+              href="https://www.instagram.com/yu.ki__seikotsuin/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2.5 bg-white/10 hover:bg-white/20 text-white font-bold px-10 py-4 rounded-full transition-all hover:scale-105 text-lg border border-white/30"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                <circle cx="12" cy="12" r="3"/>
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+              </svg>
+              Instagramを見る
+            </a>
           </div>
           <p className="text-blue-300 text-xs mt-6">予約優先制 / 初診の方もお気軽にどうぞ</p>
         </div>
