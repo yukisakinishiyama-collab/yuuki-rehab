@@ -1,0 +1,247 @@
+import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation } from '@/types/rehab'
+import { MOCK_CASES, MOCK_COMMENTS, MOCK_EVALUATIONS, MOCK_USERS } from './rehab-data'
+
+const MOCK_CREDENTIALS: Record<string, string> = {
+  'user-001': 'rehab2026',
+  'user-002': 'rehab2026',
+  'user-003': 'rehab2026',
+  'user-004': 'rehab2026',
+  // ダンス専門家
+  'user-005': 'dance2026',
+  'user-006': 'dance2026',
+  'user-007': 'dance2026',
+  'user-008': 'dance2026',
+}
+
+const STORE_VERSION = '3' // 症例データも含めて再投入
+
+const KEYS = {
+  cases: 'rehabCases',
+  comments: 'rehabComments',
+  evaluations: 'rehabEvals',
+  annotations: 'rehabAnnotations',
+  user: 'rehabUser',
+  initialized: 'rehabInitialized',
+  version: 'rehabVersion',
+} as const
+
+function get<T>(key: string): T[] {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? '[]') as T[]
+  } catch {
+    return []
+  }
+}
+
+function set<T>(key: string, data: T[]): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(key, JSON.stringify(data))
+}
+
+export function initStore(): void {
+  if (typeof window === 'undefined') return
+  const alreadyInit = localStorage.getItem(KEYS.initialized)
+  const savedVersion = localStorage.getItem(KEYS.version)
+
+  if (alreadyInit && savedVersion === STORE_VERSION) return // 最新バージョン済み
+
+  if (alreadyInit && savedVersion !== STORE_VERSION) {
+    // バージョンアップ: コメント・症例を最新データで上書き
+    localStorage.setItem(KEYS.cases, JSON.stringify(MOCK_CASES))
+    localStorage.setItem(KEYS.comments, JSON.stringify(MOCK_COMMENTS))
+    localStorage.setItem(KEYS.version, STORE_VERSION)
+    return
+  }
+
+  // 初回: 全データを投入
+  localStorage.setItem(KEYS.cases, JSON.stringify(MOCK_CASES))
+  localStorage.setItem(KEYS.comments, JSON.stringify(MOCK_COMMENTS))
+  localStorage.setItem(KEYS.evaluations, JSON.stringify(MOCK_EVALUATIONS))
+  localStorage.setItem(KEYS.initialized, '1')
+  localStorage.setItem(KEYS.version, STORE_VERSION)
+}
+
+// Auth — returns true on success, false if credentials are wrong
+export function login(userId: string, password: string): boolean {
+  const expected = MOCK_CREDENTIALS[userId]
+  if (!expected || password !== expected) return false
+  const user = MOCK_USERS.find((u) => u.id === userId)
+  if (!user) return false
+  localStorage.setItem(KEYS.user, JSON.stringify(user))
+  return true
+}
+
+export function logout(): void {
+  localStorage.removeItem(KEYS.user)
+}
+
+export function getCurrentUser(): User | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(KEYS.user)
+    return raw ? (JSON.parse(raw) as User) : null
+  } catch {
+    return null
+  }
+}
+
+// Cases
+export function getCases(): RehabCase[] {
+  return get<RehabCase>(KEYS.cases)
+}
+
+export function getCase(id: string): RehabCase | undefined {
+  return getCases().find((c) => c.id === id)
+}
+
+export function saveCase(c: RehabCase): void {
+  const cases = getCases()
+  const idx = cases.findIndex((x) => x.id === c.id)
+  if (idx >= 0) cases[idx] = c
+  else cases.unshift(c)
+  set(KEYS.cases, cases)
+}
+
+export function addVideoToCase(caseId: string, video: RehabCase['videos'][0]): void {
+  const cases = getCases()
+  const c = cases.find((x) => x.id === caseId)
+  if (!c) return
+  c.videos.push(video)
+  c.updatedAt = new Date().toISOString()
+  set(KEYS.cases, cases)
+}
+
+export function removeVideoFromCase(caseId: string, videoId: string): void {
+  const cases = getCases()
+  const c = cases.find((x) => x.id === caseId)
+  if (!c) return
+  c.videos = c.videos.filter((v) => v.id !== videoId)
+  c.updatedAt = new Date().toISOString()
+  set(KEYS.cases, cases)
+  // 関連コメント・評価・アノテーションも削除
+  set(KEYS.comments, get<VideoComment>(KEYS.comments).filter((cm) => cm.videoId !== videoId))
+  set(KEYS.evaluations, get<EvaluationResult>(KEYS.evaluations).filter((e) => e.videoId !== videoId))
+  set(KEYS.annotations, get<SavedAnnotation>(KEYS.annotations).filter((a) => a.videoId !== videoId))
+  // blob URLもキャッシュから削除
+  _videoUrlCache.delete(videoId)
+  try { sessionStorage.removeItem(`rehabVideo_${videoId}`) } catch {}
+}
+
+// Comments
+export function getComments(videoId: string): VideoComment[] {
+  return get<VideoComment>(KEYS.comments).filter((c) => c.videoId === videoId)
+}
+
+// 動画のコメントがない場合に同じ症例の全コメントを返す（専門家パネル用）
+export function getCommentsFallback(videoId: string, caseId: string): VideoComment[] {
+  const all = get<VideoComment>(KEYS.comments)
+  const byVideo = all.filter((c) => c.videoId === videoId)
+  if (byVideo.length > 0) return byVideo
+  return all.filter((c) => c.caseId === caseId)
+}
+
+export function saveComment(comment: VideoComment): void {
+  const comments = get<VideoComment>(KEYS.comments)
+  const idx = comments.findIndex((c) => c.id === comment.id)
+  if (idx >= 0) comments[idx] = comment
+  else comments.push(comment)
+  set(KEYS.comments, comments)
+}
+
+export function addReply(
+  commentId: string,
+  reply: VideoComment['replies'][0],
+): void {
+  const comments = get<VideoComment>(KEYS.comments)
+  const comment = comments.find((c) => c.id === commentId)
+  if (!comment) return
+  comment.replies.push(reply)
+  set(KEYS.comments, comments)
+}
+
+export function toggleReaction(
+  commentId: string,
+  reaction: VideoComment['reactions'][0],
+): void {
+  const comments = get<VideoComment>(KEYS.comments)
+  const comment = comments.find((c) => c.id === commentId)
+  if (!comment) return
+  const idx = comment.reactions.findIndex(
+    (r) => r.type === reaction.type && r.userId === reaction.userId,
+  )
+  if (idx >= 0) comment.reactions.splice(idx, 1)
+  else comment.reactions.push(reaction)
+  set(KEYS.comments, comments)
+}
+
+// Evaluations
+export function getEvaluation(caseId: string, videoId: string): EvaluationResult | undefined {
+  return get<EvaluationResult>(KEYS.evaluations).find(
+    (e) => e.caseId === caseId && e.videoId === videoId,
+  )
+}
+
+export function saveEvaluation(eval_: EvaluationResult): void {
+  const evals = get<EvaluationResult>(KEYS.evaluations)
+  const idx = evals.findIndex((e) => e.id === eval_.id)
+  if (idx >= 0) evals[idx] = eval_
+  else evals.push(eval_)
+  set(KEYS.evaluations, evals)
+}
+
+export function getAllEvaluations(caseId: string): EvaluationResult[] {
+  return get<EvaluationResult>(KEYS.evaluations).filter((e) => e.caseId === caseId)
+}
+
+// Video URL cache — module-level Map survives Next.js client-side navigation
+// (only lost on hard page reload, which is unavoidable without a real backend)
+const _videoUrlCache = new Map<string, string>()
+
+export function saveVideoUrl(videoId: string, url: string): void {
+  if (typeof window === 'undefined') return
+  _videoUrlCache.set(videoId, url)
+  try {
+    sessionStorage.setItem(`rehabVideo_${videoId}`, url)
+  } catch {
+    // sessionStorage quota exceeded - ignore
+  }
+}
+
+export function getVideoUrl(videoId: string): string | null {
+  if (typeof window === 'undefined') return null
+  // Check in-memory first (fastest, survives SPA navigation)
+  const cached = _videoUrlCache.get(videoId)
+  if (cached) return cached
+  // Fall back to sessionStorage (also works within same tab session)
+  const stored = sessionStorage.getItem(`rehabVideo_${videoId}`)
+  if (stored) {
+    _videoUrlCache.set(videoId, stored) // warm the in-memory cache
+    return stored
+  }
+  return null
+}
+
+export function generateId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+// Saved Annotations
+export function getAnnotations(videoId: string): SavedAnnotation[] {
+  return get<SavedAnnotation>(KEYS.annotations)
+    .filter((a) => a.videoId === videoId)
+    .sort((a, b) => a.timestamp - b.timestamp)
+}
+
+export function saveAnnotation(ann: SavedAnnotation): void {
+  const anns = get<SavedAnnotation>(KEYS.annotations)
+  const idx = anns.findIndex((a) => a.id === ann.id)
+  if (idx >= 0) anns[idx] = ann
+  else anns.push(ann)
+  set(KEYS.annotations, anns)
+}
+
+export function deleteAnnotation(id: string): void {
+  const anns = get<SavedAnnotation>(KEYS.annotations).filter((a) => a.id !== id)
+  set(KEYS.annotations, anns)
+}
