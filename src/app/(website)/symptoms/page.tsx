@@ -28,6 +28,8 @@ const symptomCategories = [
       { label: '腸脛靱帯炎（ランナー膝）', href: '/symptoms/knee-pain', tags: ['ランニング', '自転車'] },
       { label: '膝蓋腱炎（ジャンパー膝）', href: '/symptoms/knee-pain', tags: ['バレー', 'バスケ', '陸上'] },
       { label: '股関節唇損傷', href: '/symptoms/hip-pain', tags: ['サッカー', '体操', '格闘技'] },
+      { label: '腰痛・スポーツ腰部障害', href: '/symptoms/lower-back', tags: ['野球', '陸上', '体操'] },
+      { label: '手関節障害・手首の痛み', href: '/symptoms/wrist', tags: ['野球', 'テニス', '体操'] },
     ],
   },
   {
@@ -59,6 +61,8 @@ const symptomCategories = [
       { label: '股関節痛', href: '/symptoms/hip-pain', tags: ['中高年', 'スポーツ'] },
       { label: '膝痛（変形性膝関節症を除く）', href: '/symptoms/knee-pain', tags: ['スポーツ', '日常生活'] },
       { label: '肩痛（腱板損傷など）', href: '/symptoms/baseball-shoulder', tags: ['スポーツ', '日常生活'] },
+      { label: '慢性腰痛・繰り返す腰痛', href: '/symptoms/lower-back', tags: ['スポーツ', '日常生活'] },
+      { label: '手首の慢性痛・TFCC損傷', href: '/symptoms/wrist', tags: ['スポーツ', '日常生活'] },
     ],
   },
 ]

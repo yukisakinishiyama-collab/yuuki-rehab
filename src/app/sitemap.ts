@@ -18,6 +18,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     'osgood',
     'severs',
     'spondylolysis',
+    'lower-back',
+    'wrist',
   ]
 
   return [
