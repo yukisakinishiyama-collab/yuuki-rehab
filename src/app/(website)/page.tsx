@@ -362,7 +362,7 @@ export default function HomePage() {
               />
             </div>
             <div>
-              <p className="text-xs font-bold text-blue-700 mb-1 tracking-widest uppercase">Director</p>
+              <p className="text-xs font-bold text-blue-700 mb-1 tracking-widest">院長</p>
               <h3 className="text-2xl font-bold text-slate-900 mb-1">西山 勇来</h3>
               <p className="text-slate-500 text-sm mb-4">柔道整復師</p>
               <p className="text-slate-700 leading-relaxed text-sm">
