@@ -174,6 +174,21 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===== 来院誘導バナー ===== */}
+      <section className="bg-amber-400">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
+          <p className="text-amber-900 font-bold text-sm text-center">
+            💡 初回評価 <strong>¥2,000</strong> — 「まず状態だけ診てほしい」も大歓迎
+          </p>
+          <Link
+            href="/price"
+            className="text-amber-900 underline underline-offset-2 font-semibold text-sm hover:text-amber-800 whitespace-nowrap"
+          >
+            料金・メニュー詳細 →
+          </Link>
+        </div>
+      </section>
+
       {/* ===== QUICK INFO BAR ===== */}
       <section className="bg-blue-700 text-white">
         <div className="max-w-6xl mx-auto px-4 py-4">

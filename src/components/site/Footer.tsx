@@ -70,6 +70,7 @@ export default function Footer() {
               {[
                 { href: '/', label: 'トップ' },
                 { href: '/first-visit', label: '初めての方へ' },
+                { href: '/price', label: '料金' },
                 { href: '/symptoms', label: '症状・お悩み' },
                 { href: '/blog', label: 'ブログ' },
                 { href: '/faq', label: 'よくある質問' },
