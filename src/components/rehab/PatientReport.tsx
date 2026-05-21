@@ -17,6 +17,154 @@ interface AIParsed {
   rawSections: { heading: string; body: string }[]
 }
 
+// ── 部位キーワード定義 ──────────────────────────────────────────────────────
+type BodyRegion =
+  | 'head' | 'neck' | 'shoulder_l' | 'shoulder_r'
+  | 'elbow_l' | 'elbow_r' | 'wrist_l' | 'wrist_r'
+  | 'chest' | 'abdomen' | 'lower_back'
+  | 'hip_l' | 'hip_r' | 'knee_l' | 'knee_r'
+  | 'ankle_l' | 'ankle_r' | 'foot_l' | 'foot_r'
+  | 'trunk' | 'pelvis'
+
+const REGION_LABELS: Record<BodyRegion, string> = {
+  head: '頭部', neck: '頸部',
+  shoulder_l: '左肩', shoulder_r: '右肩',
+  elbow_l: '左肘', elbow_r: '右肘',
+  wrist_l: '左手首', wrist_r: '右手首',
+  chest: '胸部', abdomen: '腹部', lower_back: '腰部',
+  hip_l: '左股関節', hip_r: '右股関節',
+  knee_l: '左膝', knee_r: '右膝',
+  ankle_l: '左足首', ankle_r: '右足首',
+  foot_l: '左足部', foot_r: '右足部',
+  trunk: '体幹', pelvis: '骨盤',
+}
+
+// テキストから部位を抽出
+function detectRegions(text: string): BodyRegion[] {
+  const found = new Set<BodyRegion>()
+  const t = text
+  if (/頭|頭部/.test(t)) found.add('head')
+  if (/頸|首|頚/.test(t)) found.add('neck')
+  if (/左肩|左の肩/.test(t)) found.add('shoulder_l')
+  if (/右肩|右の肩/.test(t)) found.add('shoulder_r')
+  if (/肩(?!甲)/.test(t) && !found.has('shoulder_l') && !found.has('shoulder_r')) { found.add('shoulder_l'); found.add('shoulder_r') }
+  if (/左肘|左の肘/.test(t)) found.add('elbow_l')
+  if (/右肘|右の肘/.test(t)) found.add('elbow_r')
+  if (/肘/.test(t) && !found.has('elbow_l') && !found.has('elbow_r')) { found.add('elbow_l'); found.add('elbow_r') }
+  if (/左手首|左手関節/.test(t)) found.add('wrist_l')
+  if (/右手首|右手関節/.test(t)) found.add('wrist_r')
+  if (/手首|手関節/.test(t) && !found.has('wrist_l') && !found.has('wrist_r')) { found.add('wrist_l'); found.add('wrist_r') }
+  if (/胸|胸郭|胸椎/.test(t)) found.add('chest')
+  if (/腹|体幹|コア|trunk|core/.test(t)) { found.add('abdomen'); found.add('trunk') }
+  if (/腰|腰部|腰椎|腰背/.test(t)) found.add('lower_back')
+  if (/骨盤/.test(t)) found.add('pelvis')
+  if (/体幹|幹/.test(t)) found.add('trunk')
+  if (/左股|左の股|左ヒップ/.test(t)) found.add('hip_l')
+  if (/右股|右の股|右ヒップ/.test(t)) found.add('hip_r')
+  if (/股関節|ヒップ/.test(t) && !found.has('hip_l') && !found.has('hip_r')) { found.add('hip_l'); found.add('hip_r') }
+  if (/左膝|左の膝/.test(t)) found.add('knee_l')
+  if (/右膝|右の膝/.test(t)) found.add('knee_r')
+  if (/膝/.test(t) && !found.has('knee_l') && !found.has('knee_r')) { found.add('knee_l'); found.add('knee_r') }
+  if (/左足首|左足関節/.test(t)) found.add('ankle_l')
+  if (/右足首|右足関節/.test(t)) found.add('ankle_r')
+  if (/足首|足関節/.test(t) && !found.has('ankle_l') && !found.has('ankle_r')) { found.add('ankle_l'); found.add('ankle_r') }
+  if (/左足部|左足底/.test(t)) found.add('foot_l')
+  if (/右足部|右足底/.test(t)) found.add('foot_r')
+  if (/足部|足底|足裏/.test(t) && !found.has('foot_l') && !found.has('foot_r')) { found.add('foot_l'); found.add('foot_r') }
+  return [...found]
+}
+
+// ── ボディマップ SVG ─────────────────────────────────────────────────────────
+// SVG座標での各部位の中心と半径 (cx, cy, rx, ry)
+const REGION_SHAPES: Record<BodyRegion, { cx: number; cy: number; rx: number; ry: number }> = {
+  head:       { cx: 60, cy: 22,  rx: 14, ry: 14 },
+  neck:       { cx: 60, cy: 42,  rx: 7,  ry: 7  },
+  chest:      { cx: 60, cy: 72,  rx: 22, ry: 16 },
+  abdomen:    { cx: 60, cy: 97,  rx: 18, ry: 10 },
+  lower_back: { cx: 60, cy: 115, rx: 18, ry: 10 },
+  trunk:      { cx: 60, cy: 90,  rx: 22, ry: 25 },
+  pelvis:     { cx: 60, cy: 130, rx: 20, ry: 10 },
+  shoulder_l: { cx: 30, cy: 62,  rx: 10, ry: 10 },
+  shoulder_r: { cx: 90, cy: 62,  rx: 10, ry: 10 },
+  elbow_l:    { cx: 18, cy: 90,  rx: 8,  ry: 8  },
+  elbow_r:    { cx: 102,cy: 90,  rx: 8,  ry: 8  },
+  wrist_l:    { cx: 10, cy: 115, rx: 7,  ry: 7  },
+  wrist_r:    { cx: 110,cy: 115, rx: 7,  ry: 7  },
+  hip_l:      { cx: 42, cy: 145, rx: 12, ry: 10 },
+  hip_r:      { cx: 78, cy: 145, rx: 12, ry: 10 },
+  knee_l:     { cx: 42, cy: 180, rx: 10, ry: 10 },
+  knee_r:     { cx: 78, cy: 180, rx: 10, ry: 10 },
+  ankle_l:    { cx: 42, cy: 215, rx: 8,  ry: 8  },
+  ankle_r:    { cx: 78, cy: 215, rx: 8,  ry: 8  },
+  foot_l:     { cx: 40, cy: 232, rx: 10, ry: 6  },
+  foot_r:     { cx: 80, cy: 232, rx: 10, ry: 6  },
+}
+
+function BodyMap({ highlighted, severity = 'problem' }: { highlighted: BodyRegion[]; severity?: 'problem' | 'risk' | 'positive' }) {
+  const color = severity === 'risk' ? '#ef4444' : severity === 'positive' ? '#16a34a' : '#f59e0b'
+  const fill  = severity === 'risk' ? 'rgba(239,68,68,0.25)' : severity === 'positive' ? 'rgba(22,163,74,0.2)' : 'rgba(245,158,11,0.25)'
+
+  return (
+    <svg viewBox="0 0 120 250" width="90" height="190" style={{ display: 'block' }}>
+      {/* 人体シルエット */}
+      {/* 頭 */}
+      <circle cx="60" cy="22" r="14" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 首 */}
+      <rect x="54" y="35" width="12" height="12" rx="4" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 胴体 */}
+      <rect x="38" y="50" width="44" height="90" rx="8" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 左腕 */}
+      <rect x="20" y="54" width="18" height="70" rx="7" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 右腕 */}
+      <rect x="82" y="54" width="18" height="70" rx="7" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 左手 */}
+      <ellipse cx="29" cy="130" rx="9" ry="7" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 右手 */}
+      <ellipse cx="91" cy="130" rx="9" ry="7" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 左脚 */}
+      <rect x="39" y="140" width="20" height="85" rx="8" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 右脚 */}
+      <rect x="61" y="140" width="20" height="85" rx="8" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 左足 */}
+      <ellipse cx="49" cy="230" rx="12" ry="6" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+      {/* 右足 */}
+      <ellipse cx="71" cy="230" rx="12" ry="6" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+
+      {/* ハイライト */}
+      {highlighted.map((region) => {
+        const s = REGION_SHAPES[region]
+        if (!s) return null
+        return (
+          <ellipse
+            key={region}
+            cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry}
+            fill={fill}
+            stroke={color}
+            strokeWidth="2.5"
+            strokeDasharray="3 1.5"
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
+// テキストから部位ラベルバッジを生成
+function RegionBadges({ text, color }: { text: string; color: string }) {
+  const regions = detectRegions(text)
+  if (regions.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+      {regions.map((r) => (
+        <span key={r} style={{ fontSize: '10px', fontWeight: '600', color, background: `${color}15`, border: `1px solid ${color}40`, borderRadius: '999px', padding: '1px 7px' }}>
+          📍 {REGION_LABELS[r]}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ── AI解析 ────────────────────────────────────────────────────────────────────
 function parseAISummary(text: string): AIParsed {
   const result: AIParsed = { observations: [], problems: [], risks: [], improvements: [], recovery: [], rawSections: [] }
   if (!text) return result
@@ -71,46 +219,59 @@ function LineIcon() {
   )
 }
 
-// スコアリング表示（バッジ形式）
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : score >= 30 ? '#ea580c' : '#dc2626'
   const bg    = score >= 75 ? '#f0fdf4' : score >= 50 ? '#fffbeb' : score >= 30 ? '#fff7ed' : '#fef2f2'
   const label = score >= 75 ? '良好' : score >= 50 ? '要注意' : score >= 30 ? '要改善' : '要精査'
-  const pct   = score / 100
   const r = 52, cx = 70, cy = 70
   const circ = 2 * Math.PI * r
-  const dash  = circ * pct
+  const dash  = circ * (score / 100)
   const gap   = circ - dash
   return (
-    <div className="flex flex-col items-center">
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <svg width="140" height="140" viewBox="0 0 140 140">
-        {/* 背景リング */}
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="10" />
-        {/* 進捗リング */}
-        <circle
-          cx={cx} cy={cy} r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${gap}`}
-          strokeDashoffset={circ * 0.25}
-          transform="rotate(0 70 70)"
-          style={{ transition: 'stroke-dasharray 0.8s ease' }}
-        />
-        {/* 内側背景 */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={`${dash} ${gap}`} strokeDashoffset={circ * 0.25} />
         <circle cx={cx} cy={cy} r="42" fill={bg} />
-        {/* スコア数値 */}
         <text x={cx} y={cy - 8} textAnchor="middle" fontSize="28" fontWeight="800" fill={color}>{score}</text>
         <text x={cx} y={cy + 8} textAnchor="middle" fontSize="11" fill="#9ca3af">/ 100</text>
         <text x={cx} y={cy + 24} textAnchor="middle" fontSize="12" fontWeight="700" fill={color}>{label}</text>
       </svg>
-      <p className="text-xs text-gray-500 -mt-1">総合評価スコア</p>
+      <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '-4px' }}>総合評価スコア</p>
     </div>
   )
 }
 
-// レーダーチャート
+function StatCard({ value, label, color, bg, icon }: { value: number; label: string; color: string; bg: string; icon: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', padding: '10px 8px', gap: '3px', backgroundColor: bg }}>
+      <span style={{ fontSize: '18px' }}>{icon}</span>
+      <span style={{ fontSize: '22px', fontWeight: '900', color, lineHeight: 1 }}>{value}</span>
+      <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500', textAlign: 'center', lineHeight: 1.2 }}>{label}</span>
+    </div>
+  )
+}
+
+function SeverityBar({ label, severity, note }: { label: string; severity: string; note?: string }) {
+  const levels: Record<string, number> = { none: 0, mild: 1, moderate: 2, severe: 3 }
+  const colors = ['#d1d5db', '#fbbf24', '#f97316', '#ef4444']
+  const lbls = ['なし', '軽度', '中等度', '重度']
+  const lv = levels[severity] ?? 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid #f9fafb' }}>
+      <span style={{ fontSize: '11px', color: '#4b5563', width: '120px', flexShrink: 0, lineHeight: 1.3 }}>{label}</span>
+      <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} style={{ width: '18px', height: '8px', borderRadius: '3px', backgroundColor: i <= lv ? colors[lv] : '#e5e7eb' }} />
+        ))}
+      </div>
+      <span style={{ fontSize: '11px', fontWeight: '700', width: '44px', color: lv > 0 ? colors[lv] : '#9ca3af' }}>{lbls[lv]}</span>
+      {note && <span style={{ fontSize: '10px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{note}</span>}
+    </div>
+  )
+}
+
 function RadarChart({ data }: { data: { label: string; value: number }[] }) {
   const size = 180; const cx = size / 2; const cy = size / 2; const r = 65; const n = data.length
   if (n < 3) return null
@@ -133,37 +294,100 @@ function RadarChart({ data }: { data: { label: string; value: number }[] }) {
   )
 }
 
-// 重症度バー
-function SeverityBar({ label, severity, note }: { label: string; severity: string; note?: string }) {
-  const levels: Record<string, number> = { none: 0, mild: 1, moderate: 2, severe: 3 }
-  const colors = ['#d1d5db', '#fbbf24', '#f97316', '#ef4444']
-  const lbls = ['なし', '軽度', '中等度', '重度']
-  const lv = levels[severity] ?? 0
+// ── 発見事項カード（ボディマップ付き） ────────────────────────────────────────
+function FindingCard({
+  items, type, title, subtitle, icon, fromAI,
+}: {
+  items: { text: string; fromAI: boolean }[]
+  type: 'positive' | 'problem' | 'risk' | 'improvement'
+  title: string
+  subtitle: string
+  icon: string
+  fromAI: boolean
+}) {
+  const cfg = {
+    positive:    { bg: '#f0fdf4', border: '#bbf7d0', accent: '#16a34a', text: '#14532d', markerColor: '#16a34a', severity: 'positive' as const },
+    problem:     { bg: '#fffbeb', border: '#fde68a', accent: '#d97706', text: '#78350f', markerColor: '#d97706', severity: 'problem' as const },
+    risk:        { bg: '#fef2f2', border: '#fecaca', accent: '#dc2626', text: '#7f1d1d', markerColor: '#dc2626', severity: 'risk' as const },
+    improvement: { bg: '#eff6ff', border: '#bfdbfe', accent: '#2563eb', text: '#1e3a8a', markerColor: '#2563eb', severity: 'problem' as const },
+  }[type]
+
+  // 全テキストから部位を集約
+  const allRegions = [...new Set(items.flatMap((x) => detectRegions(x.text)))]
+
   return (
-    <div className="flex items-center gap-2 py-1 border-b border-gray-50 last:border-0">
-      <span className="text-xs text-gray-600 w-36 flex-shrink-0 leading-tight">{label}</span>
-      <div className="flex gap-0.5 flex-shrink-0">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="w-5 h-2 rounded-sm" style={{ backgroundColor: i <= lv ? colors[lv] : '#e5e7eb' }} />
-        ))}
+    <section>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+        <div style={{ width: '4px', height: '24px', borderRadius: '999px', background: cfg.accent, flexShrink: 0 }} />
+        <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: 0 }}>{icon} {title}</h3>
+        <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>{subtitle}</p>
+        {fromAI && <span style={{ fontSize: '10px', color: '#7c3aed', background: '#faf5ff', border: '1px solid #e9d5ff', padding: '1px 6px', borderRadius: '999px', flexShrink: 0 }}><Bot style={{ display: 'inline', width: '10px', height: '10px' }} /> AI所見</span>}
       </div>
-      <span className="text-xs font-semibold w-12" style={{ color: lv > 0 ? colors[lv] : '#9ca3af' }}>{lbls[lv]}</span>
-      {note && <span className="text-xs text-gray-400 truncate">{note}</span>}
-    </div>
+
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        {/* ボディマップ（部位が検出された場合のみ表示） */}
+        {allRegions.length > 0 && (
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+            <BodyMap highlighted={allRegions} severity={cfg.severity} />
+            <p style={{ fontSize: '9px', color: '#9ca3af', textAlign: 'center', margin: 0, lineHeight: 1.4 }}>指摘部位</p>
+          </div>
+        )}
+
+        {/* 発見事項リスト */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {items.map((x, i) => {
+            const regions = detectRegions(x.text)
+            return (
+              <div key={i} style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: '12px', padding: '10px 12px' }}>
+                {/* 部位バッジ */}
+                {regions.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                    {regions.map((r) => (
+                      <span key={r} style={{ fontSize: '10px', fontWeight: '700', color: cfg.accent, background: `${cfg.accent}18`, border: `1px solid ${cfg.accent}35`, borderRadius: '999px', padding: '1px 8px' }}>
+                        📍 {REGION_LABELS[r]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p style={{ fontSize: '13px', color: cfg.text, lineHeight: '1.65', margin: 0 }}>{x.text}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </section>
   )
 }
 
-// ステータス数値カード
-function StatCard({ value, label, color, bg, icon }: { value: number; label: string; color: string; bg: string; icon: string }) {
+// ── 優先アクションカード ───────────────────────────────────────────────────────
+function ActionCard({ num, text, type, fromAI }: { num: number; text: string; type: 'problem' | 'risk' | 'improvement'; fromAI?: boolean }) {
+  const cfg = {
+    risk:        { bg: '#fef2f2', border: '#fecaca', circle: '#dc2626', text: '#7f1d1d' },
+    problem:     { bg: '#fffbeb', border: '#fde68a', circle: '#d97706', text: '#78350f' },
+    improvement: { bg: '#eff6ff', border: '#bfdbfe', circle: '#2563eb', text: '#1e3a8a' },
+  }[type]
+  const regions = detectRegions(text)
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl p-3 gap-1" style={{ backgroundColor: bg }}>
-      <span className="text-xl">{icon}</span>
-      <span className="text-2xl font-black" style={{ color }}>{value}</span>
-      <span className="text-xs text-gray-500 font-medium text-center leading-tight">{label}</span>
+    <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+      <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: cfg.circle, color: '#fff', fontSize: '12px', fontWeight: '900', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{num}</div>
+      <div style={{ flex: 1 }}>
+        {regions.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '5px' }}>
+            {regions.map((r) => (
+              <span key={r} style={{ fontSize: '10px', fontWeight: '700', color: cfg.circle, background: `${cfg.circle}15`, border: `1px solid ${cfg.circle}30`, borderRadius: '999px', padding: '1px 7px' }}>
+                📍 {REGION_LABELS[r]}
+              </span>
+            ))}
+          </div>
+        )}
+        <p style={{ fontSize: '13px', color: cfg.text, lineHeight: '1.65', margin: 0 }}>{text}</p>
+        {fromAI && <span style={{ fontSize: '10px', color: '#7c3aed', marginTop: '4px', display: 'inline-block' }}>AIより</span>}
+      </div>
     </div>
   )
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function PatientReport({ case_: c }: Props) {
   const [allComments, setAllComments] = useState<VideoComment[]>([])
   const [allEvals, setAllEvals] = useState<EvaluationResult[]>([])
@@ -193,7 +417,7 @@ export default function PatientReport({ case_: c }: Props) {
   const hasManual = allComments.length > 0 || allEvals.length > 0
 
   const latestAI = aiSummaries[0] ?? null
-  const aiParsed: AIParsed | null = latestAI ? parseAISummary(latestAI.summary) : null
+  const aiParsed = latestAI ? parseAISummary(latestAI.summary) : null
   const hasAI = !!aiParsed && (
     aiParsed.problems.length + aiParsed.risks.length + aiParsed.improvements.length + aiParsed.observations.length > 0
   )
@@ -284,85 +508,75 @@ export default function PatientReport({ case_: c }: Props) {
 
   return (
     <>
-      {/* ── ツールバー（印刷非表示） ── */}
-      <div className="no-print flex items-center gap-2 flex-wrap mb-5 p-3 bg-white rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Share2 className="w-4 h-4 text-[#0d9488]" />
-          <span className="text-sm font-bold text-gray-800">患者様向け説明レポート</span>
+      {/* ── ツールバー ── */}
+      <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '20px', padding: '12px 16px', background: '#fff', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Share2 style={{ width: '16px', height: '16px', color: '#0d9488' }} />
+          <span style={{ fontSize: '13px', fontWeight: '700', color: '#111827' }}>患者様向け説明レポート</span>
           {hasAI && !hasManual && (
-            <span className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-full">
-              <Bot className="w-3 h-3" />AI所見から自動生成
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#7c3aed', background: '#faf5ff', border: '1px solid #e9d5ff', padding: '2px 8px', borderRadius: '999px' }}>
+              <Bot style={{ width: '12px', height: '12px' }} />AI所見から自動生成
             </span>
           )}
         </div>
-        <div className="ml-auto flex gap-2 flex-wrap">
-          <button onClick={handleLine} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#06C755] hover:bg-[#05a847] text-white font-medium rounded-lg text-sm transition-colors">
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={handleLine} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#06C755', color: '#fff', fontWeight: '600', borderRadius: '8px', fontSize: '13px', border: 'none', cursor: 'pointer' }}>
             <LineIcon />LINEで送る
           </button>
-          <button onClick={handleCopy} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${copied ? 'bg-green-500 text-white border-green-500' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          <button onClick={handleCopy} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copied ? '#16a34a' : '#fff', color: copied ? '#fff' : '#374151', fontWeight: '600', borderRadius: '8px', fontSize: '13px', border: '1px solid #e5e7eb', cursor: 'pointer' }}>
+            {copied ? <Check style={{ width: '14px', height: '14px' }} /> : <Copy style={{ width: '14px', height: '14px' }} />}
             {copied ? 'コピーしました' : 'コピー'}
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors">
-            <Printer className="w-3.5 h-3.5" />印刷
+          <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#111827', color: '#fff', fontWeight: '600', borderRadius: '8px', fontSize: '13px', border: 'none', cursor: 'pointer' }}>
+            <Printer style={{ width: '14px', height: '14px' }} />印刷
           </button>
         </div>
       </div>
 
       {/* ── レポート本体 ── */}
-      <div id="patient-report-body" className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+      <div id="patient-report-body" style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', border: '1px solid #f3f4f6', boxShadow: '0 1px 8px rgba(0,0,0,0.07)' }}>
 
         {/* ヘッダー */}
         <div style={{ background: 'linear-gradient(135deg, #0f2744 0%, #0d9488 100%)', padding: '28px 32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
             <div>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '6px' }}>
-                Motion Analysis Report
-              </p>
-              <h1 style={{ color: '#ffffff', fontSize: '22px', fontWeight: '800', letterSpacing: '0.05em', margin: 0 }}>
-                動作分析レポート
-              </h1>
-              <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', marginTop: '4px' }}>患者様ご説明用</p>
+              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '6px', margin: '0 0 6px' }}>Motion Analysis Report</p>
+              <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '800', letterSpacing: '0.04em', margin: '0 0 4px' }}>動作分析レポート</h1>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: 0 }}>患者様ご説明用</p>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '11px', marginBottom: '4px' }}>{now}</p>
-              <p style={{ color: '#5eead4', fontSize: '14px', fontWeight: '700', letterSpacing: '0.05em' }}>YUUKI MOTION LAB</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: '0 0 4px' }}>{now}</p>
+              <p style={{ color: '#5eead4', fontSize: '14px', fontWeight: '700', letterSpacing: '0.05em', margin: 0 }}>YUUKI MOTION LAB</p>
             </div>
           </div>
-
-          {/* 患者情報バー */}
           <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)', display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
-            {[
-              { label: '診断名', value: c.diagnosis },
-              { label: '評価部位', value: c.injuredPart },
-              { label: '評価目的', value: c.evaluationPurpose },
-            ].map(({ label, value }) => (
+            {[{ label: '診断名', value: c.diagnosis }, { label: '評価部位', value: c.injuredPart }, { label: '評価目的', value: c.evaluationPurpose }].map(({ label, value }) => (
               <div key={label}>
-                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '3px' }}>{label}</p>
-                <p style={{ color: '#ffffff', fontSize: '13px', fontWeight: '600', margin: 0 }}>{value}</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 3px' }}>{label}</p>
+                <p style={{ color: '#fff', fontSize: '13px', fontWeight: '600', margin: 0 }}>{value}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="p-6 sm:p-8 space-y-6">
+        <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
 
-          {/* ── ① スコアエリア ── */}
-          <div className="flex flex-col sm:flex-row items-center gap-6 bg-gray-50 rounded-2xl p-5">
+          {/* ① スコア */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', background: '#f9fafb', borderRadius: '16px', padding: '20px', flexWrap: 'wrap' }}>
             <ScoreBadge score={score} />
-            <div className="flex-1 w-full space-y-3">
-              <div className="grid grid-cols-4 gap-2">
-                <StatCard value={displayPositive.length}  label="良好な点"  color="#16a34a" bg="#f0fdf4" icon="✅" />
-                <StatCard value={displayProblems.length}  label="気になる点" color="#d97706" bg="#fffbeb" icon="⚠️" />
-                <StatCard value={displayImprov.length}    label="改善提案"  color="#2563eb" bg="#eff6ff" icon="🎯" />
-                <StatCard value={displayRisks.length}     label="注意事項"  color="#dc2626" bg="#fef2f2" icon="🔴" />
+            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <StatCard value={displayPositive.length} label="良好な点" color="#16a34a" bg="#f0fdf4" icon="✅" />
+                <StatCard value={displayProblems.length} label="気になる点" color="#d97706" bg="#fffbeb" icon="⚠️" />
+                <StatCard value={displayImprov.length} label="改善提案" color="#2563eb" bg="#eff6ff" icon="🎯" />
+                <StatCard value={displayRisks.length} label="注意事項" color="#dc2626" bg="#fef2f2" icon="🔴" />
               </div>
               {c.videos.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">評価した動作</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p style={{ fontSize: '10px', color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px' }}>評価した動作</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {c.videos.map((v) => (
-                      <span key={v.id} className="text-xs px-2.5 py-1 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm">
+                      <span key={v.id} style={{ fontSize: '11px', padding: '3px 10px', background: '#fff', border: '1px solid #e5e7eb', color: '#4b5563', borderRadius: '999px' }}>
                         {MOVEMENT_TYPE_LABELS[v.movementType]} — {v.label}
                       </span>
                     ))}
@@ -374,144 +588,86 @@ export default function PatientReport({ case_: c }: Props) {
 
           {/* データなし */}
           {!hasContent && (
-            <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
-              <p className="text-sm font-semibold mb-1">データがまだ記録されていません</p>
-              <p className="text-xs">動画分析ページで「AI解析」を実行するか、コメント・評価を入力してください</p>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: '#9ca3af', border: '2px dashed #e5e7eb', borderRadius: '16px' }}>
+              <p style={{ fontSize: '13px', fontWeight: '600', margin: '0 0 6px' }}>データがまだ記録されていません</p>
+              <p style={{ fontSize: '12px', margin: 0 }}>動画分析ページで「AI解析」を実行するか、コメント・評価を入力してください</p>
             </div>
           )}
 
           {hasContent && (
             <>
-              {/* ── ② グラフエリア ── */}
+              {/* ② グラフ */}
               {(radarData.length >= 3 || severeItems.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                   {radarData.length >= 3 && (
-                    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">動作別評価バランス</p>
-                      <div className="flex justify-center"><RadarChart data={radarData} /></div>
-                      <p className="text-xs text-gray-400 text-center mt-1">外側ほど良好 / 内側ほど改善が必要</p>
+                    <div style={{ background: '#fff', border: '1px solid #f3f4f6', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px' }}>動作別評価バランス</p>
+                      <div style={{ display: 'flex', justifyContent: 'center' }}><RadarChart data={radarData} /></div>
+                      <p style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', margin: '4px 0 0' }}>外側ほど良好 / 内側ほど改善が必要</p>
                     </div>
                   )}
                   {severeItems.length > 0 && (
-                    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">チェックポイント別重症度</p>
-                      <div className="divide-y divide-gray-50">
-                        {severeItems.slice(0, 10).map((it, i) => <SeverityBar key={i} label={it.label} severity={it.severity} note={it.note} />)}
-                      </div>
+                    <div style={{ background: '#fff', border: '1px solid #f3f4f6', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px' }}>チェックポイント別重症度</p>
+                      {severeItems.slice(0, 10).map((it, i) => <SeverityBar key={i} label={it.label} severity={it.severity} note={it.note} />)}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* ── ③ 良好な点 ── */}
+              {/* ③ 良好な点 */}
               {displayPositive.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-6 bg-green-500 rounded-full" />
-                    <h3 className="text-sm font-bold text-gray-900">✅ 良好な点</h3>
-                    <p className="text-xs text-gray-400">現在できていること</p>
-                    {displayPositive[0].fromAI && <span className="flex items-center gap-1 text-xs text-purple-500 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-full"><Bot className="w-2.5 h-2.5" />AI所見</span>}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {displayPositive.map((x, i) => (
-                      <div key={i} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                        <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#16a34a', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>✓</span>
-                        <p style={{ fontSize: '13px', color: '#14532d', lineHeight: '1.6', margin: 0 }}>{x.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                <FindingCard items={displayPositive} type="positive" title="良好な点" subtitle="現在できていること" icon="✅" fromAI={displayPositive[0].fromAI} />
               )}
 
-              {/* ── ④ 優先改善アクション ── */}
+              {/* ④ 優先改善アクション */}
               {priorityItems.length > 0 && (
                 <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-6 bg-blue-500 rounded-full" />
-                    <h3 className="text-sm font-bold text-gray-900">🎯 優先改善アクション</h3>
-                    <p className="text-xs text-gray-400">今すぐ意識してほしいこと</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <div style={{ width: '4px', height: '24px', borderRadius: '999px', background: '#2563eb', flexShrink: 0 }} />
+                    <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: 0 }}>🎯 優先改善アクション</h3>
+                    <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>今すぐ意識してほしいこと</p>
                   </div>
-                  <div className="space-y-2">
-                    {priorityItems.map((item, i) => {
-                      const cfg = {
-                        risk:        { bg: '#fef2f2', border: '#fecaca', circle: '#dc2626', text: '#7f1d1d' },
-                        problem:     { bg: '#fffbeb', border: '#fde68a', circle: '#d97706', text: '#78350f' },
-                        improvement: { bg: '#eff6ff', border: '#bfdbfe', circle: '#2563eb', text: '#1e3a8a' },
-                      }[item.type]
-                      return (
-                        <div key={i} style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: cfg.circle, color: '#fff', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</div>
-                          <p style={{ fontSize: '13px', color: cfg.text, lineHeight: '1.6', margin: 0, flex: 1 }}>{item.text}</p>
-                          {item.fromAI && <span style={{ fontSize: '10px', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 6px', borderRadius: '999px', flexShrink: 0, whiteSpace: 'nowrap' }}>AI</span>}
-                        </div>
-                      )
-                    })}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {priorityItems.map((item, i) => <ActionCard key={i} num={i + 1} text={item.text} type={item.type} fromAI={item.fromAI} />)}
                   </div>
                 </section>
               )}
 
-              {/* ── ⑤ 気になる動作 ── */}
+              {/* ⑤ 気になる動作 */}
               {displayProblems.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-6 bg-amber-500 rounded-full" />
-                    <h3 className="text-sm font-bold text-gray-900">⚠️ 気になる動作の特徴</h3>
-                    <p className="text-xs text-gray-400">専門家・AIが観察した課題</p>
-                  </div>
-                  <div className="space-y-2">
-                    {displayProblems.map((x, i) => (
-                      <div key={i} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0, marginTop: '5px' }} />
-                        <p style={{ fontSize: '13px', color: '#78350f', lineHeight: '1.6', margin: 0 }}>{x.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                <FindingCard items={displayProblems} type="problem" title="気になる動作の特徴" subtitle="専門家・AIが観察した課題" icon="⚠️" fromAI={displayProblems[0].fromAI} />
               )}
 
-              {/* ── ⑥ 注意事項 ── */}
+              {/* ⑥ 注意事項 */}
               {displayRisks.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-6 bg-red-500 rounded-full" />
-                    <h3 className="text-sm font-bold text-gray-900">🔴 重要な注意事項</h3>
-                    <p className="text-xs text-gray-400">再受傷・悪化を防ぐために</p>
-                  </div>
-                  <div className="space-y-2">
-                    {displayRisks.map((x, i) => (
-                      <div key={i} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderLeft: '4px solid #ef4444', borderRadius: '0 12px 12px 0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                        <span style={{ color: '#dc2626', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>▲</span>
-                        <p style={{ fontSize: '13px', color: '#7f1d1d', lineHeight: '1.6', fontWeight: '500', margin: 0 }}>{x.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                <FindingCard items={displayRisks} type="risk" title="重要な注意事項" subtitle="再受傷・悪化を防ぐために" icon="🔴" fromAI={displayRisks[0].fromAI} />
               )}
 
-              {/* ── ⑦ AI所見全文（画面のみ・折りたたみ） ── */}
+              {/* ⑦ AI所見全文（画面のみ） */}
               {latestAI && (
                 <div className="no-print">
                   <button onClick={() => setExpandAIRaw(!expandAIRaw)}
-                    className="flex items-center gap-2 w-full bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 text-left hover:bg-purple-100 transition-colors">
-                    <Bot className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                    <span className="text-sm font-bold text-purple-800 flex-1">AI所見全文（{latestAI.createdAt.slice(0, 10)}）</span>
-                    {expandAIRaw ? <ChevronUp className="w-4 h-4 text-purple-400" /> : <ChevronDown className="w-4 h-4 text-purple-400" />}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '16px', padding: '12px 16px', cursor: 'pointer', textAlign: 'left' }}>
+                    <Bot style={{ width: '16px', height: '16px', color: '#7c3aed', flexShrink: 0 }} />
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#5b21b6', flex: 1 }}>AI所見全文（{latestAI.createdAt.slice(0, 10)}）</span>
+                    {expandAIRaw ? <ChevronUp style={{ width: '16px', height: '16px', color: '#a78bfa' }} /> : <ChevronDown style={{ width: '16px', height: '16px', color: '#a78bfa' }} />}
                   </button>
                   {expandAIRaw && (
-                    <div className="mt-2 bg-purple-50 border border-purple-200 rounded-2xl p-5">
-                      <p className="text-xs text-purple-400 mb-3">※AIによる参考情報。最終判断は専門家が行います。</p>
-                      <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line">{latestAI.summary}</p>
+                    <div style={{ marginTop: '8px', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '16px', padding: '20px' }}>
+                      <p style={{ fontSize: '11px', color: '#a78bfa', margin: '0 0 12px' }}>※AIによる参考情報。最終判断は専門家が行います。</p>
+                      <p style={{ fontSize: '12px', color: '#374151', lineHeight: '1.8', whiteSpace: 'pre-line', margin: 0 }}>{latestAI.summary}</p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* ── ⑧ 印刷版AI全文 ── */}
+              {/* ⑧ 印刷版AI全文 */}
               {latestAI && (
                 <div className="hidden print:block">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-6 bg-purple-500 rounded-full" />
-                    <h3 className="text-sm font-bold text-gray-900">🤖 AI動作解析所見（詳細）</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <div style={{ width: '4px', height: '24px', borderRadius: '999px', background: '#7c3aed' }} />
+                    <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: 0 }}>🤖 AI動作解析所見（詳細）</h3>
                   </div>
                   <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '16px' }}>
                     <p style={{ fontSize: '11px', color: '#4b5563', lineHeight: '1.8', whiteSpace: 'pre-line', margin: 0 }}>
@@ -523,11 +679,11 @@ export default function PatientReport({ case_: c }: Props) {
             </>
           )}
 
-          {/* ── フッター ── */}
-          <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '20px' }}>
+          {/* フッター */}
+          <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {hasAI && !hasManual && (
-              <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                <Bot className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+              <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <Bot style={{ width: '16px', height: '16px', color: '#7c3aed', flexShrink: 0, marginTop: '1px' }} />
                 <p style={{ fontSize: '11px', color: '#5b21b6', lineHeight: '1.6', margin: 0 }}>
                   このレポートはAI動作解析所見（{latestAI?.createdAt.slice(0, 10)}）を元に自動生成されています。
                 </p>
@@ -536,13 +692,13 @@ export default function PatientReport({ case_: c }: Props) {
             <div style={{ background: '#f9fafb', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
               <span style={{ fontSize: '20px', flexShrink: 0 }}>📋</span>
               <div>
-                <p style={{ fontSize: '11px', fontWeight: '700', color: '#374151', marginBottom: '4px' }}>ご注意事項</p>
+                <p style={{ fontSize: '11px', fontWeight: '700', color: '#374151', margin: '0 0 4px' }}>ご注意事項</p>
                 <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.7', margin: 0 }}>
                   本レポートは動作分析システムによる補助情報として作成されたものです。記載内容は確定的な診断・治療方針を示すものではありません。治療方針・競技復帰の最終判断は担当医師・理学療法士の指示に従ってください。
                 </p>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', padding: '0 4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
               <p style={{ fontSize: '10px', color: '#9ca3af', margin: 0 }}>YUUKI MOTION LAB 動作解析サービス</p>
               <p style={{ fontSize: '10px', color: '#9ca3af', margin: 0 }}>{now} 作成</p>
             </div>
@@ -551,47 +707,20 @@ export default function PatientReport({ case_: c }: Props) {
       </div>
 
       <style>{`
-        /* ── 印刷スタイル ── */
         @media print {
-          /* すべての要素を非表示にしてからレポートだけ表示 */
-          body * {
-            visibility: hidden !important;
-          }
-          #patient-report-body,
-          #patient-report-body * {
-            visibility: visible !important;
-          }
+          body * { visibility: hidden !important; }
+          #patient-report-body, #patient-report-body * { visibility: visible !important; }
           #patient-report-body {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            background: #ffffff !important;
-            box-shadow: none !important;
-            border: none !important;
-            border-radius: 0 !important;
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100% !important; background: #ffffff !important;
+            box-shadow: none !important; border: none !important; border-radius: 0 !important;
             overflow: visible !important;
           }
-          /* 背景色を強制印刷 */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          /* 印刷非表示クラス */
-          .no-print {
-            display: none !important;
-            visibility: hidden !important;
-          }
-          /* 印刷専用表示 */
-          .hidden.print\\:block {
-            display: block !important;
-            visibility: visible !important;
-          }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .no-print { display: none !important; visibility: hidden !important; }
+          .hidden.print\\:block { display: block !important; visibility: visible !important; }
         }
-        @page {
-          size: A4;
-          margin: 10mm 12mm;
-        }
+        @page { size: A4; margin: 10mm 12mm; }
       `}</style>
     </>
   )
