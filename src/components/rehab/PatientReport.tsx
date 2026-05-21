@@ -5,7 +5,7 @@ import type { RehabCase, VideoComment, EvaluationResult, AISummary, SavedAnnotat
 import { MOVEMENT_TYPE_LABELS } from '@/types/rehab'
 import { getComments, getAllEvaluations, getAISummaries, getAnnotations, getVideoUrl, saveVideoUrl } from '@/lib/rehab-store'
 import { getBlobUrlFromDB } from '@/lib/video-db'
-import { Printer, Share2, Copy, Check, ChevronDown, ChevronUp, Bot, Camera, Activity } from 'lucide-react'
+import { Printer, Share2, Copy, Check, ChevronDown, ChevronUp, Bot, Camera, Activity, ImageDown } from 'lucide-react'
 import type { JointAngles, PoseAnalysisResult, ROMItem } from '@/lib/pose-analyzer'
 
 interface Props { case_: RehabCase }
@@ -292,6 +292,7 @@ export default function PatientReport({ case_: c }: Props) {
   const [sceneFrames, setSceneFrames]     = useState<SceneFrame[]>([])
   const [framesLoading, setFramesLoading] = useState(false)
   const [copied, setCopied]               = useState(false)
+  const [savingImg, setSavingImg]         = useState(false)
   const [expandAIRaw, setExpandAIRaw]     = useState(false)
 
   const now = new Date().toLocaleDateString('ja-JP', { year:'numeric',month:'long',day:'numeric' })
@@ -413,13 +414,51 @@ export default function PatientReport({ case_: c }: Props) {
 
   function handleCopy(){navigator.clipboard.writeText(buildShareText()).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)})}
   function handleLine(){
-    // テキストを800文字以内に制限（URLが長すぎるとLINEが開けない）
     const text = buildShareText().slice(0, 800)
     const url = `https://line.me/R/share?text=${encodeURIComponent(text)}`
-    // window.openのポップアップ指定を外す（モバイルでブロックされるため）
     window.open(url, '_blank')
   }
   function handlePrint(){window.print()}
+
+  // ── 印刷と同じ表示を画像化してダウンロード ──
+  async function handleSaveImage() {
+    setSavingImg(true)
+    try {
+      const { default: html2canvas } = await import('html2canvas')
+      const el = document.getElementById('patient-report-body')
+      if (!el) return
+
+      const canvas = await html2canvas(el, {
+        scale: 2,           // 高解像度
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        windowWidth: 900,   // 印刷幅に合わせる
+        logging: false,
+      })
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+
+      // ① Web Share API でネイティブ共有（モバイルでLINEに直接送れる）
+      if (navigator.canShare) {
+        const blob = await (await fetch(dataUrl)).blob()
+        const file = new File([blob], `report_${c.anonymousId}.jpg`, { type: 'image/jpeg' })
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: '動作分析レポート' })
+          return
+        }
+      }
+
+      // ② フォールバック：ダウンロード
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = `report_${c.anonymousId}_${new Date().toISOString().slice(0,10)}.jpg`
+      a.click()
+    } catch (e) {
+      console.error('画像保存エラー:', e)
+    } finally {
+      setSavingImg(false)
+    }
+  }
 
   return (
     <>
@@ -431,9 +470,20 @@ export default function PatientReport({ case_: c }: Props) {
           {framesLoading && <span style={{ fontSize:'11px',color:'#0d9488',display:'flex',alignItems:'center',gap:'4px' }}><Activity style={{ width:'12px',height:'12px' }}/>3D解析中...</span>}
         </div>
         <div style={{ marginLeft:'auto',display:'flex',gap:'8px',flexWrap:'wrap' }}>
-          <button onClick={handleLine} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#06C755',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:'pointer' }}><LineIcon/>LINEで送る</button>
+          {/* 画像で保存 / LINEで共有（メイン） */}
+          <button
+            onClick={handleSaveImage}
+            disabled={savingImg}
+            style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:savingImg?'#6b7280':'#06C755',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:savingImg?'not-allowed':'pointer',opacity:savingImg?0.7:1 }}
+          >
+            {savingImg
+              ? <><span style={{ fontSize:'12px' }}>⏳</span>生成中...</>
+              : <><ImageDown style={{ width:'14px',height:'14px' }}/>画像で保存・送信</>
+            }
+          </button>
+          {/* テキストコピー（サブ） */}
           <button onClick={handleCopy} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:copied?'#16a34a':'#fff',color:copied?'#fff':'#374151',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'1px solid #e5e7eb',cursor:'pointer' }}>
-            {copied?<Check style={{ width:'14px',height:'14px' }}/>:<Copy style={{ width:'14px',height:'14px' }}/>}{copied?'コピーしました':'コピー'}
+            {copied?<Check style={{ width:'14px',height:'14px' }}/>:<Copy style={{ width:'14px',height:'14px' }}/>}{copied?'コピー完了':'テキストコピー'}
           </button>
           <button onClick={handlePrint} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#111827',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:'pointer' }}><Printer style={{ width:'14px',height:'14px' }}/>印刷</button>
         </div>
