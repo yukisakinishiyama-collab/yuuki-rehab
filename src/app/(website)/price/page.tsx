@@ -8,7 +8,7 @@ import { CheckCircle2, ChevronRight, ChevronDown, ShieldCheck, Star, Send } from
 
 const plans = [
   {
-    tag: '保険診療',
+    tag: '健康保険診療',
     title: '急性外傷の施術',
     price: '保険適応',
     priceNote: '健康保険・自賠責・労災',
@@ -21,13 +21,13 @@ const plans = [
       '労災保険対応',
       '3割負担で概ね300〜700円程度',
     ],
-    note: '※ 慢性的な症状・運動療法は保険適応外となります',
+    note: '※ 慢性的な症状・運動療法は保険適応外。衛生材料（テーピング・包帯等）を使用した際は材料費が別途発生します',
   },
   {
-    tag: '自費・初回',
+    tag: '自由診療（自費）',
     title: '初回評価',
     price: '¥2,000',
-    priceNote: '税込 / 施術費別途',
+    priceNote: '税込 / 自由診療 / 施術費別途',
     color: 'from-blue-600 to-blue-800',
     badge: 'まずここから',
     includes: [
@@ -38,7 +38,7 @@ const plans = [
       '今後の施術方針の説明',
       '自宅でできるセルフケア指導',
     ],
-    note: '※ これだけやって¥2,000。まず現状把握だけでもOKです',
+    note: '※ 保険診療の対象外です（自費・¥2,000）。まず現状把握だけでもOKです',
   },
   {
     tag: '自費・施術',
@@ -70,7 +70,7 @@ const faqs = [
   },
   {
     q: '追加費用は発生しますか？',
-    a: 'ありません。施術前にメニューと費用をご説明し、ご了承いただいてから施術を開始します。「気づいたら高額だった」ということは一切ありません。',
+    a: '施術前にメニューと費用をご説明し、ご了承いただいてから開始します。なお、健康保険を使用した際にテーピング・包帯などの衛生材料を使用した場合は、材料費が別途発生することがあります。使用前に必ずご説明します。',
   },
   {
     q: 'キャンセルはいつまでにすればいいですか？',
@@ -172,12 +172,12 @@ export default function PricePage() {
             ))}
           </div>
 
-          {/* 日割り換算 */}
+          {/* 補足 */}
           <div className="bg-blue-50 rounded-2xl p-5 text-center">
             <p className="text-slate-600 text-sm">
-              リハビリ・運動療法（1部位）<strong className="text-blue-700"> ¥3,850</strong> は、
-              1ヶ月通うとすれば <strong className="text-blue-700">1日あたり約¥128</strong>。
-              スポーツの継続・再発防止のための投資として、多くの方に「思ったより安い」とご好評いただいています。
+              リハビリ・運動療法は <strong className="text-blue-700">1回あたり¥3,850〜</strong>（1部位の場合）。
+              スポーツの継続・再発防止を目的とした<strong>自由診療メニュー</strong>です。
+              施術ごとに内容と費用をご説明してから開始しますので、ご安心ください。
             </p>
           </div>
         </div>
@@ -297,33 +297,27 @@ export default function PricePage() {
         </div>
       </section>
 
-      {/* 社会的証明 */}
+      {/* Googleレビュー誘導 */}
       <section className="py-12 bg-blue-50">
-        <div className="max-w-4xl mx-auto px-4">
-          <p className="text-center text-slate-500 text-xs uppercase tracking-widest font-bold mb-6">患者様の声</p>
-          <div className="grid md:grid-cols-2 gap-5">
-            {[
-              {
-                name: '平井 里佳 様',
-                text: '料金も最初にしっかり説明してもらって、追加費用もなかったので安心でした。施術のたびに「今日は何をするか・なぜするか」を説明してくれるのがとてもよかったです。',
-              },
-              {
-                name: '田中 優稀 様',
-                text: '初回評価だけで問題の原因がわかって驚きました。¥2,000でここまでやってもらえるのかと。術後のリハビリも段階的に進めてくれて、無理なく復帰できました。',
-              },
-            ].map((review) => (
-              <div key={review.name} className="bg-white rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-1 mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={14} className="text-amber-400 fill-amber-400" />
-                  ))}
-                  <span className="text-xs text-slate-400 ml-2">Google レビュー</span>
-                </div>
-                <p className="text-slate-700 text-sm leading-relaxed mb-3">「{review.text}」</p>
-                <p className="text-slate-400 text-xs font-semibold">— {review.name}</p>
-              </div>
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <div className="flex items-center justify-center gap-1 mb-3">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} size={18} className="text-amber-400 fill-amber-400" />
             ))}
           </div>
+          <p className="text-slate-700 font-semibold mb-1">実際に通院された患者様の声</p>
+          <p className="text-slate-500 text-sm mb-5">Googleマップのレビューで、通院中の患者様の声をご確認いただけます。</p>
+          <a
+            href="https://www.google.com/maps/search/ゆうき整骨院+下関"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm px-6 py-3 rounded-full border border-slate-200 shadow-sm transition-all"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#4285F4"/>
+            </svg>
+            Googleマップでレビューを見る
+          </a>
         </div>
       </section>
 
