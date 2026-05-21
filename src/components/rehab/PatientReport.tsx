@@ -422,7 +422,50 @@ export default function PatientReport({ case_: c }: Props) {
     const url = `https://line.me/R/share?text=${encodeURIComponent(text)}`
     window.open(url, '_blank')
   }
-  function handlePrint(){window.print()}
+
+  function handlePrint() {
+    const el = document.getElementById('patient-report-body')
+    if (!el) { window.print(); return }
+
+    // 印刷専用ウィンドウを開いてレポートのみ印刷
+    const pw = window.open('', '_blank', 'width=900,height=700')
+    if (!pw) { window.print(); return }
+
+    pw.document.write(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <title>動作分析レポート</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm 10mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: #fff; font-family: "Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",Arial,sans-serif; font-size: 11pt; color: #111; }
+    img { max-width: 100% !important; height: auto !important; display: block; }
+    button { display: none !important; }
+    .no-print { display: none !important; }
+    /* シーンカードをページまたぎしない */
+    .scene-card-root { page-break-inside: avoid; break-inside: avoid; margin-bottom: 14px; }
+    /* 1列表示 */
+    .scene-grid { display: block !important; }
+    .scene-grid > * { margin-bottom: 14px; }
+    /* セクションをページまたぎしない */
+    section { page-break-inside: avoid; break-inside: avoid; }
+    /* 見出し後の改ページを防ぐ */
+    h1,h2,h3,h4 { page-break-after: avoid; break-after: avoid; }
+  </style>
+</head>
+<body>
+${el.outerHTML}
+</body>
+</html>`)
+    pw.document.close()
+    // 画像（base64）の描画を待ってから印刷
+    pw.addEventListener('load', () => {
+      setTimeout(() => { pw.focus(); pw.print(); }, 600)
+    })
+    // loadが発火しない場合のフォールバック
+    setTimeout(() => { pw.focus(); pw.print(); }, 1500)
+  }
 
   // ── レポートを画像化して保存 ──
   async function handleSaveImage() {
@@ -655,61 +698,6 @@ export default function PatientReport({ case_: c }: Props) {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        @media print {
-          /* ページ設定 */
-          @page { size: A4 portrait; margin: 15mm 12mm; }
-
-          /* レポート以外を全て非表示 */
-          body > *:not(#__next) { display: none !important; }
-          .no-print { display: none !important; }
-
-          /* レポート本体 */
-          #patient-report-body {
-            position: static !important;
-            width: 100% !important;
-            overflow: visible !important;
-            box-shadow: none !important;
-            border: none !important;
-            border-radius: 0 !important;
-            background: #fff !important;
-          }
-
-          /* 背景色・グラデーションを印刷で出す */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* シーンカード：ページまたぎ防止 */
-          #patient-report-body .scene-card-root {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            margin-bottom: 16px;
-          }
-
-          /* 画像：ページをまたがない */
-          #patient-report-body img {
-            max-width: 100% !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-
-          /* スコアブロック・AIサマリーブロック */
-          #patient-report-body section {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-
-          /* 見出し直後で改ページしない */
-          h1, h2, h3, h4 {
-            page-break-after: avoid !important;
-            break-after: avoid !important;
-          }
-
-          /* ボタン類を非表示 */
-          button { display: none !important; }
-        }
       `}</style>
     </>
   )
