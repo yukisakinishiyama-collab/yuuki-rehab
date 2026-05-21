@@ -5,7 +5,7 @@ import type { RehabCase, VideoComment, EvaluationResult, AISummary, SavedAnnotat
 import { MOVEMENT_TYPE_LABELS } from '@/types/rehab'
 import { getComments, getAllEvaluations, getAISummaries, getAnnotations, getVideoUrl, saveVideoUrl } from '@/lib/rehab-store'
 import { getBlobUrlFromDB } from '@/lib/video-db'
-import { Printer, Share2, Copy, Check, ChevronDown, ChevronUp, Bot, Camera, Activity, ImageDown } from 'lucide-react'
+import { Printer, Share2, Copy, Check, ChevronDown, ChevronUp, Bot, Camera, Activity } from 'lucide-react'
 import type { JointAngles, PoseAnalysisResult, ROMItem } from '@/lib/pose-analyzer'
 
 interface Props { case_: RehabCase }
@@ -296,8 +296,8 @@ export default function PatientReport({ case_: c }: Props) {
   const [aiSummaries, setAiSummaries]     = useState<AISummary[]>([])
   const [sceneFrames, setSceneFrames]     = useState<SceneFrame[]>([])
   const [framesLoading, setFramesLoading] = useState(false)
-  const [copied, setCopied]               = useState(false)
   const [savingImg, setSavingImg]         = useState(false)
+  const [showLineGuide, setShowLineGuide] = useState(false)
   const [expandAIRaw, setExpandAIRaw]     = useState(false)
 
   const now = new Date().toLocaleDateString('ja-JP', { year:'numeric',month:'long',day:'numeric' })
@@ -417,7 +417,6 @@ export default function PatientReport({ case_: c }: Props) {
     return lines.join('\n')
   }
 
-  function handleCopy(){navigator.clipboard.writeText(buildShareText()).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)})}
   function handleLine(){
     const text = buildShareText().slice(0, 800)
     const url = `https://line.me/R/share?text=${encodeURIComponent(text)}`
@@ -425,9 +424,10 @@ export default function PatientReport({ case_: c }: Props) {
   }
   function handlePrint(){window.print()}
 
-  // ── レポートを画像化してクリップボードにコピー ──
+  // ── レポートを画像化して保存 ──
   async function handleSaveImage() {
     setSavingImg(true)
+    setShowLineGuide(false)
     try {
       const { default: html2canvas } = await import('html2canvas')
       const el = document.getElementById('patient-report-body')
@@ -454,12 +454,11 @@ export default function PatientReport({ case_: c }: Props) {
         },
       })
 
-      // PNG blob を生成
       const pngBlob: Blob = await new Promise((res, rej) =>
         canvas.toBlob((b) => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
       )
 
-      // ① モバイル：Web Share API（LINEへ直接送信）
+      // スマートフォン：Web Share API で共有シートを開く（LINEを選択できる）
       if (typeof navigator.canShare === 'function') {
         const file = new File([pngBlob], `report_${c.anonymousId}.png`, { type: 'image/png' })
         if (navigator.canShare({ files: [file] })) {
@@ -468,23 +467,16 @@ export default function PatientReport({ case_: c }: Props) {
         }
       }
 
-      // ② PC：クリップボードにコピー → LINEにCtrl+Vで貼り付け可能
-      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })])
-        setCopied(true)
-        setTimeout(() => setCopied(false), 3000)
-        return
-      }
-
-      // ③ 最終フォールバック：ダウンロード
+      // PC：画像をダウンロードして案内を表示
       const url = URL.createObjectURL(pngBlob)
       const a = document.createElement('a')
       a.href = url
       a.download = `report_${c.anonymousId}_${new Date().toISOString().slice(0,10)}.png`
       a.click()
       URL.revokeObjectURL(url)
+      setShowLineGuide(true)   // ダウンロード後の手順を表示
     } catch (e) {
-      console.error('画像コピーエラー:', e)
+      console.error('画像保存エラー:', e)
     } finally {
       setSavingImg(false)
     }
@@ -500,26 +492,36 @@ export default function PatientReport({ case_: c }: Props) {
           {framesLoading && <span style={{ fontSize:'11px',color:'#0d9488',display:'flex',alignItems:'center',gap:'4px' }}><Activity style={{ width:'12px',height:'12px' }}/>3D解析中...</span>}
         </div>
         <div style={{ marginLeft:'auto',display:'flex',gap:'8px',flexWrap:'wrap' }}>
-          {/* 画像コピー / LINEで共有（メイン） */}
+          {/* 画像を保存してLINEで送る */}
           <button
             onClick={handleSaveImage}
             disabled={savingImg}
-            style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:savingImg?'#6b7280':copied?'#16a34a':'#06C755',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:savingImg?'not-allowed':'pointer',opacity:savingImg?0.7:1 }}
+            style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 14px',background:savingImg?'#6b7280':'#06C755',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:savingImg?'not-allowed':'pointer',opacity:savingImg?0.8:1 }}
           >
             {savingImg
-              ? <><span style={{ fontSize:'12px' }}>⏳</span>画像生成中...</>
-              : copied
-                ? <><Check style={{ width:'14px',height:'14px' }}/>コピー完了！LINEに貼り付けて送信</>
-                : <><ImageDown style={{ width:'14px',height:'14px' }}/>画像をコピー（LINEに貼り付け）</>
+              ? <><span style={{ fontSize:'12px' }}>⏳</span>画像を生成中...</>
+              : <><LineIcon/>LINEへ画像で送る</>
             }
-          </button>
-          {/* テキストコピー（サブ） */}
-          <button onClick={handleCopy} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#fff',color:'#374151',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'1px solid #e5e7eb',cursor:'pointer' }}>
-            <Copy style={{ width:'14px',height:'14px' }}/>テキストのみコピー
           </button>
           <button onClick={handlePrint} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#111827',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:'pointer' }}><Printer style={{ width:'14px',height:'14px' }}/>印刷</button>
         </div>
       </div>
+
+      {/* ── PC用 LINE送信手順ガイド ── */}
+      {showLineGuide && (
+        <div className="no-print" style={{ marginBottom:'16px',padding:'14px 16px',background:'#f0fdf4',border:'2px solid #06C755',borderRadius:'12px',display:'flex',flexDirection:'column',gap:'8px' }}>
+          <div style={{ display:'flex',alignItems:'center',gap:'8px' }}>
+            <LineIcon/>
+            <span style={{ fontWeight:'700',fontSize:'13px',color:'#166534' }}>画像の保存が完了しました！以下の手順でLINEに送ってください</span>
+            <button onClick={()=>setShowLineGuide(false)} style={{ marginLeft:'auto',background:'none',border:'none',cursor:'pointer',color:'#6b7280',fontSize:'16px' }}>✕</button>
+          </div>
+          <ol style={{ margin:0,paddingLeft:'20px',fontSize:'12px',color:'#166534',lineHeight:'1.8' }}>
+            <li>ダウンロードフォルダに <strong>report_〇〇.png</strong> が保存されています</li>
+            <li>LINEを開いて、送りたいトーク画面を表示する</li>
+            <li>画像ファイルをLINEのトーク画面に<strong>ドラッグ＆ドロップ</strong>、または<strong>📎クリップ→ファイル</strong>から選択して送信</li>
+          </ol>
+        </div>
+      )}
 
       {/* ── レポート本体 ── */}
       <div id="patient-report-body" style={{ background:'#fff',borderRadius:'16px',overflow:'hidden',border:'1px solid #f3f4f6',boxShadow:'0 1px 8px rgba(0,0,0,0.07)' }}>
