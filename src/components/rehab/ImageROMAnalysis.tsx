@@ -53,21 +53,18 @@ function ROMCard({ item }: { item: ROMItem }) {
           {item.axis}
         </span>
       </div>
-      <p style={{ fontSize: '11px', color: '#374151', fontWeight: '600', margin: '0 0 3px' }}>{item.label}</p>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-        <span style={{ fontSize: '26px', fontWeight: '900', color: '#111', lineHeight: 1 }}>{item.value}</span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>{item.unit}</span>
-        <span style={{ fontSize: '11px', fontWeight: '700', color: PLANE_COLOR[item.plane] ?? '#888' }}>
+      <p style={{ fontSize: '11px', color: '#374151', fontWeight: '600', margin: '0 0 6px' }}>{item.label}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '15px', fontWeight: '800', color: PLANE_COLOR[item.plane] ?? '#374151' }}>
           {item.direction}
         </span>
-        <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: '700', color: STATUS_COLOR[st] }}>
+        <span style={{ fontSize: '10px', fontWeight: '700', color: STATUS_COLOR[st] }}>
           {STATUS_LABEL[st]}
         </span>
       </div>
-      <p style={{ fontSize: '9px', color: '#9ca3af', margin: '2px 0 0' }}>
-        正常: {item.normalMin}〜{item.normalMax}{item.unit}
-        {item.note && <span style={{ color: '#d97706', marginLeft: '4px' }}>({item.note})</span>}
-      </p>
+      {item.note && (
+        <p style={{ fontSize: '9px', color: '#d97706', margin: '3px 0 0' }}>({item.note})</p>
+      )}
     </div>
   )
 }

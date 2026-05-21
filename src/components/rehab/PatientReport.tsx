@@ -158,15 +158,10 @@ function MeasurementPanel({ romItems, poseSide }: { angles: JointAngles | null; 
                 <span style={{ fontSize:'8px', color:planeColor, background:`${planeColor}22`, padding:'0 4px', borderRadius:'3px' }}>{item.plane}</span>
               </div>
               <p style={{ fontSize:'9px', color:'rgba(255,255,255,0.55)', margin:'0 0 2px' }}>{item.axis}</p>
-              <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.8)', fontWeight:'600', margin:'0 0 3px' }}>{item.label}</p>
-              <div style={{ display:'flex', alignItems:'baseline', gap:'4px' }}>
-                <span style={{ fontSize:'20px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{item.value}</span>
-                <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>{item.unit}</span>
-                <span style={{ fontSize:'10px', fontWeight:'700', color:planeColor }}>{item.direction}</span>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'3px' }}>
-                <span style={{ fontSize:'8px', color:'rgba(255,255,255,0.35)' }}>正常:{item.normalMin}〜{item.normalMax}{item.unit}</span>
-                <span style={{ fontSize:'8px', fontWeight:'700', color:ROM_STATUS_COLOR[st] }}>{ROM_STATUS_LABEL[st]}</span>
+              <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.8)', fontWeight:'600', margin:'0 0 4px' }}>{item.label}</p>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{ fontSize:'13px', fontWeight:'800', color:planeColor }}>{item.direction}</span>
+                <span style={{ fontSize:'9px', fontWeight:'700', color:ROM_STATUS_COLOR[st] }}>{ROM_STATUS_LABEL[st]}</span>
               </div>
             </div>
           )

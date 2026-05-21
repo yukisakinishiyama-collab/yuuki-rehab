@@ -406,7 +406,7 @@ export function drawPoseOverlay(
   }
   ctx.restore()
 
-  // ROM ラベル描画（キーに対応する関節点にオーバーレイ）
+  // ROM ラベル描画（方向のみ、数字なし）
   const keyToLM: Record<string, number> = {
     L_KneeFlexion: LM.LEFT_KNEE,  R_KneeFlexion: LM.RIGHT_KNEE,
     L_HipFlexion:  LM.LEFT_HIP,   R_HipFlexion:  LM.RIGHT_HIP,
@@ -420,7 +420,7 @@ export function drawPoseOverlay(
     const lm = landmarks[lmIdx]
     if (!lm || (lm.visibility ?? 1) < 0.3) continue
     const x = lm.x * w, y = lm.y * h
-    const text = `${item.direction} ${item.value}${item.unit}`
+    const text = item.direction   // 数字なし、方向ラベルのみ
     const color = item.side === 'L' ? '#60a5fa' : item.side === 'R' ? '#f87171' : '#a3e635'
     ctx.save()
     ctx.font = 'bold 12px sans-serif'
