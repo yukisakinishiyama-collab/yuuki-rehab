@@ -412,7 +412,13 @@ export default function PatientReport({ case_: c }: Props) {
   }
 
   function handleCopy(){navigator.clipboard.writeText(buildShareText()).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)})}
-  function handleLine(){window.open(`https://line.me/R/share?text=${encodeURIComponent(buildShareText())}`,'_blank','noopener,noreferrer,width=600,height=500')}
+  function handleLine(){
+    // テキストを800文字以内に制限（URLが長すぎるとLINEが開けない）
+    const text = buildShareText().slice(0, 800)
+    const url = `https://line.me/R/share?text=${encodeURIComponent(text)}`
+    // window.openのポップアップ指定を外す（モバイルでブロックされるため）
+    window.open(url, '_blank')
+  }
   function handlePrint(){window.print()}
 
   return (
