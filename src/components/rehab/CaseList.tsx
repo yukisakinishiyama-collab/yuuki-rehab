@@ -42,15 +42,15 @@ export default function CaseList() {
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">症例管理</h1>
-          <p className="text-sm text-gray-500 mt-1">{cases.length}件の症例が登録されています</p>
+          <h1 className="text-2xl font-bold text-gray-900">案件管理</h1>
+          <p className="text-sm text-gray-500 mt-1">{cases.length}件の案件が登録されています</p>
         </div>
         <Link
           href="/cases/new"
           className="inline-flex items-center gap-2 bg-[#1e3a5f] hover:bg-[#162d4a] text-white font-medium px-4 py-2.5 rounded-xl transition-colors shadow-sm text-sm"
         >
           <Plus className="w-4 h-4" />
-          新規症例
+          新規案件
         </Link>
       </div>
 
@@ -60,7 +60,7 @@ export default function CaseList() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="患者名・ID・診断名・タグで検索..."
+            placeholder="クライアント名・ID・スポーツ・タグで検索..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488] focus:border-transparent"

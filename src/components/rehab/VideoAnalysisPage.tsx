@@ -2,24 +2,27 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { getCase, getVideoUrl, getAnnotations } from '@/lib/rehab-store'
-import type { RehabCase, CaseVideo, SavedAnnotation } from '@/types/rehab'
+import {
+  getCase, getVideoUrl, getAnnotations, saveVideoUrl,
+  getComments, getPersonMarker,
+} from '@/lib/rehab-store'
+import { getBlobUrlFromDB } from '@/lib/video-db'
+import type { RehabCase, CaseVideo, SavedAnnotation, VideoComment, PersonMarker } from '@/types/rehab'
 import { MOVEMENT_TYPE_LABELS, VIDEO_DIRECTION_LABELS } from '@/types/rehab'
 import VideoPlayer from './VideoPlayer'
 import CommentPanel from './CommentPanel'
 import EvaluationChecklist from './EvaluationChecklist'
 import SpecialistReviewPanel from './SpecialistReviewPanel'
-import { ArrowLeft, Layers, MessageSquare, ClipboardList, Info, Users } from 'lucide-react'
-import { getComments } from '@/lib/rehab-store'
-import type { VideoComment } from '@/types/rehab'
-
+import SpecialistChat from './SpecialistChat'
+import PersonMarkerLayer from './PersonMarkerLayer'
+import { ArrowLeft, Layers, MessageSquare, ClipboardList, Info, Users, MessageSquareDot } from 'lucide-react'
 
 interface Props {
   caseId: string
   videoId: string
 }
 
-type Panel = 'comments' | 'specialists' | 'annotation' | 'evaluation'
+type Panel = 'comments' | 'chat' | 'specialists' | 'evaluation' | 'annotation'
 
 export default function VideoAnalysisPage({ caseId, videoId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
@@ -29,6 +32,7 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
   const [comments, setComments] = useState<VideoComment[]>([])
   const [savedAnnotations, setSavedAnnotations] = useState<SavedAnnotation[]>([])
   const [panel, setPanel] = useState<Panel>('comments')
+  const [personMarker, setPersonMarker] = useState<PersonMarker | null>(null)
   const seekRef = useRef<((t: number) => void) | null>(null)
 
   useEffect(() => {
@@ -37,24 +41,26 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
     if (c) {
       const v = c.videos.find((x) => x.id === videoId)
       setVideo(v ?? null)
-      const url = getVideoUrl(videoId)
-      setVideoSrc(url)
+
+      // まずキャッシュ → なければIndexedDB
+      const cached = getVideoUrl(videoId)
+      if (cached) {
+        setVideoSrc(cached)
+      } else {
+        getBlobUrlFromDB(videoId).then((url) => {
+          if (url) { saveVideoUrl(videoId, url); setVideoSrc(url) }
+        })
+      }
     }
     loadComments()
     loadAnnotations()
+    setPersonMarker(getPersonMarker(videoId))
   }, [caseId, videoId])
 
-  function loadComments() {
-    setComments(getComments(videoId))
-  }
+  function loadComments() { setComments(getComments(videoId)) }
+  function loadAnnotations() { setSavedAnnotations(getAnnotations(videoId)) }
 
-  function loadAnnotations() {
-    setSavedAnnotations(getAnnotations(videoId))
-  }
-
-  const handleSeek = useCallback((t: number) => {
-    seekRef.current?.(t)
-  }, [])
+  const handleSeek = useCallback((t: number) => { seekRef.current?.(t) }, [])
 
   if (!case_ || !video) {
     return (
@@ -68,10 +74,11 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
   }
 
   const PANELS: Array<{ key: Panel; icon: React.ElementType; label: string }> = [
-    { key: 'comments', icon: MessageSquare, label: 'コメント' },
-    { key: 'specialists', icon: Users, label: '専門家' },
-    { key: 'evaluation', icon: ClipboardList, label: '評価' },
-    { key: 'annotation', icon: Layers, label: '描き込み' },
+    { key: 'comments',   icon: MessageSquare,    label: 'コメント' },
+    { key: 'chat',       icon: MessageSquareDot, label: 'チャット' },
+    { key: 'specialists',icon: Users,            label: '専門家' },
+    { key: 'evaluation', icon: ClipboardList,    label: '評価' },
+    { key: 'annotation', icon: Layers,           label: '描き込み' },
   ]
 
   return (
@@ -100,6 +107,11 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
             </span>
             <span>{VIDEO_DIRECTION_LABELS[video.direction]}</span>
             <span>{video.uploadedAt.slice(0, 10)}</span>
+            {personMarker && (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full border border-yellow-200">
+                🎯 対象者マーカー設定済み
+              </span>
+            )}
           </div>
         </div>
         <div className="ml-auto flex items-center gap-1 text-xs text-gray-500">
@@ -122,21 +134,27 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
               caseId={caseId}
               savedAnnotations={savedAnnotations}
               onAnnotationSaved={loadAnnotations}
+              videoOverlay={
+                <PersonMarkerLayer
+                  videoId={videoId}
+                  marker={personMarker}
+                  onMarkerChange={setPersonMarker}
+                />
+              }
             />
           ) : (
             <div className="aspect-video bg-gradient-to-br from-[#1e3a5f] to-[#0d2a47] rounded-xl flex flex-col items-center justify-center text-white px-6 text-center">
               <div className="text-4xl mb-3">🎥</div>
-              <p className="text-sm font-medium">動画ファイルが見つかりません</p>
+              <p className="text-sm font-medium">動画を読み込み中...</p>
               <p className="text-xs text-blue-200 mt-1 leading-relaxed max-w-xs">
-                動画はブラウザのメモリに保存されるため、<br />
-                ページをリロードすると再アップロードが必要です
+                動画が表示されない場合は再アップロードしてください
               </p>
               <div className="flex gap-2 mt-4">
                 <Link
                   href={`/cases/${caseId}?tab=upload`}
                   className="px-4 py-2 bg-[#0d9488] rounded-lg text-sm hover:bg-[#0b8276] transition-colors"
                 >
-                  ↑ 動画を再アップロード
+                  ↑ 動画をアップロード
                 </Link>
                 <Link
                   href={`/cases/${caseId}`}
@@ -147,18 +165,20 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
               </div>
             </div>
           )}
-
         </div>
 
         {/* Panel column */}
-        <div className="flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" style={{ minHeight: '500px', maxHeight: '85vh', position: 'sticky', top: '1rem' }}>
-          {/* Panel tabs */}
-          <div className="flex border-b border-gray-100">
+        <div
+          className="flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          style={{ minHeight: '500px', maxHeight: '85vh', position: 'sticky', top: '1rem' }}
+        >
+          {/* Panel tabs — scrollable on small screens */}
+          <div className="flex border-b border-gray-100 overflow-x-auto">
             {PANELS.map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
                 onClick={() => setPanel(key)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
+                className={`flex-shrink-0 flex items-center justify-center gap-1 px-2 py-3 text-[11px] font-medium transition-colors whitespace-nowrap ${
                   panel === key
                     ? 'text-[#0d9488] border-b-2 border-[#0d9488] bg-teal-50/50'
                     : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
@@ -170,7 +190,7 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col min-h-0">
             {panel === 'comments' && (
               <CommentPanel
                 videoId={videoId}
@@ -179,14 +199,25 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
                 onSeek={handleSeek}
               />
             )}
+
+            {panel === 'chat' && (
+              <SpecialistChat
+                caseId={caseId}
+                videoId={videoId}
+                videoLabel={video.label}
+              />
+            )}
+
             {panel === 'specialists' && (
               <SpecialistReviewPanel
                 caseId={caseId}
                 videoId={videoId}
                 movementType={video.movementType}
                 videoSrc={videoSrc}
+                personMarker={personMarker}
               />
             )}
+
             {panel === 'annotation' && (
               <div className="h-full flex flex-col">
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-sm text-amber-800">
@@ -225,6 +256,7 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
                 )}
               </div>
             )}
+
             {panel === 'evaluation' && (
               <EvaluationChecklist
                 caseId={caseId}

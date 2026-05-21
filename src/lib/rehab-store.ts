@@ -1,25 +1,21 @@
-import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation } from '@/types/rehab'
+import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary } from '@/types/rehab'
 import { MOCK_CASES, MOCK_COMMENTS, MOCK_EVALUATIONS, MOCK_USERS } from './rehab-data'
+import { deleteVideoBlob } from './video-db'
 
 const MOCK_CREDENTIALS: Record<string, string> = {
   'user-001': 'rehab2026',
-  'user-002': 'rehab2026',
-  'user-003': 'rehab2026',
-  'user-004': 'rehab2026',
-  // ダンス専門家
-  'user-005': 'dance2026',
-  'user-006': 'dance2026',
-  'user-007': 'dance2026',
-  'user-008': 'dance2026',
 }
 
-const STORE_VERSION = '3' // 症例データも含めて再投入
+const STORE_VERSION = '6' // サービス転換：型拡張
 
 const KEYS = {
   cases: 'rehabCases',
   comments: 'rehabComments',
   evaluations: 'rehabEvals',
   annotations: 'rehabAnnotations',
+  chat: 'rehabChat',
+  markers: 'rehabMarkers',
+  aiSummaries: 'rehabAISummaries',
   user: 'rehabUser',
   initialized: 'rehabInitialized',
   version: 'rehabVersion',
@@ -47,9 +43,10 @@ export function initStore(): void {
   if (alreadyInit && savedVersion === STORE_VERSION) return // 最新バージョン済み
 
   if (alreadyInit && savedVersion !== STORE_VERSION) {
-    // バージョンアップ: コメント・症例を最新データで上書き
+    // バージョンアップ: ユーザー・コメント・症例を最新データで上書き
     localStorage.setItem(KEYS.cases, JSON.stringify(MOCK_CASES))
     localStorage.setItem(KEYS.comments, JSON.stringify(MOCK_COMMENTS))
+    localStorage.removeItem('rehabUser') // 古いログイン情報をクリア
     localStorage.setItem(KEYS.version, STORE_VERSION)
     return
   }
@@ -74,6 +71,30 @@ export function login(userId: string, password: string): boolean {
 
 export function logout(): void {
   localStorage.removeItem(KEYS.user)
+}
+
+// QRログイン用トークン（30分有効）
+// フォーマット: userId~expires~nonce（URLセーフ、localStorage不要）
+export function generateQRToken(): string {
+  const userId = 'user-001'
+  const expires = Date.now() + 30 * 60 * 1000
+  const nonce = Math.random().toString(36).slice(2, 8)
+  return `${userId}~${expires}~${nonce}`
+}
+
+export function loginWithQRToken(token: string): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const parts = token.split('~')
+    if (parts.length < 2) return false
+    const userId = parts[0]
+    const expires = parseInt(parts[1], 10)
+    if (!userId || isNaN(expires) || Date.now() > expires) return false
+    const user = MOCK_USERS.find((u) => u.id === userId)
+    if (!user) return false
+    localStorage.setItem(KEYS.user, JSON.stringify(user))
+    return true
+  } catch { return false }
 }
 
 export function getCurrentUser(): User | null {
@@ -103,6 +124,15 @@ export function saveCase(c: RehabCase): void {
   set(KEYS.cases, cases)
 }
 
+export function updateDeliveryStatus(caseId: string, status: import('@/types/rehab').DeliveryStatus): void {
+  const cases = getCases()
+  const c = cases.find((x) => x.id === caseId)
+  if (!c) return
+  c.deliveryStatus = status
+  c.updatedAt = new Date().toISOString()
+  set(KEYS.cases, cases)
+}
+
 export function addVideoToCase(caseId: string, video: RehabCase['videos'][0]): void {
   const cases = getCases()
   const c = cases.find((x) => x.id === caseId)
@@ -126,6 +156,8 @@ export function removeVideoFromCase(caseId: string, videoId: string): void {
   // blob URLもキャッシュから削除
   _videoUrlCache.delete(videoId)
   try { sessionStorage.removeItem(`rehabVideo_${videoId}`) } catch {}
+  // IndexedDBからも削除（非同期・エラーは無視）
+  deleteVideoBlob(videoId).catch(() => {})
 }
 
 // Comments
@@ -244,4 +276,57 @@ export function saveAnnotation(ann: SavedAnnotation): void {
 export function deleteAnnotation(id: string): void {
   const anns = get<SavedAnnotation>(KEYS.annotations).filter((a) => a.id !== id)
   set(KEYS.annotations, anns)
+}
+
+// ── Specialist Chat ─────────────────────────────────────────────────────────
+
+export function getChatMessages(caseId: string, videoId?: string): ChatMessage[] {
+  const all = get<ChatMessage>(KEYS.chat)
+  return all
+    .filter((m) => m.caseId === caseId && (videoId ? m.videoId === videoId : true))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+export function addChatMessage(msg: ChatMessage): void {
+  const all = get<ChatMessage>(KEYS.chat)
+  all.push(msg)
+  set(KEYS.chat, all)
+}
+
+export function deleteChatMessage(id: string): void {
+  set(KEYS.chat, get<ChatMessage>(KEYS.chat).filter((m) => m.id !== id))
+}
+
+// ── Person Marker ────────────────────────────────────────────────────────────
+
+export function getPersonMarker(videoId: string): PersonMarker | null {
+  return get<PersonMarker>(KEYS.markers).find((m) => m.videoId === videoId) ?? null
+}
+
+export function savePersonMarker(marker: PersonMarker): void {
+  const all = get<PersonMarker>(KEYS.markers).filter((m) => m.videoId !== marker.videoId)
+  all.push(marker)
+  set(KEYS.markers, all)
+}
+
+export function deletePersonMarker(videoId: string): void {
+  set(KEYS.markers, get<PersonMarker>(KEYS.markers).filter((m) => m.videoId !== videoId))
+}
+
+// ── AI Summaries ─────────────────────────────────────────────────────────────
+
+export function getAISummaries(videoId: string): AISummary[] {
+  return get<AISummary>(KEYS.aiSummaries)
+    .filter((s) => s.videoId === videoId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) // 新しい順
+}
+
+export function saveAISummary(summary: AISummary): void {
+  const all = get<AISummary>(KEYS.aiSummaries)
+  all.push(summary)
+  set(KEYS.aiSummaries, all)
+}
+
+export function deleteAISummary(id: string): void {
+  set(KEYS.aiSummaries, get<AISummary>(KEYS.aiSummaries).filter((s) => s.id !== id))
 }

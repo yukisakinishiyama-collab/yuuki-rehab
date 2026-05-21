@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MOCK_USERS } from '@/lib/rehab-data'
 import { login } from '@/lib/rehab-store'
-import { ROLE_LABELS } from '@/types/rehab'
-import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { Eye, EyeOff, LogIn, User } from 'lucide-react'
+
+const USER_ID = 'user-001'
+const USER_NAME = '西山 勇来'
 
 export default function LoginForm() {
   const router = useRouter()
-  const [selectedUserId, setSelectedUserId] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
@@ -18,17 +18,13 @@ export default function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!selectedUserId) {
-      setError('担当者を選択してください')
-      return
-    }
     if (!password) {
       setError('パスワードを入力してください')
       return
     }
     setLoading(true)
     await new Promise((r) => setTimeout(r, 400))
-    const ok = login(selectedUserId, password)
+    const ok = login(USER_ID, password)
     if (!ok) {
       setError('パスワードが正しくありません')
       setLoading(false)
@@ -39,20 +35,15 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">担当者</label>
-        <select
-          value={selectedUserId}
-          onChange={(e) => setSelectedUserId(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
-        >
-          <option value="">-- 選択してください --</option>
-          {MOCK_USERS.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}（{ROLE_LABELS[u.role]}・{u.department}）
-            </option>
-          ))}
-        </select>
+      {/* ユーザー表示（固定） */}
+      <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0d9488] to-[#1a5276] flex items-center justify-center flex-shrink-0">
+          <User className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-900">{USER_NAME}</p>
+          <p className="text-xs text-gray-500">管理者・リハビリテーション科</p>
+        </div>
       </div>
 
       <div>
@@ -63,6 +54,7 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="パスワードを入力"
+            autoFocus
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent pr-10"
           />
           <button
@@ -73,10 +65,6 @@ export default function LoginForm() {
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-1">
-          医療スタッフ: <code className="bg-gray-100 px-1 rounded">rehab2026</code>
-          ダンス専門家: <code className="bg-gray-100 px-1 rounded">dance2026</code>
-        </p>
       </div>
 
       {error && (

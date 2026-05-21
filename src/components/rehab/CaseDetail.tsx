@@ -10,14 +10,16 @@ import StatusBadge from './StatusBadge'
 import TagBadge from './TagBadge'
 import VideoGrid from './VideoGrid'
 import VideoUpload from './VideoUpload'
+import VideoCompare from './VideoCompare'
 import ReportView from './ReportView'
-import { ArrowLeft, Upload, FileText, Info, Video } from 'lucide-react'
+import PatientReport from './PatientReport'
+import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2 } from 'lucide-react'
 
 interface Props {
   caseId: string
 }
 
-type Tab = 'videos' | 'upload' | 'report'
+type Tab = 'videos' | 'upload' | 'compare' | 'report' | 'patient-report'
 
 export default function CaseDetail({ caseId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
@@ -51,8 +53,10 @@ export default function CaseDetail({ caseId }: Props) {
 
   const TABS: Array<{ key: Tab; label: string; icon: React.ElementType }> = [
     { key: 'videos', label: '動画一覧', icon: Video },
-    { key: 'upload', label: '動画アップロード', icon: Upload },
-    { key: 'report', label: 'レポート', icon: FileText },
+    { key: 'upload', label: '動画追加', icon: Upload },
+    { key: 'compare', label: '動画比較', icon: SplitSquareHorizontal },
+    { key: 'report', label: '分析レポート', icon: FileText },
+    { key: 'patient-report', label: '患者用レポート', icon: Share2 },
   ]
 
   return (
@@ -130,12 +134,12 @@ export default function CaseDetail({ caseId }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white rounded-xl border border-gray-200 shadow-sm p-1.5 mb-6 w-fit">
+      <div className="flex gap-1 bg-white rounded-xl border border-gray-200 shadow-sm p-1.5 mb-6 overflow-x-auto">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
               tab === key
                 ? 'bg-[#1e3a5f] text-white shadow-sm'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -162,8 +166,18 @@ export default function CaseDetail({ caseId }: Props) {
         </div>
       )}
 
+      {tab === 'compare' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <VideoCompare videos={case_.videos} />
+        </div>
+      )}
+
       {tab === 'report' && (
         <ReportView case_={case_} />
+      )}
+
+      {tab === 'patient-report' && (
+        <PatientReport case_={case_} />
       )}
     </div>
   )

@@ -2,9 +2,10 @@
 
 import { useState, useRef } from 'react'
 import { addVideoToCase, getCurrentUser, generateId, saveVideoUrl } from '@/lib/rehab-store'
+import { saveVideoBlob } from '@/lib/video-db'
 import type { CaseVideo, MovementType, VideoDirection } from '@/types/rehab'
 import { MOVEMENT_TYPE_LABELS, VIDEO_DIRECTION_LABELS } from '@/types/rehab'
-import { Upload, X, Film } from 'lucide-react'
+import { Upload, X, Film, Camera } from 'lucide-react'
 
 interface Props {
   caseId: string
@@ -14,6 +15,7 @@ interface Props {
 export default function VideoUpload({ caseId, onUploaded }: Props) {
   const user = getCurrentUser()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
@@ -51,6 +53,8 @@ export default function VideoUpload({ caseId, onUploaded }: Props) {
     })
 
     const videoId = generateId('video')
+    // IndexedDBにBlobを永続保存（ページリロード後も再生可能）
+    await saveVideoBlob(videoId, file)
     saveVideoUrl(videoId, preview)
 
     const video: CaseVideo = {
@@ -75,28 +79,52 @@ export default function VideoUpload({ caseId, onUploaded }: Props) {
   return (
     <div className="space-y-4">
       {!file ? (
-        <label
-          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          className={`flex flex-col items-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-            dragging ? 'border-[#0d9488] bg-teal-50' : 'border-gray-300 hover:border-[#0d9488] hover:bg-gray-50'
-          }`}
-        >
-          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-700">
-            動画ファイルをドラッグ＆ドロップ
-          </p>
-          <p className="text-xs text-gray-400 mt-1">または クリックしてファイルを選択</p>
-          <p className="text-xs text-gray-400 mt-0.5">MP4, MOV, AVI（最大 500MB）</p>
+        <div className="space-y-3">
+          {/* カメラ撮影ボタン（モバイル向け） */}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-3 border-2 border-[#0d9488] bg-teal-50 hover:bg-teal-100 rounded-xl p-5 text-center transition-colors"
+          >
+            <Camera className="w-8 h-8 text-[#0d9488]" />
+            <div className="text-left">
+              <p className="text-sm font-semibold text-[#0d9488]">カメラで撮影</p>
+              <p className="text-xs text-teal-600 mt-0.5">スマートフォンで直接録画</p>
+            </div>
+          </button>
+          {/* カメラ専用input（capture属性でカメラ起動） */}
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
             type="file"
             accept="video/*"
+            capture="environment"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />
-        </label>
+
+          {/* ファイル選択（PC・ギャラリー） */}
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            className={`flex flex-col items-center border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+              dragging ? 'border-[#0d9488] bg-teal-50' : 'border-gray-300 hover:border-[#0d9488] hover:bg-gray-50'
+            }`}
+          >
+            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm font-medium text-gray-700">
+              ファイルから選択 / ドラッグ＆ドロップ
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">MP4, MOV, AVI（最大 500MB）</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+            />
+          </label>
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Preview */}

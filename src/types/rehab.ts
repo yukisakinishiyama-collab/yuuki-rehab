@@ -4,6 +4,10 @@ export type UserRole =
 
 export type CaseStatus = 'initial' | 'intervention' | 'preReturn' | 'closed'
 
+export type DeliveryStatus = 'received' | 'analyzing' | 'done' | 'sent'
+
+export type ServiceType = 'sports' | 'rehab' | 'posture' | 'team' | 'other'
+
 export type MovementType =
   | 'walking'
   | 'squat'
@@ -78,6 +82,13 @@ export interface RehabCase {
   createdAt: string
   updatedAt: string
   videos: CaseVideo[]
+  // サービス向け追加フィールド
+  clientEmail?: string
+  clientPhone?: string
+  sport?: string
+  serviceType?: ServiceType
+  deliveryStatus?: DeliveryStatus
+  requestNote?: string
 }
 
 export interface CaseVideo {
@@ -173,6 +184,28 @@ export const CASE_STATUS_COLORS: Record<CaseStatus, string> = {
   closed: 'bg-gray-100 text-gray-600',
 }
 
+export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
+  received: '新着依頼',
+  analyzing: '解析中',
+  done: '解析完了',
+  sent: '送付済み',
+}
+
+export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
+  received: 'bg-blue-100 text-blue-800 border-blue-200',
+  analyzing: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  done: 'bg-green-100 text-green-800 border-green-200',
+  sent: 'bg-gray-100 text-gray-600 border-gray-200',
+}
+
+export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
+  sports: 'スポーツ・競技',
+  rehab: 'リハビリ・回復',
+  posture: '姿勢・日常動作',
+  team: 'チーム・法人',
+  other: 'その他',
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: '管理者',
   pt: '理学療法士',
@@ -206,6 +239,42 @@ export const VIDEO_DIRECTION_LABELS: Record<VideoDirection, string> = {
   side: '側面',
   rear: '後方',
   other: 'その他',
+}
+
+/** 専門家チャットメッセージ */
+export interface ChatMessage {
+  id: string
+  caseId: string
+  videoId?: string         // 特定動画に紐づける場合（任意）
+  text: string
+  authorId: string
+  authorName: string
+  authorRole: UserRole
+  createdAt: string
+  mentions: string[]       // @mention された userId
+}
+
+/** AI所見サマリー（自動保存） */
+export interface AISummary {
+  id: string
+  videoId: string
+  caseId: string
+  summary: string
+  frameCount: number
+  customPrompt?: string
+  createdAt: string
+  createdByName: string
+}
+
+/** 動画上の対象者マーカー（バウンディングボックス・正規化座標 0–1） */
+export interface PersonMarker {
+  videoId: string
+  x: number        // 左端 (0–1)
+  y: number        // 上端 (0–1)
+  width: number    // 幅   (0–1)
+  height: number   // 高さ (0–1)
+  label: string    // 例: "患者"
+  color: string    // CSSカラー
 }
 
 export const EVALUATION_TEMPLATES: Record<MovementType, { key: string; label: string }[]> = {

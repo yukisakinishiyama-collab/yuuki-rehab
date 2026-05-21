@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { VideoComment, User, UserRole } from '@/types/rehab'
+import type { VideoComment, User, UserRole, PersonMarker } from '@/types/rehab'
 import { ROLE_LABELS, COMMENT_TYPE_LABELS } from '@/types/rehab'
 import { MOCK_USERS } from '@/lib/rehab-data'
 import { getCommentsFallback, getCurrentUser, saveComment, generateId } from '@/lib/rehab-store'
@@ -14,6 +14,7 @@ interface Props {
   videoId: string
   movementType?: string
   videoSrc?: string | null
+  personMarker?: PersonMarker | null
 }
 
 // Role → accent color
@@ -50,7 +51,7 @@ interface CommonFinding {
   agreeNames: string[]
 }
 
-export default function SpecialistReviewPanel({ caseId, videoId, movementType, videoSrc }: Props) {
+export default function SpecialistReviewPanel({ caseId, videoId, movementType, videoSrc, personMarker }: Props) {
   const currentUser = getCurrentUser()
   const [comments, setComments] = useState<VideoComment[]>([])
   const [statuses, setStatuses] = useState<SpecialistStatus[]>([])
@@ -143,7 +144,7 @@ export default function SpecialistReviewPanel({ caseId, videoId, movementType, v
         </button>
         {showAI && (
           <div className="px-3 pb-3">
-            <AISummaryPanel comments={comments} movementType={movementType} videoSrc={videoSrc} caseInfo={caseInfo} />
+            <AISummaryPanel videoId={videoId} caseId={caseId} comments={comments} movementType={movementType} videoSrc={videoSrc} caseInfo={caseInfo} personMarker={personMarker} />
           </div>
         )}
       </div>

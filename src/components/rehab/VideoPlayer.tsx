@@ -20,20 +20,25 @@ interface Props {
   caseId: string
   savedAnnotations: SavedAnnotation[]
   onAnnotationSaved: () => void
+  /** 映像エリア上に重ねる追加オーバーレイ（PersonMarkerLayerなど） */
+  videoOverlay?: React.ReactNode
 }
 
 export default function VideoPlayer({
   src, comments, onTimeUpdate, onSeekTo,
   videoId, caseId, savedAnnotations, onAnnotationSaved,
+  videoOverlay,
 }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [playing, setPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-  const [speed, setSpeed] = useState(1)
-  const [muted, setMuted] = useState(false)
-  const [volume, setVolume] = useState(1)
+  const videoRef    = useRef<HTMLVideoElement>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
+  const [playing,    setPlaying]    = useState(false)
+  const [currentTime,setCurrentTime]= useState(0)
+  const [duration,   setDuration]   = useState(0)
+  const [speed,      setSpeed]      = useState(1)
+  const [muted,      setMuted]      = useState(false)
+  const [volume,     setVolume]     = useState(1)
   const [annotationActive, setAnnotationActive] = useState(false)
+  const [scrubbing,  setScrubbing]  = useState(false)
 
   // Expose seekTo for parent
   useEffect(() => {
@@ -57,10 +62,10 @@ export default function VideoPlayer({
     const v = videoRef.current
     if (!v) return
     if (v.paused) { v.play(); setPlaying(true) }
-    else { v.pause(); setPlaying(false) }
+    else          { v.pause(); setPlaying(false) }
   }
 
-  function seek(t: number) {
+  function seekTo(t: number) {
     if (!videoRef.current) return
     videoRef.current.currentTime = Math.max(0, Math.min(duration, t))
   }
@@ -69,7 +74,7 @@ export default function VideoPlayer({
     if (!videoRef.current) return
     videoRef.current.pause()
     setPlaying(false)
-    seek(currentTime + delta * FRAME)
+    seekTo(currentTime + delta * FRAME)
   }
 
   function setPlaybackSpeed(s: number) {
@@ -89,32 +94,63 @@ export default function VideoPlayer({
   }
 
   function formatTime(s: number) {
-    const m = Math.floor(s / 60)
+    const m   = Math.floor(s / 60)
     const sec = Math.floor(s % 60)
-    const ms = Math.floor((s % 1) * 100)
-    return `${m}:${String(sec).padStart(2, '0')}.${String(ms).padStart(2, '0')}`
+    const ms  = Math.floor((s % 1) * 100)
+    return `${m}:${String(sec).padStart(2,'0')}.${String(ms).padStart(2,'0')}`
   }
+
+  // ── タイムライン：クリック＋ドラッグ両対応 ──────────────────────────
+  function getTimelineRatio(clientX: number): number {
+    const rect = timelineRef.current?.getBoundingClientRect()
+    if (!rect) return 0
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+  }
+
+  function handleTimelineDown(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
+    setScrubbing(true)
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    seekTo(getTimelineRatio(clientX) * duration)
+  }
+
+  const handleScrubMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!scrubbing) return
+    e.preventDefault()
+    const clientX = 'touches' in e
+      ? (e as TouchEvent).touches[0]?.clientX ?? 0
+      : (e as MouseEvent).clientX
+    seekTo(getTimelineRatio(clientX) * duration)
+  }, [scrubbing, duration]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleScrubUp = useCallback(() => {
+    setScrubbing(false)
+  }, [])
+
+  useEffect(() => {
+    if (!scrubbing) return
+    window.addEventListener('mousemove', handleScrubMove)
+    window.addEventListener('mouseup',   handleScrubUp)
+    window.addEventListener('touchmove', handleScrubMove, { passive: false })
+    window.addEventListener('touchend',  handleScrubUp)
+    return () => {
+      window.removeEventListener('mousemove', handleScrubMove)
+      window.removeEventListener('mouseup',   handleScrubUp)
+      window.removeEventListener('touchmove', handleScrubMove)
+      window.removeEventListener('touchend',  handleScrubUp)
+    }
+  }, [scrubbing, handleScrubMove, handleScrubUp])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  // Comment marker positions
-  const markers = comments.map((c) => ({
-    id: c.id,
-    type: c.type,
-    pct: duration > 0 ? (c.timestamp / duration) * 100 : 0,
-  }))
-
   const markerColors: Record<string, string> = {
-    problem: '#ef4444',
-    improvement: '#3b82f6',
-    risk: '#f97316',
-    positive: '#22c55e',
-    suggestion: '#a855f7',
+    problem:'#ef4444', improvement:'#3b82f6', risk:'#f97316',
+    positive:'#22c55e', suggestion:'#a855f7',
   }
 
   return (
     <div className="bg-black rounded-xl overflow-hidden select-none">
-      {/* Video + overlay wrapper */}
+      {/* ── 映像エリア ── */}
       <div className="relative aspect-video w-full">
         <video
           ref={videoRef}
@@ -125,6 +161,8 @@ export default function VideoPlayer({
           onEnded={() => setPlaying(false)}
           onClick={() => { if (!annotationActive) togglePlay() }}
         />
+
+        {/* アノテーションオーバーレイ */}
         <VideoAnnotationOverlay
           videoId={videoId}
           caseId={caseId}
@@ -133,103 +171,105 @@ export default function VideoPlayer({
           onSaved={onAnnotationSaved}
           active={annotationActive}
         />
+
+        {/* 外部から渡された追加オーバーレイ（PersonMarkerLayerなど） */}
+        {videoOverlay}
       </div>
 
-      {/* Controls */}
+      {/* ── コントロールバー ── */}
       <div className="bg-[#111827] px-4 py-3 space-y-2">
-        {/* Timeline */}
+        {/* タイムライン（クリック＋ドラッグシーク） */}
         <div className="relative">
           <div
-            className="relative h-2 bg-gray-700 rounded-full cursor-pointer group"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              const pct = (e.clientX - rect.left) / rect.width
-              seek(pct * duration)
-            }}
+            ref={timelineRef}
+            className={`relative h-2.5 bg-gray-700 rounded-full group ${scrubbing ? 'cursor-grabbing' : 'cursor-pointer'}`}
+            onMouseDown={handleTimelineDown}
+            onTouchStart={handleTimelineDown}
           >
+            {/* 進捗バー */}
             <div
-              className="absolute inset-y-0 left-0 bg-[#0d9488] rounded-full"
+              className="absolute inset-y-0 left-0 bg-[#0d9488] rounded-full pointer-events-none"
               style={{ width: `${progress}%` }}
             />
-            {/* Comment markers */}
-            {markers.map((m) => (
-              <div
-                key={m.id}
-                className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-[#111827] z-10"
-                style={{
-                  left: `${m.pct}%`,
-                  backgroundColor: markerColors[m.type] ?? '#888',
-                  transform: 'translate(-50%, -50%)',
-                }}
-                title={m.type}
-              />
-            ))}
-            {/* Annotation markers (diamonds) */}
+            {/* コメントマーカー */}
+            {comments.map((c) => {
+              const pct = duration > 0 ? (c.timestamp / duration) * 100 : 0
+              return (
+                <div
+                  key={c.id}
+                  className="absolute top-1/2 w-2.5 h-2.5 rounded-full border-2 border-[#111827] z-10 pointer-events-none"
+                  style={{
+                    left: `${pct}%`,
+                    backgroundColor: markerColors[c.type] ?? '#888',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              )
+            })}
+            {/* アノテーションマーカー */}
             {savedAnnotations.map((ann) => {
               const pct = duration > 0 ? (ann.timestamp / duration) * 100 : 0
               return (
                 <div
                   key={ann.id}
-                  className="absolute z-10 text-amber-400 leading-none"
+                  className="absolute z-10 pointer-events-none"
                   style={{
-                    left: `${pct}%`,
-                    top: '50%',
+                    left: `${pct}%`, top: '50%',
                     transform: 'translate(-50%, -50%) rotate(45deg)',
-                    width: 8,
-                    height: 8,
+                    width: 8, height: 8,
                     backgroundColor: '#f59e0b',
-                    border: '2px solid #111827',
-                    borderRadius: 1,
+                    border: '2px solid #111827', borderRadius: 1,
                   }}
-                  title={ann.label}
                 />
               )
             })}
-            {/* Thumb */}
+            {/* サムネイル（ドラッグ中は大きく） */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow group-hover:scale-110 transition-transform z-20"
-              style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
+              className={`absolute top-1/2 rounded-full bg-white shadow z-20 pointer-events-none transition-transform ${scrubbing ? 'w-4.5 h-4.5 scale-125' : 'w-3.5 h-3.5 group-hover:scale-110'}`}
+              style={{ left: `${progress}%`, transform: `translate(-50%, -50%) ${scrubbing ? 'scale(1.25)' : ''}` }}
             />
           </div>
         </div>
 
-        {/* Buttons row */}
+        {/* ボタン行 */}
         <div className="flex items-center gap-2">
-          {/* Frame back */}
+          {/* フレーム戻る */}
           <button
             onClick={() => frame(-1)}
             className="text-gray-400 hover:text-white transition-colors p-1"
-            title="1フレーム戻る"
+            title="1フレーム戻る (←)"
           >
             <SkipBack className="w-4 h-4" />
           </button>
 
-          {/* Play/Pause */}
+          {/* 再生/一時停止 */}
           <button
             onClick={togglePlay}
-            className="w-8 h-8 bg-[#0d9488] hover:bg-[#0b8276] rounded-full flex items-center justify-center text-white transition-colors"
+            className="w-9 h-9 bg-[#0d9488] hover:bg-[#0b8276] rounded-full flex items-center justify-center text-white transition-colors shadow-md"
           >
-            {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+            {playing
+              ? <Pause className="w-4 h-4" />
+              : <Play  className="w-4 h-4 ml-0.5" />}
           </button>
 
-          {/* Frame forward */}
+          {/* フレーム進む */}
           <button
             onClick={() => frame(1)}
             className="text-gray-400 hover:text-white transition-colors p-1"
-            title="1フレーム進む"
+            title="1フレーム進む (→)"
           >
             <SkipForward className="w-4 h-4" />
           </button>
 
-          {/* Time */}
+          {/* 時間表示 */}
           <span className="text-gray-300 text-xs font-mono ml-1">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
 
           <div className="flex-1" />
 
-          {/* Speed */}
-          <div className="flex items-center gap-1">
+          {/* 再生速度 */}
+          <div className="flex items-center gap-0.5">
             {SPEEDS.map((s) => (
               <button
                 key={s}
@@ -243,21 +283,18 @@ export default function VideoPlayer({
             ))}
           </div>
 
-          {/* Volume */}
+          {/* 音量 */}
           <button onClick={toggleMute} className="text-gray-400 hover:text-white ml-2 transition-colors">
             {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
           <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
+            type="range" min={0} max={1} step={0.05}
             value={muted ? 0 : volume}
             onChange={(e) => handleVolumeChange(Number(e.target.value))}
             className="w-16 accent-[#0d9488]"
           />
 
-          {/* Annotation toggle */}
+          {/* 描き込みトグル */}
           <button
             onClick={() => setAnnotationActive((v) => !v)}
             title={annotationActive ? '描き込みモードをOFF' : '描き込みモードをON'}
@@ -271,7 +308,7 @@ export default function VideoPlayer({
             <span className="hidden sm:inline">描き込み</span>
           </button>
 
-          {/* Fullscreen */}
+          {/* フルスクリーン */}
           <button
             onClick={() => videoRef.current?.requestFullscreen()}
             className="text-gray-400 hover:text-white ml-1 transition-colors"
