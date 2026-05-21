@@ -255,11 +255,20 @@ export interface ChatMessage {
 }
 
 /** AI所見サマリー（自動保存） */
+export interface ExpertOpinion {
+  id:      string   // 'ortho' | 'pt' | 'at' | 'bio' | 'judo'
+  name:    string   // 表示名
+  role:    string   // 肩書き
+  color:   string   // UIカラー
+  opinion: string   // 意見本文
+}
+
 export interface AISummary {
   id: string
   videoId: string
   caseId: string
-  summary: string
+  summary: string             // 合議結論
+  experts?: ExpertOpinion[]   // 各専門家の意見
   frameCount: number
   customPrompt?: string
   createdAt: string

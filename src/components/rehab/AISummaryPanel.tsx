@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { VideoComment, PersonMarker, AISummary } from '@/types/rehab'
+import type { VideoComment, PersonMarker, AISummary, ExpertOpinion } from '@/types/rehab'
 import {
   getAISummaries, saveAISummary, deleteAISummary,
   getCurrentUser, generateId,
 } from '@/lib/rehab-store'
 import {
-  Sparkles, AlertTriangle, Loader, RefreshCw, Film,
-  FileText, Target, Trash2, ChevronDown, ChevronUp, Clock,
+  Sparkles, AlertTriangle, Loader, Film,
+  FileText, Target, Trash2, ChevronDown, ChevronUp, Clock, Users,
 } from 'lucide-react'
 
 interface Props {
@@ -228,7 +228,7 @@ async function extractFrames(
   })
 }
 
-// ── サマリーセクション表示 ──────────────────────────────────────────────────
+// ── 合議サマリーセクション表示 ────────────────────────────────────────────
 function SummaryView({ text }: { text: string }) {
   const sections = text.split(/\n(?=##\s)/)
   return (
@@ -241,9 +241,11 @@ function SummaryView({ text }: { text: string }) {
         const color =
           firstLine.includes('リスク') ? 'text-orange-700 border-orange-200 bg-orange-50' :
           firstLine.includes('問題') ? 'text-red-700 border-red-200 bg-red-50' :
-          firstLine.includes('介入') || firstLine.includes('トレーニング') ? 'text-blue-700 border-blue-200 bg-blue-50' :
+          firstLine.includes('介入') || firstLine.includes('推奨') ? 'text-blue-700 border-blue-200 bg-blue-50' :
           firstLine.includes('復帰') ? 'text-green-700 border-green-200 bg-green-50' :
-          firstLine.includes('観察') ? 'text-purple-700 border-purple-200 bg-purple-50' :
+          firstLine.includes('注目') || firstLine.includes('着眼') ? 'text-purple-700 border-purple-200 bg-purple-50' :
+          firstLine.includes('注意') ? 'text-yellow-700 border-yellow-200 bg-yellow-50' :
+          firstLine.includes('動作特徴') || firstLine.includes('合意') ? 'text-teal-700 border-teal-200 bg-teal-50' :
           'text-gray-800 border-gray-200 bg-white'
 
         if (!firstLine && !body) return null
@@ -254,6 +256,33 @@ function SummaryView({ text }: { text: string }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ── 専門家意見カード ────────────────────────────────────────────────────────
+function ExpertCard({ expert }: { expert: ExpertOpinion }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: expert.color + '55' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:opacity-90"
+        style={{ backgroundColor: expert.color + '15' }}
+      >
+        {/* カラードット */}
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: expert.color }} />
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-bold" style={{ color: expert.color }}>{expert.name}</span>
+          <span className="text-xs text-gray-500 ml-1.5">{expert.role}</span>
+        </div>
+        {open ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+      </button>
+      {open && (
+        <div className="px-3 py-2.5 bg-white border-t" style={{ borderColor: expert.color + '33' }}>
+          <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line">{expert.opinion}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -291,7 +320,10 @@ export default function AISummaryPanel({
       try { frames = await extractFrames(videoSrc, 12, personMarker) } catch { frames = [] }
     }
 
-    setLoadingStep('Claude AIが動作を分析中...')
+    const isMultiExpert = !customPrompt.trim()
+    setLoadingStep(isMultiExpert
+      ? '専門家5名が並列解析中... (整形外科医・PT・AT・バイオメカニクス・柔道整復師)'
+      : 'Claude AIが動作を分析中...')
 
     try {
       const res = await fetch('/api/ai-summary', {
@@ -315,6 +347,8 @@ export default function AISummaryPanel({
         return
       }
 
+      if (isMultiExpert) setLoadingStep('合議結論を生成中...')
+
       // 自動保存
       const currentUser = getCurrentUser()
       const newSummary: AISummary = {
@@ -322,6 +356,7 @@ export default function AISummaryPanel({
         videoId,
         caseId,
         summary: data.summary,
+        experts: data.experts?.length > 0 ? data.experts : undefined,
         frameCount: data.frameCount ?? 0,
         customPrompt: customPrompt.trim() || undefined,
         createdAt: new Date().toISOString(),
@@ -361,10 +396,17 @@ export default function AISummaryPanel({
               <div className="flex items-center gap-2 px-3 py-2 bg-purple-50">
                 <Clock className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-purple-700 font-medium">
-                    {new Date(s.createdAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <span className="text-xs text-purple-400 ml-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs text-purple-700 font-medium">
+                      {new Date(s.createdAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {s.experts && s.experts.length > 0 && (
+                      <span className="flex items-center gap-0.5 text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0 rounded-full font-semibold">
+                        <Users className="w-2.5 h-2.5" /> カンファレンス
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-purple-400">
                     {s.createdByName}
                     {s.frameCount > 0 && ` · 動画${s.frameCount}フレーム解析`}
                     {s.customPrompt && ' · カスタム指示'}
@@ -401,8 +443,14 @@ export default function AISummaryPanel({
                       AIによる補助的分析です。最終的な診断・判断は専門家が行ってください。
                     </p>
                   </div>
+
                   {/* 解析情報バッジ */}
                   <div className="flex items-center gap-2 flex-wrap">
+                    {s.experts && s.experts.length > 0 && (
+                      <span className="flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">
+                        <Users className="w-3 h-3" /> カンファレンス ({s.experts.length}名合議)
+                      </span>
+                    )}
                     {s.frameCount > 0 && (
                       <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                         <Film className="w-3 h-3" /> 動画{s.frameCount}フレーム解析
@@ -414,7 +462,33 @@ export default function AISummaryPanel({
                       </span>
                     )}
                   </div>
-                  <SummaryView text={s.summary} />
+
+                  {/* 合議結論 */}
+                  {s.experts && s.experts.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-indigo-700 mb-1.5 flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" /> カンファレンス合議結論
+                      </p>
+                      <SummaryView text={s.summary} />
+                    </div>
+                  )}
+                  {(!s.experts || s.experts.length === 0) && (
+                    <SummaryView text={s.summary} />
+                  )}
+
+                  {/* 専門家別意見（折りたたみ） */}
+                  {s.experts && s.experts.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1">
+                        各専門家の意見（タップで展開）
+                      </p>
+                      <div className="space-y-1.5">
+                        {s.experts.map((expert) => (
+                          <ExpertCard key={expert.id} expert={expert} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -503,13 +577,21 @@ export default function AISummaryPanel({
             </div>
           )}
 
+          {/* デフォルトモードの説明 */}
+          {!customPrompt.trim() && (
+            <div className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+              <Users className="w-3.5 h-3.5 flex-shrink-0" />
+              指示なしの場合：整形外科医・PT・AT・バイオメカニクス・柔道整復師の5名が並列解析し、合議結論を生成します
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={handleGenerate}
               className="flex-1 flex items-center gap-2 justify-center py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
             >
-              <Sparkles className="w-4 h-4" />
-              {customPrompt.trim() ? 'カスタム指示でAI解析' : 'AI解析を実行'}
+              {customPrompt.trim() ? <Sparkles className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+              {customPrompt.trim() ? 'カスタム指示でAI解析' : '5名カンファレンス解析を実行'}
             </button>
             <button
               onClick={() => { setShowForm(false); setError(''); setCustomPrompt('') }}
@@ -525,10 +607,22 @@ export default function AISummaryPanel({
       {generating && (
         <div className="flex flex-col items-center gap-3 py-6 text-purple-700 border border-purple-200 rounded-xl bg-purple-50">
           <Loader className="w-5 h-5 animate-spin" />
-          <div className="text-center">
+          <div className="text-center px-4">
             <p className="text-sm font-medium">{loadingStep || 'Claude AIが分析中...'}</p>
-            {videoSrc && (
-              <p className="text-xs text-purple-400 mt-1">動画フレームを画像解析しています</p>
+            {!customPrompt.trim() && (
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                {[
+                  { label: '整形外科医', color: '#dc2626' },
+                  { label: 'PT', color: '#2563eb' },
+                  { label: 'AT', color: '#16a34a' },
+                  { label: 'バイオメカニクス', color: '#7c3aed' },
+                  { label: '柔道整復師', color: '#d97706' },
+                ].map((e) => (
+                  <span key={e.label} className="text-xs px-2 py-0.5 rounded-full text-white font-medium" style={{ backgroundColor: e.color }}>
+                    {e.label}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
           <p className="text-xs text-purple-400">生成完了後、自動的に保存されます</p>
