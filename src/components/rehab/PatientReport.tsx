@@ -120,13 +120,13 @@ type AngleStatus = 'normal' | 'caution' | 'alert'
 function angleStatus(key: keyof JointAngles, val: number | null): AngleStatus {
   if (val === null) return 'normal'
   const ranges: Partial<Record<keyof JointAngles, [number, number]>> = {
-    leftKnee:     [160, 180], rightKnee:     [160, 180],  // 立位時ほぼ伸展
-    leftHip:      [170, 180], rightHip:      [170, 180],
-    trunkAngle:   [0, 10],                                 // 前傾10度以内
-    pelvisTilt:   [0, 3],                                  // 骨盤傾斜3cm以内
+    leftKnee:     [0, 20],   rightKnee:     [0, 20],    // 臨床: 立位屈曲0-20°正常
+    leftHip:      [0, 15],   rightHip:      [0, 15],    // 臨床: 立位屈曲0-15°正常
+    trunkAngle:   [0, 10],                               // 前傾10度以内
+    pelvisTilt:   [0, 3],                                // 骨盤傾斜3cm以内
     shoulderSymm: [0, 3],
     headForward:  [-5, 5],
-    leftAnkle:    [80, 110],  rightAnkle:    [80, 110],
+    leftAnkle:    [-10, 10], rightAnkle:    [-10, 10],  // 臨床: 背屈/底屈±10°正常
   }
   const range = ranges[key]
   if (!range) return 'normal'
@@ -141,12 +141,12 @@ const STATUS_LABEL: Record<AngleStatus, string> = { normal: '正常', caution: '
 // ── 計測値パネル ──────────────────────────────────────────────────────────────
 function MeasurementPanel({ angles, poseSide }: { angles: JointAngles; poseSide: string }) {
   const items: { key: keyof JointAngles; label: string; unit: string; side?: 'L'|'R'|'C' }[] = [
-    { key:'leftKnee',     label:'左膝屈曲',   unit:'°', side:'L' },
-    { key:'rightKnee',    label:'右膝屈曲',   unit:'°', side:'R' },
-    { key:'leftHip',      label:'左股関節',   unit:'°', side:'L' },
-    { key:'rightHip',     label:'右股関節',   unit:'°', side:'R' },
-    { key:'leftAnkle',    label:'左足首',     unit:'°', side:'L' },
-    { key:'rightAnkle',   label:'右足首',     unit:'°', side:'R' },
+    { key:'leftKnee',     label:'左膝屈曲',     unit:'°', side:'L' },
+    { key:'rightKnee',    label:'右膝屈曲',     unit:'°', side:'R' },
+    { key:'leftHip',      label:'左股関節屈曲', unit:'°', side:'L' },
+    { key:'rightHip',     label:'右股関節屈曲', unit:'°', side:'R' },
+    { key:'leftAnkle',    label:'左足首背屈',   unit:'°', side:'L' },
+    { key:'rightAnkle',   label:'右足首背屈',   unit:'°', side:'R' },
     { key:'trunkAngle',   label:'体幹前傾',   unit:'°', side:'C' },
     { key:'pelvisTilt',   label:'骨盤傾斜',   unit:'cm', side:'C' },
     { key:'shoulderSymm', label:'肩の高さ差', unit:'cm', side:'C' },
@@ -173,7 +173,9 @@ function MeasurementPanel({ angles, poseSide }: { angles: JointAngles; poseSide:
               </div>
               <div style={{ display:'flex', alignItems:'baseline', gap:'4px' }}>
                 <span style={{ fontSize:'18px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{val}</span>
-                <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>{unit}</span>
+                <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>
+                  {(key === 'leftAnkle' || key === 'rightAnkle') && val < 0 ? '° 底屈' : unit}
+                </span>
                 <span style={{ fontSize:'9px', fontWeight:'700', color:STATUS_COLOR[st], marginLeft:'auto' }}>{STATUS_LABEL[st]}</span>
               </div>
             </div>

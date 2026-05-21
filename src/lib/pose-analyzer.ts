@@ -79,21 +79,21 @@ export function calcJointAngles(wl: Landmark[]): JointAngles {
     leftAnkle: null, rightAnkle: null,
   }
 
-  // 膝屈曲角
-  if (vis(wl, LM.LEFT_HIP, LM.LEFT_KNEE, LM.LEFT_ANKLE))   a.leftKnee  = angle3(wl[LM.LEFT_HIP],  wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE])
-  if (vis(wl, LM.RIGHT_HIP, LM.RIGHT_KNEE, LM.RIGHT_ANKLE)) a.rightKnee = angle3(wl[LM.RIGHT_HIP], wl[LM.RIGHT_KNEE], wl[LM.RIGHT_ANKLE])
+  // 膝屈曲角（臨床表示: 0=完全伸展, 増加=屈曲）
+  if (vis(wl, LM.LEFT_HIP, LM.LEFT_KNEE, LM.LEFT_ANKLE))   a.leftKnee  = 180 - angle3(wl[LM.LEFT_HIP],  wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE])
+  if (vis(wl, LM.RIGHT_HIP, LM.RIGHT_KNEE, LM.RIGHT_ANKLE)) a.rightKnee = 180 - angle3(wl[LM.RIGHT_HIP], wl[LM.RIGHT_KNEE], wl[LM.RIGHT_ANKLE])
 
-  // 股関節角（肩-股-膝）
-  if (vis(wl, LM.LEFT_SHOULDER, LM.LEFT_HIP, LM.LEFT_KNEE))   a.leftHip  = angle3(wl[LM.LEFT_SHOULDER],  wl[LM.LEFT_HIP],  wl[LM.LEFT_KNEE])
-  if (vis(wl, LM.RIGHT_SHOULDER, LM.RIGHT_HIP, LM.RIGHT_KNEE)) a.rightHip = angle3(wl[LM.RIGHT_SHOULDER], wl[LM.RIGHT_HIP], wl[LM.RIGHT_KNEE])
+  // 股関節屈曲角（臨床表示: 0=中立, 増加=屈曲）
+  if (vis(wl, LM.LEFT_SHOULDER, LM.LEFT_HIP, LM.LEFT_KNEE))   a.leftHip  = 180 - angle3(wl[LM.LEFT_SHOULDER],  wl[LM.LEFT_HIP],  wl[LM.LEFT_KNEE])
+  if (vis(wl, LM.RIGHT_SHOULDER, LM.RIGHT_HIP, LM.RIGHT_KNEE)) a.rightHip = 180 - angle3(wl[LM.RIGHT_SHOULDER], wl[LM.RIGHT_HIP], wl[LM.RIGHT_KNEE])
 
   // 肩関節角（肘-肩-腰）
   if (vis(wl, LM.LEFT_ELBOW, LM.LEFT_SHOULDER, LM.LEFT_HIP))   a.leftShoulder  = angle3(wl[LM.LEFT_ELBOW],  wl[LM.LEFT_SHOULDER],  wl[LM.LEFT_HIP])
   if (vis(wl, LM.RIGHT_ELBOW, LM.RIGHT_SHOULDER, LM.RIGHT_HIP)) a.rightShoulder = angle3(wl[LM.RIGHT_ELBOW], wl[LM.RIGHT_SHOULDER], wl[LM.RIGHT_HIP])
 
-  // 足首角（膝-足首-つま先）
-  if (vis(wl, LM.LEFT_KNEE, LM.LEFT_ANKLE, LM.LEFT_FOOT))   a.leftAnkle  = angle3(wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE],  wl[LM.LEFT_FOOT])
-  if (vis(wl, LM.RIGHT_KNEE, LM.RIGHT_ANKLE, LM.RIGHT_FOOT)) a.rightAnkle = angle3(wl[LM.RIGHT_KNEE], wl[LM.RIGHT_ANKLE], wl[LM.RIGHT_FOOT])
+  // 足首背屈角（臨床表示: +背屈 / -底屈）
+  if (vis(wl, LM.LEFT_KNEE, LM.LEFT_ANKLE, LM.LEFT_FOOT))   a.leftAnkle  = 90 - angle3(wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE],  wl[LM.LEFT_FOOT])
+  if (vis(wl, LM.RIGHT_KNEE, LM.RIGHT_ANKLE, LM.RIGHT_FOOT)) a.rightAnkle = 90 - angle3(wl[LM.RIGHT_KNEE], wl[LM.RIGHT_ANKLE], wl[LM.RIGHT_FOOT])
 
   // 体幹前傾角（肩中点→腰中点 の垂直からの偏差）
   if (vis(wl, LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER, LM.LEFT_HIP, LM.RIGHT_HIP)) {
@@ -201,12 +201,12 @@ export function drawPoseOverlay(
     ctx.restore()
   }
 
-  if (landmarks[LM.LEFT_KNEE])   angleLabel(landmarks[LM.LEFT_KNEE],   angles.leftKnee,   '膝', '#3b82f6')
-  if (landmarks[LM.RIGHT_KNEE])  angleLabel(landmarks[LM.RIGHT_KNEE],  angles.rightKnee,  '膝', '#ef4444')
-  if (landmarks[LM.LEFT_HIP])    angleLabel(landmarks[LM.LEFT_HIP],    angles.leftHip,    '股', '#3b82f6')
-  if (landmarks[LM.RIGHT_HIP])   angleLabel(landmarks[LM.RIGHT_HIP],   angles.rightHip,   '股', '#ef4444')
-  if (landmarks[LM.LEFT_ANKLE])  angleLabel(landmarks[LM.LEFT_ANKLE],  angles.leftAnkle,  '足', '#3b82f6')
-  if (landmarks[LM.RIGHT_ANKLE]) angleLabel(landmarks[LM.RIGHT_ANKLE], angles.rightAnkle, '足', '#ef4444')
+  if (landmarks[LM.LEFT_KNEE])   angleLabel(landmarks[LM.LEFT_KNEE],   angles.leftKnee,   '屈曲', '#3b82f6')
+  if (landmarks[LM.RIGHT_KNEE])  angleLabel(landmarks[LM.RIGHT_KNEE],  angles.rightKnee,  '屈曲', '#ef4444')
+  if (landmarks[LM.LEFT_HIP])    angleLabel(landmarks[LM.LEFT_HIP],    angles.leftHip,    '屈曲', '#3b82f6')
+  if (landmarks[LM.RIGHT_HIP])   angleLabel(landmarks[LM.RIGHT_HIP],   angles.rightHip,   '屈曲', '#ef4444')
+  if (landmarks[LM.LEFT_ANKLE])  angleLabel(landmarks[LM.LEFT_ANKLE],  angles.leftAnkle,  '背屈', '#3b82f6')
+  if (landmarks[LM.RIGHT_ANKLE]) angleLabel(landmarks[LM.RIGHT_ANKLE], angles.rightAnkle, '背屈', '#ef4444')
 }
 
 // ── MediaPipe 初期化＆解析 ──────────────────────────────────────────────────
