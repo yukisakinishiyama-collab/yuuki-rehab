@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from 'next'
 import { MapPin, Clock, Phone, Train, Car } from 'lucide-react'
+import LineQRCode from '@/components/site/LineQRCode'
 
 export const metadata: Metadata = {
   title: 'アクセス・診療時間｜ゆうき整骨院（山口県下関市）',
@@ -157,17 +158,23 @@ export default function AccessPage() {
             LINEからご予約・お問い合わせいただけます。<br />
             24時間受付（返信は診療時間内）
           </p>
-          <a
-            href="https://lin.ee/uaGKbfk"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2.5 bg-line hover:bg-line-dark text-white font-bold px-10 py-4 rounded-full shadow-xl transition-all hover:scale-105 text-lg"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.477 2 2 6.145 2 11.243c0 3.121 1.588 5.89 4.063 7.706-.165.595-.535 2.225-.608 2.558-.092.413.148.41.314.3.13-.088 2.053-1.373 2.888-1.932.74.1 1.5.155 2.343.155 5.523 0 10-4.145 10-9.243S17.523 2 12 2z" />
-            </svg>
-            LINEで予約する
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+            <LineQRCode />
+            <div className="flex flex-col items-center gap-4">
+              <a
+                href="https://lin.ee/uaGKbfk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2.5 bg-line hover:bg-line-dark text-white font-bold px-10 py-4 rounded-full shadow-xl transition-all hover:scale-105 text-lg"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.477 2 2 6.145 2 11.243c0 3.121 1.588 5.89 4.063 7.706-.165.595-.535 2.225-.608 2.558-.092.413.148.41.314.3.13-.088 2.053-1.373 2.888-1.932.74.1 1.5.155 2.343.155 5.523 0 10-4.145 10-9.243S17.523 2 12 2z" />
+                </svg>
+                LINEで予約する
+              </a>
+              <p className="text-blue-300 text-xs">ボタンをタップするとLINEが開きます</p>
+            </div>
+          </div>
         </div>
       </section>
     </div>

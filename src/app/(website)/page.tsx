@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+import LineQRCode from '@/components/site/LineQRCode'
 import {
   Activity,
   Shield,
@@ -505,6 +506,9 @@ export default function HomePage() {
             症状のご相談・ご予約はLINEが便利です。<br />
             質問だけでも大歓迎です。お気軽にメッセージください。
           </p>
+          <div className="flex flex-col items-center gap-6 mb-2">
+            <LineQRCode />
+          </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="https://lin.ee/uaGKbfk"
