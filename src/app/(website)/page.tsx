@@ -15,6 +15,10 @@ import {
   ArrowRight,
   Users,
   Zap,
+  Video,
+  Brain,
+  ScanLine,
+  Send,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -374,6 +378,74 @@ export default function HomePage() {
               <p className="text-slate-700 leading-relaxed text-sm">
                 スポーツ障害・術前術後リハビリを専門とし、学生アスリートから社会人まで幅広く対応しています。「痛みを取るだけでなく、再発しない体づくり」を目指し、運動療法と動作改善を重視した施術を行っています。医療機関と連携しながら、科学的根拠に基づいたリハビリプログラムを提供します。
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== MOTION LAB ===== */}
+      <section className="py-16 md:py-24 bg-gradient-to-br from-[#0d1f33] via-[#1a3a5c] to-[#0a2d28] relative overflow-hidden">
+        {/* 背景装飾 */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />
+        </div>
+        <div className="max-w-6xl mx-auto px-4 relative z-10">
+          <div className="text-center mb-12">
+            <span className="inline-block bg-teal-500/20 text-teal-300 text-xs font-bold tracking-widest uppercase px-4 py-1.5 rounded-full mb-3">Technology</span>
+            <h2 className="text-2xl md:text-3xl font-bold text-white mt-2">
+              YUUKI <span className="text-teal-400">MOTION LAB</span>
+            </h2>
+            <p className="text-blue-200 mt-3 max-w-2xl mx-auto text-sm leading-relaxed">
+              動画を送るだけで、AIと専門家が動作を分析。「なぜ痛むのか」「何を直せばいいのか」を可視化する、ゆうき整骨院の動作解析サービスです。
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {[
+              {
+                icon: Video,
+                title: '動画を送るだけ',
+                desc: 'スマートフォンで撮影した動作動画をフォームから送信。来院前でも相談できます。',
+              },
+              {
+                icon: ScanLine,
+                title: 'フレーム単位で分析',
+                desc: '関節角度・重心バランス・動作パターンを映像で確認。「見えない問題」を可視化します。',
+              },
+              {
+                icon: Brain,
+                title: 'AIが補助分析',
+                desc: 'AIが動作所見・問題点・介入提案を自動生成。専門家の判断を強力にサポートします。',
+              },
+            ].map((item) => (
+              <div key={item.title} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+                <div className="w-12 h-12 bg-teal-500/20 rounded-xl flex items-center justify-center mb-4">
+                  <item.icon size={22} className="text-teal-400" />
+                </div>
+                <h3 className="text-white font-bold mb-2">{item.title}</h3>
+                <p className="text-blue-200 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white/5 border border-teal-500/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
+            <div className="flex-1">
+              <p className="text-teal-300 text-xs font-bold tracking-widest uppercase mb-2">Remote Analysis</p>
+              <h3 className="text-xl font-bold text-white mb-2">遠方の方・来院前の方へ</h3>
+              <p className="text-blue-200 text-sm leading-relaxed">
+                「下関まで来院できないけど相談したい」「まず自分の動きを見てほしい」という方は、動作解析フォームから動画をお送りください。専門家が確認してフィードバックします。
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 shrink-0">
+              <Link
+                href="/submit"
+                className="inline-flex items-center justify-center gap-2 bg-teal-500 hover:bg-teal-400 text-white font-bold px-8 py-4 rounded-full transition-all hover:scale-105"
+              >
+                <Send size={18} />
+                動画を送って相談する
+              </Link>
+              <p className="text-blue-300/60 text-xs text-center">無料・LINEアカウント不要</p>
             </div>
           </div>
         </div>
