@@ -69,7 +69,21 @@ function detectSide(lm: Landmark[]): 'front' | 'side' | 'unknown' {
   return shoulderWidth > 0.12 || hipWidth > 0.1 ? 'front' : 'side'
 }
 
-export function calcJointAngles(wl: Landmark[]): JointAngles {
+/**
+ * 撮影方向に応じて信頼できる角度のみ計算する。
+ *
+ * ■ 正面 (front)
+ *   - 膝・股関節屈曲: 計算（両側可視）
+ *   - 骨盤傾斜・肩対称性: 計算（左右高さ差が意味を持つ）
+ *   - 足首背屈: スキップ（正面からはz軸深度推定が不正確）
+ *   - 頭部前方偏位: スキップ（深度z軸依存）
+ *
+ * ■ 側面 (side)
+ *   - 膝・股関節・足首背屈: 計算（矢状面で正確）
+ *   - 体幹前傾角・頭部前方偏位: 計算
+ *   - 骨盤傾斜・肩対称性: スキップ（片側しか見えない）
+ */
+export function calcJointAngles(wl: Landmark[], poseSide: 'front' | 'side' | 'unknown' = 'unknown'): JointAngles {
   const a: JointAngles = {
     leftKnee: null, rightKnee: null,
     leftHip: null, rightHip: null,
@@ -78,6 +92,8 @@ export function calcJointAngles(wl: Landmark[]): JointAngles {
     headForward: null, shoulderSymm: null,
     leftAnkle: null, rightAnkle: null,
   }
+
+  // ── 全方向共通 ─────────────────────────────────────────────────────────────
 
   // 膝屈曲角（臨床表示: 0=完全伸展, 増加=屈曲）
   if (vis(wl, LM.LEFT_HIP, LM.LEFT_KNEE, LM.LEFT_ANKLE))   a.leftKnee  = 180 - angle3(wl[LM.LEFT_HIP],  wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE])
@@ -91,10 +107,6 @@ export function calcJointAngles(wl: Landmark[]): JointAngles {
   if (vis(wl, LM.LEFT_ELBOW, LM.LEFT_SHOULDER, LM.LEFT_HIP))   a.leftShoulder  = angle3(wl[LM.LEFT_ELBOW],  wl[LM.LEFT_SHOULDER],  wl[LM.LEFT_HIP])
   if (vis(wl, LM.RIGHT_ELBOW, LM.RIGHT_SHOULDER, LM.RIGHT_HIP)) a.rightShoulder = angle3(wl[LM.RIGHT_ELBOW], wl[LM.RIGHT_SHOULDER], wl[LM.RIGHT_HIP])
 
-  // 足首背屈角（臨床表示: +背屈 / -底屈）
-  if (vis(wl, LM.LEFT_KNEE, LM.LEFT_ANKLE, LM.LEFT_FOOT))   a.leftAnkle  = 90 - angle3(wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE],  wl[LM.LEFT_FOOT])
-  if (vis(wl, LM.RIGHT_KNEE, LM.RIGHT_ANKLE, LM.RIGHT_FOOT)) a.rightAnkle = 90 - angle3(wl[LM.RIGHT_KNEE], wl[LM.RIGHT_ANKLE], wl[LM.RIGHT_FOOT])
-
   // 体幹前傾角（肩中点→腰中点 の垂直からの偏差）
   if (vis(wl, LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER, LM.LEFT_HIP, LM.RIGHT_HIP)) {
     const shoulderMid = { x: (wl[LM.LEFT_SHOULDER].x + wl[LM.RIGHT_SHOULDER].x) / 2, y: (wl[LM.LEFT_SHOULDER].y + wl[LM.RIGHT_SHOULDER].y) / 2, z: (wl[LM.LEFT_SHOULDER].z + wl[LM.RIGHT_SHOULDER].z) / 2 }
@@ -104,22 +116,33 @@ export function calcJointAngles(wl: Landmark[]): JointAngles {
     a.trunkAngle = Math.round(Math.atan2(Math.abs(dx), Math.abs(dy)) * 180 / Math.PI)
   }
 
-  // 骨盤傾斜（左右腰の高さ差 cm換算）
-  if (vis(wl, LM.LEFT_HIP, LM.RIGHT_HIP)) {
-    a.pelvisTilt = Math.round(Math.abs(wl[LM.LEFT_HIP].y - wl[LM.RIGHT_HIP].y) * 100)
+  // ── 側面撮影のみ（矢状面の深度 z 軸が必要） ───────────────────────────────
+
+  if (poseSide === 'side' || poseSide === 'unknown') {
+    // 足首背屈角（+背屈 / -底屈）— 正面からはz深度が不正確なのでスキップ
+    if (vis(wl, LM.LEFT_KNEE, LM.LEFT_ANKLE, LM.LEFT_FOOT))   a.leftAnkle  = 90 - angle3(wl[LM.LEFT_KNEE],  wl[LM.LEFT_ANKLE],  wl[LM.LEFT_FOOT])
+    if (vis(wl, LM.RIGHT_KNEE, LM.RIGHT_ANKLE, LM.RIGHT_FOOT)) a.rightAnkle = 90 - angle3(wl[LM.RIGHT_KNEE], wl[LM.RIGHT_ANKLE], wl[LM.RIGHT_FOOT])
+
+    // 頭部前方偏位（耳の前後位置 z, 肩基準 cm換算）
+    const earVisible = vis(wl, LM.LEFT_EAR, LM.LEFT_SHOULDER) || vis(wl, LM.RIGHT_EAR, LM.RIGHT_SHOULDER)
+    if (earVisible) {
+      const earZ = vis(wl, LM.LEFT_EAR)      ? wl[LM.LEFT_EAR].z      : wl[LM.RIGHT_EAR].z
+      const shlZ = vis(wl, LM.LEFT_SHOULDER) ? wl[LM.LEFT_SHOULDER].z : wl[LM.RIGHT_SHOULDER].z
+      a.headForward = Math.round((earZ - shlZ) * 100)
+    }
   }
 
-  // 肩の左右対称性（高さ差 cm換算）
-  if (vis(wl, LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER)) {
-    a.shoulderSymm = Math.round(Math.abs(wl[LM.LEFT_SHOULDER].y - wl[LM.RIGHT_SHOULDER].y) * 100)
-  }
+  // ── 正面撮影のみ（左右の x 軸差・高さ差が意味を持つ） ────────────────────
 
-  // 頭部前方偏位（耳の前後位置 z, 肩基準 cm換算）
-  const earVisible = vis(wl, LM.LEFT_EAR, LM.LEFT_SHOULDER) || vis(wl, LM.RIGHT_EAR, LM.RIGHT_SHOULDER)
-  if (earVisible) {
-    const earZ  = vis(wl, LM.LEFT_EAR)       ? wl[LM.LEFT_EAR].z       : wl[LM.RIGHT_EAR].z
-    const shlZ  = vis(wl, LM.LEFT_SHOULDER)  ? wl[LM.LEFT_SHOULDER].z  : wl[LM.RIGHT_SHOULDER].z
-    a.headForward = Math.round((earZ - shlZ) * 100)
+  if (poseSide === 'front' || poseSide === 'unknown') {
+    // 骨盤傾斜（左右腰の高さ差 cm換算）
+    if (vis(wl, LM.LEFT_HIP, LM.RIGHT_HIP)) {
+      a.pelvisTilt = Math.round(Math.abs(wl[LM.LEFT_HIP].y - wl[LM.RIGHT_HIP].y) * 100)
+    }
+    // 肩の左右対称性（高さ差 cm換算）
+    if (vis(wl, LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER)) {
+      a.shoulderSymm = Math.round(Math.abs(wl[LM.LEFT_SHOULDER].y - wl[LM.RIGHT_SHOULDER].y) * 100)
+    }
   }
 
   return a
@@ -279,9 +302,9 @@ export async function analyzeAndAnnotateFrame(
       const landmarks:      Landmark[] = result.landmarks[0]
       const worldLandmarks: Landmark[] = result.worldLandmarks[0]
 
-      // 角度計算はワールド座標で（より正確な3D計測）
-      const jointAngles = calcJointAngles(worldLandmarks)
+      // 撮影方向をまず自動判定し、方向に応じた角度のみ計算
       const poseSide    = detectSide(landmarks)
+      const jointAngles = calcJointAngles(worldLandmarks, poseSide)
 
       // 出力canvas に骨格を重ねて描画
       const outCanvas = document.createElement('canvas')

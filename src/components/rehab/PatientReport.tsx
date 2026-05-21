@@ -140,47 +140,64 @@ const STATUS_LABEL: Record<AngleStatus, string> = { normal: '正常', caution: '
 
 // ── 計測値パネル ──────────────────────────────────────────────────────────────
 function MeasurementPanel({ angles, poseSide }: { angles: JointAngles; poseSide: string }) {
-  const items: { key: keyof JointAngles; label: string; unit: string; side?: 'L'|'R'|'C' }[] = [
-    { key:'leftKnee',     label:'左膝屈曲',     unit:'°', side:'L' },
-    { key:'rightKnee',    label:'右膝屈曲',     unit:'°', side:'R' },
-    { key:'leftHip',      label:'左股関節屈曲', unit:'°', side:'L' },
-    { key:'rightHip',     label:'右股関節屈曲', unit:'°', side:'R' },
-    { key:'leftAnkle',    label:'左足首背屈',   unit:'°', side:'L' },
-    { key:'rightAnkle',   label:'右足首背屈',   unit:'°', side:'R' },
-    { key:'trunkAngle',   label:'体幹前傾',   unit:'°', side:'C' },
-    { key:'pelvisTilt',   label:'骨盤傾斜',   unit:'cm', side:'C' },
-    { key:'shoulderSymm', label:'肩の高さ差', unit:'cm', side:'C' },
-    { key:'headForward',  label:'頭部前方位', unit:'cm', side:'C' },
+  type Item = { key: keyof JointAngles; label: string; unit: string; side?: 'L'|'R'|'C'; group: 'common'|'front'|'side' }
+  const items: Item[] = [
+    { key:'leftKnee',     label:'左膝屈曲',     unit:'°',  side:'L', group:'common' },
+    { key:'rightKnee',    label:'右膝屈曲',     unit:'°',  side:'R', group:'common' },
+    { key:'leftHip',      label:'左股関節屈曲', unit:'°',  side:'L', group:'common' },
+    { key:'rightHip',     label:'右股関節屈曲', unit:'°',  side:'R', group:'common' },
+    { key:'trunkAngle',   label:'体幹前傾',     unit:'°',  side:'C', group:'common' },
+    { key:'leftAnkle',    label:'左足首背屈',   unit:'°',  side:'L', group:'side'   },
+    { key:'rightAnkle',   label:'右足首背屈',   unit:'°',  side:'R', group:'side'   },
+    { key:'headForward',  label:'頭部前方位',   unit:'cm', side:'C', group:'side'   },
+    { key:'pelvisTilt',   label:'骨盤傾斜',     unit:'cm', side:'C', group:'front'  },
+    { key:'shoulderSymm', label:'肩の高さ差',   unit:'cm', side:'C', group:'front'  },
   ]
   const visible = items.filter((it) => angles[it.key] !== null)
   if (visible.length === 0) return null
 
+  const sideLabel   = poseSide === 'front'   ? '📷 正面撮影 AI自動判定'
+                    : poseSide === 'side'     ? '📷 側面撮影 AI自動判定'
+                    : '📷 撮影方向 判定中'
+  const sideBg      = poseSide === 'front'   ? 'rgba(59,130,246,0.3)'
+                    : poseSide === 'side'     ? 'rgba(16,185,129,0.3)'
+                    : 'rgba(245,158,11,0.3)'
+  const sideNote    = poseSide === 'front'   ? '正面：左右対称性・膝・股関節を評価。足首背屈は側面撮影で追加計測。'
+                    : poseSide === 'side'     ? '側面：足首背屈・体幹・頭部前方を評価。正面撮影と組み合わせると左右差も確認可。'
+                    : '撮影方向が検出できませんでした。全方向の参考値を表示しています。'
+
+  function AngleCard({ key: k, label, unit, side }: Item) {
+    const val = angles[k] as number
+    const st  = angleStatus(k, val)
+    const sideColor = side === 'L' ? '#60a5fa' : side === 'R' ? '#f87171' : '#a3e635'
+    const displayUnit = (k === 'leftAnkle' || k === 'rightAnkle') && val < 0 ? '° 底屈' : unit
+    return (
+      <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:'8px', padding:'7px 10px', borderLeft:`3px solid ${STATUS_COLOR[st]}` }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'4px', marginBottom:'3px' }}>
+          {side && <span style={{ fontSize:'9px', fontWeight:'800', color:sideColor, background:'rgba(255,255,255,0.12)', padding:'0 4px', borderRadius:'3px' }}>{side}</span>}
+          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.6)' }}>{label}</span>
+        </div>
+        <div style={{ display:'flex', alignItems:'baseline', gap:'4px' }}>
+          <span style={{ fontSize:'18px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{val}</span>
+          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>{displayUnit}</span>
+          <span style={{ fontSize:'9px', fontWeight:'700', color:STATUS_COLOR[st], marginLeft:'auto' }}>{STATUS_LABEL[st]}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ marginTop:'12px', background:'rgba(15,39,68,0.92)', borderRadius:'12px', padding:'12px 14px' }}>
-      <p style={{ fontSize:'10px', color:'#5eead4', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 8px' }}>
-        3D関節計測 — {poseSide === 'front' ? '正面' : poseSide === 'side' ? '側面' : ''}
-      </p>
+      {/* 撮影方向バッジ */}
+      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' }}>
+        <span style={{ fontSize:'11px', fontWeight:'800', color:'#fff', background:sideBg, padding:'2px 8px', borderRadius:'20px', letterSpacing:'0.05em' }}>
+          {sideLabel}
+        </span>
+      </div>
+      <p style={{ fontSize:'9px', color:'rgba(255,255,255,0.45)', margin:'0 0 10px', lineHeight:1.5 }}>{sideNote}</p>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))', gap:'6px' }}>
-        {visible.map(({ key, label, unit, side }) => {
-          const val = angles[key] as number
-          const st  = angleStatus(key, val)
-          const sideColor = side === 'L' ? '#60a5fa' : side === 'R' ? '#f87171' : '#a3e635'
-          return (
-            <div key={key} style={{ background:'rgba(255,255,255,0.07)', borderRadius:'8px', padding:'7px 10px', borderLeft:`3px solid ${STATUS_COLOR[st]}` }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'4px', marginBottom:'3px' }}>
-                {side && <span style={{ fontSize:'9px', fontWeight:'800', color:sideColor, background:'rgba(255,255,255,0.12)', padding:'0 4px', borderRadius:'3px' }}>{side}</span>}
-                <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.6)' }}>{label}</span>
-              </div>
-              <div style={{ display:'flex', alignItems:'baseline', gap:'4px' }}>
-                <span style={{ fontSize:'18px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{val}</span>
-                <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>
-                  {(key === 'leftAnkle' || key === 'rightAnkle') && val < 0 ? '° 底屈' : unit}
-                </span>
-                <span style={{ fontSize:'9px', fontWeight:'700', color:STATUS_COLOR[st], marginLeft:'auto' }}>{STATUS_LABEL[st]}</span>
-              </div>
-            </div>
-          )
-        })}
+        {visible.map((item) => <AngleCard key={item.key} {...item} />)}
       </div>
     </div>
   )
@@ -426,7 +443,7 @@ export default function PatientReport({ case_: c }: Props) {
   }
 
   function handleCopy(){navigator.clipboard.writeText(buildShareText()).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)})}
-  function handleLine(){window.open(`https://line.me/R/msg/text/?${encodeURIComponent(buildShareText())}`,'_blank','noopener,noreferrer,width=600,height=500')}
+  function handleLine(){window.open(`https://line.me/R/share?text=${encodeURIComponent(buildShareText())}`,'_blank','noopener,noreferrer,width=600,height=500')}
   function handlePrint(){window.print()}
 
   return (
