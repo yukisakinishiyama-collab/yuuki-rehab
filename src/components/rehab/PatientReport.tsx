@@ -426,7 +426,7 @@ export default function PatientReport({ case_: c }: Props) {
   }
 
   function handleCopy(){navigator.clipboard.writeText(buildShareText()).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)})}
-  function handleLine(){window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encodeURIComponent(buildShareText())}`,'_blank','noopener,noreferrer,width=600,height=500')}
+  function handleLine(){window.open(`https://line.me/R/msg/text/?${encodeURIComponent(buildShareText())}`,'_blank','noopener,noreferrer,width=600,height=500')}
   function handlePrint(){window.print()}
 
   return (
