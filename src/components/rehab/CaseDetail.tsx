@@ -13,13 +13,14 @@ import VideoUpload from './VideoUpload'
 import VideoCompare from './VideoCompare'
 import ReportView from './ReportView'
 import PatientReport from './PatientReport'
-import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2 } from 'lucide-react'
+import ImageROMAnalysis from './ImageROMAnalysis'
+import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2, Camera } from 'lucide-react'
 
 interface Props {
   caseId: string
 }
 
-type Tab = 'videos' | 'upload' | 'compare' | 'report' | 'patient-report'
+type Tab = 'videos' | 'upload' | 'compare' | 'report' | 'patient-report' | 'image-rom'
 
 export default function CaseDetail({ caseId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
@@ -54,6 +55,7 @@ export default function CaseDetail({ caseId }: Props) {
   const TABS: Array<{ key: Tab; label: string; icon: React.ElementType }> = [
     { key: 'videos', label: '動画一覧', icon: Video },
     { key: 'upload', label: '動画追加', icon: Upload },
+    { key: 'image-rom', label: '📸 画像ROM計測', icon: Camera },
     { key: 'compare', label: '動画比較', icon: SplitSquareHorizontal },
     { key: 'report', label: '分析レポート', icon: FileText },
     { key: 'patient-report', label: '患者用レポート', icon: Share2 },
@@ -163,6 +165,21 @@ export default function CaseDetail({ caseId }: Props) {
             caseId={case_.id}
             onUploaded={() => { reload(); setTab('videos') }}
           />
+        </div>
+      )}
+
+      {tab === 'image-rom' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Camera className="w-5 h-5 text-teal-600" />
+              画像ROM計測
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              正面・側面の写真をアップロードすると、AIが骨格を検出して運動軸ごとのROMを自動計測します。
+            </p>
+          </div>
+          <ImageROMAnalysis />
         </div>
       )}
 

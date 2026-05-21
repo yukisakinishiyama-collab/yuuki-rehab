@@ -6,7 +6,7 @@ import { MOVEMENT_TYPE_LABELS } from '@/types/rehab'
 import { getComments, getAllEvaluations, getAISummaries, getAnnotations, getVideoUrl, saveVideoUrl } from '@/lib/rehab-store'
 import { getBlobUrlFromDB } from '@/lib/video-db'
 import { Printer, Share2, Copy, Check, ChevronDown, ChevronUp, Bot, Camera, Activity } from 'lucide-react'
-import type { JointAngles, PoseAnalysisResult } from '@/lib/pose-analyzer'
+import type { JointAngles, PoseAnalysisResult, ROMItem } from '@/lib/pose-analyzer'
 
 interface Props { case_: RehabCase }
 
@@ -19,6 +19,7 @@ interface SceneFrame {
   imageData:    string          // base64 (生フレーム＋描画済みアノテーション)
   poseData:     string | null   // base64 (ポーズ骨格オーバーレイ済み)
   angles:       JointAngles | null
+  romItems:     ROMItem[]
   poseSide:     'front' | 'side' | 'unknown'
   comment?:     VideoComment
   annotation?:  SavedAnnotation
@@ -115,89 +116,61 @@ type BodyRegion='head'|'neck'|'shoulder_l'|'shoulder_r'|'elbow_l'|'elbow_r'|'wri
 const REGION_LABELS:Record<BodyRegion,string>={head:'頭部',neck:'頸部',shoulder_l:'左肩',shoulder_r:'右肩',elbow_l:'左肘',elbow_r:'右肘',wrist_l:'左手首',wrist_r:'右手首',chest:'胸部',abdomen:'腹部',lower_back:'腰部',hip_l:'左股関節',hip_r:'右股関節',knee_l:'左膝',knee_r:'右膝',ankle_l:'左足首',ankle_r:'右足首',foot_l:'左足部',foot_r:'右足部',trunk:'体幹',pelvis:'骨盤'}
 function detectRegions(text:string):BodyRegion[]{const f=new Set<BodyRegion>();const t=text;if(/頭|頭部/.test(t))f.add('head');if(/頸|首|頚/.test(t))f.add('neck');if(/左肩/.test(t))f.add('shoulder_l');if(/右肩/.test(t))f.add('shoulder_r');if(/肩(?!甲)/.test(t)&&!f.has('shoulder_l')&&!f.has('shoulder_r')){f.add('shoulder_l');f.add('shoulder_r')};if(/左肘/.test(t))f.add('elbow_l');if(/右肘/.test(t))f.add('elbow_r');if(/肘/.test(t)&&!f.has('elbow_l')&&!f.has('elbow_r')){f.add('elbow_l');f.add('elbow_r')};if(/胸|胸郭/.test(t))f.add('chest');if(/腹|コア/.test(t)){f.add('abdomen');f.add('trunk')};if(/腰|腰部/.test(t))f.add('lower_back');if(/骨盤/.test(t))f.add('pelvis');if(/体幹/.test(t))f.add('trunk');if(/左股/.test(t))f.add('hip_l');if(/右股/.test(t))f.add('hip_r');if(/股関節|ヒップ/.test(t)&&!f.has('hip_l')&&!f.has('hip_r')){f.add('hip_l');f.add('hip_r')};if(/左膝/.test(t))f.add('knee_l');if(/右膝/.test(t))f.add('knee_r');if(/膝/.test(t)&&!f.has('knee_l')&&!f.has('knee_r')){f.add('knee_l');f.add('knee_r')};if(/左足首|左足関節/.test(t))f.add('ankle_l');if(/右足首|右足関節/.test(t))f.add('ankle_r');if(/足首|足関節/.test(t)&&!f.has('ankle_l')&&!f.has('ankle_r')){f.add('ankle_l');f.add('ankle_r')};if(/左足部/.test(t))f.add('foot_l');if(/右足部/.test(t))f.add('foot_r');if(/足部|足底|足裏/.test(t)&&!f.has('foot_l')&&!f.has('foot_r')){f.add('foot_l');f.add('foot_r')};return [...f]}
 
-// ── 関節角度 正常範囲チェック ─────────────────────────────────────────────────
-type AngleStatus = 'normal' | 'caution' | 'alert'
-function angleStatus(key: keyof JointAngles, val: number | null): AngleStatus {
-  if (val === null) return 'normal'
-  const ranges: Partial<Record<keyof JointAngles, [number, number]>> = {
-    leftKnee:     [0, 20],   rightKnee:     [0, 20],    // 臨床: 立位屈曲0-20°正常
-    leftHip:      [0, 15],   rightHip:      [0, 15],    // 臨床: 立位屈曲0-15°正常
-    trunkAngle:   [0, 10],                               // 前傾10度以内
-    pelvisTilt:   [0, 3],                                // 骨盤傾斜3cm以内
-    shoulderSymm: [0, 3],
-    headForward:  [-5, 5],
-    leftAnkle:    [-10, 10], rightAnkle:    [-10, 10],  // 臨床: 背屈/底屈±10°正常
-  }
-  const range = ranges[key]
-  if (!range) return 'normal'
-  if (val >= range[0] && val <= range[1]) return 'normal'
-  const deviation = Math.min(Math.abs(val - range[0]), Math.abs(val - range[1]))
-  return deviation > 15 ? 'alert' : 'caution'
+// ── 計測値パネル（ROMItemベース） ────────────────────────────────────────────
+const ROM_STATUS_COLOR = { normal: '#16a34a', caution: '#d97706', alert: '#dc2626' }
+const ROM_STATUS_LABEL = { normal: '正常', caution: '要注意', alert: '要改善' }
+const PLANE_COLOR: Record<string, string> = { '矢状面(前後)': '#0d9488', '前額面(左右)': '#7c3aed' }
+
+function romItemStatus(item: ROMItem): 'normal' | 'caution' | 'alert' {
+  if (item.value >= item.normalMin && item.value <= item.normalMax) return 'normal'
+  const dev = Math.min(Math.abs(item.value - item.normalMin), Math.abs(item.value - item.normalMax))
+  return dev > 15 ? 'alert' : 'caution'
 }
 
-const STATUS_COLOR: Record<AngleStatus, string> = { normal: '#16a34a', caution: '#d97706', alert: '#dc2626' }
-const STATUS_LABEL: Record<AngleStatus, string> = { normal: '正常', caution: '要注意', alert: '要改善' }
+function MeasurementPanel({ romItems, poseSide }: { angles: JointAngles | null; romItems: ROMItem[]; poseSide: string }) {
+  if (!romItems || romItems.length === 0) return null
 
-// ── 計測値パネル ──────────────────────────────────────────────────────────────
-function MeasurementPanel({ angles, poseSide }: { angles: JointAngles; poseSide: string }) {
-  type Item = { key: keyof JointAngles; label: string; unit: string; side?: 'L'|'R'|'C'; group: 'common'|'front'|'side' }
-  const items: Item[] = [
-    { key:'leftKnee',     label:'左膝屈曲',     unit:'°',  side:'L', group:'common' },
-    { key:'rightKnee',    label:'右膝屈曲',     unit:'°',  side:'R', group:'common' },
-    { key:'leftHip',      label:'左股関節屈曲', unit:'°',  side:'L', group:'common' },
-    { key:'rightHip',     label:'右股関節屈曲', unit:'°',  side:'R', group:'common' },
-    { key:'trunkAngle',   label:'体幹前傾',     unit:'°',  side:'C', group:'common' },
-    { key:'leftAnkle',    label:'左足首背屈',   unit:'°',  side:'L', group:'side'   },
-    { key:'rightAnkle',   label:'右足首背屈',   unit:'°',  side:'R', group:'side'   },
-    { key:'headForward',  label:'頭部前方位',   unit:'cm', side:'C', group:'side'   },
-    { key:'pelvisTilt',   label:'骨盤傾斜',     unit:'cm', side:'C', group:'front'  },
-    { key:'shoulderSymm', label:'肩の高さ差',   unit:'cm', side:'C', group:'front'  },
-  ]
-  const visible = items.filter((it) => angles[it.key] !== null)
-  if (visible.length === 0) return null
-
-  const sideLabel   = poseSide === 'front'   ? '📷 正面撮影 AI自動判定'
-                    : poseSide === 'side'     ? '📷 側面撮影 AI自動判定'
-                    : '📷 撮影方向 判定中'
-  const sideBg      = poseSide === 'front'   ? 'rgba(59,130,246,0.3)'
-                    : poseSide === 'side'     ? 'rgba(16,185,129,0.3)'
-                    : 'rgba(245,158,11,0.3)'
-  const sideNote    = poseSide === 'front'   ? '正面：左右対称性・膝・股関節を評価。足首背屈は側面撮影で追加計測。'
-                    : poseSide === 'side'     ? '側面：足首背屈・体幹・頭部前方を評価。正面撮影と組み合わせると左右差も確認可。'
-                    : '撮影方向が検出できませんでした。全方向の参考値を表示しています。'
-
-  function AngleCard({ key: k, label, unit, side }: Item) {
-    const val = angles[k] as number
-    const st  = angleStatus(k, val)
-    const sideColor = side === 'L' ? '#60a5fa' : side === 'R' ? '#f87171' : '#a3e635'
-    const displayUnit = (k === 'leftAnkle' || k === 'rightAnkle') && val < 0 ? '° 底屈' : unit
-    return (
-      <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:'8px', padding:'7px 10px', borderLeft:`3px solid ${STATUS_COLOR[st]}` }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'4px', marginBottom:'3px' }}>
-          {side && <span style={{ fontSize:'9px', fontWeight:'800', color:sideColor, background:'rgba(255,255,255,0.12)', padding:'0 4px', borderRadius:'3px' }}>{side}</span>}
-          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.6)' }}>{label}</span>
-        </div>
-        <div style={{ display:'flex', alignItems:'baseline', gap:'4px' }}>
-          <span style={{ fontSize:'18px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{val}</span>
-          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>{displayUnit}</span>
-          <span style={{ fontSize:'9px', fontWeight:'700', color:STATUS_COLOR[st], marginLeft:'auto' }}>{STATUS_LABEL[st]}</span>
-        </div>
-      </div>
-    )
-  }
+  const sideLabel = poseSide === 'front' ? '📷 正面 AI判定' : poseSide === 'side' ? '📷 側面 AI判定' : '📷 方向判定中'
+  const sideBg    = poseSide === 'front' ? 'rgba(59,130,246,0.35)' : poseSide === 'side' ? 'rgba(13,148,136,0.35)' : 'rgba(245,158,11,0.35)'
+  const sideNote  = poseSide === 'front'
+    ? '前額面: 外反/内反・外転・骨盤・肩傾き'
+    : poseSide === 'side'
+    ? '矢状面: 屈曲/伸展・背屈/底屈・体幹・頭部'
+    : '全計測（参考値）'
 
   return (
     <div style={{ marginTop:'12px', background:'rgba(15,39,68,0.92)', borderRadius:'12px', padding:'12px 14px' }}>
-      {/* 撮影方向バッジ */}
-      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' }}>
-        <span style={{ fontSize:'11px', fontWeight:'800', color:'#fff', background:sideBg, padding:'2px 8px', borderRadius:'20px', letterSpacing:'0.05em' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px', flexWrap:'wrap' }}>
+        <span style={{ fontSize:'10px', fontWeight:'800', color:'#fff', background:sideBg, padding:'2px 8px', borderRadius:'20px' }}>
           {sideLabel}
         </span>
+        <span style={{ fontSize:'9px', color:'rgba(255,255,255,0.5)' }}>{sideNote}</span>
       </div>
-      <p style={{ fontSize:'9px', color:'rgba(255,255,255,0.45)', margin:'0 0 10px', lineHeight:1.5 }}>{sideNote}</p>
-
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))', gap:'6px' }}>
-        {visible.map((item) => <AngleCard key={item.key} {...item} />)}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'6px', marginTop:'8px' }}>
+        {romItems.map((item) => {
+          const st = romItemStatus(item)
+          const sideColor = item.side === 'L' ? '#60a5fa' : item.side === 'R' ? '#f87171' : '#a3e635'
+          const planeColor = PLANE_COLOR[item.plane] ?? '#94a3b8'
+          return (
+            <div key={item.key} style={{ background:'rgba(255,255,255,0.07)', borderRadius:'8px', padding:'7px 10px', borderLeft:`3px solid ${ROM_STATUS_COLOR[st]}` }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'3px', marginBottom:'2px', flexWrap:'wrap' }}>
+                <span style={{ fontSize:'8px', fontWeight:'800', color:sideColor, background:'rgba(255,255,255,0.12)', padding:'0 4px', borderRadius:'3px' }}>{item.side}</span>
+                <span style={{ fontSize:'8px', color:planeColor, background:`${planeColor}22`, padding:'0 4px', borderRadius:'3px' }}>{item.plane}</span>
+              </div>
+              <p style={{ fontSize:'9px', color:'rgba(255,255,255,0.55)', margin:'0 0 2px' }}>{item.axis}</p>
+              <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.8)', fontWeight:'600', margin:'0 0 3px' }}>{item.label}</p>
+              <div style={{ display:'flex', alignItems:'baseline', gap:'4px' }}>
+                <span style={{ fontSize:'20px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{item.value}</span>
+                <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)' }}>{item.unit}</span>
+                <span style={{ fontSize:'10px', fontWeight:'700', color:planeColor }}>{item.direction}</span>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'3px' }}>
+                <span style={{ fontSize:'8px', color:'rgba(255,255,255,0.35)' }}>正常:{item.normalMin}〜{item.normalMax}{item.unit}</span>
+                <span style={{ fontSize:'8px', fontWeight:'700', color:ROM_STATUS_COLOR[st] }}>{ROM_STATUS_LABEL[st]}</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -252,7 +225,7 @@ function SceneCard({ frame, index }: { frame: SceneFrame; index: number }) {
       {/* 計測値 */}
       {hasPose && frame.angles && (
         <div style={{ padding:'0 12px 12px' }}>
-          <MeasurementPanel angles={frame.angles} poseSide={frame.poseSide} />
+          <MeasurementPanel angles={frame.angles} romItems={frame.romItems ?? []} poseSide={frame.poseSide} />
         </div>
       )}
 
@@ -374,19 +347,20 @@ export default function PatientReport({ case_: c }: Props) {
             const { base64,w,h } = await extractFrame(videoUrl, ts, annotation ? [annotation,...nearAnnotations.filter((a)=>a.id!==annotation.id)] : nearAnnotations)
 
             // ポーズ解析
-            let poseData:string|null=null, angles:JointAngles|null=null, poseSide:'front'|'side'|'unknown'='unknown'
+            let poseData:string|null=null, angles:JointAngles|null=null, romItems:ROMItem[]=[], poseSide:'front'|'side'|'unknown'='unknown'
             if (analyzeAndAnnotateFrame) {
               try {
                 const poseResult = await analyzeAndAnnotateFrame(base64, w, h)
                 if (poseResult.result.detected) {
                   poseData = poseResult.annotated
                   angles   = poseResult.result.jointAngles
+                  romItems = poseResult.result.romItems ?? []
                   poseSide = poseResult.result.poseSide
                 }
               } catch { /* pose失敗は無視 */ }
             }
 
-            frames.push({ videoId:video.id, videoLabel:video.label, movementType:video.movementType, timestamp:ts, imageData:base64, poseData, angles, poseSide, comment, annotation })
+            frames.push({ videoId:video.id, videoLabel:video.label, movementType:video.movementType, timestamp:ts, imageData:base64, poseData, angles, romItems, poseSide, comment, annotation })
           } catch { /* skip */ }
         }
       }
