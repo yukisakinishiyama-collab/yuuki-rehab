@@ -425,7 +425,7 @@ export default function PatientReport({ case_: c }: Props) {
   }
   function handlePrint(){window.print()}
 
-  // ── 印刷と同じ表示を画像化してダウンロード ──
+  // ── レポートを画像化してクリップボードにコピー ──
   async function handleSaveImage() {
     setSavingImg(true)
     try {
@@ -433,56 +433,58 @@ export default function PatientReport({ case_: c }: Props) {
       const el = document.getElementById('patient-report-body')
       if (!el) return
 
-      // ページ内の全 <img> を確実に読み込んでから撮影
+      // 全 <img> のロードを待つ
       const allImgs = Array.from(el.querySelectorAll('img'))
       await Promise.all(allImgs.map((img) => {
         if (img.complete && img.naturalHeight > 0) return Promise.resolve()
-        return new Promise<void>((res) => {
-          img.onload = () => res()
-          img.onerror = () => res()       // エラーでもスキップして続行
-          // 既に src がある場合は再セットして強制ロード
-          const src = img.src
-          img.src = ''
-          img.src = src
-        })
+        return new Promise<void>((res) => { img.onload = () => res(); img.onerror = () => res() })
       }))
-
-      // 少し待ってレンダリングを安定させる
       await new Promise((r) => setTimeout(r, 300))
 
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,       // data:URL 画像を許可
-        imageTimeout: 0,        // タイムアウトなし（大きな画像も待つ）
+        allowTaint: true,
+        imageTimeout: 0,
         backgroundColor: '#ffffff',
         windowWidth: 960,
         logging: false,
         onclone: (_doc, clonedEl) => {
-          // クローン要素内の no-print 要素を非表示にする
           clonedEl.querySelectorAll<HTMLElement>('.no-print,[data-noprint]').forEach((n) => { n.style.display = 'none' })
         },
       })
 
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+      // PNG blob を生成
+      const pngBlob: Blob = await new Promise((res, rej) =>
+        canvas.toBlob((b) => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+      )
 
-      // ① Web Share API でネイティブ共有（モバイルでLINEに直接送れる）
+      // ① モバイル：Web Share API（LINEへ直接送信）
       if (typeof navigator.canShare === 'function') {
-        const blob = await (await fetch(dataUrl)).blob()
-        const file = new File([blob], `report_${c.anonymousId}.jpg`, { type: 'image/jpeg' })
+        const file = new File([pngBlob], `report_${c.anonymousId}.png`, { type: 'image/png' })
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: '動作分析レポート' })
           return
         }
       }
 
-      // ② フォールバック：ダウンロード
+      // ② PC：クリップボードにコピー → LINEにCtrl+Vで貼り付け可能
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })])
+        setCopied(true)
+        setTimeout(() => setCopied(false), 3000)
+        return
+      }
+
+      // ③ 最終フォールバック：ダウンロード
+      const url = URL.createObjectURL(pngBlob)
       const a = document.createElement('a')
-      a.href = dataUrl
-      a.download = `report_${c.anonymousId}_${new Date().toISOString().slice(0,10)}.jpg`
+      a.href = url
+      a.download = `report_${c.anonymousId}_${new Date().toISOString().slice(0,10)}.png`
       a.click()
+      URL.revokeObjectURL(url)
     } catch (e) {
-      console.error('画像保存エラー:', e)
+      console.error('画像コピーエラー:', e)
     } finally {
       setSavingImg(false)
     }
@@ -498,20 +500,22 @@ export default function PatientReport({ case_: c }: Props) {
           {framesLoading && <span style={{ fontSize:'11px',color:'#0d9488',display:'flex',alignItems:'center',gap:'4px' }}><Activity style={{ width:'12px',height:'12px' }}/>3D解析中...</span>}
         </div>
         <div style={{ marginLeft:'auto',display:'flex',gap:'8px',flexWrap:'wrap' }}>
-          {/* 画像で保存 / LINEで共有（メイン） */}
+          {/* 画像コピー / LINEで共有（メイン） */}
           <button
             onClick={handleSaveImage}
             disabled={savingImg}
-            style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:savingImg?'#6b7280':'#06C755',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:savingImg?'not-allowed':'pointer',opacity:savingImg?0.7:1 }}
+            style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:savingImg?'#6b7280':copied?'#16a34a':'#06C755',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:savingImg?'not-allowed':'pointer',opacity:savingImg?0.7:1 }}
           >
             {savingImg
-              ? <><span style={{ fontSize:'12px' }}>⏳</span>生成中...</>
-              : <><ImageDown style={{ width:'14px',height:'14px' }}/>画像で保存・送信</>
+              ? <><span style={{ fontSize:'12px' }}>⏳</span>画像生成中...</>
+              : copied
+                ? <><Check style={{ width:'14px',height:'14px' }}/>コピー完了！LINEに貼り付けて送信</>
+                : <><ImageDown style={{ width:'14px',height:'14px' }}/>画像をコピー（LINEに貼り付け）</>
             }
           </button>
           {/* テキストコピー（サブ） */}
-          <button onClick={handleCopy} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:copied?'#16a34a':'#fff',color:copied?'#fff':'#374151',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'1px solid #e5e7eb',cursor:'pointer' }}>
-            {copied?<Check style={{ width:'14px',height:'14px' }}/>:<Copy style={{ width:'14px',height:'14px' }}/>}{copied?'コピー完了':'テキストコピー'}
+          <button onClick={handleCopy} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#fff',color:'#374151',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'1px solid #e5e7eb',cursor:'pointer' }}>
+            <Copy style={{ width:'14px',height:'14px' }}/>テキストのみコピー
           </button>
           <button onClick={handlePrint} style={{ display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#111827',color:'#fff',fontWeight:'600',borderRadius:'8px',fontSize:'13px',border:'none',cursor:'pointer' }}><Printer style={{ width:'14px',height:'14px' }}/>印刷</button>
         </div>
