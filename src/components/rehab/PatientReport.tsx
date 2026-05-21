@@ -199,9 +199,14 @@ function SceneCard({ frame, index }: { frame: SceneFrame; index: number }) {
       </div>
 
       {/* フレーム写真 */}
-      <div style={{ position:'relative',background:'#000' }}>
+      <div style={{ position:'relative',background:'#000',lineHeight:0 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={displayImage} alt={`シーン${index+1}`} style={{ width:'100%',display:'block',maxHeight:'300px',objectFit:'contain' }} />
+        <img
+          src={displayImage}
+          alt={`シーン${index+1}`}
+          crossOrigin="anonymous"
+          style={{ width:'100%',display:'block',maxHeight:'300px',objectFit:'contain' }}
+        />
 
         {/* ポーズ切替ボタン（画面のみ） */}
         {hasPose && (
@@ -428,18 +433,41 @@ export default function PatientReport({ case_: c }: Props) {
       const el = document.getElementById('patient-report-body')
       if (!el) return
 
+      // ページ内の全 <img> を確実に読み込んでから撮影
+      const allImgs = Array.from(el.querySelectorAll('img'))
+      await Promise.all(allImgs.map((img) => {
+        if (img.complete && img.naturalHeight > 0) return Promise.resolve()
+        return new Promise<void>((res) => {
+          img.onload = () => res()
+          img.onerror = () => res()       // エラーでもスキップして続行
+          // 既に src がある場合は再セットして強制ロード
+          const src = img.src
+          img.src = ''
+          img.src = src
+        })
+      }))
+
+      // 少し待ってレンダリングを安定させる
+      await new Promise((r) => setTimeout(r, 300))
+
       const canvas = await html2canvas(el, {
-        scale: 2,           // 高解像度
+        scale: 2,
         useCORS: true,
+        allowTaint: true,       // data:URL 画像を許可
+        imageTimeout: 0,        // タイムアウトなし（大きな画像も待つ）
         backgroundColor: '#ffffff',
-        windowWidth: 900,   // 印刷幅に合わせる
+        windowWidth: 960,
         logging: false,
+        onclone: (_doc, clonedEl) => {
+          // クローン要素内の no-print 要素を非表示にする
+          clonedEl.querySelectorAll<HTMLElement>('.no-print,[data-noprint]').forEach((n) => { n.style.display = 'none' })
+        },
       })
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
 
       // ① Web Share API でネイティブ共有（モバイルでLINEに直接送れる）
-      if (navigator.canShare) {
+      if (typeof navigator.canShare === 'function') {
         const blob = await (await fetch(dataUrl)).blob()
         const file = new File([blob], `report_${c.anonymousId}.jpg`, { type: 'image/jpeg' })
         if (navigator.canShare({ files: [file] })) {
