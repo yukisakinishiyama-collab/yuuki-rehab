@@ -14,6 +14,11 @@ export const metadata: Metadata = {
     siteName: 'ゆうき整骨院',
     locale: 'ja_JP',
     type: 'website',
+    url: 'https://yuuki-rehab.vercel.app',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@yuuki_seikotsu',
   },
   verification: {
     google: 'P8U9O0cyM1sx_kiQpAJzg5uiQ2tEB2Q1BqoxU_qSbA8',

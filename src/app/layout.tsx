@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "YUUKI REHAB | 運動器リハビリ動画分析",
-  description: "理学療法士・医師・トレーナーのための運動器リハビリテーション動画分析プラットフォーム",
+  title: "ゆうき整骨院｜下関のスポーツ障害・術前術後リハビリ専門整骨院",
+  description: "山口県下関市のゆうき整骨院。スポーツ障害・術前術後リハビリ・競技復帰に特化した運動療法型整骨院。",
   icons: {
-    icon: "/icon.png.png?v=3",
-    apple: "/icon.png.png?v=3",
+    icon: "/icon.png.png?v=20260521",
+    apple: "/icon.png.png?v=20260521",
   },
 };
 

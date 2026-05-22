@@ -32,12 +32,12 @@ const symptoms = [
   { label: '野球肩', href: '/symptoms/baseball-shoulder', icon: '⚾' },
   { label: '野球肘', href: '/symptoms/baseball-elbow', icon: '💪' },
   { label: 'ACL術前・術後リハビリ', href: '/symptoms/acl', icon: '🏃' },
-  { label: '半月板術前・術後', href: '/symptoms/acl', icon: '🦴' },
+  { label: '半月板術前・術後', href: '/symptoms/meniscus', icon: '🦴' },
   { label: '股関節痛', href: '/symptoms/hip-pain', icon: '🔵' },
-  { label: '股関節唇損傷', href: '/symptoms/hip-pain', icon: '⚡' },
+  { label: '腰痛・腰部障害', href: '/symptoms/lower-back', icon: '🔧' },
   { label: 'シンスプリント', href: '/symptoms/shin-splints', icon: '🏅' },
   { label: '膝痛', href: '/symptoms/knee-pain', icon: '🔴' },
-  { label: '肩痛', href: '/symptoms/baseball-shoulder', icon: '💙' },
+  { label: '手関節・手首の痛み', href: '/symptoms/wrist', icon: '🤝' },
   { label: '成長期障害', href: '/symptoms/osgood', icon: '📈' },
 ]
 
@@ -267,7 +267,7 @@ export default function HomePage() {
                   <h3 className="text-xl font-bold">対応できる部位・疾患</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  {['股関節', '膝関節', '足関節', '肩関節', '成長期の障害', '術前・術後リハビリ', 'スポーツ外傷', 'スポーツ障害'].map((item) => (
+                  {['股関節', '膝関節', '足関節', '肩関節', '腰椎', '手関節', '成長期の障害', '術前・術後リハビリ', 'スポーツ外傷', 'スポーツ障害'].map((item) => (
                     <div key={item} className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
                       <Zap size={14} className="text-sky-300 shrink-0" />
                       {item}

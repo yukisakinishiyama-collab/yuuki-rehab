@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 
 const faqs = [
   {
@@ -64,13 +64,14 @@ const faqs = [
       },
       {
         q: '費用の目安を教えてください。',
-        a: '症状・施術内容によって異なります。初回（評価・施術含む）の目安はLINEでお問い合わせいただけますとご案内できます。',
+        a: '初回評価（身体評価・動作分析）¥2,000、リハビリ・運動療法¥3,850〜（1部位）です。急性外傷は健康保険適応です。詳しくは料金ページをご覧ください。',
+        link: '/price',
       },
     ],
   },
 ]
 
-function FaqItem({ q, a }: { q: string; a: string }) {
+function FaqItem({ q, a, link }: { q: string; a: string; link?: string }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border border-slate-100 rounded-xl overflow-hidden">
@@ -88,7 +89,14 @@ function FaqItem({ q, a }: { q: string; a: string }) {
       {open && (
         <div className="flex gap-3 px-5 pb-5 pt-2 bg-blue-50">
           <span className="shrink-0 w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">A</span>
-          <p className="text-slate-700 text-sm leading-relaxed">{a}</p>
+          <div>
+            <p className="text-slate-700 text-sm leading-relaxed">{a}</p>
+            {link && (
+              <Link href={link} className="inline-flex items-center gap-1 mt-2 text-blue-700 text-xs font-semibold hover:underline">
+                <ExternalLink size={12} /> 料金ページを見る
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -118,7 +126,7 @@ export default function FaqPage() {
               </h2>
               <div className="space-y-3">
                 {cat.items.map((item) => (
-                  <FaqItem key={item.q} q={item.q} a={item.a} />
+                  <FaqItem key={item.q} q={item.q} a={item.a} link={'link' in item ? (item as {link?: string}).link : undefined} />
                 ))}
               </div>
             </div>

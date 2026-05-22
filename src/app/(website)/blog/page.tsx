@@ -1,11 +1,8 @@
-﻿import type { Metadata } from 'next'
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronRight, Calendar, Tag } from 'lucide-react'
-
-export const metadata: Metadata = {
-  title: 'ブログ｜スポーツ障害・リハビリのお役立ち情報',
-  description: 'ゆうき整骨院のブログ。スポーツ障害・術前術後リハビリ・競技復帰・再発予防に関する医学的根拠に基づいた情報を発信しています。下関市の整骨院からスポーツリハビリの最新情報を。',
-}
 
 const posts = [
   {
@@ -73,6 +70,9 @@ const posts = [
 const categories = ['すべて', 'スポーツ障害', '術前・術後リハビリ', '成長期障害', '運動療法', '競技復帰']
 
 export default function BlogPage() {
+  const [selected, setSelected] = useState('すべて')
+  const filtered = selected === 'すべて' ? posts : posts.filter((p) => p.category === selected)
+
   return (
     <div>
       <section className="bg-gradient-to-br from-navy to-blue-800 py-16 md:py-24">
@@ -87,13 +87,14 @@ export default function BlogPage() {
 
       <section className="py-12 md:py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4">
-          {/* Category Filter (Display Only) */}
+          {/* Category Filter */}
           <div className="flex flex-wrap gap-2 mb-10">
             {categories.map((cat) => (
               <button
                 key={cat}
+                onClick={() => setSelected(cat)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  cat === 'すべて'
+                  cat === selected
                     ? 'bg-blue-700 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700'
                 }`}
@@ -103,31 +104,35 @@ export default function BlogPage() {
             ))}
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.map((post) => (
-              <article key={post.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
-                <div className={`h-40 bg-gradient-to-br ${post.color} flex flex-col items-center justify-center gap-2 relative`}>
-                  <span className="text-5xl">{post.emoji}</span>
-                  <span className="bg-black/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">{post.category}</span>
-                </div>
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
-                    <Calendar size={12} />
-                    {post.date}
+          {filtered.length === 0 ? (
+            <p className="text-center text-slate-400 py-12">該当する記事がありません</p>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filtered.map((post) => (
+                <article key={post.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
+                  <div className={`h-40 bg-gradient-to-br ${post.color} flex flex-col items-center justify-center gap-2 relative`}>
+                    <span className="text-5xl">{post.emoji}</span>
+                    <span className="bg-black/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">{post.category}</span>
                   </div>
-                  <h2 className="text-sm font-bold text-slate-800 leading-snug mb-3 line-clamp-2">{post.title}</h2>
-                  <p className="text-slate-500 text-xs leading-relaxed mb-4 line-clamp-3">{post.excerpt}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {post.tags.map((tag) => (
-                      <span key={tag} className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
-                        <Tag size={10} />{tag}
-                      </span>
-                    ))}
+                  <div className="p-5">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                      <Calendar size={12} />
+                      {post.date}
+                    </div>
+                    <h2 className="text-sm font-bold text-slate-800 leading-snug mb-3 line-clamp-2">{post.title}</h2>
+                    <p className="text-slate-500 text-xs leading-relaxed mb-4 line-clamp-3">{post.excerpt}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {post.tags.map((tag) => (
+                        <span key={tag} className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                          <Tag size={10} />{tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
