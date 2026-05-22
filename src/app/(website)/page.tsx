@@ -136,12 +136,12 @@ export default function HomePage() {
             <span className="inline-block bg-blue-500/30 text-blue-200 text-xs font-bold tracking-widest px-3 py-1.5 rounded-full mb-6 uppercase">
               山口県下関市の整骨院
             </span>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-4">
+            <h1 className="text-[clamp(1.25rem,6vw,2rem)] sm:text-4xl md:text-5xl font-bold text-white leading-[1.4] sm:leading-tight mb-4">
               スポーツ障害・<br className="sm:hidden" />術前術後リハビリに
               <br />
               <span className="text-sky-300">特化した</span>下関の整骨院
             </h1>
-            <p className="text-blue-100 text-lg leading-relaxed mb-8">
+            <p className="text-blue-100 text-base sm:text-lg leading-relaxed mb-8">
               競技復帰と再発予防まで支える、運動療法型整骨院。<br className="hidden md:block" />
               医学的根拠をもとに、あなたの回復とパフォーマンス向上を全力でサポートします。
             </p>
@@ -411,8 +411,9 @@ export default function HomePage() {
             <h2 className="text-2xl md:text-3xl font-bold text-white mt-2">
               YUUKI <span className="text-teal-400">MOTION LAB</span>
             </h2>
-            <p className="text-blue-200 mt-3 max-w-2xl mx-auto text-sm leading-relaxed">
-              動画を送るだけで、AIと専門家が動作を分析。「なぜ痛むのか」「何を直せばいいのか」を可視化する、ゆうき整骨院の動作解析サービスです。
+            <p className="text-blue-200 mt-3 max-w-2xl mx-auto text-sm leading-relaxed text-left sm:text-center">
+              動画を送るだけで、AIと専門家が動作を分析。<br className="hidden sm:block" />
+              「なぜ痛むのか」「何を直せばいいのか」を可視化する、ゆうき整骨院の動作解析サービスです。
             </p>
           </div>
 
@@ -444,12 +445,12 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="bg-white/5 border border-teal-500/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
+          <div className="bg-white/5 border border-teal-500/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex-1">
               <p className="text-teal-300 text-xs font-bold tracking-widest uppercase mb-2">Remote Analysis</p>
-              <h3 className="text-xl font-bold text-white mb-2">遠方の方・来院前の方へ</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-2">遠方の方・来院前の方へ</h3>
               <p className="text-blue-200 text-sm leading-relaxed mb-4">
-                「下関まで来院できないけど相談したい」「まず自分の動きを見てほしい」という方は、LINEまたはメールで動画をお送りください。専門家が確認してフィードバックします。
+                下関まで来院できない方も、LINEまたはメールで動画をお送りいただければ専門家が動作を確認してフィードバックします。
               </p>
               <div className="flex flex-wrap gap-3 text-xs">
                 <span className="bg-teal-500/20 text-teal-300 px-3 py-1.5 rounded-full font-bold">一般・遠隔の方 ¥2,500</span>
