@@ -136,7 +136,7 @@ export default function HomePage() {
             <span className="inline-block bg-blue-500/30 text-blue-200 text-xs font-bold tracking-widest px-3 py-1.5 rounded-full mb-6 uppercase">
               山口県下関市の整骨院
             </span>
-            <h1 className="text-[clamp(1.25rem,6vw,2rem)] sm:text-4xl md:text-5xl font-bold text-white leading-[1.4] sm:leading-tight mb-4">
+            <h1 className="hero-h1 font-bold text-white mb-4">
               スポーツ障害・<br className="sm:hidden" />術前術後リハビリに
               <br />
               <span className="text-sky-300">特化した</span>下関の整骨院
