@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 
-// 依頼種別ラベル
 const SERVICE_LABELS: Record<string, string> = {
   sports:  'スポーツ・競技フォーム改善',
   rehab:   'リハビリ・回復確認',
@@ -10,7 +9,6 @@ const SERVICE_LABELS: Record<string, string> = {
   other:   'その他',
 }
 
-// メール通知を送信
 async function sendNotificationEmail(data: {
   clientName: string
   clientEmail: string
@@ -28,7 +26,7 @@ async function sendNotificationEmail(data: {
   const gmailPass = process.env.GMAIL_APP_PASSWORD
 
   if (!gmailUser || !gmailPass) {
-    console.warn('[notify] GMAIL_USER / GMAIL_APP_PASSWORD が未設定のためメール通知をスキップします')
+    console.warn('[notify] GMAIL_USER / GMAIL_APP_PASSWORD が未設定のためスキップします')
     return
   }
 
@@ -67,12 +65,16 @@ async function sendNotificationEmail(data: {
       <p style="margin:0;color:#1e293b">${data.requestNote}</p>
     </div>` : ''}
 
-    <h2 style="font-size:15px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin-top:20px">動画ファイル</h2>
+    <h2 style="font-size:15px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin-top:20px">動画ファイル（選択済み）</h2>
     <p style="font-size:14px;margin:0">📁 ${data.videoFileName}（${data.videoSizeMB} MB）</p>
-    <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">※ 動画はダッシュボードで確認できます</p>
+    <p style="font-size:12px;color:#64748b;margin:6px 0 0">
+      ※ 動画本体は下記アドレスに返信してお受け取りください
+    </p>
 
     <div style="margin-top:24px;padding:16px;background:#ecfdf5;border-radius:8px;text-align:center">
-      <p style="margin:0;font-size:13px;color:#065f46;font-weight:600">まずは <a href="mailto:${data.clientEmail}" style="color:#0d9488">${data.clientEmail}</a> へ返信してご対応ください</p>
+      <p style="margin:0;font-size:14px;color:#065f46;font-weight:600">
+        ↩ <a href="mailto:${data.clientEmail}" style="color:#0d9488">${data.clientEmail}</a> へ返信して動画を受け取る
+      </p>
     </div>
   </div>
   <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:12px">YUUKI MOTION LAB 自動通知メール</p>
@@ -81,7 +83,7 @@ async function sendNotificationEmail(data: {
 
   await transporter.sendMail({
     from: `"YUUKI MOTION LAB" <${gmailUser}>`,
-    to: gmailUser,
+    to: 'yukisakinishiyama@gmail.com',
     subject: `【動作解析依頼】${data.clientName}様 ／ ${data.sport}`,
     html,
   })
@@ -89,74 +91,65 @@ async function sendNotificationEmail(data: {
 
 export async function POST(req: NextRequest) {
   try {
-    const fd = await req.formData()
-    const clientName  = (fd.get('clientName')  as string) || ''
-    const clientEmail = (fd.get('clientEmail') as string) || ''
-    const clientPhone = (fd.get('clientPhone') as string) || ''
-    const age         = (fd.get('age')         as string) || ''
-    const gender      = (fd.get('gender')      as string) || 'other'
-    const serviceType = (fd.get('serviceType') as string) || 'other'
-    const sport       = (fd.get('sport')       as string) || ''
-    const requestNote = (fd.get('requestNote') as string) || ''
-    const videoFile   = fd.get('video') as File | null
+    // JSON形式で受け取る（動画ファイル本体は送らない）
+    const body = await req.json()
+    const {
+      clientName  = '',
+      clientEmail = '',
+      clientPhone = '',
+      age         = '',
+      gender      = 'other',
+      serviceType = 'other',
+      sport       = '',
+      requestNote = '',
+      videoFileName = '（なし）',
+      videoSizeMB   = '0',
+    } = body
 
-    if (!clientName || !clientEmail || !sport || !videoFile) {
+    if (!clientName || !clientEmail || !sport) {
       return NextResponse.json({ error: '必須項目が不足しています' }, { status: 400 })
     }
 
-    const videoSizeMB = (videoFile.size / 1024 / 1024).toFixed(1)
     const submittedAt = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
 
-    // 開発環境: ファイルに保存
+    // 開発環境: ローカルに記録
     if (process.env.NODE_ENV === 'development') {
-      const { writeFile, readFile, mkdir } = await import('fs/promises')
-      const { existsSync } = await import('fs')
-      const path = await import('path')
-
-      const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads')
-      const SUBMISSIONS_FILE = path.join(UPLOADS_DIR, 'submissions.json')
-
-      if (!existsSync(UPLOADS_DIR)) {
-        await mkdir(UPLOADS_DIR, { recursive: true })
-      }
-
-      const ext = videoFile.name.split('.').pop() ?? 'mp4'
-      const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const fileName = `${fileId}.${ext}`
-      const buffer = Buffer.from(await videoFile.arrayBuffer())
-      await writeFile(path.join(UPLOADS_DIR, fileName), buffer)
-
-      let submissions: object[] = []
       try {
-        const raw = await readFile(SUBMISSIONS_FILE, 'utf-8')
-        submissions = JSON.parse(raw)
-      } catch { /* 初回 */ }
+        const { writeFile, readFile, mkdir } = await import('fs/promises')
+        const { existsSync } = await import('fs')
+        const path = await import('path')
+        const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads')
+        const SUBMISSIONS_FILE = path.join(UPLOADS_DIR, 'submissions.json')
+        if (!existsSync(UPLOADS_DIR)) await mkdir(UPLOADS_DIR, { recursive: true })
 
-      submissions.unshift({
-        id: fileId, clientName, clientEmail,
-        clientPhone: clientPhone || undefined,
-        age: age ? Number(age) : undefined,
-        gender, serviceType, sport,
-        requestNote: requestNote || undefined,
-        videoPath: `/uploads/${fileName}`,
-        videoFileName: videoFile.name,
-        createdAt: new Date().toISOString(),
-        processed: false,
-      })
+        let submissions: object[] = []
+        try { submissions = JSON.parse(await readFile(SUBMISSIONS_FILE, 'utf-8')) } catch { /* 初回 */ }
 
-      await writeFile(SUBMISSIONS_FILE, JSON.stringify(submissions, null, 2), 'utf-8')
+        const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        submissions.unshift({
+          id: fileId, clientName, clientEmail,
+          clientPhone: clientPhone || undefined,
+          age: age ? Number(age) : undefined,
+          gender, serviceType, sport,
+          requestNote: requestNote || undefined,
+          videoFileName, videoSizeMB,
+          createdAt: new Date().toISOString(),
+          processed: false,
+        })
+        await writeFile(SUBMISSIONS_FILE, JSON.stringify(submissions, null, 2), 'utf-8')
+      } catch (e) {
+        console.warn('Dev storage error:', e)
+      }
     }
 
-    // 通知メールを送信（開発・本番共通）
+    // 通知メールを送信
     await sendNotificationEmail({
       clientName, clientEmail,
       clientPhone: clientPhone || undefined,
       age: age || undefined,
-      gender,
-      serviceType, sport,
+      gender, serviceType, sport,
       requestNote: requestNote || undefined,
-      videoFileName: videoFile.name,
-      videoSizeMB,
+      videoFileName, videoSizeMB,
       submittedAt,
     })
 

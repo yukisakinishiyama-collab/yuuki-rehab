@@ -53,13 +53,21 @@ export default function SubmitForm() {
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setStatus('submitting')
 
-    const fd = new FormData()
-    Object.entries(form).forEach(([k, v]) => fd.append(k, v))
-    fd.append('video', videoFile!)
-
     try {
-      const res = await fetch('/api/submit', { method: 'POST', body: fd })
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? '送信に失敗しました') }
+      // 動画ファイル本体は送らず、テキスト情報のみJSONで送信
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          videoFileName: videoFile?.name ?? '（なし）',
+          videoSizeMB: videoFile ? (videoFile.size / 1024 / 1024).toFixed(1) : '0',
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: '送信に失敗しました' }))
+        throw new Error(d.error ?? '送信に失敗しました')
+      }
       setStatus('done')
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : '送信に失敗しました')
@@ -73,10 +81,17 @@ export default function SubmitForm() {
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="w-8 h-8 text-green-500" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">送信が完了しました</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">依頼を受け付けました</h2>
         <p className="text-gray-600 text-sm mb-4">
-          動画を受け付けました。解析完了後、<strong>{form.clientEmail}</strong> にレポートをお送りします。
+          担当者が内容を確認後、<strong>{form.clientEmail}</strong> へご連絡します。
         </p>
+        <div className="bg-blue-50 rounded-xl p-4 text-left mb-4">
+          <p className="text-blue-800 text-xs font-bold mb-1">📎 動画の送り方</p>
+          <p className="text-blue-700 text-xs leading-relaxed">
+            担当者からのメールに返信する形で動画をお送りください。<br />
+            またはLINEでも受け付けています。
+          </p>
+        </div>
         <p className="text-xs text-gray-400">通常3〜5営業日以内にご連絡します</p>
       </div>
     )
