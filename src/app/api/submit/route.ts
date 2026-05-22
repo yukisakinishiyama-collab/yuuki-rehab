@@ -9,6 +9,58 @@ const SERVICE_LABELS: Record<string, string> = {
   other:   'その他',
 }
 
+// LINE Messaging API でプッシュ通知
+async function sendLineNotification(data: {
+  clientName: string
+  clientEmail: string
+  clientPhone?: string
+  sport: string
+  serviceType: string
+  requestNote?: string
+  videoFileName: string
+  submittedAt: string
+}) {
+  const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  const userId = process.env.LINE_USER_ID
+
+  if (!token || !userId) {
+    console.warn('[notify] LINE_CHANNEL_ACCESS_TOKEN / LINE_USER_ID が未設定のためスキップします')
+    return
+  }
+
+  const serviceLabel = SERVICE_LABELS[data.serviceType] ?? data.serviceType
+  const text = [
+    `📹 動作解析依頼が届きました`,
+    `━━━━━━━━━━━━━━`,
+    `👤 ${data.clientName}`,
+    `📧 ${data.clientEmail}`,
+    data.clientPhone ? `📞 ${data.clientPhone}` : null,
+    `🏃 ${data.sport}（${serviceLabel}）`,
+    data.requestNote ? `📝 ${data.requestNote}` : null,
+    `📁 ${data.videoFileName}`,
+    `━━━━━━━━━━━━━━`,
+    `🕐 ${data.submittedAt}`,
+    `↩ 返信してください`,
+  ].filter(Boolean).join('\n')
+
+  const res = await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      to: userId,
+      messages: [{ type: 'text', text }],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    console.error('[notify] LINE送信エラー:', err)
+  }
+}
+
 async function sendNotificationEmail(data: {
   clientName: string
   clientEmail: string
@@ -142,16 +194,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 通知メールを送信
-    await sendNotificationEmail({
-      clientName, clientEmail,
-      clientPhone: clientPhone || undefined,
-      age: age || undefined,
-      gender, serviceType, sport,
-      requestNote: requestNote || undefined,
-      videoFileName, videoSizeMB,
-      submittedAt,
-    })
+    // メール通知 と LINE通知 を並行送信
+    await Promise.allSettled([
+      sendNotificationEmail({
+        clientName, clientEmail,
+        clientPhone: clientPhone || undefined,
+        age: age || undefined,
+        gender, serviceType, sport,
+        requestNote: requestNote || undefined,
+        videoFileName, videoSizeMB,
+        submittedAt,
+      }),
+      sendLineNotification({
+        clientName, clientEmail,
+        clientPhone: clientPhone || undefined,
+        sport, serviceType,
+        requestNote: requestNote || undefined,
+        videoFileName,
+        submittedAt,
+      }),
+    ])
 
     return NextResponse.json({ success: true })
 
