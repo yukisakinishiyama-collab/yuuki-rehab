@@ -448,19 +448,31 @@ export default function HomePage() {
             <div className="flex-1">
               <p className="text-teal-300 text-xs font-bold tracking-widest uppercase mb-2">Remote Analysis</p>
               <h3 className="text-xl font-bold text-white mb-2">遠方の方・来院前の方へ</h3>
-              <p className="text-blue-200 text-sm leading-relaxed">
-                「下関まで来院できないけど相談したい」「まず自分の動きを見てほしい」という方は、動作解析フォームから動画をお送りください。専門家が確認してフィードバックします。
+              <p className="text-blue-200 text-sm leading-relaxed mb-4">
+                「下関まで来院できないけど相談したい」「まず自分の動きを見てほしい」という方は、LINEまたはメールで動画をお送りください。専門家が確認してフィードバックします。
               </p>
+              <div className="flex flex-wrap gap-3 text-xs">
+                <span className="bg-teal-500/20 text-teal-300 px-3 py-1.5 rounded-full font-bold">一般・遠隔の方 ¥2,500</span>
+                <span className="bg-white/10 text-blue-200 px-3 py-1.5 rounded-full font-bold">通院中の方 ¥500</span>
+              </div>
             </div>
             <div className="flex flex-col gap-3 shrink-0">
-              <Link
-                href="/submit"
-                className="inline-flex items-center justify-center gap-2 bg-teal-500 hover:bg-teal-400 text-white font-bold px-8 py-4 rounded-full transition-all hover:scale-105"
+              <a
+                href="https://lin.ee/uaGKbfk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-line hover:bg-line-dark text-white font-bold px-7 py-3.5 rounded-full transition-all hover:scale-105"
               >
-                <Send size={18} />
-                動画を送って相談する
-              </Link>
-              <p className="text-blue-300/60 text-xs text-center">無料・LINEアカウント不要</p>
+                <Send size={16} />
+                LINEで動画を送る
+              </a>
+              <a
+                href="mailto:yukisakinishiyama@gmail.com?subject=動作解析のご依頼&body=お名前：%0Aスポーツ・目的：%0Aご要望："
+                className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold px-7 py-3.5 rounded-full border border-white/30 transition-all"
+              >
+                <Send size={16} />
+                メールで動画を送る
+              </a>
             </div>
           </div>
         </div>

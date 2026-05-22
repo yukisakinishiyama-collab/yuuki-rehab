@@ -254,18 +254,29 @@ export default function PricePage() {
           {/* 遠隔→来院の導線 */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col sm:flex-row items-center gap-5">
             <div className="flex-1">
-              <p className="text-white font-bold mb-1">「遠い」「まず試したい」方へ</p>
+              <p className="text-white font-bold mb-1">「遠い」「まず試したい」方へ（¥2,500）</p>
               <p className="text-blue-200 text-sm leading-relaxed">
-                ¥2,500で動画を送ってもらい、分析結果をお届けします。「この先生に診てもらいたい」と感じたら、そのままLINEで来院予約に進んでいただけます。遠方からでも、まず繋がれる場所を作りたいと考えています。
+                LINEまたはメールで動画をお送りください。専門家が確認して分析結果をお届けします。「この先生に診てもらいたい」と感じたら、そのまま来院予約に進めます。
               </p>
             </div>
-            <Link
-              href="/submit"
-              className="shrink-0 inline-flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white font-bold px-6 py-3.5 rounded-full transition-all hover:scale-105 whitespace-nowrap"
-            >
-              <Send size={16} />
-              動画を送る（¥2,500）
-            </Link>
+            <div className="flex flex-col gap-2 shrink-0">
+              <a
+                href="https://lin.ee/uaGKbfk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-line hover:bg-line-dark text-white font-bold px-6 py-3 rounded-full transition-all whitespace-nowrap"
+              >
+                <Send size={15} />
+                LINEで動画を送る
+              </a>
+              <a
+                href="mailto:yukisakinishiyama@gmail.com?subject=動作解析のご依頼（¥2,500）&body=お名前：%0Aスポーツ・目的：%0Aご要望："
+                className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold px-6 py-3 rounded-full border border-white/30 transition-all whitespace-nowrap text-sm"
+              >
+                <Send size={15} />
+                メールで動画を送る
+              </a>
+            </div>
           </div>
         </div>
       </section>
