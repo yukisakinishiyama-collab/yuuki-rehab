@@ -137,12 +137,12 @@ export default function HomePage() {
               山口県下関市の整骨院
             </span>
             <h1 className="hero-h1 font-bold text-white mb-4">
-              スポーツ障害・<br className="sm:hidden" />術前術後リハビリに
+              スポーツ障害・保存療法・<br />術前術後リハビリに
               <br />
               <span className="text-sky-300">特化した</span>下関の整骨院
             </h1>
             <p className="text-blue-100 text-base sm:text-lg leading-relaxed mb-8">
-              競技復帰と再発予防まで支える、運動療法型整骨院。<br className="hidden md:block" />
+              競技復帰と再発予防まで支える、保存療法・運動療法型整骨院。<br className="hidden md:block" />
               医学的根拠をもとに、あなたの回復とパフォーマンス向上を全力でサポートします。
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
