@@ -36,7 +36,6 @@ export default function CaseForm() {
   function validate() {
     const e: Record<string, string> = {}
     if (!form.clientName.trim()) e.clientName = '氏名を入力してください'
-    if (!form.clientEmail.trim()) e.clientEmail = 'メールアドレスを入力してください'
     if (form.clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.clientEmail)) {
       e.clientEmail = '正しいメールアドレスを入力してください'
     }
@@ -124,7 +123,7 @@ export default function CaseForm() {
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">連絡先（レポート送付先）</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="メールアドレス" error={errors.clientEmail} required>
+          <Field label="メールアドレス（任意）" error={errors.clientEmail}>
             <input
               type="email"
               placeholder="例：yamada@example.com"
