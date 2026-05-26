@@ -40,7 +40,6 @@ export default function SubmitForm() {
   function validate() {
     const e: Record<string, string> = {}
     if (!form.clientName.trim()) e.clientName = '氏名を入力してください'
-    if (!form.clientEmail.trim()) e.clientEmail = 'メールアドレスを入力してください'
     if (form.clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.clientEmail)) e.clientEmail = '正しいメールアドレスを入力してください'
     if (!form.sport.trim()) e.sport = 'スポーツ・目的を入力してください'
     if (!videoFile) e.video = '動画ファイルを選択してください'
@@ -119,7 +118,7 @@ export default function SubmitForm() {
               onChange={(e) => setForm({ ...form, age: e.target.value })} className={ic} />
           </Field>
         </div>
-        <Field label="メールアドレス（レポート送付先）" error={errors.clientEmail} required>
+        <Field label="メールアドレス（任意）" error={errors.clientEmail}>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input type="email" placeholder="example@email.com" value={form.clientEmail}
