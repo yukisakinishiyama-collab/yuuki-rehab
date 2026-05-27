@@ -334,8 +334,6 @@ ${persona.name}（${persona.emoji}）として回答してください。
     return new Response(readable, {
       headers: {
         'Content-Type':      'text/plain; charset=utf-8',
-        'X-Expert-Name':     persona.name,
-        'X-Expert-Color':    persona.color,
         'Transfer-Encoding': 'chunked',
       },
     })
