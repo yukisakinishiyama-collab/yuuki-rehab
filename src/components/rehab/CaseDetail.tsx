@@ -14,14 +14,16 @@ import VideoCompare from './VideoCompare'
 import ReportView from './ReportView'
 import PatientReport from './PatientReport'
 import ImageROMAnalysis from './ImageROMAnalysis'
-import ExerciseProgramPanel from './ExerciseProgramPanel'
-import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2, Camera, Dumbbell } from 'lucide-react'
+import EvalDiscussionPanel from './EvalDiscussionPanel'
+import OverallEvaluation from './OverallEvaluation'
+import MultiAngleAnalysis from './MultiAngleAnalysis'
+import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2, Camera, MessageSquareDot, BarChart2, Layers } from 'lucide-react'
 
 interface Props {
   caseId: string
 }
 
-type Tab = 'videos' | 'upload' | 'compare' | 'report' | 'patient-report' | 'image-rom' | 'exercise'
+type Tab = 'videos' | 'upload' | 'compare' | 'multi-angle' | 'report' | 'patient-report' | 'image-rom' | 'discussion' | 'overall'
 
 export default function CaseDetail({ caseId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
@@ -54,13 +56,15 @@ export default function CaseDetail({ caseId }: Props) {
   const reviewerUsers = MOCK_USERS.filter((u) => case_.reviewers.includes(u.id))
 
   const TABS: Array<{ key: Tab; label: string; icon: React.ElementType }> = [
-    { key: 'videos', label: '動画一覧', icon: Video },
-    { key: 'upload', label: '動画追加', icon: Upload },
-    { key: 'image-rom', label: '📸 画像ROM計測', icon: Camera },
-    { key: 'compare', label: '動画比較', icon: SplitSquareHorizontal },
-    { key: 'report', label: '分析レポート', icon: FileText },
-    { key: 'exercise', label: '🏃 運動プログラム', icon: Dumbbell },
-    { key: 'patient-report', label: '患者用レポート', icon: Share2 },
+    { key: 'videos',         label: '動画一覧',              icon: Video },
+    { key: 'upload',         label: '動画追加',              icon: Upload },
+    { key: 'image-rom',      label: '📸 画像ROM計測',        icon: Camera },
+    { key: 'multi-angle',    label: '🎥 多角度解析',         icon: Layers },
+    { key: 'compare',        label: '動画比較',              icon: SplitSquareHorizontal },
+    { key: 'report',         label: '分析レポート',          icon: FileText },
+    { key: 'overall',        label: '📊 総合評価',           icon: BarChart2 },
+    { key: 'discussion',     label: '💬 AIディスカッション', icon: MessageSquareDot },
+    { key: 'patient-report', label: '患者用レポート',        icon: Share2 },
   ]
 
   return (
@@ -185,6 +189,21 @@ export default function CaseDetail({ caseId }: Props) {
         </div>
       )}
 
+      {tab === 'multi-angle' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-600" />
+              多角度同時解析
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              正面・側面など複数アングルを同時に再生しながら骨格解析を行い、角度差をリアルタイム比較します。
+            </p>
+          </div>
+          <MultiAngleAnalysis case_={case_} videos={case_.videos} />
+        </div>
+      )}
+
       {tab === 'compare' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <VideoCompare videos={case_.videos} />
@@ -195,9 +214,15 @@ export default function CaseDetail({ caseId }: Props) {
         <ReportView case_={case_} />
       )}
 
-      {tab === 'exercise' && (
+      {tab === 'overall' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-          <ExerciseProgramPanel case_={case_} />
+          <OverallEvaluation case_={case_} />
+        </div>
+      )}
+
+      {tab === 'discussion' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5" style={{ minHeight: '600px' }}>
+          <EvalDiscussionPanel case_={case_} />
         </div>
       )}
 

@@ -7,23 +7,154 @@
  */
 
 import { useState, useEffect } from 'react'
-import type { RehabCase, ExerciseProgram, ExerciseItem } from '@/types/rehab'
-import {
-  EXERCISE_PHASE_LABELS,
-  EXERCISE_PHASE_COLORS,
+import type {
+  RehabCase, ExerciseProgram, ExerciseItem,
+  EvaluationResult, AISummary, VideoComment, ROMSession,
 } from '@/types/rehab'
 import {
-  getExercisePrograms, saveExerciseProgram, deleteExerciseProgram, generateId, getCurrentUser,
+  EXERCISE_PHASE_LABELS, EXERCISE_PHASE_COLORS, MOVEMENT_TYPE_LABELS,
+} from '@/types/rehab'
+import {
+  getExercisePrograms, saveExerciseProgram, deleteExerciseProgram,
+  generateId, getCurrentUser, getAllEvaluations, getAISummaries,
+  getCommentsFallback, getROMSessions,
 } from '@/lib/rehab-store'
 import {
   Dumbbell, Sparkles, ExternalLink, Clock, RotateCcw,
   ChevronDown, ChevronUp, Trash2, Link2, X, AlertCircle, Play,
-  CheckCircle2, Timer, Film,
+  CheckCircle2, Timer, Film, ClipboardList, Brain, MessageSquare,
+  Activity, ChevronRight,
 } from 'lucide-react'
 
 interface Props {
   case_: RehabCase
-  evaluationSummary?: string  // 動画解析・評価の要約（任意）
+}
+
+// ── 評価データ集約の型 ────────────────────────────────────────────────────────
+interface EvalContext {
+  evaluations: EvaluationResult[]
+  aiSummaries: AISummary[]
+  comments:    VideoComment[]
+  romSessions: ROMSession[]
+  summaryText: string          // AIへ渡す文字列
+  statCount: {                 // データ量のカウント
+    issues:   number           // チェック済みで問題あり
+    comments: number           // 問題点・リスクコメント
+    aiReports:number           // AIカンファレンス
+    romData:  number           // ROM計測セッション
+  }
+}
+
+// ── 評価データから AI へ渡すテキストを生成 ────────────────────────────────────
+function buildEvalContext(case_: RehabCase): EvalContext {
+  const evaluations = getAllEvaluations(case_.id)
+  const allComments: VideoComment[] = []
+  const allAISummaries: AISummary[]  = []
+  const allROMSessions: ROMSession[] = []
+
+  for (const video of case_.videos) {
+    allComments.push(...getCommentsFallback(video.id, case_.id))
+    allAISummaries.push(...getAISummaries(video.id))
+    allROMSessions.push(...getROMSessions(video.id))
+  }
+
+  // 重複除去
+  const uniqueComments   = [...new Map(allComments.map((c) => [c.id, c])).values()]
+  const uniqueSummaries  = [...new Map(allAISummaries.map((s) => [s.id, s])).values()]
+  const problemComments  = uniqueComments.filter((c) => c.type === 'problem' || c.type === 'risk')
+
+  // チェックリストの問題項目
+  const issueItems = evaluations.flatMap((ev) =>
+    ev.items.filter((it) => it.checked && (it.severity === 'moderate' || it.severity === 'severe'))
+      .map((it) => ({ evType: ev.movementType, ...it }))
+  )
+
+  // ── summaryText 組み立て ──────────────────────────────────────────────────
+  const parts: string[] = []
+
+  // 1) チェックリスト評価
+  if (issueItems.length > 0) {
+    parts.push('## 動作評価チェックリスト（問題あり項目）')
+    const byMovement = new Map<string, typeof issueItems>()
+    for (const it of issueItems) {
+      const list = byMovement.get(it.evType) ?? []
+      list.push(it)
+      byMovement.set(it.evType, list)
+    }
+    for (const [mvType, items] of byMovement) {
+      const label = MOVEMENT_TYPE_LABELS[mvType as keyof typeof MOVEMENT_TYPE_LABELS] ?? mvType
+      parts.push(`### ${label}`)
+      for (const it of items) {
+        const sev = it.severity === 'severe' ? '重度' : it.severity === 'moderate' ? '中等度' : '軽度'
+        parts.push(`- ${it.label}: ${sev}異常${it.note ? ` → ${it.note}` : ''}`)
+      }
+    }
+    // 全体メモ
+    const notes = evaluations.filter((e) => e.overallNote).map((e) => e.overallNote)
+    if (notes.length > 0) {
+      parts.push('### 評価者メモ')
+      notes.slice(0, 3).forEach((n) => parts.push(`- ${n}`))
+    }
+  }
+
+  // 2) コメント（問題点・リスク）
+  if (problemComments.length > 0) {
+    parts.push('\n## 動画コメント（問題点・リスク）')
+    for (const c of problemComments.slice(0, 10)) {
+      const tag = c.type === 'problem' ? '問題点' : 'リスク'
+      parts.push(`- [${tag}] ${c.text}`)
+    }
+  }
+
+  // 3) AI専門家評価
+  if (uniqueSummaries.length > 0) {
+    parts.push('\n## AI専門家カンファレンス評価')
+    const latest = uniqueSummaries[0]
+    if (latest.summary) parts.push(latest.summary.slice(0, 400))
+    if (latest.experts) {
+      for (const exp of latest.experts.slice(0, 3)) {
+        parts.push(`### ${exp.name}（${exp.role}）`)
+        parts.push(exp.opinion.slice(0, 250))
+      }
+    }
+  }
+
+  // 4) ROM計測データ
+  if (allROMSessions.length > 0) {
+    parts.push('\n## 動的ROM計測結果')
+    for (const sess of allROMSessions.slice(0, 2)) {
+      if (sess.samples.length === 0) continue
+      // 関節ごとの最大・最小を算出
+      const angMap = new Map<string, { max: number; min: number; label: string }>()
+      for (const s of sess.samples) {
+        for (const [key, ang] of Object.entries(s.angles)) {
+          const cur = angMap.get(key) ?? { max: -Infinity, min: Infinity, label: ang.label }
+          if (ang.value > cur.max) cur.max = ang.value
+          if (ang.value < cur.min) cur.min = ang.value
+          angMap.set(key, cur)
+        }
+      }
+      for (const [, v] of angMap) {
+        if (v.max !== -Infinity) {
+          parts.push(`- ${v.label}: 最大${Math.round(v.max)}° / 最小${Math.round(v.min)}° / 可動域${Math.round(v.max - v.min)}°`)
+        }
+      }
+    }
+  }
+
+  return {
+    evaluations,
+    aiSummaries: uniqueSummaries,
+    comments:    uniqueComments,
+    romSessions: allROMSessions,
+    summaryText: parts.join('\n'),
+    statCount: {
+      issues:    issueItems.length,
+      comments:  problemComments.length,
+      aiReports: uniqueSummaries.length,
+      romData:   allROMSessions.length,
+    },
+  }
 }
 
 // ── YouTube URL → embed URL 変換 ─────────────────────────────────────────────
@@ -293,11 +424,12 @@ function ExerciseCard({
 // ─────────────────────────────────────────────────────────────────────────────
 // メインコンポーネント
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props) {
-  const [programs, setPrograms] = useState<ExerciseProgram[]>([])
-  const [selected, setSelected] = useState<ExerciseProgram | null>(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
+export default function ExerciseProgramPanel({ case_ }: Props) {
+  const [programs,    setPrograms]    = useState<ExerciseProgram[]>([])
+  const [selected,    setSelected]    = useState<ExerciseProgram | null>(null)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
+  const [evalContext, setEvalContext] = useState<EvalContext | null>(null)
 
   function reload() {
     const ps = getExercisePrograms(case_.id)
@@ -305,7 +437,11 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
     if (ps.length > 0 && !selected) setSelected(ps[0])
   }
 
-  useEffect(() => { reload() }, [case_.id])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    reload()
+    // 評価データを非同期で集約（localStorage読み取りは軽量なので同期でOK）
+    setEvalContext(buildEvalContext(case_))
+  }, [case_.id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI でプログラム生成 ──────────────────────────────────────────────────
   async function handleGenerate() {
@@ -326,7 +462,7 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
             sport:             case_.sport,
             status:            case_.status,
           },
-          evaluationSummary,
+          evaluationSummary: evalContext?.summaryText ?? '',
         }),
       })
       const json = await res.json()
@@ -425,6 +561,63 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
         </button>
       </div>
 
+      {/* ── 参照する評価データの状況 ── */}
+      {evalContext && (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+          <p className="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5">
+            <ClipboardList className="w-3.5 h-3.5" />
+            AIが参照する評価データ
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              {
+                icon: <ClipboardList className="w-3.5 h-3.5" />,
+                label: '問題あり項目',
+                count: evalContext.statCount.issues,
+                color: evalContext.statCount.issues > 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400',
+              },
+              {
+                icon: <MessageSquare className="w-3.5 h-3.5" />,
+                label: '問題・リスクコメント',
+                count: evalContext.statCount.comments,
+                color: evalContext.statCount.comments > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-400',
+              },
+              {
+                icon: <Brain className="w-3.5 h-3.5" />,
+                label: 'AIカンファレンス',
+                count: evalContext.statCount.aiReports,
+                color: evalContext.statCount.aiReports > 0 ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-400',
+              },
+              {
+                icon: <Activity className="w-3.5 h-3.5" />,
+                label: 'ROM計測セッション',
+                count: evalContext.statCount.romData,
+                color: evalContext.statCount.romData > 0 ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-400',
+              },
+            ].map((item) => (
+              <div key={item.label} className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${item.color}`}>
+                {item.icon}
+                <div className="min-w-0">
+                  <p className="text-xs font-bold">{item.count}件</p>
+                  <p className="text-[10px] leading-tight truncate">{item.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* 評価データがある場合のメッセージ */}
+          {(evalContext.statCount.issues + evalContext.statCount.comments + evalContext.statCount.aiReports + evalContext.statCount.romData) > 0 ? (
+            <p className="text-[10px] text-teal-700 mt-2 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              評価データをもとにカスタマイズされたプログラムが生成されます
+            </p>
+          ) : (
+            <p className="text-[10px] text-gray-400 mt-2">
+              ※ 評価・コメント・ROM計測があると、より個別に最適化されたプログラムが作成されます
+            </p>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -444,7 +637,11 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
             {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
           </div>
           <p className="text-xs text-gray-400 text-center pt-2">
-            AIが {case_.diagnosis} の診断データを解析してプログラムを作成しています...
+            AIが {case_.diagnosis} の診断・評価データ（
+            {evalContext
+              ? `チェック${evalContext.statCount.issues}件・コメント${evalContext.statCount.comments}件・AI評価${evalContext.statCount.aiReports}件・ROM${evalContext.statCount.romData}件`
+              : '診断データ'}
+            ）を解析してプログラムを作成しています...
           </p>
         </div>
       )}

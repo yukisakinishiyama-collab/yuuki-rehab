@@ -359,6 +359,39 @@ export interface PersonMarker {
   color: string    // CSSカラー
 }
 
+// ─── AI評価ディスカッション ──────────────────────────────────────────────────
+
+/** ディスカッションのメッセージ1件 */
+export interface DiscussionMessage {
+  id:         string
+  caseId:     string
+  role:       'user' | 'expert'   // user=施術者, expert=AI専門家
+  expertId?:  string              // 'ortho' | 'pt' | 'at' | 'all'
+  expertName?: string             // 表示名
+  expertColor?: string            // UIカラー
+  text:       string
+  createdAt:  string
+}
+
+/** ディスカッションセッション（1ケースにつき複数保持） */
+export interface DiscussionSession {
+  id:        string
+  caseId:    string
+  title:     string               // セッションの見出し（例: '左膝評価ディスカッション #1'）
+  messages:  DiscussionMessage[]
+  createdAt: string
+  updatedAt: string
+}
+
+export const DISCUSSION_EXPERTS = [
+  { id: 'ortho', name: '整形外科医',          color: '#dc2626', emoji: '🏥' },
+  { id: 'pt',    name: '理学療法士',          color: '#2563eb', emoji: '🦴' },
+  { id: 'at',    name: 'アスレティックトレーナー', color: '#16a34a', emoji: '💪' },
+  { id: 'all',   name: '全員に質問',          color: '#7c3aed', emoji: '👥' },
+] as const
+
+export type DiscussionExpertId = 'ortho' | 'pt' | 'at' | 'all'
+
 export const EVALUATION_TEMPLATES: Record<MovementType, { key: string; label: string }[]> = {
   walking: [
     { key: 'stance_initial', label: '初期接地（ヒールストライク）' },

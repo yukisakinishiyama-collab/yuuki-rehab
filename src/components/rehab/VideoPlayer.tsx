@@ -1,10 +1,11 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import type { VideoComment, SavedAnnotation } from '@/types/rehab'
 import {
   Play, Pause, SkipBack, SkipForward,
-  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot, Crosshair,
+  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot, Crosshair, Box,
 } from 'lucide-react'
 import VideoAnnotationOverlay from './VideoAnnotationOverlay'
 import MotionCaptureOverlay from './MotionCaptureOverlay'
@@ -12,7 +13,10 @@ import MarkerTrackerOverlay from './MarkerTrackerOverlay'
 import MarkerSetupPanel from './MarkerSetupPanel'
 import VirtualMarkerLayer from './VirtualMarkerLayer'
 import type { MarkerConfig } from '@/lib/color-marker-tracker'
-import type { ROMItem } from '@/lib/pose-analyzer'
+import type { ROMItem, Landmark } from '@/lib/pose-analyzer'
+
+// Three.js は SSR 非対応のため dynamic import
+const Skeleton3DView = dynamic(() => import('./Skeleton3DView'), { ssr: false })
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
 const FRAME = 1 / 30
@@ -26,9 +30,7 @@ interface Props {
   caseId: string
   savedAnnotations: SavedAnnotation[]
   onAnnotationSaved: () => void
-  /** 映像エリア上に重ねる追加オーバーレイ（PersonMarkerLayerなど） */
   videoOverlay?: React.ReactNode
-  /** MediaPipe ROMデータ受け取りコールバック（動的ROM計測用） */
   onROM?: (items: ROMItem[], videoTime: number) => void
 }
 
@@ -45,15 +47,18 @@ export default function VideoPlayer({
   const [speed,      setSpeed]      = useState(1)
   const [muted,      setMuted]      = useState(false)
   const [volume,     setVolume]     = useState(1)
-  const [annotationActive,   setAnnotationActive]   = useState(false)
-  const [motionCapture,      setMotionCapture]      = useState(false)
-  const [markerActive,       setMarkerActive]       = useState(false)
-  const [showMarkerSetup,    setShowMarkerSetup]    = useState(false)
-  const [markerConfigs,      setMarkerConfigs]      = useState<MarkerConfig[]>([])
+  const [annotationActive,    setAnnotationActive]    = useState(false)
+  const [motionCapture,       setMotionCapture]       = useState(false)
+  const [markerActive,        setMarkerActive]        = useState(false)
+  const [showMarkerSetup,     setShowMarkerSetup]     = useState(false)
+  const [markerConfigs,       setMarkerConfigs]       = useState<MarkerConfig[]>([])
   const [virtualMarkerActive, setVirtualMarkerActive] = useState(false)
+  const [view3D,              setView3D]              = useState(false)
+  const [worldLandmarks,      setWorldLandmarks]      = useState<Landmark[]>([])
+  const [pose3dDetected,      setPose3dDetected]      = useState(false)
+  const [latestROMItems,      setLatestROMItems]      = useState<ROMItem[]>([])
   const [scrubbing,  setScrubbing]  = useState(false)
 
-  // Expose seekTo for parent
   useEffect(() => {
     if (onSeekTo) {
       onSeekTo((t: number) => {
@@ -113,7 +118,6 @@ export default function VideoPlayer({
     return `${m}:${String(sec).padStart(2,'0')}.${String(ms).padStart(2,'0')}`
   }
 
-  // ── タイムライン：クリック＋ドラッグ両対応 ──────────────────────────
   function getTimelineRatio(clientX: number): number {
     const rect = timelineRef.current?.getBoundingClientRect()
     if (!rect) return 0
@@ -136,9 +140,7 @@ export default function VideoPlayer({
     seekTo(getTimelineRatio(clientX) * duration)
   }, [scrubbing, duration]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleScrubUp = useCallback(() => {
-    setScrubbing(false)
-  }, [])
+  const handleScrubUp = useCallback(() => { setScrubbing(false) }, [])
 
   useEffect(() => {
     if (!scrubbing) return
@@ -161,59 +163,122 @@ export default function VideoPlayer({
     positive:'#22c55e', suggestion:'#a855f7',
   }
 
+  // 3D ON 時は骨格も自動で ON
+  function toggle3D() {
+    const next = !view3D
+    setView3D(next)
+    if (next && !motionCapture) setMotionCapture(true)
+  }
+
   return (
     <div className="bg-black rounded-xl overflow-hidden select-none">
+
       {/* ── 映像エリア ── */}
-      <div className="relative aspect-video w-full">
-        <video
-          ref={videoRef}
-          src={src}
-          className="w-full h-full object-contain"
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)}
-          onEnded={() => setPlaying(false)}
-          onClick={() => { if (!annotationActive) togglePlay() }}
-        />
+      <div className={`relative w-full ${view3D ? 'flex' : ''}`}>
 
-        {/* アノテーションオーバーレイ */}
-        <VideoAnnotationOverlay
-          videoId={videoId}
-          caseId={caseId}
-          currentTime={currentTime}
-          savedAnnotations={savedAnnotations}
-          onSaved={onAnnotationSaved}
-          active={annotationActive}
-        />
-
-        {/* MediaPipeリアルタイム骨格 */}
-        <MotionCaptureOverlay
-          videoRef={videoRef}
-          active={motionCapture}
-          onROM={onROM ? (items) => onROM(items, videoRef.current?.currentTime ?? 0) : undefined}
-        />
-
-        {/* カラーマーカー追跡 */}
-        <MarkerTrackerOverlay videoRef={videoRef} active={markerActive} configs={markerConfigs} />
-
-        {/* マーカー設定パネル */}
-        {showMarkerSetup && (
-          <MarkerSetupPanel
-            configs={markerConfigs}
-            onChange={(cfg) => { setMarkerConfigs(cfg); setMarkerActive(cfg.length > 0) }}
-            onClose={() => setShowMarkerSetup(false)}
+        {/* 動画パネル */}
+        <div
+          className={`relative ${view3D ? 'w-1/2' : 'w-full aspect-video'}`}
+          style={view3D ? { aspectRatio: '16/9' } : {}}
+        >
+          <video
+            ref={videoRef}
+            src={src}
+            className="w-full h-full object-contain"
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)}
+            onEnded={() => setPlaying(false)}
+            onClick={() => { if (!annotationActive) togglePlay() }}
           />
+
+          <VideoAnnotationOverlay
+            videoId={videoId}
+            caseId={caseId}
+            currentTime={currentTime}
+            savedAnnotations={savedAnnotations}
+            onSaved={onAnnotationSaved}
+            active={annotationActive}
+          />
+
+          <MotionCaptureOverlay
+            videoRef={videoRef}
+            active={motionCapture}
+            onROM={(items) => {
+              setLatestROMItems(items)
+              onROM?.(items, videoRef.current?.currentTime ?? 0)
+            }}
+            onWorld={(lms, det) => {
+              setWorldLandmarks(lms)
+              setPose3dDetected(det)
+            }}
+          />
+
+          <MarkerTrackerOverlay videoRef={videoRef} active={markerActive} configs={markerConfigs} />
+
+          {showMarkerSetup && (
+            <MarkerSetupPanel
+              configs={markerConfigs}
+              onChange={(cfg) => { setMarkerConfigs(cfg); setMarkerActive(cfg.length > 0) }}
+              onClose={() => setShowMarkerSetup(false)}
+            />
+          )}
+
+          <VirtualMarkerLayer videoRef={videoRef} active={virtualMarkerActive} />
+
+          {videoOverlay}
+
+          {/* ── 動画右上フローティングボタン ── */}
+          <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-20">
+            <button
+              onClick={toggle3D}
+              title={view3D ? '3Dビューを閉じる' : '3Dスケルトンビューを表示'}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shadow-xl transition-all ${
+                view3D
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-indigo-900/90 text-indigo-200 hover:bg-indigo-600 hover:text-white border border-indigo-400/60 backdrop-blur-sm'
+              }`}
+            >
+              <Box className="w-4 h-4" />
+              3D
+            </button>
+
+            <button
+              onClick={() => setMotionCapture((v) => !v)}
+              title={motionCapture ? '骨格表示をOFF' : '骨格リアルタイム表示をON'}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shadow-xl transition-all ${
+                motionCapture
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-black/80 text-gray-300 hover:bg-teal-600 hover:text-white border border-white/20 backdrop-blur-sm'
+              }`}
+            >
+              <Scan className="w-4 h-4" />
+              骨格
+            </button>
+          </div>
+
+          {view3D && (
+            <div className="absolute bottom-2 left-2 bg-black/70 text-white text-[11px] px-2 py-1 rounded-lg pointer-events-none font-medium">
+              🎥 オリジナル動画
+            </div>
+          )}
+        </div>
+
+        {/* 3Dスケルトンパネル */}
+        {view3D && (
+          <div className="w-1/2 bg-gray-950" style={{ aspectRatio: '16/9' }}>
+            <Skeleton3DView
+              worldLandmarks={worldLandmarks}
+              romItems={latestROMItems}
+              detected={pose3dDetected}
+            />
+          </div>
         )}
-
-        {/* 仮想マーカー追跡（クリック配置 + テンプレートマッチング） */}
-        <VirtualMarkerLayer videoRef={videoRef} active={virtualMarkerActive} />
-
-        {/* 外部から渡された追加オーバーレイ（PersonMarkerLayerなど） */}
-        {videoOverlay}
       </div>
 
       {/* ── コントロールバー ── */}
       <div className="bg-[#111827] px-4 py-3 space-y-2">
-        {/* タイムライン（クリック＋ドラッグシーク） */}
+
+        {/* タイムライン */}
         <div className="relative">
           <div
             ref={timelineRef}
@@ -221,12 +286,10 @@ export default function VideoPlayer({
             onMouseDown={handleTimelineDown}
             onTouchStart={handleTimelineDown}
           >
-            {/* 進捗バー */}
             <div
               className="absolute inset-y-0 left-0 bg-[#0d9488] rounded-full pointer-events-none"
               style={{ width: `${progress}%` }}
             />
-            {/* コメントマーカー */}
             {comments.map((c) => {
               const pct = duration > 0 ? (c.timestamp / duration) * 100 : 0
               return (
@@ -241,7 +304,6 @@ export default function VideoPlayer({
                 />
               )
             })}
-            {/* アノテーションマーカー */}
             {savedAnnotations.map((ann) => {
               const pct = duration > 0 ? (ann.timestamp / duration) * 100 : 0
               return (
@@ -258,144 +320,95 @@ export default function VideoPlayer({
                 />
               )
             })}
-            {/* サムネイル（ドラッグ中は大きく） */}
             <div
-              className={`absolute top-1/2 rounded-full bg-white shadow z-20 pointer-events-none transition-transform ${scrubbing ? 'w-4.5 h-4.5 scale-125' : 'w-3.5 h-3.5 group-hover:scale-110'}`}
+              className={`absolute top-1/2 rounded-full bg-white shadow z-20 pointer-events-none transition-transform ${scrubbing ? 'scale-125' : 'w-3.5 h-3.5 group-hover:scale-110'}`}
               style={{ left: `${progress}%`, transform: `translate(-50%, -50%) ${scrubbing ? 'scale(1.25)' : ''}` }}
             />
           </div>
         </div>
 
-        {/* ボタン行 */}
+        {/* ── 1行目: 再生コントロール ── */}
         <div className="flex items-center gap-2">
-          {/* フレーム戻る */}
-          <button
-            onClick={() => frame(-1)}
-            className="text-gray-400 hover:text-white transition-colors p-1"
-            title="1フレーム戻る (←)"
-          >
+          <button onClick={() => frame(-1)} className="text-gray-400 hover:text-white p-1" title="1フレーム戻る">
             <SkipBack className="w-4 h-4" />
           </button>
-
-          {/* 再生/一時停止 */}
           <button
             onClick={togglePlay}
-            className="w-9 h-9 bg-[#0d9488] hover:bg-[#0b8276] rounded-full flex items-center justify-center text-white transition-colors shadow-md"
+            className="w-9 h-9 bg-[#0d9488] hover:bg-[#0b8276] rounded-full flex items-center justify-center text-white shadow-md flex-shrink-0"
           >
-            {playing
-              ? <Pause className="w-4 h-4" />
-              : <Play  className="w-4 h-4 ml-0.5" />}
+            {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
           </button>
-
-          {/* フレーム進む */}
-          <button
-            onClick={() => frame(1)}
-            className="text-gray-400 hover:text-white transition-colors p-1"
-            title="1フレーム進む (→)"
-          >
+          <button onClick={() => frame(1)} className="text-gray-400 hover:text-white p-1" title="1フレーム進む">
             <SkipForward className="w-4 h-4" />
           </button>
-
-          {/* 時間表示 */}
-          <span className="text-gray-300 text-xs font-mono ml-1">
+          <span className="text-gray-300 text-xs font-mono ml-1 flex-shrink-0">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
-
           <div className="flex-1" />
-
-          {/* 再生速度 */}
           <div className="flex items-center gap-0.5">
             {SPEEDS.map((s) => (
               <button
                 key={s}
                 onClick={() => setPlaybackSpeed(s)}
-                className={`px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
-                  speed === s ? 'bg-[#0d9488] text-white' : 'text-gray-400 hover:text-white'
-                }`}
+                className={`px-1.5 py-0.5 rounded text-xs font-medium ${speed === s ? 'bg-[#0d9488] text-white' : 'text-gray-400 hover:text-white'}`}
               >
                 {s}x
               </button>
             ))}
           </div>
-
-          {/* 音量 */}
-          <button onClick={toggleMute} className="text-gray-400 hover:text-white ml-2 transition-colors">
+          <button onClick={toggleMute} className="text-gray-400 hover:text-white ml-1 flex-shrink-0">
             {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
           <input
             type="range" min={0} max={1} step={0.05}
             value={muted ? 0 : volume}
             onChange={(e) => handleVolumeChange(Number(e.target.value))}
-            className="w-16 accent-[#0d9488]"
+            className="w-14 accent-[#0d9488] flex-shrink-0"
           />
+          <button onClick={() => videoRef.current?.requestFullscreen()} className="text-gray-400 hover:text-white ml-1 flex-shrink-0">
+            <Maximize className="w-4 h-4" />
+          </button>
+        </div>
 
-          {/* MediaPipe骨格トグル */}
+        {/* ── 2行目: 解析ツール ── */}
+        <div className="flex items-center gap-1.5 pt-1 border-t border-white/10">
+          <span className="text-gray-500 text-[11px] mr-1">解析:</span>
+
           <button
             onClick={() => setMotionCapture((v) => !v)}
-            title={motionCapture ? '骨格表示をOFF' : '骨格リアルタイム表示をON'}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
-              motionCapture ? 'bg-teal-500 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${motionCapture ? 'bg-teal-500 text-white' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
           >
-            <Scan className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">骨格</span>
+            <Scan className="w-3.5 h-3.5" />骨格
           </button>
 
-          {/* カラーマーカートグル */}
           <button
-            onClick={() => {
-              if (markerConfigs.length === 0) {
-                setShowMarkerSetup(true)   // 未設定なら設定画面へ
-              } else {
-                setMarkerActive((v) => !v) // 設定済みならON/OFF
-              }
-            }}
-            onContextMenu={(e) => { e.preventDefault(); setShowMarkerSetup(true) }} // 右クリックで設定画面
-            title={markerActive ? 'マーカー追跡をOFF（右クリックで設定）' : 'カラーマーカー追跡をON（右クリックで設定）'}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
-              markerActive ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'
-            }`}
+            onClick={toggle3D}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold ${view3D ? 'bg-indigo-500 text-white' : 'bg-indigo-900/60 text-indigo-300 hover:bg-indigo-600 hover:text-white border border-indigo-600/50'}`}
+          >
+            <Box className="w-3.5 h-3.5" />3D
+          </button>
+
+          <button
+            onClick={() => { if (markerConfigs.length === 0) setShowMarkerSetup(true); else setMarkerActive((v) => !v) }}
+            onContextMenu={(e) => { e.preventDefault(); setShowMarkerSetup(true) }}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${markerActive ? 'bg-orange-500 text-white' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
           >
             <CircleDot className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">
-              {markerConfigs.length > 0 ? `マーカー(${markerConfigs.length})` : 'マーカー'}
-            </span>
+            {markerConfigs.length > 0 ? `マーカー(${markerConfigs.length})` : 'マーカー'}
           </button>
 
-          {/* 仮想マーカー追跡トグル */}
           <button
             onClick={() => setVirtualMarkerActive((v) => !v)}
-            title={virtualMarkerActive ? '仮想マーカー追跡をOFF' : '動画上にマーカーを配置して追跡（一時停止してクリック）'}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
-              virtualMarkerActive
-                ? 'bg-purple-500 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-white/10'
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${virtualMarkerActive ? 'bg-purple-500 text-white' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
           >
-            <Crosshair className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">仮想M</span>
+            <Crosshair className="w-3.5 h-3.5" />仮想M
           </button>
 
-          {/* 描き込みトグル */}
           <button
             onClick={() => setAnnotationActive((v) => !v)}
-            title={annotationActive ? '描き込みモードをOFF' : '描き込みモードをON'}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
-              annotationActive
-                ? 'bg-amber-500 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-white/10'
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${annotationActive ? 'bg-amber-500 text-white' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
           >
-            <PenLine className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">描き込み</span>
-          </button>
-
-          {/* フルスクリーン */}
-          <button
-            onClick={() => videoRef.current?.requestFullscreen()}
-            className="text-gray-400 hover:text-white ml-1 transition-colors"
-          >
-            <Maximize className="w-4 h-4" />
+            <PenLine className="w-3.5 h-3.5" />描き込み
           </button>
         </div>
       </div>

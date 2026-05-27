@@ -1,15 +1,31 @@
 'use client'
 
+/**
+ * VideoUpload
+ * 複数ファイルの同時選択・ドラッグ＆ドロップに対応したアップロードUI。
+ * 各ファイルごとにラベル・動作種別・撮影方向を個別設定し、一括または個別登録が可能。
+ */
+
 import { useState, useRef } from 'react'
 import { addVideoToCase, getCurrentUser, generateId, saveVideoUrl } from '@/lib/rehab-store'
 import { saveVideoBlob } from '@/lib/video-db'
 import type { CaseVideo, MovementType, VideoDirection } from '@/types/rehab'
 import { MOVEMENT_TYPE_LABELS, VIDEO_DIRECTION_LABELS } from '@/types/rehab'
-import { Upload, X, Film, Camera } from 'lucide-react'
+import { Upload, X, Film, Camera, CheckCircle, Loader2, Plus } from 'lucide-react'
 
 interface Props {
   caseId: string
   onUploaded: () => void
+}
+
+interface QueueItem {
+  id: string
+  file: File
+  preview: string
+  label: string
+  direction: VideoDirection
+  movementType: MovementType
+  status: 'pending' | 'saving' | 'done' | 'error'
 }
 
 export default function VideoUpload({ caseId, onUploaded }: Props) {
@@ -17,193 +33,317 @@ export default function VideoUpload({ caseId, onUploaded }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState('')
-  const [form, setForm] = useState({
-    label: '',
-    direction: 'front' as VideoDirection,
-    movementType: 'walking' as MovementType,
-  })
-  const [saving, setSaving] = useState(false)
+  const [queue, setQueue] = useState<QueueItem[]>([])
+  const [savingAll, setSavingAll] = useState(false)
 
-  function handleFile(f: File) {
-    if (!f.type.startsWith('video/')) return
-    setFile(f)
-    const url = URL.createObjectURL(f)
-    setPreview(url)
+  // ── ファイル追加 ──────────────────────────────────────────────────────────────
+  function addFiles(files: FileList | File[]) {
+    const arr = Array.from(files).filter((f) => f.type.startsWith('video/'))
+    if (arr.length === 0) return
+    const newItems: QueueItem[] = arr.map((f) => ({
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      file: f,
+      preview: URL.createObjectURL(f),
+      label: '',
+      direction: 'front' as VideoDirection,
+      movementType: 'walking' as MovementType,
+      status: 'pending',
+    }))
+    setQueue((prev) => [...prev, ...newItems])
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
+    if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
   }
 
-  async function handleSave() {
-    if (!file || !user || !preview) return
-    setSaving(true)
-
-    // Get duration from already-created preview URL (reuse, don't create a second blob URL)
-    const duration = await new Promise<number>((resolve) => {
-      const v = document.createElement('video')
-      v.src = preview
-      v.onloadedmetadata = () => resolve(Math.round(v.duration))
-      v.onerror = () => resolve(0)
+  function removeItem(id: string) {
+    setQueue((prev) => {
+      const item = prev.find((q) => q.id === id)
+      if (item) URL.revokeObjectURL(item.preview)
+      return prev.filter((q) => q.id !== id)
     })
+  }
 
-    const videoId = generateId('video')
-    // IndexedDBにBlobを永続保存（ページリロード後も再生可能）
-    await saveVideoBlob(videoId, file)
-    saveVideoUrl(videoId, preview)
+  function updateItem(
+    id: string,
+    patch: Partial<Pick<QueueItem, 'label' | 'direction' | 'movementType'>>,
+  ) {
+    setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)))
+  }
 
-    const video: CaseVideo = {
-      id: videoId,
-      caseId,
-      label: form.label || file.name,
-      direction: form.direction,
-      movementType: form.movementType,
-      tags: [MOVEMENT_TYPE_LABELS[form.movementType], VIDEO_DIRECTION_LABELS[form.direction]],
-      uploadedAt: new Date().toISOString(),
-      uploadedBy: user.id,
-      fileName: file.name,
-      duration,
+  // ── 1件保存 ───────────────────────────────────────────────────────────────────
+  async function saveOne(item: QueueItem): Promise<void> {
+    if (!user) return
+    setQueue((prev) =>
+      prev.map((q) => (q.id === item.id ? { ...q, status: 'saving' } : q)),
+    )
+    try {
+      // 動画の長さを取得（既存プレビューURLを再利用）
+      const duration = await new Promise<number>((resolve) => {
+        const v = document.createElement('video')
+        v.src = item.preview
+        v.onloadedmetadata = () => resolve(Math.round(v.duration))
+        v.onerror = () => resolve(0)
+      })
+
+      const videoId = generateId('video')
+      await saveVideoBlob(videoId, item.file)
+      saveVideoUrl(videoId, item.preview)
+
+      const video: CaseVideo = {
+        id: videoId,
+        caseId,
+        label: item.label || item.file.name,
+        direction: item.direction,
+        movementType: item.movementType,
+        tags: [
+          MOVEMENT_TYPE_LABELS[item.movementType],
+          VIDEO_DIRECTION_LABELS[item.direction],
+        ],
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: user.id,
+        fileName: item.file.name,
+        duration,
+      }
+      addVideoToCase(caseId, video)
+      setQueue((prev) =>
+        prev.map((q) => (q.id === item.id ? { ...q, status: 'done' } : q)),
+      )
+    } catch {
+      setQueue((prev) =>
+        prev.map((q) => (q.id === item.id ? { ...q, status: 'error' } : q)),
+      )
     }
-    addVideoToCase(caseId, video)
-    setSaving(false)
-    setFile(null)
-    setPreview('')
+  }
+
+  // ── 全件保存 ──────────────────────────────────────────────────────────────────
+  async function handleSaveAll() {
+    const pending = queue.filter((q) => q.status === 'pending')
+    if (pending.length === 0) return
+    setSavingAll(true)
+    for (const item of pending) {
+      await saveOne(item)
+    }
+    setSavingAll(false)
+    // 完了済みを削除してコールバック
+    setQueue((prev) => prev.filter((q) => q.status !== 'done'))
     onUploaded()
   }
 
+  const pendingCount = queue.filter((q) => q.status === 'pending').length
+  const doneCount = queue.filter((q) => q.status === 'done').length
+  const savingCount = queue.filter((q) => q.status === 'saving').length
+
   return (
-    <div className="space-y-4">
-      {!file ? (
-        <div className="space-y-3">
-          {/* カメラ撮影ボタン（モバイル向け） */}
-          <button
-            type="button"
-            onClick={() => cameraInputRef.current?.click()}
-            className="w-full flex items-center justify-center gap-3 border-2 border-[#0d9488] bg-teal-50 hover:bg-teal-100 rounded-xl p-5 text-center transition-colors"
-          >
-            <Camera className="w-8 h-8 text-[#0d9488]" />
-            <div className="text-left">
-              <p className="text-sm font-semibold text-[#0d9488]">カメラで撮影</p>
-              <p className="text-xs text-teal-600 mt-0.5">スマートフォンで直接録画</p>
-            </div>
-          </button>
-          {/* カメラ専用input（capture属性でカメラ起動） */}
+    <div className="space-y-5">
+
+      {/* ── アップロードエリア ─────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        {/* カメラ撮影（モバイル） */}
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="w-full flex items-center justify-center gap-3 border-2 border-[#0d9488] bg-teal-50 hover:bg-teal-100 rounded-xl p-5 transition-colors"
+        >
+          <Camera className="w-8 h-8 text-[#0d9488]" />
+          <div className="text-left">
+            <p className="text-sm font-semibold text-[#0d9488]">カメラで撮影</p>
+            <p className="text-xs text-teal-600 mt-0.5">スマートフォンで直接録画</p>
+          </div>
+        </button>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="video/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => e.target.files && addFiles(e.target.files)}
+        />
+
+        {/* ファイル選択（複数可） */}
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`flex flex-col items-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+            dragging
+              ? 'border-[#0d9488] bg-teal-50'
+              : 'border-gray-300 hover:border-[#0d9488] hover:bg-gray-50'
+          }`}
+        >
+          <Upload className="w-9 h-9 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-gray-700">
+            ファイルから選択 / ドラッグ＆ドロップ
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            <span className="font-medium text-[#0d9488]">複数ファイル同時選択対応</span>
+            　·　MP4, MOV, AVI（各最大 500MB）
+          </p>
+          <div className="mt-3 flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-500">
+            <Plus className="w-3 h-3" />
+            ファイルを追加
+          </div>
           <input
-            ref={cameraInputRef}
+            ref={fileInputRef}
             type="file"
             accept="video/*"
-            capture="environment"
+            multiple
             className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+            onChange={(e) => e.target.files && addFiles(e.target.files)}
           />
+        </label>
+      </div>
 
-          {/* ファイル選択（PC・ギャラリー） */}
-          <label
-            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            className={`flex flex-col items-center border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-              dragging ? 'border-[#0d9488] bg-teal-50' : 'border-gray-300 hover:border-[#0d9488] hover:bg-gray-50'
-            }`}
-          >
-            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-700">
-              ファイルから選択 / ドラッグ＆ドロップ
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">MP4, MOV, AVI（最大 500MB）</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-          </label>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Preview */}
-          <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
-            <video
-              src={preview}
-              controls
-              className="w-full h-full object-contain"
-            />
+      {/* ── キュー一覧 ────────────────────────────────────────────────────── */}
+      {queue.length > 0 && (
+        <div className="space-y-3">
+          {/* ヘッダー行 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 text-sm">
+              <span className="font-semibold text-gray-700">登録待ち</span>
+              <span className="px-2 py-0.5 bg-[#0d9488] text-white rounded-full text-xs font-medium">
+                {pendingCount}件
+              </span>
+              {savingCount > 0 && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  保存中 {savingCount}件
+                </span>
+              )}
+              {doneCount > 0 && (
+                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  完了 {doneCount}件
+                </span>
+              )}
+            </div>
+
             <button
-              onClick={() => { setFile(null); setPreview('') }}
-              className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+              onClick={handleSaveAll}
+              disabled={savingAll || pendingCount === 0}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-[#1e3a5f] hover:bg-[#162d4a] text-white font-medium rounded-lg transition-colors disabled:opacity-50"
             >
-              <X className="w-4 h-4" />
+              {savingAll
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Upload className="w-3.5 h-3.5" />
+              }
+              {savingAll ? '登録中...' : `全て登録（${pendingCount}件）`}
             </button>
           </div>
 
-          {/* Metadata */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-3">
-              <label className="block text-xs font-medium text-gray-600 mb-1">ラベル</label>
-              <input
-                type="text"
-                placeholder={file.name}
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">動作の種類</label>
-              <select
-                value={form.movementType}
-                onChange={(e) => setForm({ ...form, movementType: e.target.value as MovementType })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488]"
-              >
-                {(Object.keys(MOVEMENT_TYPE_LABELS) as MovementType[]).map((mt) => (
-                  <option key={mt} value={mt}>{MOVEMENT_TYPE_LABELS[mt]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">撮影方向</label>
-              <select
-                value={form.direction}
-                onChange={(e) => setForm({ ...form, direction: e.target.value as VideoDirection })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488]"
-              >
-                {(Object.keys(VIDEO_DIRECTION_LABELS) as VideoDirection[]).map((d) => (
-                  <option key={d} value={d}>{VIDEO_DIRECTION_LABELS[d]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <Film className="w-3.5 h-3.5" />
-                {file.name}
+          {/* キューアイテム */}
+          {queue.map((item) => (
+            <div
+              key={item.id}
+              className={`border rounded-xl p-3 transition-all ${
+                item.status === 'done'    ? 'bg-green-50 border-green-200 opacity-70' :
+                item.status === 'error'   ? 'bg-red-50 border-red-200' :
+                item.status === 'saving'  ? 'bg-blue-50 border-blue-200' :
+                'bg-white border-gray-200 shadow-sm'
+              }`}
+            >
+              <div className="flex gap-3">
+                {/* サムネイル */}
+                <div className="w-28 h-20 rounded-lg overflow-hidden bg-black flex-shrink-0">
+                  <video
+                    src={item.preview}
+                    className="w-full h-full object-contain"
+                    muted
+                    preload="metadata"
+                  />
+                </div>
+
+                {/* フォーム */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  {/* ラベル + 削除/ステータス */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder={item.file.name}
+                      value={item.label}
+                      onChange={(e) => updateItem(item.id, { label: e.target.value })}
+                      disabled={item.status !== 'pending'}
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488] disabled:opacity-60 disabled:bg-gray-50"
+                    />
+                    {item.status === 'pending' && (
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
+                        title="削除"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    {item.status === 'saving' && (
+                      <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
+                    )}
+                    {item.status === 'done' && (
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    )}
+                    {item.status === 'error' && (
+                      <span className="text-xs text-red-500 flex-shrink-0">エラー</span>
+                    )}
+                  </div>
+
+                  {/* 動作種別 + 撮影方向 */}
+                  <div className="flex gap-2">
+                    <select
+                      value={item.movementType}
+                      onChange={(e) =>
+                        updateItem(item.id, { movementType: e.target.value as MovementType })
+                      }
+                      disabled={item.status !== 'pending'}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488] disabled:opacity-60 disabled:bg-gray-50"
+                    >
+                      {(Object.keys(MOVEMENT_TYPE_LABELS) as MovementType[]).map((mt) => (
+                        <option key={mt} value={mt}>
+                          {MOVEMENT_TYPE_LABELS[mt]}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={item.direction}
+                      onChange={(e) =>
+                        updateItem(item.id, { direction: e.target.value as VideoDirection })
+                      }
+                      disabled={item.status !== 'pending'}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d9488] disabled:opacity-60 disabled:bg-gray-50"
+                    >
+                      {(Object.keys(VIDEO_DIRECTION_LABELS) as VideoDirection[]).map((d) => (
+                        <option key={d} value={d}>
+                          {VIDEO_DIRECTION_LABELS[d]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* ファイル情報 */}
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <Film className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{item.file.name}</span>
+                    <span className="ml-auto flex-shrink-0">
+                      {(item.file.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ))}
 
-          <div className="flex justify-end gap-2">
+          {/* 完了後のクリアボタン */}
+          {doneCount > 0 && pendingCount === 0 && (
             <button
-              type="button"
-              onClick={() => { setFile(null); setPreview('') }}
-              className="px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              onClick={() => {
+                setQueue([])
+                onUploaded()
+              }}
+              className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline transition-colors"
             >
-              キャンセル
+              完了済みをクリアして動画一覧へ
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-[#0d9488] hover:bg-[#0b8276] text-white font-medium rounded-lg transition-colors disabled:opacity-60"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              {saving ? '登録中...' : '動画を登録'}
-            </button>
-          </div>
+          )}
         </div>
       )}
     </div>

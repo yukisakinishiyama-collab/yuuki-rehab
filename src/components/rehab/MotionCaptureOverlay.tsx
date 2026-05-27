@@ -7,22 +7,28 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react'
-import type { ROMItem } from '@/lib/pose-analyzer'
+import type { ROMItem, Landmark } from '@/lib/pose-analyzer'
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>
   active: boolean
   /** ROM データが更新されるたびに呼ばれるコールバック（動的ROM計測用） */
   onROM?: (items: ROMItem[]) => void
+  /** 3D worldLandmarks が更新されるたびに呼ばれるコールバック（3Dビュー用） */
+  onWorld?: (landmarks: Landmark[], detected: boolean) => void
 }
 
 const SIDE_LABEL: Record<string, string> = { front: '📷 正面', side: '📷 側面', unknown: '📷 判定中' }
 const SIDE_COLOR: Record<string, string> = { front: '#2563eb', side: '#7c3aed', unknown: '#6b7280' }
 
-export default function MotionCaptureOverlay({ videoRef, active, onROM }: Props) {
+export default function MotionCaptureOverlay({ videoRef, active, onROM, onWorld }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const rafRef      = useRef<number | null>(null)
   const readyRef    = useRef(false)        // initVideoMode完了フラグ
+
+  // 最後に検出した骨格をキャッシュ（一時停止中も再描画するため）
+  const lastLandmarksRef = useRef<Landmark[]>([])
+  const lastROMRef       = useRef<ROMItem[]>([])
 
   const [romItems,  setRomItems]  = useState<ROMItem[]>([])
   const [poseSide,  setPoseSide]  = useState<'front' | 'side' | 'unknown'>('unknown')
@@ -47,21 +53,30 @@ export default function MotionCaptureOverlay({ videoRef, active, onROM }: Props)
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // 停止中でも最後の骨格を薄く残す（再生中のみ更新）
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { detectPoseForVideoSync, drawPoseOverlay } = require('@/lib/pose-analyzer') as typeof import('@/lib/pose-analyzer')
+
     if (!video.paused && !video.ended && video.readyState >= 2) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { detectPoseForVideoSync, drawPoseOverlay } = require('@/lib/pose-analyzer') as typeof import('@/lib/pose-analyzer')
+      // ── 再生中：新しいフレームを検出して描画・キャッシュ ──
       const result = detectPoseForVideoSync(video, performance.now())
 
       if (result.detected) {
         drawPoseOverlay(ctx, result.landmarks, result.romItems, canvas.width, canvas.height)
+        // キャッシュ更新
+        lastLandmarksRef.current = result.landmarks
+        lastROMRef.current       = result.romItems
         setDetected(true)
         setRomItems(result.romItems)
         setPoseSide(result.poseSide)
         onROM?.(result.romItems)
+        onWorld?.(result.worldLandmarks, true)
       } else {
         setDetected(false)
+        onWorld?.([], false)
       }
+    } else if (lastLandmarksRef.current.length > 0) {
+      // ── 一時停止中：キャッシュした骨格をそのまま再描画 ──
+      drawPoseOverlay(ctx, lastLandmarksRef.current, lastROMRef.current, canvas.width, canvas.height)
     }
 
     rafRef.current = requestAnimationFrame(loop)
@@ -73,6 +88,9 @@ export default function MotionCaptureOverlay({ videoRef, active, onROM }: Props)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       rafRef.current = null
       readyRef.current = false
+      // キャッシュをクリア
+      lastLandmarksRef.current = []
+      lastROMRef.current       = []
       // キャンバスをクリア
       const ctx = canvasRef.current?.getContext('2d')
       if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)

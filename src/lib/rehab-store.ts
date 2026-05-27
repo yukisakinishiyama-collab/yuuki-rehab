@@ -1,4 +1,4 @@
-import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary, ExerciseProgram, ROMSession } from '@/types/rehab'
+import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary, ExerciseProgram, ROMSession, DiscussionSession } from '@/types/rehab'
 import { MOCK_CASES, MOCK_COMMENTS, MOCK_EVALUATIONS, MOCK_USERS } from './rehab-data'
 import { deleteVideoBlob } from './video-db'
 
@@ -17,7 +17,8 @@ const KEYS = {
   markers: 'rehabMarkers',
   aiSummaries: 'rehabAISummaries',
   exercisePrograms: 'rehabExercisePrograms',
-  romSessions:      'rehabROMSessions',
+  romSessions:        'rehabROMSessions',
+  discussions:        'rehabDiscussions',
   user: 'rehabUser',
   initialized: 'rehabInitialized',
   version: 'rehabVersion',
@@ -371,4 +372,24 @@ export function saveROMSession(session: ROMSession): void {
 
 export function deleteROMSession(id: string): void {
   set(KEYS.romSessions, get<ROMSession>(KEYS.romSessions).filter((s) => s.id !== id))
+}
+
+// ── AI評価ディスカッション ────────────────────────────────────────────────────
+
+export function getDiscussionSessions(caseId: string): DiscussionSession[] {
+  return get<DiscussionSession>(KEYS.discussions)
+    .filter((s) => s.caseId === caseId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+export function saveDiscussionSession(session: DiscussionSession): void {
+  const all = get<DiscussionSession>(KEYS.discussions)
+  const idx = all.findIndex((s) => s.id === session.id)
+  if (idx >= 0) all[idx] = session
+  else all.push(session)
+  set(KEYS.discussions, all)
+}
+
+export function deleteDiscussionSession(id: string): void {
+  set(KEYS.discussions, get<DiscussionSession>(KEYS.discussions).filter((s) => s.id !== id))
 }
