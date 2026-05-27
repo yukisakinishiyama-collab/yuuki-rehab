@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
+// 環境変数のAPIキーからASCII以外の文字（日本語等）を除去してクライアント初期化
+const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
+const cleanKey = rawKey.replace(/[^\x20-\x7E]/g, '').trim()
+const client = new Anthropic({ apiKey: cleanKey })
 
 // ── リクエスト型 ─────────────────────────────────────────────────────────────
 interface RequestBody {

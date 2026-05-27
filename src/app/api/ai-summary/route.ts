@@ -150,7 +150,9 @@ AIは診断者ではなく補助ツールです。確定診断・治療方針の
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    // APIキーからASCII以外の文字（日本語等）を除去
+    const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
+    const apiKey = rawKey.replace(/[^\x20-\x7E]/g, '').trim()
     const client = new Anthropic({ apiKey })
     const body   = await req.json()
 
