@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-// 環境変数のAPIキーからASCII以外の文字（日本語等）を除去してクライアント初期化
+// 環境変数のAPIキーから sk-ant- パターンを抽出（非ASCII文字が混入していても対応）
 const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
-const cleanKey = rawKey.replace(/[^\x20-\x7E]/g, '').trim()
-const client = new Anthropic({ apiKey: cleanKey })
+const keyMatch = rawKey.match(/sk-ant-[A-Za-z0-9_\-]+/)
+const cleanKey = keyMatch ? keyMatch[0] : rawKey.replace(/[^\x20-\x7E]/g, '').trim()
+console.log('[discussion] cleanKey prefix:', cleanKey.slice(0, 20) || '(empty – key invalid)')
+const client = new Anthropic({ apiKey: cleanKey || 'INVALID_KEY' })
 
 // ── 専門家ペルソナ（臨床的に詳細化） ─────────────────────────────────────────
 const EXPERT_PERSONAS: Record<string, {
@@ -275,9 +277,15 @@ function buildClinicalContext(data: RequestBody['structuredData']): string {
 
 // ── ストリーミング POST ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // 診断用ログ（APIキーの先頭8文字のみ）
-  const apiKey = process.env.ANTHROPIC_API_KEY ?? ''
-  console.log('[discussion] API key prefix:', apiKey.slice(0, 15) || '(empty)')
+  // APIキーの検証
+  if (!cleanKey || !cleanKey.startsWith('sk-ant-')) {
+    const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
+    console.error('[discussion] Invalid API key. rawKey length:', rawKey.length, 'first char code:', rawKey.charCodeAt(0))
+    return NextResponse.json({
+      error: 'APIキー設定エラー',
+      detail: `Vercelの環境変数 ANTHROPIC_API_KEY が正しく設定されていません。現在の値の先頭文字コード: ${rawKey.charCodeAt(0)}。sk-ant-api03- で始まるキーを設定してください。`
+    }, { status: 500 })
+  }
 
   try {
     const body = await req.json() as RequestBody

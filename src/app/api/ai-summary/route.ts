@@ -150,10 +150,11 @@ AIは診断者ではなく補助ツールです。確定診断・治療方針の
 
 export async function POST(req: NextRequest) {
   try {
-    // APIキーからASCII以外の文字（日本語等）を除去
+    // APIキーから sk-ant- パターンを抽出（非ASCII文字が混入していても対応）
     const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
-    const apiKey = rawKey.replace(/[^\x20-\x7E]/g, '').trim()
-    const client = new Anthropic({ apiKey })
+    const keyMatch = rawKey.match(/sk-ant-[A-Za-z0-9_\-]+/)
+    const apiKey = keyMatch ? keyMatch[0] : rawKey.replace(/[^\x20-\x7E]/g, '').trim()
+    const client = new Anthropic({ apiKey: apiKey || 'INVALID_KEY' })
     const body   = await req.json()
 
     const { movementType, comments, evaluation, caseInfo, frames, customPrompt, personMarker } = body

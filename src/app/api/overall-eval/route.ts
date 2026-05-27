@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-// 環境変数のAPIキーからASCII以外の文字（日本語等）を除去してクライアント初期化
+// 環境変数のAPIキーから sk-ant- パターンを抽出（非ASCII文字が混入していても対応）
 const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
-const cleanKey = rawKey.replace(/[^\x20-\x7E]/g, '').trim()
-const client = new Anthropic({ apiKey: cleanKey })
+const keyMatch = rawKey.match(/sk-ant-[A-Za-z0-9_\-]+/)
+const cleanKey = keyMatch ? keyMatch[0] : rawKey.replace(/[^\x20-\x7E]/g, '').trim()
+const client = new Anthropic({ apiKey: cleanKey || 'INVALID_KEY' })
 
 // ── リクエスト型 ─────────────────────────────────────────────────────────────
 interface RequestBody {
