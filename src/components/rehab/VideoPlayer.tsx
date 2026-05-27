@@ -4,12 +4,13 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import type { VideoComment, SavedAnnotation } from '@/types/rehab'
 import {
   Play, Pause, SkipBack, SkipForward,
-  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot,
+  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot, Crosshair,
 } from 'lucide-react'
 import VideoAnnotationOverlay from './VideoAnnotationOverlay'
 import MotionCaptureOverlay from './MotionCaptureOverlay'
 import MarkerTrackerOverlay from './MarkerTrackerOverlay'
 import MarkerSetupPanel from './MarkerSetupPanel'
+import VirtualMarkerLayer from './VirtualMarkerLayer'
 import type { MarkerConfig } from '@/lib/color-marker-tracker'
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
@@ -46,6 +47,7 @@ export default function VideoPlayer({
   const [markerActive,       setMarkerActive]       = useState(false)
   const [showMarkerSetup,    setShowMarkerSetup]    = useState(false)
   const [markerConfigs,      setMarkerConfigs]      = useState<MarkerConfig[]>([])
+  const [virtualMarkerActive, setVirtualMarkerActive] = useState(false)
   const [scrubbing,  setScrubbing]  = useState(false)
 
   // Expose seekTo for parent
@@ -194,6 +196,9 @@ export default function VideoPlayer({
             onClose={() => setShowMarkerSetup(false)}
           />
         )}
+
+        {/* 仮想マーカー追跡（クリック配置 + テンプレートマッチング） */}
+        <VirtualMarkerLayer videoRef={videoRef} active={virtualMarkerActive} />
 
         {/* 外部から渡された追加オーバーレイ（PersonMarkerLayerなど） */}
         {videoOverlay}
@@ -348,6 +353,20 @@ export default function VideoPlayer({
             <span className="hidden sm:inline">
               {markerConfigs.length > 0 ? `マーカー(${markerConfigs.length})` : 'マーカー'}
             </span>
+          </button>
+
+          {/* 仮想マーカー追跡トグル */}
+          <button
+            onClick={() => setVirtualMarkerActive((v) => !v)}
+            title={virtualMarkerActive ? '仮想マーカー追跡をOFF' : '動画上にマーカーを配置して追跡（一時停止してクリック）'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
+              virtualMarkerActive
+                ? 'bg-purple-500 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">仮想M</span>
           </button>
 
           {/* 描き込みトグル */}
