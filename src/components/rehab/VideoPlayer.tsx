@@ -4,9 +4,10 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import type { VideoComment, SavedAnnotation } from '@/types/rehab'
 import {
   Play, Pause, SkipBack, SkipForward,
-  Volume2, VolumeX, Maximize, PenLine,
+  Volume2, VolumeX, Maximize, PenLine, Scan,
 } from 'lucide-react'
 import VideoAnnotationOverlay from './VideoAnnotationOverlay'
+import MotionCaptureOverlay from './MotionCaptureOverlay'
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
 const FRAME = 1 / 30
@@ -37,7 +38,8 @@ export default function VideoPlayer({
   const [speed,      setSpeed]      = useState(1)
   const [muted,      setMuted]      = useState(false)
   const [volume,     setVolume]     = useState(1)
-  const [annotationActive, setAnnotationActive] = useState(false)
+  const [annotationActive,   setAnnotationActive]   = useState(false)
+  const [motionCapture,      setMotionCapture]      = useState(false)
   const [scrubbing,  setScrubbing]  = useState(false)
 
   // Expose seekTo for parent
@@ -172,6 +174,9 @@ export default function VideoPlayer({
           active={annotationActive}
         />
 
+        {/* モーションキャプチャオーバーレイ */}
+        <MotionCaptureOverlay videoRef={videoRef} active={motionCapture} />
+
         {/* 外部から渡された追加オーバーレイ（PersonMarkerLayerなど） */}
         {videoOverlay}
       </div>
@@ -293,6 +298,20 @@ export default function VideoPlayer({
             onChange={(e) => handleVolumeChange(Number(e.target.value))}
             className="w-16 accent-[#0d9488]"
           />
+
+          {/* モーションキャプチャトグル */}
+          <button
+            onClick={() => setMotionCapture((v) => !v)}
+            title={motionCapture ? 'モーションキャプチャをOFF' : 'モーションキャプチャをON（骨格リアルタイム表示）'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
+              motionCapture
+                ? 'bg-teal-500 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Scan className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">骨格</span>
+          </button>
 
           {/* 描き込みトグル */}
           <button

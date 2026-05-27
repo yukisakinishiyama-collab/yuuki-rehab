@@ -455,6 +455,65 @@ async function initLandmarker(): Promise<void> {
   return _initPromise
 }
 
+// ── VIDEOモード（リアルタイム再生用） ──────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _videoLandmarker: any = null
+let _videoInitPromise: Promise<void> | null = null
+
+/** VIDEOモードのランドマーカーを初期化（初回のみ非同期） */
+export async function initVideoMode(): Promise<void> {
+  if (_videoLandmarker) return
+  if (_videoInitPromise) return _videoInitPromise
+  _videoInitPromise = (async () => {
+    const { PoseLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision')
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
+    )
+    _videoLandmarker = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+        delegate: 'CPU',
+      },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+    })
+  })()
+  return _videoInitPromise
+}
+
+/**
+ * 動画フレームをリアルタイム解析（同期・initVideoMode()完了後に呼ぶこと）
+ * detectForVideo は MediaPipe 側が同期的に結果を返す
+ */
+export function detectPoseForVideoSync(
+  video: HTMLVideoElement,
+  timestampMs: number,
+): PoseAnalysisResult {
+  const empty: PoseAnalysisResult = {
+    detected: false, landmarks: [], worldLandmarks: [],
+    jointAngles: {
+      leftKnee:null,rightKnee:null,leftHip:null,rightHip:null,
+      leftShoulder:null,rightShoulder:null,trunkAngle:null,
+      pelvisTilt:null,headForward:null,shoulderSymm:null,
+      leftAnkle:null,rightAnkle:null,
+    },
+    romItems: [], poseSide: 'unknown',
+  }
+  if (!_videoLandmarker) return empty
+  try {
+    const result = _videoLandmarker.detectForVideo(video, timestampMs)
+    if (!result.landmarks?.length) return empty
+    const lm = result.landmarks[0] as Landmark[]
+    const wl = result.worldLandmarks[0] as Landmark[]
+    const poseSide   = detectSide(lm)
+    const jointAngles = calcJointAngles(wl, poseSide)
+    const romItems    = calcROMItems(wl, poseSide)
+    return { detected: true, landmarks: lm, worldLandmarks: wl, jointAngles, romItems, poseSide }
+  } catch {
+    return empty
+  }
+}
+
 /** 画像データからポーズ検出・ROM計測・骨格描画を行い annotated base64 JPEG を返す */
 export async function analyzeAndAnnotateFrame(
   imageDataUrl: string,
