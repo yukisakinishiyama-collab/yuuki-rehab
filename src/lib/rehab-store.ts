@@ -1,4 +1,4 @@
-import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary } from '@/types/rehab'
+import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary, ExerciseProgram } from '@/types/rehab'
 import { MOCK_CASES, MOCK_COMMENTS, MOCK_EVALUATIONS, MOCK_USERS } from './rehab-data'
 import { deleteVideoBlob } from './video-db'
 
@@ -16,6 +16,7 @@ const KEYS = {
   chat: 'rehabChat',
   markers: 'rehabMarkers',
   aiSummaries: 'rehabAISummaries',
+  exercisePrograms: 'rehabExercisePrograms',
   user: 'rehabUser',
   initialized: 'rehabInitialized',
   version: 'rehabVersion',
@@ -329,4 +330,24 @@ export function saveAISummary(summary: AISummary): void {
 
 export function deleteAISummary(id: string): void {
   set(KEYS.aiSummaries, get<AISummary>(KEYS.aiSummaries).filter((s) => s.id !== id))
+}
+
+// ── Exercise Programs ─────────────────────────────────────────────────────────
+
+export function getExercisePrograms(caseId: string): ExerciseProgram[] {
+  return get<ExerciseProgram>(KEYS.exercisePrograms)
+    .filter((p) => p.caseId === caseId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export function saveExerciseProgram(program: ExerciseProgram): void {
+  const all = get<ExerciseProgram>(KEYS.exercisePrograms)
+  const idx = all.findIndex((p) => p.id === program.id)
+  if (idx >= 0) all[idx] = program
+  else all.push(program)
+  set(KEYS.exercisePrograms, all)
+}
+
+export function deleteExerciseProgram(id: string): void {
+  set(KEYS.exercisePrograms, get<ExerciseProgram>(KEYS.exercisePrograms).filter((p) => p.id !== id))
 }

@@ -275,6 +275,52 @@ export interface AISummary {
   createdByName: string
 }
 
+// ─── 運動プログラム ───────────────────────────────────────────────────────────
+
+/** 運動フェーズ */
+export type ExercisePhase = 'warmup' | 'main' | 'cooldown'
+
+export const EXERCISE_PHASE_LABELS: Record<ExercisePhase, string> = {
+  warmup:   'ウォームアップ',
+  main:     'メイン',
+  cooldown: 'クールダウン',
+}
+
+export const EXERCISE_PHASE_COLORS: Record<ExercisePhase, string> = {
+  warmup:   'bg-orange-100 text-orange-800 border-orange-200',
+  main:     'bg-blue-100 text-blue-800 border-blue-200',
+  cooldown: 'bg-teal-100 text-teal-800 border-teal-200',
+}
+
+/** 1種目の運動 */
+export interface ExerciseItem {
+  id:             string
+  name:           string       // 例: '膝屈曲ストレッチ'
+  phase:          ExercisePhase
+  durationSec:    number       // 実施時間（秒）
+  sets?:          number       // セット数
+  reps?:          string       // 例: '10回' '30秒キープ'
+  restSec?:       number       // 休憩（秒）
+  instruction:    string       // 手順（Step形式）
+  purpose:        string       // なぜこの運動が必要か
+  caution?:       string       // 注意事項
+  youtubeQuery:   string       // YouTube検索キーワード（日本語）
+  customVideoUrl?: string      // ユーザーが貼り付けた動画URL（YouTube等）
+}
+
+/** 15分運動プログラム */
+export interface ExerciseProgram {
+  id:            string
+  caseId:        string
+  createdAt:     string
+  targetArea:    string       // 例: '左膝・股関節'
+  goal:          string       // 例: '可動域改善・筋力増強'
+  totalMinutes:  number       // 総時間（分）
+  exercises:     ExerciseItem[]
+  generalNotes:  string       // 全体的な注意事項
+  createdByName: string
+}
+
 /** 動画上の対象者マーカー（バウンディングボックス・正規化座標 0–1） */
 export interface PersonMarker {
   videoId: string

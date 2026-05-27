@@ -14,13 +14,14 @@ import VideoCompare from './VideoCompare'
 import ReportView from './ReportView'
 import PatientReport from './PatientReport'
 import ImageROMAnalysis from './ImageROMAnalysis'
-import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2, Camera } from 'lucide-react'
+import ExerciseProgramPanel from './ExerciseProgramPanel'
+import { ArrowLeft, Upload, FileText, Info, Video, SplitSquareHorizontal, Share2, Camera, Dumbbell } from 'lucide-react'
 
 interface Props {
   caseId: string
 }
 
-type Tab = 'videos' | 'upload' | 'compare' | 'report' | 'patient-report' | 'image-rom'
+type Tab = 'videos' | 'upload' | 'compare' | 'report' | 'patient-report' | 'image-rom' | 'exercise'
 
 export default function CaseDetail({ caseId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
@@ -58,6 +59,7 @@ export default function CaseDetail({ caseId }: Props) {
     { key: 'image-rom', label: '📸 画像ROM計測', icon: Camera },
     { key: 'compare', label: '動画比較', icon: SplitSquareHorizontal },
     { key: 'report', label: '分析レポート', icon: FileText },
+    { key: 'exercise', label: '🏃 運動プログラム', icon: Dumbbell },
     { key: 'patient-report', label: '患者用レポート', icon: Share2 },
   ]
 
@@ -191,6 +193,12 @@ export default function CaseDetail({ caseId }: Props) {
 
       {tab === 'report' && (
         <ReportView case_={case_} />
+      )}
+
+      {tab === 'exercise' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <ExerciseProgramPanel case_={case_} />
+        </div>
       )}
 
       {tab === 'patient-report' && (
