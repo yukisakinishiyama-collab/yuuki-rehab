@@ -94,9 +94,9 @@ export default function Skeleton3DView({ worldLandmarks, romItems, detected }: P
     el.appendChild(renderer.domElement)
     rendererRef.current = renderer
 
-    // グリッド（床）
+    // グリッド（床）- 足元 y≈-0.5 に配置
     const gridHelper = new THREE.GridHelper(2, 10, COLOR_GRID, 0x1a2e4a)
-    gridHelper.position.y = -1.0
+    gridHelper.position.y = -0.5
     scene.add(gridHelper)
 
     // 環境光 + ディレクショナルライト
@@ -127,13 +127,16 @@ export default function Skeleton3DView({ worldLandmarks, romItems, detected }: P
     }
 
     // レンダーループ
+    // スケルトンの中心（股関節y=0 → Three.js y≈0.5）を注視点に設定
+    const LOOK_AT_Y = 0.4
+
     function animate() {
       const { phi, theta, dist } = orbitRef.current
       const x = dist * Math.sin(phi) * Math.sin(theta)
-      const y = dist * Math.cos(phi)
+      const y = dist * Math.cos(phi) + LOOK_AT_Y
       const z = dist * Math.sin(phi) * Math.cos(theta)
       camera.position.set(x, y, z)
-      camera.lookAt(0, 0, 0)
+      camera.lookAt(0, LOOK_AT_Y, 0)
       renderer.render(scene, camera)
       rafIdRef.current = requestAnimationFrame(animate)
     }
