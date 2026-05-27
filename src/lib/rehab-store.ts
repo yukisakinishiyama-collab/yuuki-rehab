@@ -1,4 +1,4 @@
-import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary, ExerciseProgram } from '@/types/rehab'
+import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary, ExerciseProgram, ROMSession } from '@/types/rehab'
 import { MOCK_CASES, MOCK_COMMENTS, MOCK_EVALUATIONS, MOCK_USERS } from './rehab-data'
 import { deleteVideoBlob } from './video-db'
 
@@ -17,6 +17,7 @@ const KEYS = {
   markers: 'rehabMarkers',
   aiSummaries: 'rehabAISummaries',
   exercisePrograms: 'rehabExercisePrograms',
+  romSessions:      'rehabROMSessions',
   user: 'rehabUser',
   initialized: 'rehabInitialized',
   version: 'rehabVersion',
@@ -350,4 +351,24 @@ export function saveExerciseProgram(program: ExerciseProgram): void {
 
 export function deleteExerciseProgram(id: string): void {
   set(KEYS.exercisePrograms, get<ExerciseProgram>(KEYS.exercisePrograms).filter((p) => p.id !== id))
+}
+
+// ── ROM Sessions ──────────────────────────────────────────────────────────────
+
+export function getROMSessions(videoId: string): ROMSession[] {
+  return get<ROMSession>(KEYS.romSessions)
+    .filter((s) => s.videoId === videoId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export function saveROMSession(session: ROMSession): void {
+  const all = get<ROMSession>(KEYS.romSessions)
+  const idx = all.findIndex((s) => s.id === session.id)
+  if (idx >= 0) all[idx] = session
+  else all.push(session)
+  set(KEYS.romSessions, all)
+}
+
+export function deleteROMSession(id: string): void {
+  set(KEYS.romSessions, get<ROMSession>(KEYS.romSessions).filter((s) => s.id !== id))
 }

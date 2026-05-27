@@ -15,14 +15,16 @@ import EvaluationChecklist from './EvaluationChecklist'
 import SpecialistReviewPanel from './SpecialistReviewPanel'
 import SpecialistChat from './SpecialistChat'
 import PersonMarkerLayer from './PersonMarkerLayer'
-import { ArrowLeft, Layers, MessageSquare, ClipboardList, Info, Users, MessageSquareDot } from 'lucide-react'
+import DynamicROMPanel from './DynamicROMPanel'
+import { ArrowLeft, Layers, MessageSquare, ClipboardList, Info, Users, MessageSquareDot, Activity } from 'lucide-react'
+import type { ROMItem } from '@/lib/pose-analyzer'
 
 interface Props {
   caseId: string
   videoId: string
 }
 
-type Panel = 'comments' | 'chat' | 'specialists' | 'evaluation' | 'annotation'
+type Panel = 'comments' | 'chat' | 'specialists' | 'evaluation' | 'annotation' | 'rom'
 
 export default function VideoAnalysisPage({ caseId, videoId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
@@ -31,8 +33,10 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
   const [currentTime, setCurrentTime] = useState(0)
   const [comments, setComments] = useState<VideoComment[]>([])
   const [savedAnnotations, setSavedAnnotations] = useState<SavedAnnotation[]>([])
-  const [panel, setPanel] = useState<Panel>('comments')
+  const [panel, setPanel] = useState<Panel>('rom')
   const [personMarker, setPersonMarker] = useState<PersonMarker | null>(null)
+  const [latestROM,    setLatestROM]    = useState<ROMItem[]>([])
+  const [motionActive, setMotionActive] = useState(false)
   const seekRef = useRef<((t: number) => void) | null>(null)
 
   useEffect(() => {
@@ -74,6 +78,7 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
   }
 
   const PANELS: Array<{ key: Panel; icon: React.ElementType; label: string }> = [
+    { key: 'rom',        icon: Activity,         label: '📐 ROM' },
     { key: 'comments',   icon: MessageSquare,    label: 'コメント' },
     { key: 'chat',       icon: MessageSquareDot, label: 'チャット' },
     { key: 'specialists',icon: Users,            label: '専門家' },
@@ -134,6 +139,11 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
               caseId={caseId}
               savedAnnotations={savedAnnotations}
               onAnnotationSaved={loadAnnotations}
+              onROM={(items, _t) => {
+                setLatestROM(items)
+                // 骨格がアクティブかどうかを推定（itemsが来ていればactive）
+                if (items.length > 0) setMotionActive(true)
+              }}
               videoOverlay={
                 <PersonMarkerLayer
                   videoId={videoId}
@@ -191,6 +201,17 @@ export default function VideoAnalysisPage({ caseId, videoId }: Props) {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 flex flex-col min-h-0">
+            {panel === 'rom' && (
+              <DynamicROMPanel
+                videoId={videoId}
+                caseId={caseId}
+                romItems={latestROM}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+                isMediaPipeActive={motionActive}
+              />
+            )}
+
             {panel === 'comments' && (
               <CommentPanel
                 videoId={videoId}

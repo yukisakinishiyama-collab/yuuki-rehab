@@ -275,6 +275,33 @@ export interface AISummary {
   createdByName: string
 }
 
+// ─── 動的ROM計測 ─────────────────────────────────────────────────────────────
+
+/** 1サンプル（動画タイムスタンプ + 各関節角度） */
+export interface ROMSample {
+  t:      number                           // 動画時刻（秒）
+  angles: Record<string, {                 // joint key → 角度情報
+    value:     number
+    direction: string
+    label:     string
+    side:      string
+  }>
+}
+
+/** ROM計測セッション（1回分の計測） */
+export interface ROMSession {
+  id:            string
+  caseId:        string
+  videoId:       string
+  label:         string           // 例: '歩行 ROM計測 #1'
+  samples:       ROMSample[]
+  durationSec:   number           // 計測区間の長さ
+  startTime:     number           // 動画の開始時刻
+  createdAt:     string
+  createdByName: string
+  source:        'mediapipe' | 'virtual_marker' | 'color_marker'
+}
+
 // ─── 運動プログラム ───────────────────────────────────────────────────────────
 
 /** 運動フェーズ */

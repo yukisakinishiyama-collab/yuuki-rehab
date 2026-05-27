@@ -12,6 +12,7 @@ import MarkerTrackerOverlay from './MarkerTrackerOverlay'
 import MarkerSetupPanel from './MarkerSetupPanel'
 import VirtualMarkerLayer from './VirtualMarkerLayer'
 import type { MarkerConfig } from '@/lib/color-marker-tracker'
+import type { ROMItem } from '@/lib/pose-analyzer'
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
 const FRAME = 1 / 30
@@ -27,12 +28,14 @@ interface Props {
   onAnnotationSaved: () => void
   /** 映像エリア上に重ねる追加オーバーレイ（PersonMarkerLayerなど） */
   videoOverlay?: React.ReactNode
+  /** MediaPipe ROMデータ受け取りコールバック（動的ROM計測用） */
+  onROM?: (items: ROMItem[], videoTime: number) => void
 }
 
 export default function VideoPlayer({
   src, comments, onTimeUpdate, onSeekTo,
   videoId, caseId, savedAnnotations, onAnnotationSaved,
-  videoOverlay,
+  videoOverlay, onROM,
 }: Props) {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -183,7 +186,11 @@ export default function VideoPlayer({
         />
 
         {/* MediaPipeリアルタイム骨格 */}
-        <MotionCaptureOverlay videoRef={videoRef} active={motionCapture} />
+        <MotionCaptureOverlay
+          videoRef={videoRef}
+          active={motionCapture}
+          onROM={onROM ? (items) => onROM(items, videoRef.current?.currentTime ?? 0) : undefined}
+        />
 
         {/* カラーマーカー追跡 */}
         <MarkerTrackerOverlay videoRef={videoRef} active={markerActive} configs={markerConfigs} />

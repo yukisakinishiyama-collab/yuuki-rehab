@@ -12,12 +12,14 @@ import type { ROMItem } from '@/lib/pose-analyzer'
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>
   active: boolean
+  /** ROM データが更新されるたびに呼ばれるコールバック（動的ROM計測用） */
+  onROM?: (items: ROMItem[]) => void
 }
 
 const SIDE_LABEL: Record<string, string> = { front: '📷 正面', side: '📷 側面', unknown: '📷 判定中' }
 const SIDE_COLOR: Record<string, string> = { front: '#2563eb', side: '#7c3aed', unknown: '#6b7280' }
 
-export default function MotionCaptureOverlay({ videoRef, active }: Props) {
+export default function MotionCaptureOverlay({ videoRef, active, onROM }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const rafRef      = useRef<number | null>(null)
   const readyRef    = useRef(false)        // initVideoMode完了フラグ
@@ -56,6 +58,7 @@ export default function MotionCaptureOverlay({ videoRef, active }: Props) {
         setDetected(true)
         setRomItems(result.romItems)
         setPoseSide(result.poseSide)
+        onROM?.(result.romItems)
       } else {
         setDetected(false)
       }
