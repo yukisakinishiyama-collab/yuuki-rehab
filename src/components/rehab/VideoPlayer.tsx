@@ -4,10 +4,13 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import type { VideoComment, SavedAnnotation } from '@/types/rehab'
 import {
   Play, Pause, SkipBack, SkipForward,
-  Volume2, VolumeX, Maximize, PenLine, Scan,
+  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot,
 } from 'lucide-react'
 import VideoAnnotationOverlay from './VideoAnnotationOverlay'
 import MotionCaptureOverlay from './MotionCaptureOverlay'
+import MarkerTrackerOverlay from './MarkerTrackerOverlay'
+import MarkerSetupPanel from './MarkerSetupPanel'
+import type { MarkerConfig } from '@/lib/color-marker-tracker'
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
 const FRAME = 1 / 30
@@ -40,6 +43,9 @@ export default function VideoPlayer({
   const [volume,     setVolume]     = useState(1)
   const [annotationActive,   setAnnotationActive]   = useState(false)
   const [motionCapture,      setMotionCapture]      = useState(false)
+  const [markerActive,       setMarkerActive]       = useState(false)
+  const [showMarkerSetup,    setShowMarkerSetup]    = useState(false)
+  const [markerConfigs,      setMarkerConfigs]      = useState<MarkerConfig[]>([])
   const [scrubbing,  setScrubbing]  = useState(false)
 
   // Expose seekTo for parent
@@ -174,8 +180,20 @@ export default function VideoPlayer({
           active={annotationActive}
         />
 
-        {/* モーションキャプチャオーバーレイ */}
+        {/* MediaPipeリアルタイム骨格 */}
         <MotionCaptureOverlay videoRef={videoRef} active={motionCapture} />
+
+        {/* カラーマーカー追跡 */}
+        <MarkerTrackerOverlay videoRef={videoRef} active={markerActive} configs={markerConfigs} />
+
+        {/* マーカー設定パネル */}
+        {showMarkerSetup && (
+          <MarkerSetupPanel
+            configs={markerConfigs}
+            onChange={(cfg) => { setMarkerConfigs(cfg); setMarkerActive(cfg.length > 0) }}
+            onClose={() => setShowMarkerSetup(false)}
+          />
+        )}
 
         {/* 外部から渡された追加オーバーレイ（PersonMarkerLayerなど） */}
         {videoOverlay}
@@ -299,18 +317,37 @@ export default function VideoPlayer({
             className="w-16 accent-[#0d9488]"
           />
 
-          {/* モーションキャプチャトグル */}
+          {/* MediaPipe骨格トグル */}
           <button
             onClick={() => setMotionCapture((v) => !v)}
-            title={motionCapture ? 'モーションキャプチャをOFF' : 'モーションキャプチャをON（骨格リアルタイム表示）'}
+            title={motionCapture ? '骨格表示をOFF' : '骨格リアルタイム表示をON'}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
-              motionCapture
-                ? 'bg-teal-500 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-white/10'
+              motionCapture ? 'bg-teal-500 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'
             }`}
           >
             <Scan className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">骨格</span>
+          </button>
+
+          {/* カラーマーカートグル */}
+          <button
+            onClick={() => {
+              if (markerConfigs.length === 0) {
+                setShowMarkerSetup(true)   // 未設定なら設定画面へ
+              } else {
+                setMarkerActive((v) => !v) // 設定済みならON/OFF
+              }
+            }}
+            onContextMenu={(e) => { e.preventDefault(); setShowMarkerSetup(true) }} // 右クリックで設定画面
+            title={markerActive ? 'マーカー追跡をOFF（右クリックで設定）' : 'カラーマーカー追跡をON（右クリックで設定）'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ml-1 transition-colors ${
+              markerActive ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <CircleDot className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {markerConfigs.length > 0 ? `マーカー(${markerConfigs.length})` : 'マーカー'}
+            </span>
           </button>
 
           {/* 描き込みトグル */}
