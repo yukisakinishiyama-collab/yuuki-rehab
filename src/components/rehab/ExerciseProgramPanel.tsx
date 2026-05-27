@@ -329,8 +329,17 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
           evaluationSummary,
         }),
       })
-      if (!res.ok) throw new Error('APIエラー')
-      const { program } = await res.json()
+      const json = await res.json()
+      if (!res.ok) {
+        const detail = json?.detail ?? json?.error ?? 'APIエラー'
+        throw new Error(detail)
+      }
+      const { program } = json
+      if (!program) throw new Error('APIからプログラムデータが返りませんでした')
+      if (!Array.isArray(program.exercises) || program.exercises.length === 0) {
+        throw new Error('運動リストが空です（AI応答の形式エラー）')
+      }
+
       const user = getCurrentUser()
       const saved: ExerciseProgram = {
         id:            generateId('ep'),
@@ -339,7 +348,7 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
         targetArea:    program.targetArea ?? '',
         goal:          program.goal ?? '',
         totalMinutes:  program.totalMinutes ?? 15,
-        exercises:     (program.exercises ?? []).map((e: Omit<ExerciseItem, 'id'> & { id?: string }, i: number) => ({
+        exercises:     program.exercises.map((e: Omit<ExerciseItem, 'id'> & { id?: string }, i: number) => ({
           ...e,
           id: e.id ?? `ex${i + 1}`,
         })),
@@ -350,8 +359,9 @@ export default function ExerciseProgramPanel({ case_, evaluationSummary }: Props
       setSelected(saved)
       reload()
     } catch (e) {
-      setError('プログラムの生成に失敗しました。再試行してください。')
-      console.error(e)
+      const msg = e instanceof Error ? e.message : '不明なエラー'
+      setError(`生成に失敗しました: ${msg}`)
+      console.error('[ExerciseProgram]', e)
     } finally {
       setLoading(false)
     }
