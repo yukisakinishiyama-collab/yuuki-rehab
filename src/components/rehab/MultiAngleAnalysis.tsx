@@ -446,7 +446,15 @@ export default function MultiAngleAnalysis({ case_, videos }: Props) {
         }),
       })
 
-      if (!res.ok) throw new Error('API error')
+      if (!res.ok) {
+        // サーバーエラーの詳細を取得して表示
+        let detail = `HTTPステータス: ${res.status}`
+        try {
+          const errJson = await res.json()
+          detail = `${detail}\n詳細: ${errJson.detail ?? errJson.error ?? JSON.stringify(errJson)}`
+        } catch { /* JSON解析失敗は無視 */ }
+        throw new Error(detail)
+      }
 
       let full = ''
       const reader = res.body!.getReader()
@@ -469,10 +477,12 @@ export default function MultiAngleAnalysis({ case_, videos }: Props) {
       }
       setChatMessages((prev) => [...prev, expertMsg])
       setStreamingText('')
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error('[MultiAngleAnalysis chat error]', errMsg)
       setChatMessages((prev) => [
         ...prev,
-        { id: generateId('cm'), role: 'expert', expertName: 'エラー', expertColor: '#dc2626', text: 'エラーが発生しました。APIキーをご確認ください。' },
+        { id: generateId('cm'), role: 'expert', expertName: 'エラー', expertColor: '#dc2626', text: `エラーが発生しました。\n\n${errMsg}` },
       ])
     } finally {
       setStreaming(false)

@@ -272,6 +272,10 @@ function buildClinicalContext(data: RequestBody['structuredData']): string {
 
 // ── ストリーミング POST ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  // 診断用ログ（APIキーの先頭8文字のみ）
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? ''
+  console.log('[discussion] API key prefix:', apiKey.slice(0, 15) || '(empty)')
+
   try {
     const body = await req.json() as RequestBody
     const { expertId, messages, structuredData } = body

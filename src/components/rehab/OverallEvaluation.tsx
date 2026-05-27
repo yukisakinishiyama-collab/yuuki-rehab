@@ -315,7 +315,14 @@ export default function OverallEvaluation({ case_ }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error('API error')
+      if (!res.ok) {
+        let detail = `HTTPステータス: ${res.status}`
+        try {
+          const errJson = await res.json()
+          detail = `${detail}\n詳細: ${errJson.detail ?? errJson.error ?? JSON.stringify(errJson)}`
+        } catch { /* JSON解析失敗は無視 */ }
+        throw new Error(detail)
+      }
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       while (true) {
@@ -329,7 +336,9 @@ export default function OverallEvaluation({ case_ }: Props) {
       }
       setReportDone(true)
     } catch (err) {
-      setReport('エラーが発生しました。APIキーを確認してください。')
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error('[OverallEvaluation error]', errMsg)
+      setReport(`エラーが発生しました。\n\n${errMsg}`)
     } finally {
       setGenerating(false)
     }
