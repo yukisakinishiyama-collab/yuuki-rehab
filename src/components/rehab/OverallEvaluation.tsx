@@ -347,7 +347,8 @@ export default function OverallEvaluation({ case_ }: Props) {
   if (!data) return null
 
   const totalIssues = data.severityCounts.severe + data.severityCounts.moderate + data.severityCounts.mild
-  const hasData = data.totalEvals > 0 || data.totalROMSessions > 0
+  // 動画が1件以上あればレポート生成可能（評価未実施でも症例情報からAIが分析）
+  const hasData = data.totalVideos > 0 || data.totalEvals > 0 || data.totalROMSessions > 0
 
   return (
     <div className="space-y-6">
@@ -409,11 +410,19 @@ export default function OverallEvaluation({ case_ }: Props) {
         />
       </div>
 
-      {/* データなし警告 */}
+      {/* データなし警告（動画も評価もない場合のみ表示） */}
       {!hasData && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
-          <p className="font-semibold mb-1">まだ評価データがありません</p>
-          <p>動画を解析して評価チェックリストを記録すると、ここに総合評価が表示されます。</p>
+          <p className="font-semibold mb-1">まだデータがありません</p>
+          <p>動画をアップロードするとAI総合評価レポートを生成できます。</p>
+        </div>
+      )}
+
+      {/* 動画あり・評価なしの場合のヒント */}
+      {data.totalVideos > 0 && data.totalEvals === 0 && data.totalROMSessions === 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
+          <p className="font-semibold mb-1">💡 症例情報と動画からAIレポートを生成できます</p>
+          <p>評価チェックリストやROM計測を行うと、より詳細なレポートが生成されます。</p>
         </div>
       )}
 
