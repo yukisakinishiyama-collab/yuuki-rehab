@@ -1,39 +1,49 @@
-import { cn } from "@/lib/utils";
-import { ButtonHTMLAttributes } from "react";
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '@/lib/utils'
+import { forwardRef, type ButtonHTMLAttributes } from 'react'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
-  size?: "sm" | "md" | "lg";
-}
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        default:     'bg-teal-600 text-white hover:bg-teal-700',
+        destructive: 'bg-red-500 text-white hover:bg-red-600',
+        outline:     'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900',
+        secondary:   'bg-gray-100 text-gray-900 hover:bg-gray-200',
+        ghost:       'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+        link:        'text-teal-600 underline-offset-4 hover:underline p-0 h-auto',
+        success:     'bg-green-600 text-white hover:bg-green-700',
+        warning:     'bg-amber-500 text-white hover:bg-amber-600',
+      },
+      size: {
+        default: 'h-10 px-4 py-2',
+        sm:      'h-8 rounded-md px-3 text-xs',
+        lg:      'h-11 rounded-md px-8 text-base',
+        icon:    'h-10 w-10',
+        'icon-sm': 'h-8 w-8',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+)
 
-export function Button({
-  variant = "primary",
-  size = "md",
-  className,
-  children,
-  ...props
-}: ButtonProps) {
-  return (
+export interface ButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, ...props }, ref) => (
     <button
-      className={cn(
-        "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed",
-        {
-          "bg-teal-600 text-white hover:bg-teal-700 focus:ring-teal-500": variant === "primary",
-          "bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-400": variant === "secondary",
-          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-400": variant === "outline",
-          "text-gray-600 hover:bg-gray-100 focus:ring-gray-400": variant === "ghost",
-          "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500": variant === "danger",
-        },
-        {
-          "px-3 py-1.5 text-sm gap-1.5": size === "sm",
-          "px-4 py-2 text-sm gap-2": size === "md",
-          "px-6 py-3 text-base gap-2": size === "lg",
-        },
-        className
-      )}
+      ref={ref}
+      className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    >
-      {children}
-    </button>
-  );
-}
+    />
+  )
+)
+Button.displayName = 'Button'
+
+export { buttonVariants }

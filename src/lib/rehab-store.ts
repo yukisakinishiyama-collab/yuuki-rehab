@@ -49,7 +49,9 @@ export function initStore(): void {
     // バージョンアップ: ユーザー・コメント・症例を最新データで上書き
     localStorage.setItem(KEYS.cases, JSON.stringify(MOCK_CASES))
     localStorage.setItem(KEYS.comments, JSON.stringify(MOCK_COMMENTS))
-    localStorage.removeItem('rehabUser') // 古いログイン情報をクリア
+    // ※ rehabUser（ログインセッション）はここでは削除しない。
+    //    login() 直後に AuthGuard が initStore() を呼ぶと
+    //    セッションが消えてログインできなくなるバグを防ぐ。
     localStorage.setItem(KEYS.version, STORE_VERSION)
     return
   }

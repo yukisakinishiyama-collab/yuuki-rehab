@@ -21,7 +21,7 @@ export default function QRAutoLogin() {
       const ok = loginWithQRToken(token)
       if (ok) {
         setStatus('success')
-        setTimeout(() => router.replace('/dashboard'), 800)
+        setTimeout(() => { window.location.href = '/dashboard' }, 800)
       } else {
         setStatus('failed')
       }

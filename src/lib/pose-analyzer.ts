@@ -569,3 +569,147 @@ export async function analyzeAndAnnotateFrame(
     img.src = imageDataUrl
   })
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// スポーツ解析モード（既存コードと完全に分離）
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * スポーツモードの1フレーム検出結果
+ * landmarks/worldLandmarks は人物数分の配列（最大 numPoses 人）
+ */
+export interface SportsFrameResult {
+  persons: {
+    landmarks:      Landmark[]
+    worldLandmarks: Landmark[]
+  }[]
+  timestampMs: number
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _sportsLandmarker: any = null
+let _sportsInitPromise: Promise<void> | null = null
+
+/**
+ * スポーツ解析用ランドマーカーを初期化する（初回のみ非同期）
+ *
+ * - モデル: pose_landmarker_heavy（最高精度）
+ * - デリゲート: GPU を優先し、失敗時は CPU にフォールバック
+ * - 同時検出人数: 最大 6 人
+ */
+export async function initSportsMode(): Promise<void> {
+  if (_sportsLandmarker) return
+  if (_sportsInitPromise) return _sportsInitPromise
+
+  _sportsInitPromise = (async () => {
+    const { PoseLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision')
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
+    )
+
+    const commonOpts = {
+      runningMode:                  'VIDEO' as const,
+      numPoses:                     6,
+      minPoseDetectionConfidence:   0.5,
+      minPosePresenceConfidence:    0.5,
+      minTrackingConfidence:        0.5,
+    }
+
+    const heavyModel =
+      'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task'
+
+    // GPU を試み、失敗したら CPU にフォールバック
+    try {
+      _sportsLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        ...commonOpts,
+        baseOptions: { modelAssetPath: heavyModel, delegate: 'GPU' },
+      })
+    } catch {
+      _sportsLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        ...commonOpts,
+        baseOptions: { modelAssetPath: heavyModel, delegate: 'CPU' },
+      })
+    }
+  })()
+
+  return _sportsInitPromise
+}
+
+/**
+ * スポーツモードで動画フレームを解析する（initSportsMode() 完了後に呼ぶこと）
+ * @param video HTMLVideoElement（再生中 or シーク済み）
+ * @param timestampMs 動画の現在時刻（ミリ秒、単調増加であること）
+ */
+export function detectSportsFrame(
+  video: HTMLVideoElement,
+  timestampMs: number,
+): SportsFrameResult {
+  if (!_sportsLandmarker) return { persons: [], timestampMs }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res: any = _sportsLandmarker.detectForVideo(video, timestampMs)
+    const lmList: Landmark[][] = res.landmarks       ?? []
+    const wlList: Landmark[][] = res.worldLandmarks  ?? []
+
+    const persons = lmList.map((lm: Landmark[], i: number) => ({
+      landmarks:      lm,
+      worldLandmarks: (wlList[i] ?? []) as Landmark[],
+    }))
+
+    return { persons, timestampMs }
+  } catch {
+    return { persons: [], timestampMs }
+  }
+}
+
+/**
+ * スポーツ解析用の骨格オーバーレイを描画する
+ * 既存の drawPoseOverlay と異なり、人物ごとの色を受け取る
+ */
+export function drawSportsPoseOverlay(
+  ctx:       CanvasRenderingContext2D,
+  landmarks: Landmark[],
+  color:     string,
+  w:         number,
+  h:         number,
+): void {
+  ctx.save()
+
+  // ── 骨格線 ──────────────────────────────────────────────────────────────
+  ctx.lineWidth = 2.5
+  ctx.lineCap   = 'round'
+
+  for (const [a, b] of CONNECTIONS) {
+    const la = landmarks[a], lb = landmarks[b]
+    if (!la || !lb) continue
+    if ((la.visibility ?? 1) < 0.3 || (lb.visibility ?? 1) < 0.3) continue
+
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'
+    ctx.shadowBlur  = 3
+    ctx.strokeStyle = color
+    ctx.globalAlpha = 0.85
+    ctx.beginPath()
+    ctx.moveTo(la.x * w, la.y * h)
+    ctx.lineTo(lb.x * w, lb.y * h)
+    ctx.stroke()
+  }
+
+  // ── 関節点 ──────────────────────────────────────────────────────────────
+  ctx.globalAlpha = 1.0
+  ctx.shadowBlur  = 4
+
+  for (let i = 0; i < landmarks.length; i++) {
+    const lm = landmarks[i]
+    if (!lm || (lm.visibility ?? 1) < 0.3) continue
+
+    ctx.fillStyle   = color
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth   = 1.5
+    ctx.beginPath()
+    ctx.arc(lm.x * w, lm.y * h, 4.5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
+
+  ctx.restore()
+}

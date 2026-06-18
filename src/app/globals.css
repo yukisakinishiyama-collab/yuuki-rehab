@@ -1,40 +1,246 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────
+   デザイントークン（全画面共通）
+   Clinical Calm × Recovery Momentum
+───────────────────────────────────────────── */
 @theme {
-  --color-navy: #1a365d;
-  --color-navy-light: #2a4a7f;
-  --color-line: #00B900;
+  /* ブランドカラー */
+  --color-primary:       #0d9488;
+  --color-primary-hover: #0b7a70;
+  --color-primary-light: #ccfbf1;
+  --color-primary-mid:   #5eead4;
+
+  --color-accent:        #f97316;   /* 達成・前進（コーラル/アンバー） */
+  --color-accent-light:  #fff7ed;
+  --color-accent-mid:    #fdba74;
+
+  --color-navy:      #13253d;
+  --color-navy-800:  #1a3152;
+  --color-navy-light:#1e3a5f;
+
+  --color-line:      #00B900;
   --color-line-dark: #009900;
+
+  /* サーフェス（中立的な亜麻白 — ブルーティントを排除し臨床記録用紙の質感へ） */
+  --color-surface:        #f4f4f5;
+  --color-surface-card:   #ffffff;
+  --color-surface-raised: #fafafa;
+
+  /* テキスト */
+  --color-text-primary:   #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #94a3b8;
+
+  /* 状態色 */
+  --color-success:  #10b981;
+  --color-warning:  #f59e0b;
+  --color-danger:   #ef4444;
+
+  /* フォント変数（Zen Kaku Gothic New を日本語フォントとして使用） */
+  --font-display: var(--font-sora), var(--font-zen-kaku), sans-serif;
+  --font-body:    var(--font-ibm-plex-sans), var(--font-zen-kaku), sans-serif;
+  --font-mono:    var(--font-ibm-plex-mono), monospace;
+
+  /* シャドウ */
+  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-card: 0 0 0 1px rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.08);
+  --shadow-card-hover: 0 0 0 1px rgb(13 148 136 / 0.2), 0 4px 16px -4px rgb(13 148 136 / 0.15);
+
+  /* 角丸 */
+  --radius-sm:  0.5rem;   /* 8px */
+  --radius-md:  0.75rem;  /* 12px */
+  --radius-lg:  1rem;     /* 16px */
+  --radius-xl:  1.25rem;  /* 20px */
+  --radius-2xl: 1.5rem;   /* 24px */
+
+  /* モーション */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:   cubic-bezier(0.45, 0, 0.55, 1);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   400ms;
+  --duration-slower: 600ms;
 }
 
+/* ─────────────────────────────────────────────
+   ダークモード対応（system preference）
+───────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface:        #0b1420;
+    --color-surface-card:   #131f2e;
+    --color-surface-raised: #1a2840;
+    --color-text-primary:   #e2e8f0;
+    --color-text-secondary: #94a3b8;
+    --color-text-muted:     #4b5563;
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.05), 0 2px 8px -2px rgb(0 0 0 / 0.4);
+    --shadow-card-hover: 0 0 0 1px rgb(13 148 136 / 0.35), 0 4px 16px -4px rgb(13 148 136 / 0.2);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   グローバルベース
+───────────────────────────────────────────── */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: var(--color-surface);
+  --foreground: var(--color-text-primary);
 }
 
-html {
-  scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Arial, sans-serif;
 }
 
-/* ヒーロー見出し: 画面幅に比例したフォントサイズ */
-.hero-h1 {
-  font-size: clamp(1.25rem, 6vw, 2rem);
-  line-height: 1.4;
+/* ─────────────────────────────────────────────
+   タイポグラフィユーティリティ
+───────────────────────────────────────────── */
+.font-display { font-family: var(--font-display); }
+.font-body    { font-family: var(--font-body); }
+.font-mono    { font-family: var(--font-mono); }
+
+/* 臨床指標数値（等幅・タビュラー）*/
+.metric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
-@media (min-width: 640px) {
-  .hero-h1 {
-    font-size: 2.25rem;
-    line-height: 1.25;
+
+/* ヒーロー見出し */
+.hero-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 6vw, 2rem);
+  line-height: 1.3;
+  font-weight: 700;
+}
+@media (min-width: 640px)  { .hero-h1 { font-size: 2.25rem; line-height: 1.25; } }
+@media (min-width: 768px)  { .hero-h1 { font-size: 3rem; } }
+
+/* ─────────────────────────────────────────────
+   共通カード
+───────────────────────────────────────────── */
+.card {
+  background: var(--color-surface-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--duration-normal) var(--ease-out-expo);
+}
+.card:hover { box-shadow: var(--shadow-card-hover); }
+
+.card-raised {
+  background: var(--color-surface-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+/* ─────────────────────────────────────────────
+   ページ登場アニメーション
+───────────────────────────────────────────── */
+@keyframes slide-up-fade {
+  /* Y移動を4pxに抑制 — 「フワッと浮く」AI量産デザインを排除し、精密な登場演出へ */
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bar-fill {
+  from { width: 0%; }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgb(13 148 136 / 0.4); }
+  70%  { box-shadow: 0 0 0 8px rgb(13 148 136 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(13 148 136 / 0); }
+}
+
+@keyframes achievement-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up-fade var(--duration-slow) var(--ease-out-expo) both;
+}
+.animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-out-expo) both;
+}
+.animate-bar-fill {
+  animation: bar-fill var(--duration-slower) var(--ease-out-expo) both;
+}
+.animate-achievement {
+  animation: achievement-pop 0.5s var(--ease-out-expo) both;
+}
+
+/* スタッガー遅延 */
+.delay-75  { animation-delay:  75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-375 { animation-delay: 375ms; }
+.delay-450 { animation-delay: 450ms; }
+
+/* prefers-reduced-motion 尊重 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up,
+  .animate-scale-in,
+  .animate-bar-fill,
+  .animate-achievement {
+    animation: none !important;
+    transition: none !important;
   }
 }
-@media (min-width: 768px) {
-  .hero-h1 {
-    font-size: 3rem;
+
+/* ─────────────────────────────────────────────
+   紙吹雪アニメーション
+───────────────────────────────────────────── */
+@keyframes confetti-fall {
+  0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+.animate-confetti {
+  animation: confetti-fall linear forwards;
+}
+
+/* ─────────────────────────────────────────────
+   フォーカスリング（アクセシビリティ）
+───────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────
+   印刷スタイル
+───────────────────────────────────────────── */
+@media print {
+  .no-print { display: none !important; }
+  .print-break { page-break-after: always; }
+
+  body {
+    background: white !important;
+    color: #000 !important;
+    font-size: 12pt;
+  }
+
+  .card, .card-raised {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+  }
+
+  /* 印刷時は背景グラデーション除去 */
+  [class*="bg-gradient"] {
+    background: #f8fafc !important;
+    color: #000 !important;
   }
 }

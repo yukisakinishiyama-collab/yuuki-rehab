@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -9,9 +9,11 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
-  User,
   Smartphone,
+  Activity,
+  Ruler,
+  ClipboardList,
+  Users,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
 import { logout } from '@/lib/rehab-store'
@@ -19,31 +21,57 @@ import { ROLE_LABELS } from '@/types/rehab'
 import type { User as UserType } from '@/types/rehab'
 import QRLoginModal from './QRLoginModal'
 
-const NAV = [
-  { href: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
-  { href: '/cases', label: '案件管理', icon: FolderOpen },
+/* ── ナビゲーション定義（セクション分け） ── */
+const NAV_SECTIONS = [
+  {
+    section: 'WORKSPACE',
+    items: [
+      { href: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
+      { href: '/cases',     label: '案件管理',       icon: FolderOpen },
+    ],
+  },
+  {
+    section: 'PATIENT MGMT',
+    items: [
+      { href: '/patients/dashboard', label: 'リハビリ状況',   icon: LayoutDashboard },
+      { href: '/patients',           label: '患者管理',       icon: Users },
+    ],
+  },
+  {
+    section: 'CLINICAL',
+    items: [
+      { href: '/protocols', label: 'プロトコル立案', icon: ClipboardList },
+      { href: '/rom',       label: '可動域ノート',   icon: Activity },
+    ],
+  },
+  {
+    section: 'MEASURE',
+    items: [
+      { href: '/gonio',   label: '関節角度計',      icon: Ruler },
+    ],
+  },
 ]
 
-// Premium SVG logo mark
-function LogoMark({ size = 36 }: { size?: number }) {
+/* ── ロゴ ── */
+function Logo() {
   return (
-    <svg width={size} height={size} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="36" height="36" rx="10" fill="url(#grad)" />
-      {/* Cross / pulse symbol */}
-      <path d="M18 8 L18 28" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-      <path d="M8 18 L28 18" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-      {/* Small diamond accents */}
-      <circle cx="18" cy="18" r="3.5" fill="white" fillOpacity="0.25"/>
-      <defs>
-        <linearGradient id="grad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#1a5276"/>
-          <stop offset="100%" stopColor="#0d9488"/>
-        </linearGradient>
-      </defs>
-    </svg>
+    <div className="flex items-center gap-2.5">
+      {/* シンプルな十字マーク */}
+      <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="7" fill="#0d9488" fillOpacity="0.15"/>
+          <path d="M14 6v16M6 14h16" stroke="#0d9488" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div className="text-white font-bold text-[13px] tracking-[0.12em] leading-none">YUUKI</div>
+        <div className="text-white/30 text-[9px] tracking-[0.18em] mt-0.5">REHAB SYSTEM</div>
+      </div>
+    </div>
   )
 }
 
+/* ── サイドバー本体 ── */
 function SidebarContent({
   user,
   onLogout,
@@ -57,62 +85,90 @@ function SidebarContent({
 }) {
   return (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <LogoMark size={38} />
-          <div>
-            <div className="text-white font-bold text-sm leading-none tracking-wider">YUUKI REHAB</div>
-            <div className="text-[#5ec9c2] text-[10px] mt-0.5 tracking-widest uppercase">Motion Analysis</div>
-          </div>
-        </div>
+
+      {/* ロゴ */}
+      <div className="px-5 pt-6 pb-5">
+        <Logo />
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? 'bg-gradient-to-r from-[#0d9488] to-[#0b8276] text-white shadow-md shadow-teal-900/30'
-                  : 'text-blue-200/80 hover:bg-white/8 hover:text-white'
-              }`}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
-              {active && <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-60" />}
-            </Link>
-          )
-        })}
+      {/* ナビ */}
+      <nav className="flex-1 px-3 overflow-y-auto">
+        {NAV_SECTIONS.map(({ section, items }) => (
+          <div key={section} className="mb-5">
+            {/* セクションラベル */}
+            <div className="px-3 mb-1.5 text-[9px] font-bold tracking-[0.2em] text-white/20 select-none">
+              {section}
+            </div>
+            {items.map(({ href, label, icon: Icon }) => {
+              const active = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`group relative flex items-center gap-3 px-3 py-2 text-[13px]
+                    transition-all duration-150 rounded-md
+                    ${active
+                      ? 'text-white'
+                      : 'text-white/35 hover:text-white/75'
+                    }`}
+                >
+                  {/* アクティブ時の左ボーダー */}
+                  {active && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5
+                      bg-[#0d9488] rounded-full shadow-[0_0_8px_#0d9488aa]" />
+                  )}
+                  <Icon className={`w-[15px] h-[15px] flex-shrink-0 transition-colors ${
+                    active ? 'text-[#0d9488]' : 'text-white/25 group-hover:text-white/50'
+                  }`} />
+                  <span className={`font-medium leading-none ${active ? 'font-semibold' : ''}`}>
+                    {label}
+                  </span>
+                  {/* アクティブドット */}
+                  {active && (
+                    <span className="ml-auto w-1 h-1 rounded-full bg-[#0d9488]
+                      shadow-[0_0_6px_#0d9488]" />
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* User */}
-      <div className="px-3 py-4 border-t border-white/10">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/8 mb-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0d9488] to-[#1a5276] flex items-center justify-center flex-shrink-0 ring-2 ring-white/20">
-            <User className="w-4 h-4 text-white" />
+      {/* ユーザー + ボトムアクション */}
+      <div className="px-3 pb-4 pt-3 border-t border-white/[0.06]">
+        {/* ユーザー行 */}
+        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
+          {/* イニシャルアバター */}
+          <div className="w-6 h-6 rounded-md bg-[#0d9488]/20 flex items-center justify-center
+            flex-shrink-0 ring-1 ring-[#0d9488]/30 text-[10px] font-bold text-[#0d9488] select-none">
+            {user.name.slice(0, 1)}
           </div>
-          <div className="min-w-0">
-            <div className="text-white text-sm font-medium truncate">{user.name}</div>
-            <div className="text-[#5ec9c2] text-[10px] uppercase tracking-wider">{ROLE_LABELS[user.role]}</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-white/80 text-[12px] font-medium truncate leading-none">
+              {user.name}
+            </div>
+            <div className="text-white/25 text-[9px] tracking-wider mt-0.5">
+              {ROLE_LABELS[user.role]}
+            </div>
           </div>
         </div>
+
+        {/* サブアクション */}
         <button
           onClick={onOpenQR}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-blue-300/70 hover:bg-white/8 hover:text-white transition-all mb-1"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+            text-[12px] text-white/25 hover:text-white/60 transition-colors"
         >
-          <Smartphone className="w-4 h-4" />
+          <Smartphone className="w-3.5 h-3.5 flex-shrink-0" />
           スマートフォンでアクセス
         </button>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-blue-300/70 hover:bg-white/8 hover:text-white transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+            text-[12px] text-white/25 hover:text-red-400/70 transition-colors"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
           ログアウト
         </button>
       </div>
@@ -125,6 +181,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showQR, setShowQR] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  // 起動時にクラウドからデータを取得
+  useEffect(() => {
+    import('@/lib/sync-service').then(async ({ pullFromCloud, isSyncEnabled }) => {
+      if (!isSyncEnabled()) return
+      setSyncing(true)
+      await pullFromCloud()
+      setSyncing(false)
+    })
+  }, [])
 
   function handleLogout() {
     logout()
@@ -136,8 +203,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {(user) => (
         <div className="flex min-h-screen bg-[#f0f4f8]">
           {/* Desktop sidebar */}
-          <aside className="hidden md:flex flex-col w-60 bg-[#13253d] fixed inset-y-0 left-0 z-30 shadow-xl">
+          <aside className="hidden md:flex flex-col w-56 bg-[#080e1a] fixed inset-y-0 left-0 z-30
+            border-r border-white/[0.05]">
             <SidebarContent user={user} onLogout={handleLogout} pathname={pathname} onOpenQR={() => setShowQR(true)} />
+            {syncing && (
+              <div className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-teal-900/50 text-teal-300 text-[10px] flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+                同期中...
+              </div>
+            )}
           </aside>
 
           {/* Mobile sidebar overlay */}
@@ -147,7 +221,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={() => setMobileOpen(false)}
               />
-              <aside className="relative w-64 h-full bg-[#13253d] flex flex-col shadow-2xl">
+              <aside className="relative w-56 h-full bg-[#080e1a] flex flex-col border-r border-white/[0.05]">
                 <button
                   className="absolute top-4 right-4 text-white/60 hover:text-white"
                   onClick={() => setMobileOpen(false)}
@@ -160,15 +234,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           {/* Main */}
-          <div className="flex-1 md:ml-60 flex flex-col min-h-screen">
+          <div className="flex-1 md:ml-56 flex flex-col min-h-screen">
             {/* Mobile header */}
-            <header className="md:hidden bg-[#13253d] px-4 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-md">
+            <header className="md:hidden bg-[#080e1a] px-4 py-3 flex items-center gap-3 sticky top-0 z-20
+              border-b border-white/[0.06]">
               <button onClick={() => setMobileOpen(true)} className="text-white/80 hover:text-white">
                 <Menu className="w-5 h-5" />
               </button>
               <div className="flex items-center gap-2 flex-1">
-                <LogoMark size={28} />
-                <span className="text-white font-bold text-sm tracking-wider">YUUKI REHAB</span>
+                <Logo />
               </div>
               <button
                 onClick={() => setShowQR(true)}

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スマートフォンでアクセス — YUUKI REHAB</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #0d1f33 0%, #1a3a5c 50%, #0d2b2a 100%);
+    font-family: -apple-system, 'Hiragino Sans', sans-serif;
+  }
+  .card {
+    background: white;
+    border-radius: 24px;
+    padding: 36px 40px;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    max-width: 380px;
+    width: 90%;
+  }
+  .logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #1a5276, #0d9488);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+  h1 { font-size: 18px; font-weight: 700; color: #1e3a5f; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #64748b; margin: 0 0 24px; }
+  #qrcode { display: flex; justify-content: center; margin: 0 0 16px; }
+  #qrcode canvas, #qrcode img {
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
+    padding: 8px;
+  }
+  .url-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #0d9488;
+    font-weight: 600;
+    word-break: break-all;
+    margin-bottom: 20px;
+  }
+  .steps {
+    text-align: left;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .steps li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #475569; }
+  .num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #0d9488; color: white;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .note { font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #ecfdf5; color: #059669;
+    border: 1px solid #a7f3d0;
+    border-radius: 20px; padding: 4px 10px;
+    font-size: 11px; font-weight: 700;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+      <path d="M18 6 L18 30" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M6 18 L30 18" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <h1>YUUKI REHAB</h1>
+  <div class="badge">📶 院内 WiFi 接続</div>
+  <p class="sub">スマートフォンでスキャン（同じWiFiに接続してください）</p>
+
+  <div id="qrcode"></div>
+
+  <div class="url-box" id="urlDisplay"></div>
+
+  <ol class="steps">
+    <li><span class="num">1</span>スマートフォンをこのPCと同じ WiFi に接続する</li>
+    <li><span class="num">2</span>カメラでQRコードを読み取りURLをタップ</li>
+    <li><span class="num">3</span>関節角度計が開く</li>
+  </ol>
+
+  <p class="note">院内スタッフ専用 — ログイン不要</p>
+</div>
+
+<script>
+  // 院内 WiFi 経由でアクセス（PC と同じ WiFi に接続すること）
+  var url = 'http://192.168.11.51:3000/gonio'
+  document.getElementById('urlDisplay').textContent = url
+
+  new QRCode(document.getElementById('qrcode'), {
+    text: url,
+    width: 220,
+    height: 220,
+    colorDark: '#1e3a5f',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  })
+</script>
+</body>
+</html>
