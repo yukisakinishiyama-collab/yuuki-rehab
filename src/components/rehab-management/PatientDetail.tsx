@@ -30,6 +30,146 @@ import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import { nanoid } from 'nanoid'
 
+// ── SOAPカルテ展開カード ────────────────────────────────────
+function SOAPNoteCard({ note }: { note: SOAPNote }) {
+  const [open, setOpen] = useState(false)
+  const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'
+  const adherenceLabel = note.homeExerciseAdherence === 'done' ? '✅ 実施' : note.homeExerciseAdherence === 'partial' ? '⚠️ 一部' : '❌ 未実施'
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      {/* ヘッダー行（クリックで展開） */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+      >
+        {/* 回数バッジ */}
+        <span className="w-7 h-7 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+          {note.visitNumber}
+        </span>
+
+        {/* 日付 */}
+        <span className="text-sm font-medium text-gray-700 w-24 flex-shrink-0">{note.visitDate}</span>
+
+        {/* NRS */}
+        <span className={`text-sm font-bold ${nrsColor} w-14 flex-shrink-0`}>NRS {note.painToday}</span>
+
+        {/* Phase */}
+        <span className="text-xs bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-2 py-0.5 flex-shrink-0">
+          Phase {note.currentPhase}
+        </span>
+
+        {/* 自宅運動 */}
+        <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:block">{adherenceLabel}</span>
+
+        {/* 改善点プレビュー */}
+        {note.improvements && (
+          <span className="text-xs text-gray-400 truncate flex-1 hidden md:block">
+            ✓ {note.improvements}
+          </span>
+        )}
+
+        {/* 開閉矢印 */}
+        <span className={`ml-auto text-gray-400 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+
+      {/* 展開コンテンツ */}
+      {open && (
+        <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50/50">
+
+          {/* S: 主観的情報 */}
+          <section>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center">S</span>
+              <span className="text-xs font-semibold text-blue-700">主観的情報（患者の訴え）</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {note.changeFromLast && <Row label="前回からの変化" value={note.changeFromLast} />}
+              {note.adlDifficulty && <Row label="日常生活の困り事" value={note.adlDifficulty} />}
+              {note.patientConcern && <Row label="患者の不安" value={note.patientConcern} />}
+              {note.patientGoalToday && <Row label="本日の目標" value={note.patientGoalToday} />}
+              <Row label="自宅運動" value={adherenceLabel} />
+            </div>
+          </section>
+
+          {/* O: 客観的情報 */}
+          <section>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">O</span>
+              <span className="text-xs font-semibold text-green-700">客観的情報（検査・観察）</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {note.romFindings && <Row label="ROM所見" value={note.romFindings} />}
+              {note.strengthFindings && <Row label="筋力所見" value={note.strengthFindings} />}
+              {note.specialTestFindings && <Row label="スペシャルテスト" value={note.specialTestFindings} />}
+              {note.tenderness && <Row label="圧痛" value={note.tenderness} />}
+              {note.gait && <Row label="歩行" value={note.gait} />}
+              {note.singleLegStance && <Row label="片脚立位" value={note.singleLegStance} />}
+              {note.squat && <Row label="スクワット" value={note.squat} />}
+              {(note.swelling || note.heat) && (
+                <Row label="腫脹・熱感" value={[note.swelling && '腫脹あり', note.heat && '熱感あり'].filter(Boolean).join('　')} />
+              )}
+              {note.therapistObservation && <Row label="施術者観察" value={note.therapistObservation} className="sm:col-span-2" />}
+            </div>
+          </section>
+
+          {/* A: 評価・分析 */}
+          <section>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">A</span>
+              <span className="text-xs font-semibold text-amber-700">評価・分析</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {note.improvements && <Row label="改善したこと" value={note.improvements} highlight="green" />}
+              {note.remainingIssues && <Row label="残存課題" value={note.remainingIssues} highlight="amber" />}
+              {note.priorityIssue && <Row label="優先課題" value={note.priorityIssue} />}
+            </div>
+          </section>
+
+          {/* P: 計画 */}
+          <section>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center">P</span>
+              <span className="text-xs font-semibold text-purple-700">計画</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {note.treatmentToday && <Row label="本日の治療内容" value={note.treatmentToday} />}
+              {note.homeExercise && <Row label="自宅運動指示" value={note.homeExercise} highlight="purple" />}
+              {note.nextGoal && <Row label="次回目標" value={note.nextGoal} highlight="blue" />}
+              {note.forbiddenMovements && <Row label="禁忌動作" value={note.forbiddenMovements} highlight="red" />}
+              {note.recommendedFrequency && <Row label="来院頻度" value={note.recommendedFrequency} />}
+              {note.nextReassessment && <Row label="再評価予定" value={note.nextReassessment} />}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Row({ label, value, highlight, className = '' }: {
+  label: string
+  value: string
+  highlight?: 'green' | 'amber' | 'blue' | 'purple' | 'red'
+  className?: string
+}) {
+  const bg = highlight === 'green' ? 'bg-green-50 border-green-100' :
+    highlight === 'amber' ? 'bg-amber-50 border-amber-100' :
+    highlight === 'blue' ? 'bg-blue-50 border-blue-100' :
+    highlight === 'purple' ? 'bg-purple-50 border-purple-100' :
+    highlight === 'red' ? 'bg-red-50 border-red-100' :
+    'bg-white border-gray-100'
+  return (
+    <div className={`rounded-lg border p-2 ${bg} ${className}`}>
+      <p className="text-gray-400 font-medium mb-0.5">{label}</p>
+      <p className="text-gray-700 whitespace-pre-wrap">{value}</p>
+    </div>
+  )
+}
+
 type TabKey = 'overview' | 'plan' | 'evaluation' | 'soap' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
 
 interface Props {
@@ -458,27 +598,22 @@ export default function PatientDetail({ patient }: Props) {
 
         {/* ── SOAPカルテタブ ── */}
         {activeTab === 'soap' && (
-          <div className="space-y-6">
-            {soapNotes.length > 0 && (
-              <Card>
-                <CardHeader><SectionTitle>カルテ一覧</SectionTitle></CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {soapNotes.map(note => (
-                      <div key={note.id} className="flex items-center justify-between py-2 border-b border-gray-50 text-sm">
-                        <span className="text-gray-600">{note.visitDate}（第{note.visitNumber}回）</span>
-                        <span className={`font-medium ${note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
-                          NRS: {note.painToday}
-                        </span>
-                        <span className="text-xs text-gray-500 truncate max-w-[180px]">{note.improvements}</span>
-                        <Badge color="teal">Phase {note.currentPhase}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          <div className="space-y-4">
+            {/* 新規カルテ入力 */}
             <SOAPForm patientId={patient.id} onSaved={reload} />
+
+            {/* 過去カルテ一覧（アコーディオン） */}
+            {soapNotes.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1 pt-2">
+                  <SectionTitle>過去のカルテ</SectionTitle>
+                  <span className="text-xs text-gray-400">{soapNotes.length}件</span>
+                </div>
+                {soapNotes.map(note => (
+                  <SOAPNoteCard key={note.id} note={note} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
