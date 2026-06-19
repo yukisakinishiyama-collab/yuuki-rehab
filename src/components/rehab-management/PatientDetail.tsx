@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
-  SpecialTestResult,
+  SpecialTestResult, QuickMemo,
 } from '@/types/patient'
 import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
 import BodyMap from './BodyMap'
@@ -15,6 +15,7 @@ import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getExercises, getPatientExercises, savePatientExercise,
   deletePatientExercise, getProgressRecords, getRehabPlans,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo,
 } from '@/lib/patient-store'
 import {
   calculateImprovementScore, calculateROMImprovement,
@@ -30,6 +31,110 @@ import SOAPForm from './SOAPForm'
 import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import { nanoid } from 'nanoid'
+
+// ── 簡易メモタブ ────────────────────────────────────────────
+function QuickMemoTab({ patientId, memos, onUpdate }: {
+  patientId: string
+  memos: QuickMemo[]
+  onUpdate: () => void
+}) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [content, setContent] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  function handleSave() {
+    if (!content.trim()) return
+    saveQuickMemo({
+      id: nanoid(),
+      patientId,
+      memoDate: date,
+      content: content.trim(),
+      createdAt: new Date().toISOString(),
+    })
+    setContent('')
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+    onUpdate()
+  }
+
+  function handleDelete(id: string) {
+    deleteQuickMemo(id)
+    onUpdate()
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* 入力エリア */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-gray-500 whitespace-nowrap">日付</label>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          />
+        </div>
+        <textarea
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
+          rows={4}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
+          onKeyDown={e => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave()
+          }}
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-400">Ctrl+Enter で保存</span>
+          <div className="flex items-center gap-3">
+            {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!content.trim()}
+              className="px-4 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              保存
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* メモ一覧 */}
+      {memos.length === 0 ? (
+        <p className="text-center text-sm text-gray-400 py-8">まだメモがありません</p>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400 px-1">{memos.length}件のメモ</p>
+          {memos.map(memo => (
+            <div key={memo.id} className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex gap-3 group">
+              <div className="flex-shrink-0 text-center">
+                <p className="text-[10px] text-gray-400">{memo.memoDate.slice(0, 7)}</p>
+                <p className="text-lg font-bold text-teal-700 leading-none">{memo.memoDate.slice(8, 10)}</p>
+                <p className="text-[10px] text-gray-400">日</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDelete(memo.id)}
+                className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
+                title="削除"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const SOAP_RESULT_COLORS: Record<SpecialTestResult, string> = {
   positive: 'bg-red-100 text-red-700 border-red-200',
@@ -210,7 +315,7 @@ function Row({ label, value, highlight, className = '' }: {
   )
 }
 
-type TabKey = 'overview' | 'plan' | 'evaluation' | 'soap' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
+type TabKey = 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
 
 interface Props {
   patient: Patient
@@ -228,6 +333,7 @@ export default function PatientDetail({ patient }: Props) {
   const [patientExercises, setPatientExercises] = useState<PatientExercise[]>([])
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
   const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
+  const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
 
   useEffect(() => {
     reload()
@@ -243,6 +349,7 @@ export default function PatientDetail({ patient }: Props) {
     setPatientExercises(getPatientExercises(patient.id))
     setProgressRecords(getProgressRecords(patient.id))
     setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
+    setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
   }
 
   // ── 算出値 ──
@@ -334,6 +441,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'plan', label: 'リハビリ計画', icon: '📅', badge: rehabPlans.length || undefined },
     { key: 'evaluation', label: '初回評価', icon: '📋' },
     { key: 'soap', label: 'SOAPカルテ', icon: '📝' },
+    { key: 'memo', label: '簡易メモ', icon: '🗒️', badge: quickMemos.length || undefined },
     { key: 'rom', label: 'ROM', icon: '📐' },
     { key: 'strength', label: '筋力', icon: '💪' },
     { key: 'special', label: 'スペシャルテスト', icon: '🔍' },
@@ -655,6 +763,15 @@ export default function PatientDetail({ patient }: Props) {
               </div>
             )}
           </div>
+        )}
+
+        {/* ── 簡易メモ タブ ── */}
+        {activeTab === 'memo' && (
+          <QuickMemoTab
+            patientId={patient.id}
+            memos={quickMemos}
+            onUpdate={reload}
+          />
         )}
 
         {/* ── ROM タブ ── */}

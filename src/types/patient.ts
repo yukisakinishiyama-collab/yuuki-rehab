@@ -297,6 +297,17 @@ export interface ProgressRecord {
 }
 
 // ──────────────────────────────────────────────
+// 簡易メモ
+// ──────────────────────────────────────────────
+export interface QuickMemo {
+  id: string
+  patientId: string
+  memoDate: string
+  content: string
+  createdAt: string
+}
+
+// ──────────────────────────────────────────────
 // 来院記録
 // ──────────────────────────────────────────────
 export interface AttendanceRecord {

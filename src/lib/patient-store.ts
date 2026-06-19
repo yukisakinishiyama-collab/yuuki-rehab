@@ -4,7 +4,7 @@
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
-  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk
+  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo
 } from '@/types/patient'
 import { SAMPLE_PATIENTS, SAMPLE_EVALUATIONS, SAMPLE_EXERCISES, SAMPLE_SOAP_NOTES } from './patient-data'
 
@@ -23,6 +23,7 @@ const KEYS = {
   progressRecords: 'pt_progress_records',
   attendanceRecords: 'pt_attendance_records',
   retentionRisks: 'pt_retention_risks',
+  quickMemos: 'pt_quick_memos',
   initialized: 'pt_initialized',
   version: 'pt_version',
 } as const
@@ -176,6 +177,24 @@ export function saveRehabPlan(plan: RehabPlan): void {
   if (idx >= 0) list[idx] = plan
   else list.push(plan)
   set(KEYS.rehabPlans, list)
+}
+
+// ── 簡易メモ ──
+export function getQuickMemos(patientId?: string): QuickMemo[] {
+  const all = get<QuickMemo>(KEYS.quickMemos)
+  return patientId ? all.filter(m => m.patientId === patientId) : all
+}
+
+export function saveQuickMemo(memo: QuickMemo): void {
+  const list = getQuickMemos()
+  const idx = list.findIndex(m => m.id === memo.id)
+  if (idx >= 0) list[idx] = memo
+  else list.push(memo)
+  set(KEYS.quickMemos, list)
+}
+
+export function deleteQuickMemo(id: string): void {
+  set(KEYS.quickMemos, getQuickMemos().filter(m => m.id !== id))
 }
 
 // ── 運動マスタ ──
