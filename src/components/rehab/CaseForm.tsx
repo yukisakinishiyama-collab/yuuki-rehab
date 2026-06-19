@@ -3,9 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveCase, getCurrentUser, generateId } from '@/lib/rehab-store'
+import { savePatient, getPatients } from '@/lib/patient-store'
 import type { RehabCase, ServiceType, DeliveryStatus } from '@/types/rehab'
+import type { Patient } from '@/types/patient'
 import { SERVICE_TYPE_LABELS } from '@/types/rehab'
 import { Save, User, Mail, Phone, Activity, FileText } from 'lucide-react'
+import { nanoid } from 'nanoid'
 
 const SERVICE_TYPES = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]
 
@@ -75,6 +78,32 @@ export default function CaseForm() {
       requestNote: form.requestNote || undefined,
     }
     saveCase(newCase)
+
+    // 同名患者が患者管理にいなければ自動登録
+    const existing = getPatients().find(p => p.name === form.clientName)
+    if (!existing) {
+      const now = new Date().toISOString()
+      const patient: Patient = {
+        id: nanoid(),
+        name: form.clientName,
+        kana: '',
+        birthDate: '',
+        gender: form.gender,
+        phone: form.clientPhone || '',
+        emergencyContact: '',
+        mainComplaint: form.requestNote || form.sport,
+        bodyRegion: 'other',
+        diagnosisLabel: '',
+        onsetDate: '',
+        firstVisitDate: new Date().toISOString().split('T')[0],
+        status: 'active',
+        therapistNotes: '',
+        createdAt: now,
+        updatedAt: now,
+      }
+      savePatient(patient)
+    }
+
     router.push(`/cases/${newCase.id}`)
   }
 
