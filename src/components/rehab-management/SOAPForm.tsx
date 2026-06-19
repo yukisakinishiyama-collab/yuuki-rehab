@@ -4,7 +4,7 @@
 // ──────────────────────────────────────────────
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { SOAPNote, RehabPhase } from '@/types/patient'
+import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult } from '@/types/patient'
 import { PHASE_SHORT_LABELS } from '@/types/patient'
 import { saveSOAPNote, getSOAPNotes } from '@/lib/patient-store'
 import {
@@ -37,6 +37,7 @@ interface FormState {
   singleLegStance: string
   squat: string
   treatmentAreas: string[]
+  soapSpecialTests: SOAPSpecialTest[]
   therapistObservation: string
   improvements: string
   remainingIssues: string
@@ -51,6 +52,193 @@ interface FormState {
   forbiddenMovements: string
   recommendedFrequency: string
   nextReassessment: string
+}
+
+// ── 関節別スペシャルテスト定義 ──────────────────────────────
+const TESTS_BY_JOINT: Record<string, string[]> = {
+  '膝関節': [
+    'Lachman test', 'Anterior drawer test', 'Posterior drawer test',
+    'Valgus stress test', 'Varus stress test',
+    'McMurray test', 'Apley test', 'Thessaly test',
+    'Patellar grind test (Clarke)', 'Patella apprehension test',
+  ],
+  '股関節': [
+    'FABER test (Patrick)', 'FADIR test', 'Thomas test',
+    'Ober test', 'Trendelenburg test', 'Hip scour test',
+    'Anterior impingement test',
+  ],
+  '足関節': [
+    'Anterior drawer test', 'Talar tilt test',
+    'Thompson test', 'Squeeze test',
+    'Kleiger test (外旋ストレス)', 'Ottawa ankle rules',
+  ],
+  '肩関節': [
+    'Hawkins-Kennedy test', 'Neer test',
+    'Empty can test (Jobe)', 'Drop arm test',
+    'Speed test', 'Yergason test',
+    'Apprehension test', 'Relocation test', 'Sulcus sign',
+    "O'Brien test (SLAP)", 'Cross-arm test',
+  ],
+  '肘関節': [
+    'Valgus stress test', "Cozen's test (外側上顆炎)",
+    "Golfer's elbow test (内側上顆炎)",
+    'Tinel sign（肘部管）', 'Varus stress test',
+  ],
+  '手関節・手指': [
+    'Finkelstein test', 'Phalen test', 'Tinel sign（手根管）',
+    'Watson test (舟状骨)', 'Grind test (第1CM関節)',
+  ],
+  '頚部': [
+    'Spurling test', 'Distraction test',
+    'Lhermitte sign', '椎骨動脈テスト', 'Adson test',
+    'Upper limb tension test (ULTT)',
+  ],
+  '腰部': [
+    'SLR test', 'SLUMP test', 'Kemp test',
+    'Bragard test', '大腿神経伸張テスト', 'ASLR test',
+    'Prone instability test',
+  ],
+}
+
+const RESULT_LABELS: Record<SpecialTestResult, string> = {
+  positive: '陽性(+)',
+  negative: '陰性(−)',
+  suspicious: '疑陽性(±)',
+  unable: '実施不可',
+}
+const RESULT_COLORS: Record<SpecialTestResult, string> = {
+  positive: 'bg-red-100 text-red-700 border-red-200',
+  negative: 'bg-green-100 text-green-700 border-green-200',
+  suspicious: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  unable: 'bg-gray-100 text-gray-500 border-gray-200',
+}
+
+// 関節別スペシャルテストピッカー
+function SpecialTestPicker({
+  value, onChange,
+}: {
+  value: SOAPSpecialTest[]
+  onChange: (v: SOAPSpecialTest[]) => void
+}) {
+  const [joint, setJoint] = useState<string>(Object.keys(TESTS_BY_JOINT)[0])
+  const joints = Object.keys(TESTS_BY_JOINT)
+
+  function getEntry(j: string, t: string) {
+    return value.find(v => v.joint === j && v.testName === t)
+  }
+
+  function toggle(testName: string) {
+    const existing = getEntry(joint, testName)
+    if (existing) {
+      onChange(value.filter(v => !(v.joint === joint && v.testName === testName)))
+    } else {
+      onChange([...value, { joint, testName, result: 'negative' }])
+    }
+  }
+
+  function setResult(testName: string, result: SpecialTestResult) {
+    onChange(value.map(v =>
+      v.joint === joint && v.testName === testName ? { ...v, result } : v
+    ))
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* 選択済みチップ */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map(v => (
+            <span
+              key={`${v.joint}-${v.testName}`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border font-medium ${RESULT_COLORS[v.result]}`}
+            >
+              <span className="text-gray-400 font-normal">{v.joint.replace('関節', '').replace('・手指', '')}</span>
+              {v.testName.replace(/ test| sign/i, '')}
+              <span className="font-bold">{v.result === 'positive' ? '+' : v.result === 'negative' ? '−' : v.result === 'suspicious' ? '±' : '?'}</span>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter(x => !(x.joint === v.joint && x.testName === v.testName)))}
+                className="ml-0.5 hover:text-red-500"
+              >×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 関節タブ */}
+      <div className="flex flex-wrap gap-1">
+        {joints.map(j => {
+          const count = value.filter(v => v.joint === j).length
+          return (
+            <button
+              key={j}
+              type="button"
+              onClick={() => setJoint(j)}
+              className={`px-2.5 py-1 text-xs rounded-lg border transition-colors relative ${
+                joint === j
+                  ? 'bg-teal-600 text-white border-teal-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
+              }`}
+            >
+              {j}
+              {count > 0 && (
+                <span className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
+                  joint === j ? 'bg-white text-teal-700' : 'bg-teal-100 text-teal-700'
+                }`}>{count}</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* テスト一覧 */}
+      <div className="grid grid-cols-1 gap-1.5">
+        {TESTS_BY_JOINT[joint].map(testName => {
+          const entry = getEntry(joint, testName)
+          const selected = !!entry
+          return (
+            <div
+              key={testName}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
+                selected
+                  ? 'border-teal-300 bg-teal-50'
+                  : 'border-gray-200 bg-white hover:border-teal-200'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => toggle(testName)}
+                className={`w-4 h-4 rounded border-2 flex-shrink-0 transition-colors ${
+                  selected ? 'bg-teal-600 border-teal-600' : 'border-gray-300'
+                }`}
+              >
+                {selected && <span className="text-white text-[10px] leading-none flex items-center justify-center">✓</span>}
+              </button>
+              <span className={`flex-1 ${selected ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>{testName}</span>
+              {selected && (
+                <div className="flex gap-1">
+                  {(Object.keys(RESULT_LABELS) as SpecialTestResult[]).map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setResult(testName, r)}
+                      className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${
+                        entry.result === r
+                          ? RESULT_COLORS[r]
+                          : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      {RESULT_LABELS[r]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 const PHASES: RehabPhase[] = [1, 2, 3, 4, 5, 6]
@@ -74,6 +262,7 @@ const defaultForm: FormState = {
   singleLegStance: '',
   squat: '',
   treatmentAreas: [],
+  soapSpecialTests: [],
   therapistObservation: '',
   improvements: '',
   remainingIssues: '',
@@ -121,6 +310,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       singleLegStance: form.singleLegStance,
       squat: form.squat,
       treatmentAreas: form.treatmentAreas,
+      soapSpecialTests: form.soapSpecialTests,
       therapistObservation: form.therapistObservation,
       improvements: form.improvements,
       remainingIssues: form.remainingIssues,
@@ -258,9 +448,18 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 placeholder="例：大腿四頭筋 右MMT4、左5" rows={2} />
             </div>
             <div>
-              <FormLabel>スペシャルテスト所見</FormLabel>
+              <FormLabel>スペシャルテスト（関節別）</FormLabel>
+              <div className="mt-1">
+                <SpecialTestPicker
+                  value={form.soapSpecialTests}
+                  onChange={v => setForm(f => ({ ...f, soapSpecialTests: v }))}
+                />
+              </div>
+            </div>
+            <div>
+              <FormLabel>スペシャルテスト補足メモ</FormLabel>
               <Textarea value={form.specialTestFindings} onChange={v => setForm(f => ({ ...f, specialTestFindings: v }))}
-                placeholder="例：Lachman test 陰性、McMurray test 陰性" rows={2} />
+                placeholder="例：再現性低い、疼痛回避あり" rows={2} />
             </div>
             <div>
               <FormLabel>圧痛</FormLabel>

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
+  SpecialTestResult,
 } from '@/types/patient'
 import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
 import BodyMap from './BodyMap'
@@ -29,6 +30,16 @@ import SOAPForm from './SOAPForm'
 import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import { nanoid } from 'nanoid'
+
+const SOAP_RESULT_COLORS: Record<SpecialTestResult, string> = {
+  positive: 'bg-red-100 text-red-700 border-red-200',
+  negative: 'bg-green-100 text-green-700 border-green-200',
+  suspicious: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  unable: 'bg-gray-100 text-gray-500 border-gray-200',
+}
+const SOAP_RESULT_SYMBOL: Record<SpecialTestResult, string> = {
+  positive: '+', negative: '−', suspicious: '±', unable: '?',
+}
 
 // ── SOAPカルテ展開カード ────────────────────────────────────
 function SOAPNoteCard({ note }: { note: SOAPNote }) {
@@ -116,7 +127,24 @@ function SOAPNoteCard({ note }: { note: SOAPNote }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               {note.romFindings && <Row label="ROM所見" value={note.romFindings} />}
               {note.strengthFindings && <Row label="筋力所見" value={note.strengthFindings} />}
-              {note.specialTestFindings && <Row label="スペシャルテスト" value={note.specialTestFindings} />}
+              {note.soapSpecialTests && note.soapSpecialTests.length > 0 && (
+                <div className="sm:col-span-2 rounded-lg border border-gray-100 bg-white p-2">
+                  <p className="text-gray-400 font-medium mb-1.5">スペシャルテスト</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {note.soapSpecialTests.map((t, i) => (
+                      <span
+                        key={i}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border font-medium ${SOAP_RESULT_COLORS[t.result]}`}
+                      >
+                        <span className="text-gray-400 font-normal text-[10px]">{t.joint.replace('関節', '').replace('・手指', '')}</span>
+                        {t.testName.replace(/ test| sign/i, '')}
+                        <span className="font-bold">{SOAP_RESULT_SYMBOL[t.result]}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {note.specialTestFindings && <Row label="テスト補足" value={note.specialTestFindings} className="sm:col-span-2" />}
               {note.tenderness && <Row label="圧痛" value={note.tenderness} />}
               {note.gait && <Row label="歩行" value={note.gait} />}
               {note.singleLegStance && <Row label="片脚立位" value={note.singleLegStance} />}

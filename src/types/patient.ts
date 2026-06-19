@@ -16,6 +16,13 @@ export type SpecialTestResult = 'positive' | 'negative' | 'suspicious' | 'unable
 export type EndFeel = 'bony' | 'soft' | 'firm' | 'springy' | 'empty' | 'spasm'
 export type SOAPVisitStatus = 'completed' | 'cancelled' | 'no_show'
 
+// SOAPカルテ内のスペシャルテスト記録
+export interface SOAPSpecialTest {
+  joint: string
+  testName: string
+  result: SpecialTestResult
+}
+
 // ──────────────────────────────────────────────
 // 患者
 // ──────────────────────────────────────────────
@@ -189,6 +196,7 @@ export interface SOAPNote {
   patientGoalToday: string
   // O: Objective
   treatmentAreas?: string[]  // 施術部位（人体図）
+  soapSpecialTests?: SOAPSpecialTest[]  // 関節別スペシャルテスト
   romFindings: string
   strengthFindings: string
   specialTestFindings: string
