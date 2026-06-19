@@ -51,16 +51,35 @@ export interface RedFlag {
   other: string
 }
 
+export type PainDuration = 'acute' | 'subacute' | 'chronic'
+
+export const PAIN_DURATION_LABELS: Record<PainDuration, string> = {
+  acute: '急性（4週以内）',
+  subacute: '亜急性（1〜3ヶ月）',
+  chronic: '慢性（3ヶ月以上）',
+}
+
 export interface Evaluation {
   id: string
   patientId: string
   evaluationDate: string
+  // 痛み部位（人体図）
+  painLocations?: string[]
+  // 痛みの経過
+  painDuration?: PainDuration
   // 痛み
   painNrs: number
   restPain: boolean
   nightPain: boolean
   weightBearingPain: boolean
   movementPain: boolean
+  // 慢性痛スクリーニング
+  spreadingPain?: boolean
+  centralSensitization?: boolean
+  sleepDisturbance?: boolean
+  fatigueNrs?: number
+  catastrophizing?: boolean
+  kinesophobia?: boolean
   // 症状
   swelling: boolean
   heat: boolean

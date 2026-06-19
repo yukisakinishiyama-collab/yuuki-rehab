@@ -6,13 +6,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
-  SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord,
+  SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
 } from '@/types/patient'
-import { BODY_REGION_LABELS, PHASE_LABELS } from '@/types/patient'
+import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
+import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getExercises, getPatientExercises, savePatientExercise,
-  deletePatientExercise, getProgressRecords,
+  deletePatientExercise, getProgressRecords, getRehabPlans,
 } from '@/lib/patient-store'
 import {
   calculateImprovementScore, calculateROMImprovement,
@@ -29,7 +30,7 @@ import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import { nanoid } from 'nanoid'
 
-type TabKey = 'overview' | 'evaluation' | 'soap' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
+type TabKey = 'overview' | 'plan' | 'evaluation' | 'soap' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
 
 interface Props {
   patient: Patient
@@ -46,6 +47,7 @@ export default function PatientDetail({ patient }: Props) {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [patientExercises, setPatientExercises] = useState<PatientExercise[]>([])
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
+  const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
 
   useEffect(() => {
     reload()
@@ -60,6 +62,7 @@ export default function PatientDetail({ patient }: Props) {
     setExercises(getExercises())
     setPatientExercises(getPatientExercises(patient.id))
     setProgressRecords(getProgressRecords(patient.id))
+    setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
   }
 
   // ── 算出値 ──
@@ -146,8 +149,9 @@ export default function PatientDetail({ patient }: Props) {
 
   const assignedExerciseIds = new Set(patientExercises.filter(pe => pe.status === 'active').map(pe => pe.exerciseId))
 
-  const TABS: { key: TabKey; label: string; icon: string }[] = [
+  const TABS: { key: TabKey; label: string; icon: string; badge?: number }[] = [
     { key: 'overview', label: '概要', icon: '👁' },
+    { key: 'plan', label: 'リハビリ計画', icon: '📅', badge: rehabPlans.length || undefined },
     { key: 'evaluation', label: '初回評価', icon: '📋' },
     { key: 'soap', label: 'SOAPカルテ', icon: '📝' },
     { key: 'rom', label: 'ROM', icon: '📐' },
@@ -201,13 +205,18 @@ export default function PatientDetail({ patient }: Props) {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-3.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`relative px-3.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   activeTab === tab.key
                     ? 'border-teal-600 text-teal-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 {tab.icon} {tab.label}
+                {tab.badge != null && tab.badge > 0 && (
+                  <span className="ml-1 bg-teal-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -331,6 +340,78 @@ export default function PatientDetail({ patient }: Props) {
           </div>
         )}
 
+        {/* ── リハビリ計画タブ ── */}
+        {activeTab === 'plan' && (
+          <div className="space-y-4">
+            {rehabPlans.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <p className="text-gray-400 text-sm mb-2">リハビリ計画がまだありません</p>
+                  <p className="text-gray-400 text-xs">「プロトコル立案」でプロトコルを作成し、「カルテへ反映」ボタンで追加できます</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-sm font-medium text-gray-700">{rehabPlans.length}フェーズのリハビリ計画</span>
+                  <span className="text-xs text-gray-400">（プロトコルから反映）</span>
+                </div>
+                {rehabPlans.map((plan, i) => (
+                  <Card key={plan.id}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                          i === 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {plan.phase}
+                        </span>
+                        <div>
+                          <SectionTitle>{plan.mainProblem || PHASE_SHORT_LABELS[plan.phase]}</SectionTitle>
+                          <p className="text-xs text-gray-400 mt-0.5">{PHASE_LABELS[plan.phase]}</p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        {plan.shortTermGoal && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-400 mb-1">短期ゴール</p>
+                            <p className="text-gray-700 bg-green-50 rounded-lg p-2 text-xs">{plan.shortTermGoal}</p>
+                          </div>
+                        )}
+                        {plan.midTermGoal && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-400 mb-1">中期ゴール</p>
+                            <p className="text-gray-700 bg-blue-50 rounded-lg p-2 text-xs">{plan.midTermGoal}</p>
+                          </div>
+                        )}
+                        {plan.longTermGoal && (
+                          <div className="md:col-span-2">
+                            <p className="text-xs font-medium text-gray-400 mb-1">長期ゴール</p>
+                            <p className="text-gray-700 bg-purple-50 rounded-lg p-2 text-xs">{plan.longTermGoal}</p>
+                          </div>
+                        )}
+                        {plan.recommendedFrequency && (
+                          <div className="md:col-span-2">
+                            <p className="text-xs font-medium text-gray-400 mb-1">運動メニュー</p>
+                            <p className="text-gray-700 text-xs">{plan.recommendedFrequency}</p>
+                          </div>
+                        )}
+                        {plan.precautions && (
+                          <div className="md:col-span-2">
+                            <p className="text-xs font-medium text-gray-400 mb-1">進行基準</p>
+                            <p className="text-gray-700 bg-amber-50 rounded-lg p-2 text-xs">{plan.precautions}</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
         {/* ── 初回評価タブ ── */}
         {activeTab === 'evaluation' && (
           <div className="space-y-6">
@@ -340,16 +421,31 @@ export default function PatientDetail({ patient }: Props) {
                 <CardContent>
                   <div className="space-y-2">
                     {evaluations.map(ev => (
-                      <div key={ev.id} className="flex items-center justify-between py-2 border-b border-gray-50 text-sm">
-                        <span className="text-gray-600">{ev.evaluationDate}</span>
-                        <span className={`font-medium ${ev.painNrs >= 7 ? 'text-red-600' : ev.painNrs >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
-                          NRS: {ev.painNrs}
-                        </span>
-                        <div className="flex gap-1">
-                          {ev.swelling && <Badge color="blue">腫脹</Badge>}
-                          {ev.numbness && <Badge color="red">しびれ</Badge>}
-                          {ev.nightPain && <Badge color="red">夜間痛</Badge>}
+                      <div key={ev.id} className="py-3 border-b border-gray-50 last:border-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-gray-600 text-sm">{ev.evaluationDate}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium text-sm ${ev.painNrs >= 7 ? 'text-red-600' : ev.painNrs >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                              NRS: {ev.painNrs}
+                            </span>
+                            {ev.painDuration && (
+                              <Badge color={ev.painDuration === 'chronic' ? 'red' : ev.painDuration === 'subacute' ? 'yellow' : 'teal'}>
+                                {ev.painDuration === 'chronic' ? '慢性' : ev.painDuration === 'subacute' ? '亜急性' : '急性'}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            {ev.swelling && <Badge color="blue">腫脹</Badge>}
+                            {ev.numbness && <Badge color="red">しびれ</Badge>}
+                            {ev.nightPain && <Badge color="red">夜間痛</Badge>}
+                            {ev.centralSensitization && <Badge color="purple">中枢感作</Badge>}
+                          </div>
                         </div>
+                        {ev.painLocations && ev.painLocations.length > 0 && (
+                          <div className="mt-2">
+                            <BodyMap selected={ev.painLocations} onChange={() => {}} readOnly />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
