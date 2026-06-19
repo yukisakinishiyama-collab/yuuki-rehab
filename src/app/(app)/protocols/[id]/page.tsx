@@ -7,14 +7,18 @@ import type { Protocol, ProtocolPatient } from '@/types/protocol'
 import {
   getProtocolById, getPatientById, updatePhase, advancePhase, deleteProtocol
 } from '@/lib/protocol-store'
+import { getPatients as getPtPatients, saveRehabPlan } from '@/lib/patient-store'
+import type { Patient as PtPatient } from '@/types/patient'
 import PhaseCard from '@/components/protocol/PhaseCard'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
+  BookOpen,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
+import { nanoid } from 'nanoid'
 
 type Tab = 'protocol' | 'discussion'
 
@@ -25,6 +29,10 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [patient, setPatient] = useState<ProtocolPatient | null>(null)
   const [tab, setTab] = useState<Tab>('protocol')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showReflectModal, setShowReflectModal] = useState(false)
+  const [ptPatients, setPtPatients] = useState<PtPatient[]>([])
+  const [selectedPtId, setSelectedPtId] = useState('')
+  const [reflectDone, setReflectDone] = useState(false)
 
   useEffect(() => {
     const p = getProtocolById(id)
@@ -51,6 +59,36 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     if (!protocol) return
     deleteProtocol(protocol.id)
     router.replace('/protocols')
+  }
+
+  function handleOpenReflect() {
+    setPtPatients(getPtPatients())
+    setSelectedPtId('')
+    setReflectDone(false)
+    setShowReflectModal(true)
+  }
+
+  function handleReflect() {
+    if (!protocol || !selectedPtId) return
+    const now = new Date().toISOString()
+    // プロトコルの各フェーズをRehabPlanとして登録
+    protocol.phases.forEach((ph, i) => {
+      const phaseNum = Math.min(i + 1, 6) as 1|2|3|4|5|6
+      saveRehabPlan({
+        id: nanoid(),
+        patientId: selectedPtId,
+        phase: phaseNum,
+        mainProblem: ph.title,
+        shortTermGoal: ph.goals[0] ?? '',
+        midTermGoal: ph.goals[1] ?? '',
+        longTermGoal: ph.goals.slice(2).join('、') ?? '',
+        recommendedFrequency: ph.exercises.map(e => e.name + (e.dose ? `（${e.dose}）` : '')).join('、'),
+        precautions: ph.advanceCriteria.map(c => c.label).join('、'),
+        createdAt: now,
+        updatedAt: now,
+      })
+    })
+    setReflectDone(true)
   }
 
   if (!protocol || !patient) {
@@ -112,6 +150,14 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
 
         {/* アクションボタン */}
         <div className="flex items-center gap-2 no-print flex-shrink-0">
+          <button
+            onClick={handleOpenReflect}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-teal-200
+              bg-teal-50 hover:bg-teal-100 transition-colors text-sm text-teal-700 font-semibold font-display"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">カルテへ反映</span>
+          </button>
           <button
             onClick={() => window.print()}
             title="印刷"
@@ -280,6 +326,93 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           </div>
         )}
       </div>
+
+      {/* カルテへ反映モーダル */}
+      {showReflectModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-teal-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 font-display">カルテへ反映</h3>
+            </div>
+
+            {!reflectDone ? (
+              <>
+                <p className="text-sm text-gray-500 mb-4">
+                  このプロトコルのフェーズ構成をリハビリ計画としてカルテに登録します。<br />
+                  対象患者を選択してください。
+                </p>
+                {ptPatients.length === 0 ? (
+                  <div className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4 mb-4">
+                    患者管理に患者が登録されていません。<br />
+                    先に患者を登録してください。
+                  </div>
+                ) : (
+                  <select
+                    value={selectedPtId}
+                    onChange={e => setSelectedPtId(e.target.value)}
+                    className="w-full h-10 rounded-md border border-gray-200 bg-white px-3 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-teal-600 mb-4"
+                  >
+                    <option value="">患者を選択...</option>
+                    {ptPatients.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}　{p.kana && `（${p.kana}）`}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800">
+                  プロトコルの全{protocol.phases.length}フェーズがリハビリ計画として登録されます。
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleReflect}
+                    disabled={!selectedPtId}
+                    className="flex-1 bg-teal-600 text-white py-2.5 rounded-xl text-sm font-bold
+                      font-display hover:bg-teal-700 disabled:opacity-40 transition-colors"
+                  >
+                    カルテに反映する
+                  </button>
+                  <button
+                    onClick={() => setShowReflectModal(false)}
+                    className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm
+                      hover:bg-gray-200 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 rounded-xl p-4 mb-4">
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <p className="text-sm font-semibold">
+                    カルテにリハビリ計画を反映しました！
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Link
+                    href={`/patients/${selectedPtId}`}
+                    className="flex-1 text-center bg-teal-600 text-white py-2.5 rounded-xl text-sm
+                      font-bold font-display hover:bg-teal-700 transition-colors"
+                    onClick={() => setShowReflectModal(false)}
+                  >
+                    カルテを開く
+                  </Link>
+                  <button
+                    onClick={() => setShowReflectModal(false)}
+                    className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm
+                      hover:bg-gray-200 transition-colors"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 印刷用免責 */}
       <div className="hidden print:block mt-6 text-xs text-gray-400 border-t pt-4 font-body">
