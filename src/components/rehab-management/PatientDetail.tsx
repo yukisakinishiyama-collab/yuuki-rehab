@@ -86,6 +86,12 @@ function SOAPNoteCard({ note }: { note: SOAPNote }) {
               <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center">S</span>
               <span className="text-xs font-semibold text-blue-700">主観的情報（患者の訴え）</span>
             </div>
+            {note.painLocations && note.painLocations.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-gray-500 font-medium mb-1">この日の痛み部位</p>
+                <BodyMap selected={note.painLocations} onChange={() => {}} readOnly />
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               {note.changeFromLast && <Row label="前回からの変化" value={note.changeFromLast} />}
               {note.adlDifficulty && <Row label="日常生活の困り事" value={note.adlDifficulty} />}
@@ -101,6 +107,12 @@ function SOAPNoteCard({ note }: { note: SOAPNote }) {
               <span className="w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">O</span>
               <span className="text-xs font-semibold text-green-700">客観的情報（検査・観察）</span>
             </div>
+            {note.treatmentAreas && note.treatmentAreas.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-gray-500 font-medium mb-1">施術部位</p>
+                <BodyMap selected={note.treatmentAreas} onChange={() => {}} readOnly />
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               {note.romFindings && <Row label="ROM所見" value={note.romFindings} />}
               {note.strengthFindings && <Row label="筋力所見" value={note.strengthFindings} />}

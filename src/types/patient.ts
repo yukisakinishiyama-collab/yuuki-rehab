@@ -180,6 +180,7 @@ export interface SOAPNote {
   visitDate: string
   visitNumber: number
   // S: Subjective
+  painLocations?: string[]   // この日の痛み部位（人体図）
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -187,6 +188,7 @@ export interface SOAPNote {
   patientConcern: string
   patientGoalToday: string
   // O: Objective
+  treatmentAreas?: string[]  // 施術部位（人体図）
   romFindings: string
   strengthFindings: string
   specialTestFindings: string

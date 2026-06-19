@@ -11,6 +11,7 @@ import {
   Card, CardHeader, CardContent, FormLabel, Input, Textarea,
   ToggleSwitch, SaveButton, SectionTitle, NRSInput,
 } from './shared'
+import BodyMap from './BodyMap'
 
 interface Props {
   patientId: string
@@ -19,6 +20,7 @@ interface Props {
 
 interface FormState {
   visitDate: string
+  painLocations: string[]
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -34,6 +36,7 @@ interface FormState {
   gait: string
   singleLegStance: string
   squat: string
+  treatmentAreas: string[]
   therapistObservation: string
   improvements: string
   remainingIssues: string
@@ -54,6 +57,7 @@ const PHASES: RehabPhase[] = [1, 2, 3, 4, 5, 6]
 
 const defaultForm: FormState = {
   visitDate: new Date().toISOString().split('T')[0],
+  painLocations: [],
   painToday: 3,
   changeFromLast: '',
   adlDifficulty: '',
@@ -69,6 +73,7 @@ const defaultForm: FormState = {
   gait: '',
   singleLegStance: '',
   squat: '',
+  treatmentAreas: [],
   therapistObservation: '',
   improvements: '',
   remainingIssues: '',
@@ -99,6 +104,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       patientId,
       visitDate: form.visitDate,
       visitNumber: notes.length + 1,
+      painLocations: form.painLocations,
       painToday: form.painToday,
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
@@ -114,6 +120,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       gait: form.gait,
       singleLegStance: form.singleLegStance,
       squat: form.squat,
+      treatmentAreas: form.treatmentAreas,
       therapistObservation: form.therapistObservation,
       improvements: form.improvements,
       remainingIssues: form.remainingIssues,
@@ -179,7 +186,16 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
         {/* S: Subjective */}
         {activeTab === 'S' && (
           <div className="space-y-4">
-            <NRSInput value={form.painToday} onChange={v => setForm(f => ({ ...f, painToday: v }))} label="本日の痛み（NRS）" />
+            <div>
+              <FormLabel>本日の痛み部位（人体図）</FormLabel>
+              <div className="mt-1">
+                <BodyMap
+                  selected={form.painLocations}
+                  onChange={v => setForm(f => ({ ...f, painLocations: v }))}
+                />
+              </div>
+            </div>
+            <NRSInput value={form.painToday} onChange={v => setForm(f => ({ ...f, painToday: v }))} label="本日の痛み強度（NRS）" />
 
             <div>
               <FormLabel>前回からの変化</FormLabel>
@@ -222,6 +238,15 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
         {/* O: Objective */}
         {activeTab === 'O' && (
           <div className="space-y-4">
+            <div>
+              <FormLabel>施術部位（人体図）</FormLabel>
+              <div className="mt-1">
+                <BodyMap
+                  selected={form.treatmentAreas}
+                  onChange={v => setForm(f => ({ ...f, treatmentAreas: v }))}
+                />
+              </div>
+            </div>
             <div>
               <FormLabel>ROM所見</FormLabel>
               <Textarea value={form.romFindings} onChange={v => setForm(f => ({ ...f, romFindings: v }))}
