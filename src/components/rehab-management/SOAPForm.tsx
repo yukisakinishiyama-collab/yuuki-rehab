@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult } from '@/types/patient'
 import { PHASE_SHORT_LABELS } from '@/types/patient'
+import { SPECIAL_TEST_DESCRIPTIONS } from '@/lib/special-test-descriptions'
 import { saveSOAPNote, getSOAPNotes } from '@/lib/patient-store'
 import {
   Card, CardHeader, CardContent, FormLabel, Input, Textarea,
@@ -54,6 +55,82 @@ interface FormState {
   nextReassessment: string
 }
 
+// ── テスト説明モーダル ────────────────────────────────────────
+function TestInfoModal({ testName, onClose }: { testName: string; onClose: () => void }) {
+  const desc = SPECIAL_TEST_DESCRIPTIONS[testName]
+  if (!desc) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-4"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ヘッダー */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">{testName}</h3>
+            <p className="text-xs text-teal-600 font-medium mt-0.5">🎯 {desc.target}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0 mt-0.5"
+          >×</button>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* 体位 */}
+        <div className="flex gap-2">
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">位</span>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-0.5">患者体位</p>
+            <p className="text-sm text-gray-800">{desc.position}</p>
+          </div>
+        </div>
+
+        {/* 実施方法 */}
+        <div className="flex gap-2">
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex-shrink-0 mt-0.5">法</span>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-0.5">実施方法</p>
+            <p className="text-sm text-gray-800 leading-relaxed">{desc.method}</p>
+          </div>
+        </div>
+
+        {/* 陽性基準 */}
+        <div className="flex gap-2">
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-xs font-bold flex-shrink-0 mt-0.5">陽</span>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-0.5">陽性基準</p>
+            <p className="text-sm text-red-700 leading-relaxed font-medium">{desc.positive}</p>
+          </div>
+        </div>
+
+        {/* 臨床メモ */}
+        {desc.note && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <p className="text-xs font-semibold text-amber-700 mb-1">💡 臨床メモ</p>
+            <p className="text-xs text-amber-800 leading-relaxed">{desc.note}</p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-xl transition-colors"
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── 関節別スペシャルテスト定義 ──────────────────────────────
 const TESTS_BY_JOINT: Record<string, string[]> = {
   '膝関節': [
@@ -68,7 +145,7 @@ const TESTS_BY_JOINT: Record<string, string[]> = {
     'Anterior impingement test',
   ],
   '足関節': [
-    'Anterior drawer test', 'Talar tilt test',
+    'Anterior drawer test（足関節）', 'Talar tilt test',
     'Thompson test', 'Squeeze test',
     'Kleiger test (外旋ストレス)', 'Ottawa ankle rules',
   ],
@@ -80,9 +157,9 @@ const TESTS_BY_JOINT: Record<string, string[]> = {
     "O'Brien test (SLAP)", 'Cross-arm test',
   ],
   '肘関節': [
-    'Valgus stress test', "Cozen's test (外側上顆炎)",
+    'Valgus stress test（肘）', "Cozen's test (外側上顆炎)",
     "Golfer's elbow test (内側上顆炎)",
-    'Tinel sign（肘部管）', 'Varus stress test',
+    'Tinel sign（肘部管）', 'Varus stress test（肘）',
   ],
   '手関節・手指': [
     'Finkelstein test', 'Phalen test', 'Tinel sign（手根管）',
@@ -121,6 +198,7 @@ function SpecialTestPicker({
   onChange: (v: SOAPSpecialTest[]) => void
 }) {
   const [joint, setJoint] = useState<string>(Object.keys(TESTS_BY_JOINT)[0])
+  const [infoTest, setInfoTest] = useState<string | null>(null)
   const joints = Object.keys(TESTS_BY_JOINT)
 
   function getEntry(j: string, t: string) {
@@ -144,6 +222,9 @@ function SpecialTestPicker({
 
   return (
     <div className="space-y-3">
+      {/* テスト説明モーダル */}
+      {infoTest && <TestInfoModal testName={infoTest} onClose={() => setInfoTest(null)} />}
+
       {/* 選択済みチップ */}
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -215,6 +296,17 @@ function SpecialTestPicker({
                 {selected && <span className="text-white text-[10px] leading-none flex items-center justify-center">✓</span>}
               </button>
               <span className={`flex-1 ${selected ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>{testName}</span>
+              {/* ℹ 説明ボタン */}
+              {SPECIAL_TEST_DESCRIPTIONS[testName] && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); setInfoTest(testName) }}
+                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-400 hover:text-teal-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors"
+                  title="テスト方法を確認"
+                >
+                  i
+                </button>
+              )}
               {selected && (
                 <div className="flex gap-1">
                   {(Object.keys(RESULT_LABELS) as SpecialTestResult[]).map(r => (
