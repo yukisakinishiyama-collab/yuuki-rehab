@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
-  SpecialTestResult, QuickMemo,
+  SpecialTestResult, QuickMemo, Intake,
 } from '@/types/patient'
 import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
 import BodyMap from './BodyMap'
@@ -15,7 +15,7 @@ import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getExercises, getPatientExercises, savePatientExercise,
   deletePatientExercise, getProgressRecords, getRehabPlans,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes,
 } from '@/lib/patient-store'
 import {
   calculateImprovementScore, calculateROMImprovement,
@@ -30,6 +30,7 @@ import SpecialTestInputForm from './SpecialTestInputForm'
 import SOAPForm from './SOAPForm'
 import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
+import IntakeForm from './IntakeForm'
 import { nanoid } from 'nanoid'
 
 // ── 簡易メモタブ ────────────────────────────────────────────
@@ -298,7 +299,7 @@ function SOAPNoteCard({ note }: { note: SOAPNote }) {
 function Row({ label, value, highlight, className = '' }: {
   label: string
   value: string
-  highlight?: 'green' | 'amber' | 'blue' | 'purple' | 'red'
+  highlight?: 'green' | 'amber' | 'blue' | 'purple' | 'red' | 'teal'
   className?: string
 }) {
   const bg = highlight === 'green' ? 'bg-green-50 border-green-100' :
@@ -306,6 +307,7 @@ function Row({ label, value, highlight, className = '' }: {
     highlight === 'blue' ? 'bg-blue-50 border-blue-100' :
     highlight === 'purple' ? 'bg-purple-50 border-purple-100' :
     highlight === 'red' ? 'bg-red-50 border-red-100' :
+    highlight === 'teal' ? 'bg-teal-50 border-teal-100' :
     'bg-white border-gray-100'
   return (
     <div className={`rounded-lg border p-2 ${bg} ${className}`}>
@@ -315,7 +317,83 @@ function Row({ label, value, highlight, className = '' }: {
   )
 }
 
-type TabKey = 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
+// ── 問診票サマリーカード ────────────────────────────────────
+function IntakeCard({ intake }: { intake: Intake }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      {/* ヘッダー行 */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+      >
+        <span className="text-sm font-medium text-gray-700 w-28 flex-shrink-0">{intake.intakeDate}</span>
+        <span className="text-sm text-gray-600 flex-1 truncate">{intake.chiefComplaint}</span>
+        {intake.suspectedDiagnosis && (
+          <span className="text-xs bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-2 py-0.5 flex-shrink-0">
+            {intake.suspectedDiagnosis}
+          </span>
+        )}
+        {intake.aiSuggestedTests && intake.aiSuggestedTests.length > 0 && (
+          <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded-full px-2 py-0.5 flex-shrink-0">
+            🤖 AI分析済
+          </span>
+        )}
+        <span className={`ml-auto text-gray-400 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+
+      {/* 展開コンテンツ */}
+      {open && (
+        <div className="border-t border-gray-100 px-4 py-4 space-y-3 bg-gray-50/50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {intake.chiefComplaint && <Row label="主訴" value={intake.chiefComplaint} />}
+            {intake.injuryMechanism && <Row label="受傷機転" value={intake.injuryMechanism} />}
+            {intake.painNrs > 0 && <Row label="痛みNRS" value={`${intake.painNrs}/10`} />}
+            {intake.painCharacter.length > 0 && <Row label="痛みの性状" value={intake.painCharacter.join('、')} />}
+            {intake.importantGoal && <Row label="取り戻したい動作" value={intake.importantGoal} highlight="blue" />}
+            {intake.suspectedDiagnosis && <Row label="疑い診断" value={intake.suspectedDiagnosis} highlight="teal" />}
+          </div>
+          {/* AI分析結果 */}
+          {(intake.aiSuggestedTests || intake.aiDifferentials || intake.aiProtocol) && (
+            <div className="mt-2 space-y-2">
+              <p className="text-xs font-semibold text-purple-700">🤖 AI分析結果</p>
+              {intake.aiSuggestedTests && intake.aiSuggestedTests.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 mb-1">推奨テスト</p>
+                  <div className="flex flex-wrap gap-1">
+                    {intake.aiSuggestedTests.map((t, i) => (
+                      <span key={i} className="text-xs px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {intake.aiDifferentials && intake.aiDifferentials.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 mb-1">鑑別診断</p>
+                  <ul className="text-xs text-gray-600 space-y-0.5">
+                    {intake.aiDifferentials.map((d, i) => <li key={i}>• {d}</li>)}
+                  </ul>
+                </div>
+              )}
+              {intake.aiProtocol && (
+                <div className="bg-green-50 border border-green-100 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-400 mb-0.5">推奨プロトコル</p>
+                  <p className="text-xs text-green-800">{intake.aiProtocol}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
 
 interface Props {
   patient: Patient
@@ -323,7 +401,7 @@ interface Props {
 
 export default function PatientDetail({ patient }: Props) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  const [activeTab, setActiveTab] = useState<TabKey>('intake')
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [romRecords, setRomRecords] = useState<ROMRecord[]>([])
   const [strengthRecords, setStrengthRecords] = useState<StrengthRecord[]>([])
@@ -334,6 +412,7 @@ export default function PatientDetail({ patient }: Props) {
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
   const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
+  const [intakes, setIntakes] = useState<Intake[]>([])
 
   useEffect(() => {
     reload()
@@ -350,6 +429,7 @@ export default function PatientDetail({ patient }: Props) {
     setProgressRecords(getProgressRecords(patient.id))
     setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
+    setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
   }
 
   // ── 算出値 ──
@@ -437,9 +517,10 @@ export default function PatientDetail({ patient }: Props) {
   const assignedExerciseIds = new Set(patientExercises.filter(pe => pe.status === 'active').map(pe => pe.exerciseId))
 
   const TABS: { key: TabKey; label: string; icon: string; badge?: number }[] = [
+    { key: 'intake', label: '問診票', icon: '📋', badge: intakes.length || undefined },
     { key: 'overview', label: '概要', icon: '👁' },
     { key: 'plan', label: 'リハビリ計画', icon: '📅', badge: rehabPlans.length || undefined },
-    { key: 'evaluation', label: '初回評価', icon: '📋' },
+    { key: 'evaluation', label: '初回評価', icon: '🩺' },
     { key: 'soap', label: 'SOAPカルテ', icon: '📝' },
     { key: 'memo', label: '簡易メモ', icon: '🗒️', badge: quickMemos.length || undefined },
     { key: 'rom', label: 'ROM', icon: '📐' },
@@ -513,6 +594,21 @@ export default function PatientDetail({ patient }: Props) {
 
       {/* コンテンツ */}
       <div className="max-w-5xl mx-auto">
+
+        {/* ── 問診票タブ ── */}
+        {activeTab === 'intake' && (
+          <div className="space-y-4">
+            <IntakeForm patientId={patient.id} onSaved={reload} />
+            {intakes.length > 0 && (
+              <div className="space-y-2">
+                <SectionTitle>過去の問診票</SectionTitle>
+                {intakes.map(intake => (
+                  <IntakeCard key={intake.id} intake={intake} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── 概要タブ ── */}
         {activeTab === 'overview' && (

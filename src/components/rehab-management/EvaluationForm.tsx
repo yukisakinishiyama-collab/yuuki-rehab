@@ -13,15 +13,40 @@ import {
 } from './shared'
 import { RedFlagAlert } from './shared'
 import BodyMap from './BodyMap'
+import JointDetailMap, { SUPPORTED_JOINTS } from './JointDetailMap'
 
 interface Props {
   patientId: string
   onSaved?: () => void
 }
 
+// 痛み部位IDから関節名へのマッピング（評価フォーム用）
+const BODY_REGION_TO_JOINT: Record<string, string> = {
+  fkl: '膝関節', fkr: '膝関節', bkl: '膝関節', bkr: '膝関節',
+  fsl: '肩関節', fsr: '肩関節', bsl: '肩関節', bsr: '肩関節',
+  fhil: '股関節', fhir: '股関節', bgl: '股関節', bgr: '股関節',
+  fal: '足関節', far: '足関節', bhal: '足関節', bher: '足関節',
+  fab: '腰部', blb: '腰部',
+  fn: '頚部', bn: '頚部',
+  fel: '肘関節', fer: '肘関節', bel: '肘関節', ber: '肘関節',
+  fhdl: '手関節・手指', fhdr: '手関節・手指',
+}
+
+function getJointsFromPainLocations(locations: string[]): string[] {
+  const joints = new Set<string>()
+  for (const loc of locations) {
+    const joint = BODY_REGION_TO_JOINT[loc]
+    if (joint && SUPPORTED_JOINTS.includes(joint)) {
+      joints.add(joint)
+    }
+  }
+  return Array.from(joints)
+}
+
 interface FormState {
   evaluationDate: string
   painLocations: string[]
+  jointDetailLocations: Record<string, string[]>
   painDuration: PainDuration
   painNrs: number
   restPain: boolean
@@ -61,6 +86,7 @@ interface FormState {
 const defaultForm: FormState = {
   evaluationDate: new Date().toISOString().split('T')[0],
   painLocations: [],
+  jointDetailLocations: {},
   painDuration: 'acute',
   painNrs: 5,
   restPain: false,
@@ -109,6 +135,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
       patientId,
       evaluationDate: form.evaluationDate,
       painLocations: form.painLocations,
+      jointDetailLocations: form.jointDetailLocations,
       painDuration: form.painDuration,
       painNrs: form.painNrs,
       restPain: form.restPain,
@@ -152,6 +179,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
   }
 
   const isChronicPain = form.painDuration === 'chronic'
+  const selectedJoints = getJointsFromPainLocations(form.painLocations)
 
   return (
     <Card>
@@ -196,6 +224,24 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
                 onChange={locs => setForm(f => ({ ...f, painLocations: locs }))}
               />
             </div>
+
+            {/* 関節別詳細部位 */}
+            {selectedJoints.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-xs font-semibold text-gray-600">関節別詳細部位</p>
+                {selectedJoints.map(joint => (
+                  <JointDetailMap
+                    key={joint}
+                    joint={joint}
+                    selected={form.jointDetailLocations[joint] ?? []}
+                    onChange={regions => setForm(f => ({
+                      ...f,
+                      jointDetailLocations: { ...f.jointDetailLocations, [joint]: regions },
+                    }))}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* 痛みの経過 */}
             <div>

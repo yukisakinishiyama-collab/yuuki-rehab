@@ -72,6 +72,8 @@ export interface Evaluation {
   evaluationDate: string
   // 痛み部位（人体図）
   painLocations?: string[]
+  // 関節別詳細部位
+  jointDetailLocations?: Record<string, string[]>
   // 痛みの経過
   painDuration?: PainDuration
   // 痛み
@@ -188,6 +190,7 @@ export interface SOAPNote {
   visitNumber: number
   // S: Subjective
   painLocations?: string[]   // この日の痛み部位（人体図）
+  jointDetailLocations?: Record<string, string[]>  // 関節別詳細部位
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -397,4 +400,54 @@ export const RISK_LABELS: Record<RiskLevel, string> = {
   low: '低',
   medium: '中',
   high: '高',
+}
+
+// ──────────────────────────────────────────────
+// 問診票
+// ──────────────────────────────────────────────
+export interface Intake {
+  id: string
+  patientId: string
+  intakeDate: string
+  isNewInjury: boolean        // 既存患者の新しいけが
+
+  // 主訴・経緯
+  chiefComplaint: string
+  injuryDate: string
+  injuryMechanism: string
+  firstTimeSymptoм: boolean
+  previousSameInjury: boolean
+  previousTreatment: string
+
+  // 痛み
+  painLocations: string[]                       // 全体人体図
+  jointDetailLocations: Record<string, string[]> // 関節別詳細部位
+  painNrs: number
+  painCharacter: string[]     // 鈍痛・鋭痛・burning・しびれ・重だるい
+  painTiming: string[]        // 安静時・動作時・夜間・朝方
+  worseFactor: string
+  betterFactor: string
+
+  // 生活・活動
+  adlDifficulty: string[]     // 歩行・階段・正座・しゃがみ・挙上 etc
+  occupation: string
+  sportsActivity: string
+  importantGoal: string       // 患者が最も取り戻したい動作
+
+  // 既往歴
+  pastMedicalHistory: string
+  currentMedications: string
+  imagingResults: string
+
+  // AI分析結果（API呼び出し後に格納）
+  aiSuggestedTests?: string[]
+  aiDifferentials?: string[]
+  aiProtocol?: string
+  aiReasoning?: string
+
+  // 施術者入力
+  suspectedDiagnosis: string
+  therapistNotes: string
+
+  createdAt: string
 }
