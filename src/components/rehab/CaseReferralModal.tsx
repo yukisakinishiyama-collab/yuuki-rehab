@@ -26,7 +26,6 @@ interface LetterContent {
   onset: string
   symptoms: string
   course: string
-  recommendedFrequency: string
 }
 
 function toReiwa(dateStr?: string): string {
@@ -71,12 +70,6 @@ function ReferralPreview({ case_, destination, content }: {
           <p className="font-bold underline mb-1">【経過・紹介理由】</p>
           <p className="whitespace-pre-wrap">{content.course || '（AI生成後に表示されます）'}</p>
         </div>
-        {content.recommendedFrequency && (
-          <div>
-            <p className="font-bold underline mb-1">【治療頻度の推奨】</p>
-            <p className="whitespace-pre-wrap">{content.recommendedFrequency}</p>
-          </div>
-        )}
       </div>
       <div className="border-t border-gray-200 pt-4 text-right space-y-1 text-sm">
         <p>ゆうき整骨院</p>
@@ -111,12 +104,6 @@ function ReportPreview({ case_, destination, content }: {
           <p className="font-bold underline mb-1">【経過報告】</p>
           <p className="whitespace-pre-wrap">{content.course || '（AI生成後に表示されます）'}</p>
         </div>
-        {content.recommendedFrequency && (
-          <div>
-            <p className="font-bold underline mb-1">【治療頻度の推奨】</p>
-            <p className="whitespace-pre-wrap">{content.recommendedFrequency}</p>
-          </div>
-        )}
       </div>
       <div className="border-t border-gray-200 pt-4 text-right space-y-1 text-sm">
         <p>ゆうき整骨院</p>
@@ -131,7 +118,7 @@ function ReportPreview({ case_, destination, content }: {
 export default function CaseReferralModal({ case_, evaluations, aiSummaries, onClose }: Props) {
   const [letterType, setLetterType] = useState<LetterType>('referral')
   const [destination, setDestination] = useState<Destination>({ institution: '', department: '', doctor: '' })
-  const [content, setContent] = useState<LetterContent>({ diagnosis: '', onset: '', symptoms: '', course: '', recommendedFrequency: '' })
+  const [content, setContent] = useState<LetterContent>({ diagnosis: '', onset: '', symptoms: '', course: '' })
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generated, setGenerated] = useState(false)
@@ -203,7 +190,6 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
         onset: generated.onset ?? '',
         symptoms: generated.symptoms ?? '',
         course: generated.course ?? '',
-        recommendedFrequency: generated.recommendedFrequency ?? '',
       })
       setGenerated(true)
     } catch (e) {

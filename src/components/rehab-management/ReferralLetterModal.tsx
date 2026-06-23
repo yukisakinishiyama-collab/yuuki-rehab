@@ -28,7 +28,6 @@ interface LetterContent {
   onset: string
   symptoms: string
   course: string
-  recommendedFrequency: string
 }
 
 // 西暦→令和変換
@@ -103,14 +102,6 @@ function ReferralPreview({
         </div>
       )}
 
-      {/* 治療頻度の推奨 */}
-      {content.recommendedFrequency && (
-        <div>
-          <span className="inline-block w-40">　治療頻度推奨：</span>
-          <span className="whitespace-pre-wrap">{content.recommendedFrequency}</span>
-        </div>
-      )}
-
       {/* フッター */}
       <div className="mt-8 pt-4 border-t border-gray-300 text-sm space-y-0.5">
         <p>{today}</p>
@@ -173,14 +164,6 @@ function ReportPreview({
         </div>
       )}
 
-      {/* 治療頻度の推奨 */}
-      {content.recommendedFrequency && (
-        <div>
-          <span className="inline-block w-40">　治療頻度推奨：</span>
-          <span className="whitespace-pre-wrap">{content.recommendedFrequency}</span>
-        </div>
-      )}
-
       {/* フッター */}
       <div className="mt-8 pt-4 border-t border-gray-300 text-sm space-y-0.5">
         <p className="text-right mr-16">{today}</p>
@@ -213,7 +196,6 @@ export default function ReferralLetterModal({ patient, intakes, soapNotes, selec
     onset: '',
     symptoms: '',
     course: '',
-    recommendedFrequency: '',
   })
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -468,15 +450,6 @@ ${printRef.current.innerHTML}
                 />
               </div>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">治療頻度の推奨</label>
-                <textarea
-                  value={content.recommendedFrequency}
-                  onChange={e => setContent(c => ({ ...c, recommendedFrequency: e.target.value }))}
-                  placeholder="例：週2〜3回の来院を推奨。急性期終了後は週1回に移行予定。"
-                  className={TA_CLS}
-                />
-              </div>
             </div>
 
             {/* プレビュー */}
