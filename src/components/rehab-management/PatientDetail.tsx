@@ -31,6 +31,7 @@ import SOAPForm from './SOAPForm'
 import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
+import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 
 // ── 簡易メモタブ ────────────────────────────────────────────
@@ -148,50 +149,51 @@ const SOAP_RESULT_SYMBOL: Record<SpecialTestResult, string> = {
 }
 
 // ── SOAPカルテ展開カード ────────────────────────────────────
-function SOAPNoteCard({ note }: { note: SOAPNote }) {
+function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () => void }) {
   const [open, setOpen] = useState(false)
   const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'
   const adherenceLabel = note.homeExerciseAdherence === 'done' ? '✅ 実施' : note.homeExerciseAdherence === 'partial' ? '⚠️ 一部' : '❌ 未実施'
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-      {/* ヘッダー行（クリックで展開） */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-      >
-        {/* 回数バッジ */}
-        <span className="w-7 h-7 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
-          {note.visitNumber}
-        </span>
-
-        {/* 日付 */}
-        <span className="text-sm font-medium text-gray-700 w-24 flex-shrink-0">{note.visitDate}</span>
-
-        {/* NRS */}
-        <span className={`text-sm font-bold ${nrsColor} w-14 flex-shrink-0`}>NRS {note.painToday}</span>
-
-        {/* Phase */}
-        <span className="text-xs bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-2 py-0.5 flex-shrink-0">
-          Phase {note.currentPhase}
-        </span>
-
-        {/* 自宅運動 */}
-        <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:block">{adherenceLabel}</span>
-
-        {/* 改善点プレビュー */}
-        {note.improvements && (
-          <span className="text-xs text-gray-400 truncate flex-1 hidden md:block">
-            ✓ {note.improvements}
+      {/* ヘッダー行（展開ボタン＋アクションボタン） */}
+      <div className="flex items-center gap-2 pr-3 hover:bg-gray-50 transition-colors">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex-1 flex items-center gap-3 px-4 py-3 text-left min-w-0"
+        >
+          <span className="w-7 h-7 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+            {note.visitNumber}
           </span>
-        )}
+          <span className="text-sm font-medium text-gray-700 w-24 flex-shrink-0">{note.visitDate}</span>
+          <span className={`text-sm font-bold ${nrsColor} w-14 flex-shrink-0`}>NRS {note.painToday}</span>
+          <span className="text-xs bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-2 py-0.5 flex-shrink-0">
+            Phase {note.currentPhase}
+          </span>
+          <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:block">{adherenceLabel}</span>
+          {note.improvements && (
+            <span className="text-xs text-gray-400 truncate flex-1 hidden md:block">
+              ✓ {note.improvements}
+            </span>
+          )}
+          <span className={`text-gray-400 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+            ▼
+          </span>
+        </button>
 
-        {/* 開閉矢印 */}
-        <span className={`ml-auto text-gray-400 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
-          ▼
-        </span>
-      </button>
+        {/* 常時表示のアクションボタン */}
+        {onReferral && (
+          <button
+            type="button"
+            onClick={onReferral}
+            title="この経過から紹介状・報告書を作成"
+            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+          >
+            📄 紹介状
+          </button>
+        )}
+      </div>
 
       {/* 展開コンテンツ */}
       {open && (
@@ -290,6 +292,7 @@ function SOAPNoteCard({ note }: { note: SOAPNote }) {
               {note.nextReassessment && <Row label="再評価予定" value={note.nextReassessment} />}
             </div>
           </section>
+
         </div>
       )}
     </div>
@@ -318,33 +321,66 @@ function Row({ label, value, highlight, className = '' }: {
 }
 
 // ── 問診票サマリーカード ────────────────────────────────────
-function IntakeCard({ intake }: { intake: Intake }) {
+function IntakeCard({
+  intake, onReferral, onProtocol,
+}: {
+  intake: Intake
+  onReferral?: () => void
+  onProtocol?: () => void
+}) {
   const [open, setOpen] = useState(false)
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-      {/* ヘッダー行 */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-      >
-        <span className="text-sm font-medium text-gray-700 w-28 flex-shrink-0">{intake.intakeDate}</span>
-        <span className="text-sm text-gray-600 flex-1 truncate">{intake.chiefComplaint}</span>
-        {intake.suspectedDiagnosis && (
-          <span className="text-xs bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-2 py-0.5 flex-shrink-0">
-            {intake.suspectedDiagnosis}
+      {/* ヘッダー行（展開ボタン＋アクションボタン） */}
+      <div className="flex items-center gap-2 pr-3 hover:bg-gray-50 transition-colors">
+        {/* 展開トリガー（行の大部分） */}
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex-1 flex items-center gap-3 px-4 py-3 text-left min-w-0"
+        >
+          <span className="text-sm font-medium text-gray-700 w-28 flex-shrink-0">{intake.intakeDate}</span>
+          <span className="text-sm text-gray-600 flex-1 truncate">{intake.chiefComplaint}</span>
+          {intake.suspectedDiagnosis && (
+            <span className="text-xs bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-2 py-0.5 flex-shrink-0 hidden sm:inline">
+              {intake.suspectedDiagnosis}
+            </span>
+          )}
+          {intake.aiSuggestedTests && intake.aiSuggestedTests.length > 0 && (
+            <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded-full px-2 py-0.5 flex-shrink-0 hidden md:inline">
+              🤖 AI分析済
+            </span>
+          )}
+          <span className={`text-gray-400 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+            ▼
           </span>
-        )}
-        {intake.aiSuggestedTests && intake.aiSuggestedTests.length > 0 && (
-          <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded-full px-2 py-0.5 flex-shrink-0">
-            🤖 AI分析済
-          </span>
-        )}
-        <span className={`ml-auto text-gray-400 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
-          ▼
-        </span>
-      </button>
+        </button>
+
+        {/* 常時表示のアクションボタン */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {onReferral && (
+            <button
+              type="button"
+              onClick={onReferral}
+              title="紹介状・報告書を作成"
+              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+            >
+              📄 紹介状
+            </button>
+          )}
+          {onProtocol && (
+            <button
+              type="button"
+              onClick={onProtocol}
+              title="プロトコルを作成"
+              className="px-2.5 py-1.5 bg-teal-600 text-white text-xs font-medium rounded-lg hover:bg-teal-700 transition-colors shadow-sm whitespace-nowrap"
+            >
+              📋 プロトコル
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* 展開コンテンツ */}
       {open && (
@@ -387,6 +423,7 @@ function IntakeCard({ intake }: { intake: Intake }) {
               )}
             </div>
           )}
+
         </div>
       )}
     </div>
@@ -413,6 +450,9 @@ export default function PatientDetail({ patient }: Props) {
   const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
+  const [showReferralModal, setShowReferralModal] = useState(false)
+  const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
+  const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
 
   useEffect(() => {
     reload()
@@ -430,6 +470,37 @@ export default function PatientDetail({ patient }: Props) {
     setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
+  }
+
+  // 問診票データからプロトコル作成ページへのURLを生成
+  function buildProtocolUrl(intake: Intake): string {
+    const BODY_REGION_TO_JOINT: Record<string, string> = {
+      fkl: '膝関節', fkr: '膝関節', bkl: '膝関節', bkr: '膝関節',
+      fsl: '肩関節', fsr: '肩関節', bsl: '肩関節', bsr: '肩関節',
+      fhil: '股関節', fhir: '股関節', bgl: '股関節', bgr: '股関節',
+      fal: '足関節', far: '足関節', bhal: '足関節', bher: '足関節',
+      fab: '腰部', blb: '腰部', fn: '頚部', bn: '頚部',
+      fel: '肘関節', fer: '肘関節', bel: '肘関節', ber: '肘関節',
+      fhdl: '手関節・手指', fhdr: '手関節・手指',
+    }
+    const JOINT_NAME_TO_KEY: Record<string, string> = {
+      '膝関節': 'knee', '肩関節': 'shoulder', '股関節': 'hip',
+      '足関節': 'ankle', '肘関節': 'elbow', '手関節・手指': 'hand',
+      '腰部': 'spine', '頚部': 'spine',
+    }
+    const jointNames = [...new Set(intake.painLocations.map(l => BODY_REGION_TO_JOINT[l]).filter(Boolean))]
+    const jointKey = jointNames[0] ? (JOINT_NAME_TO_KEY[jointNames[0]] ?? 'other') : ''
+    const notesParts: string[] = []
+    if (intake.chiefComplaint) notesParts.push(intake.chiefComplaint)
+    if (intake.importantGoal) notesParts.push(`目標: ${intake.importantGoal}`)
+    if (intake.therapistNotes) notesParts.push(`施術者メモ: ${intake.therapistNotes}`)
+    const params = new URLSearchParams()
+    if (intake.suspectedDiagnosis) params.set('diagnosis', intake.suspectedDiagnosis)
+    if (jointKey) params.set('joint', jointKey)
+    if (intake.sportsActivity) params.set('sport', intake.sportsActivity)
+    if (intake.injuryDate) params.set('eventDate', intake.injuryDate)
+    if (notesParts.length) params.set('notes', notesParts.join('\n'))
+    return `/protocols/new?${params.toString()}`
   }
 
   // ── 算出値 ──
@@ -534,7 +605,7 @@ export default function PatientDetail({ patient }: Props) {
   return (
     <div className="space-y-0">
       {/* ヘッダーカード */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
         <div className="px-6 pt-5 pb-4">
           <button
             onClick={() => router.back()}
@@ -543,13 +614,20 @@ export default function PatientDetail({ patient }: Props) {
             ← 患者一覧に戻る
           </button>
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-xl font-semibold text-gray-900">{patient.name}</h1>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className="text-sm text-gray-400">{patient.kana}</span>
                 <Badge color="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
                 {patient.diagnosisLabel && <Badge color="gray">{patient.diagnosisLabel}</Badge>}
                 <RetentionRiskBadge level={retentionRisk.level} />
+                <button
+                  type="button"
+                  onClick={() => setShowReferralModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm"
+                >
+                  📄 紹介状・報告書
+                </button>
               </div>
             </div>
             {improvementScore && (
@@ -603,7 +681,15 @@ export default function PatientDetail({ patient }: Props) {
               <div className="space-y-2">
                 <SectionTitle>過去の問診票</SectionTitle>
                 {intakes.map(intake => (
-                  <IntakeCard key={intake.id} intake={intake} />
+                  <IntakeCard
+                    key={intake.id}
+                    intake={intake}
+                    onReferral={() => {
+                      setSelectedIntake(intake)
+                      setShowReferralModal(true)
+                    }}
+                    onProtocol={() => router.push(buildProtocolUrl(intake))}
+                  />
                 ))}
               </div>
             )}
@@ -854,7 +940,15 @@ export default function PatientDetail({ patient }: Props) {
                   <span className="text-xs text-gray-400">{soapNotes.length}件</span>
                 </div>
                 {soapNotes.map(note => (
-                  <SOAPNoteCard key={note.id} note={note} />
+                  <SOAPNoteCard
+                    key={note.id}
+                    note={note}
+                    onReferral={() => {
+                      setSelectedSoap(note)
+                      setSelectedIntake(null)
+                      setShowReferralModal(true)
+                    }}
+                  />
                 ))}
               </div>
             )}
@@ -1120,6 +1214,32 @@ export default function PatientDetail({ patient }: Props) {
           />
         )}
       </div>
+
+      {/* 紹介状・報告書 フローティングボタン（常時表示） */}
+      <button
+        type="button"
+        onClick={() => setShowReferralModal(true)}
+        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}
+        className="flex items-center gap-2 px-4 py-3 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl hover:bg-teal-700 transition-colors"
+      >
+        📄 紹介状・報告書
+      </button>
+
+      {/* 紹介状・報告書モーダル */}
+      {showReferralModal && (
+        <ReferralLetterModal
+          patient={patient}
+          intakes={intakes}
+          soapNotes={soapNotes}
+          selectedIntake={selectedIntake ?? undefined}
+          selectedSoap={selectedSoap ?? undefined}
+          onClose={() => {
+            setShowReferralModal(false)
+            setSelectedIntake(null)
+            setSelectedSoap(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 // 問診票フォーム（多段タブ構成）
 // ──────────────────────────────────────────────
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { nanoid } from 'nanoid'
 import type { Intake } from '@/types/patient'
 import { saveIntake } from '@/lib/patient-store'
@@ -152,13 +153,30 @@ interface AIResult {
 
 type TabKey = 'basic' | 'pain_location' | 'detail' | 'life' | 'ai'
 
+// 関節名（日本語）→ Protocol Joint キーのマッピング
+const JOINT_NAME_TO_KEY: Record<string, string> = {
+  '膝関節': 'knee', '肩関節': 'shoulder', '股関節': 'hip',
+  '足関節': 'ankle', '肘関節': 'elbow', '手関節・手指': 'hand',
+  '腰部': 'spine', '頚部': 'spine',
+}
+
+interface ProtocolPrefill {
+  diagnosis: string
+  joint: string
+  sport: string
+  eventDate: string
+  notes: string
+}
+
 export default function IntakeForm({ patientId, onSaved }: Props) {
+  const router = useRouter()
   const [form, setForm] = useState<FormState>(defaultForm)
   const [tab, setTab] = useState<TabKey>('basic')
   const [saved, setSaved] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [aiResult, setAiResult] = useState<AIResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [protocolPrefill, setProtocolPrefill] = useState<ProtocolPrefill | null>(null)
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: 'basic', label: '基本情報' },
@@ -241,12 +259,41 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
     saveIntake(intake)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+
+    // プロトコル作成用の転記データを保存
+    const joints = getJointsFromPainLocations(form.painLocations)
+    const firstJoint = joints[0] ? (JOINT_NAME_TO_KEY[joints[0]] ?? 'other') : ''
+    const notesParts: string[] = []
+    if (form.chiefComplaint) notesParts.push(form.chiefComplaint)
+    if (form.importantGoal) notesParts.push(`目標: ${form.importantGoal}`)
+    if (form.therapistNotes) notesParts.push(`施術者メモ: ${form.therapistNotes}`)
+    setProtocolPrefill({
+      diagnosis: form.suspectedDiagnosis,
+      joint: firstJoint,
+      sport: form.sportsActivity,
+      eventDate: form.injuryDate,
+      notes: notesParts.join('\n'),
+    })
+
     setForm(defaultForm)
     setAiResult(null)
     onSaved?.()
   }
 
+  // プロトコル作成ページへ問診データを転記して遷移
+  function handleGoToProtocol() {
+    if (!protocolPrefill) return
+    const params = new URLSearchParams()
+    if (protocolPrefill.diagnosis) params.set('diagnosis', protocolPrefill.diagnosis)
+    if (protocolPrefill.joint) params.set('joint', protocolPrefill.joint)
+    if (protocolPrefill.sport) params.set('sport', protocolPrefill.sport)
+    if (protocolPrefill.eventDate) params.set('eventDate', protocolPrefill.eventDate)
+    if (protocolPrefill.notes) params.set('notes', protocolPrefill.notes)
+    router.push(`/protocols/new?${params.toString()}`)
+  }
+
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -685,5 +732,25 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
         )}
       </CardContent>
     </Card>
+
+    {/* 問診票保存後: プロトコル作成への誘導バナー */}
+    {protocolPrefill && (
+      <div className="mt-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-teal-800">問診票を保存しました</p>
+          <p className="text-xs text-teal-600 mt-0.5 truncate">
+            この情報をもとにリハビリプロトコルを作成できます
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleGoToProtocol}
+          className="flex-shrink-0 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+        >
+          プロトコル作成 →
+        </button>
+      </div>
+    )}
+    </>
   )
 }

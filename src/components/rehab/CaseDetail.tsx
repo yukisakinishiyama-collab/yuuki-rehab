@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { getCase } from '@/lib/rehab-store'
-import type { RehabCase } from '@/types/rehab'
+import { getCase, getAllEvaluations, getAISummaries } from '@/lib/rehab-store'
+import type { RehabCase, EvaluationResult, AISummary } from '@/types/rehab'
 import { MOCK_USERS } from '@/lib/rehab-data'
+import CaseReferralModal from './CaseReferralModal'
 import StatusBadge from './StatusBadge'
 import TagBadge from './TagBadge'
 import VideoGrid from './VideoGrid'
@@ -27,6 +28,9 @@ type Tab = 'videos' | 'upload' | 'compare' | 'multi-angle' | 'report' | 'patient
 
 export default function CaseDetail({ caseId }: Props) {
   const [case_, setCase] = useState<RehabCase | null>(null)
+  const [evaluations, setEvaluations] = useState<EvaluationResult[]>([])
+  const [aiSummaries, setAiSummaries] = useState<AISummary[]>([])
+  const [showReferralModal, setShowReferralModal] = useState(false)
   const searchParams = useSearchParams()
   const [tab, setTab] = useState<Tab>(
     searchParams.get('tab') === 'upload' ? 'upload' : 'videos'
@@ -35,6 +39,11 @@ export default function CaseDetail({ caseId }: Props) {
   function reload() {
     const c = getCase(caseId)
     setCase(c ?? null)
+    if (c) {
+      setEvaluations(getAllEvaluations(caseId))
+      const summaries = c.videos.flatMap(v => getAISummaries(v.id))
+      setAiSummaries(summaries)
+    }
   }
 
   useEffect(() => {
@@ -92,6 +101,13 @@ export default function CaseDetail({ caseId }: Props) {
             </div>
             <p className="text-gray-600">{case_.diagnosis}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowReferralModal(true)}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm"
+          >
+            📄 紹介状・報告書
+          </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
@@ -228,6 +244,15 @@ export default function CaseDetail({ caseId }: Props) {
 
       {tab === 'patient-report' && (
         <PatientReport case_={case_} />
+      )}
+
+      {showReferralModal && (
+        <CaseReferralModal
+          case_={case_}
+          evaluations={evaluations}
+          aiSummaries={aiSummaries}
+          onClose={() => setShowReferralModal(false)}
+        />
       )}
     </div>
   )

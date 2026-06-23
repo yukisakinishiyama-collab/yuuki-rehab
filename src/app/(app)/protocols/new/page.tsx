@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import PatientForm from '@/components/protocol/PatientForm'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
-import type { ProtocolPatient } from '@/types/protocol'
+import type { ProtocolPatient, Joint } from '@/types/protocol'
 import {
   savePatient, generateProtocolFromTemplate, saveProtocol
 } from '@/lib/protocol-store'
@@ -13,9 +13,25 @@ import { Cpu, FileText, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react
 
 type Mode = 'select' | 'ai' | 'template'
 
-export default function NewProtocolPage() {
+function NewProtocolPageInner() {
   const router = useRouter()
-  const [mode, setMode] = useState<Mode>('select')
+  const searchParams = useSearchParams()
+
+  // 問診票からの転記データをURLパラメータで受け取る
+  const prefillData = useMemo(() => {
+    const diagnosis = searchParams.get('diagnosis')
+    const joint = searchParams.get('joint') as Joint | null
+    if (!diagnosis && !joint) return undefined
+    return {
+      diagnosis: diagnosis ?? undefined,
+      joint: joint ?? undefined,
+      sport: searchParams.get('sport') ?? undefined,
+      eventDate: searchParams.get('eventDate') ?? undefined,
+      notes: searchParams.get('notes') ?? undefined,
+    }
+  }, [searchParams])
+
+  const [mode, setMode] = useState<Mode>(prefillData ? 'template' : 'select')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [consentChecked, setConsentChecked] = useState(false)
@@ -191,6 +207,14 @@ export default function NewProtocolPage() {
 
       <DisclaimerBanner />
 
+      {/* 問診票からの転記バナー */}
+      {prefillData && (
+        <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 my-3 text-sm text-teal-800 font-body animate-slide-up">
+          <span className="text-base">📋</span>
+          問診票のデータを転記しました。内容を確認・修正してからプロトコルを生成してください。
+        </div>
+      )}
+
       {error && (
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 my-3 text-sm text-red-700 font-body animate-slide-up">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -199,7 +223,7 @@ export default function NewProtocolPage() {
       )}
 
       <div className="bg-[--color-surface-card] rounded-2xl border border-slate-200 p-5 mt-2 shadow-sm animate-slide-up delay-150">
-        <PatientForm onSubmit={handleFormSubmit} loading={loading} />
+        <PatientForm onSubmit={handleFormSubmit} loading={loading} initial={prefillData} />
       </div>
 
       {/* AI同意モーダル */}
@@ -268,5 +292,13 @@ export default function NewProtocolPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function NewProtocolPage() {
+  return (
+    <Suspense>
+      <NewProtocolPageInner />
+    </Suspense>
   )
 }
