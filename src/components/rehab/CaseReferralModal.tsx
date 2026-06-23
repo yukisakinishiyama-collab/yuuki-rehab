@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void
 }
 
-type LetterType = 'referral' | 'report'
+type LetterType = 'referral' | 'report' | 'patient'
 
 interface Destination {
   institution: string
@@ -26,6 +26,7 @@ interface LetterContent {
   onset: string
   symptoms: string
   course: string
+  recommendedFrequency: string
 }
 
 function toReiwa(dateStr?: string): string {
@@ -115,10 +116,56 @@ function ReportPreview({ case_, destination, content }: {
   )
 }
 
+function PatientLetterPreview({ case_, content }: {
+  case_: RehabCase; content: LetterContent
+}) {
+  const today = toReiwa()
+  const patientName = case_.patientName ?? case_.anonymousId
+  return (
+    <div className="font-serif text-sm leading-relaxed text-gray-900 space-y-5">
+      <h2 className="text-center text-xl tracking-[0.3em] font-bold mt-2">治　療　説　明　書</h2>
+      <div className="text-right text-sm">{today}</div>
+      <div className="border-b border-gray-300 pb-3">
+        <p>{patientName} 様</p>
+      </div>
+      {content.diagnosis && (
+        <div>
+          <span className="inline-block w-28 font-semibold">傷病名：</span>
+          <span>{content.diagnosis}</span>
+        </div>
+      )}
+      {content.symptoms && (
+        <div>
+          <p className="font-semibold underline mb-1">【現在の状態】</p>
+          <p className="whitespace-pre-wrap">{content.symptoms}</p>
+        </div>
+      )}
+      {content.course && (
+        <div>
+          <p className="font-semibold underline mb-1">【今後の見通し】</p>
+          <p className="whitespace-pre-wrap">{content.course}</p>
+        </div>
+      )}
+      {content.recommendedFrequency && (
+        <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3">
+          <p className="font-semibold text-teal-800 mb-1">【治療頻度の目安】</p>
+          <p className="whitespace-pre-wrap text-teal-900">{content.recommendedFrequency}</p>
+        </div>
+      )}
+      <div className="border-t border-gray-200 pt-4 text-right space-y-1 text-sm">
+        <p>ゆうき整骨院</p>
+        <p>〒753-0000　山口県下関市（住所）</p>
+        <p>TEL: 083-000-0000</p>
+        <p>柔道整復師　西山 勇来</p>
+      </div>
+    </div>
+  )
+}
+
 export default function CaseReferralModal({ case_, evaluations, aiSummaries, onClose }: Props) {
   const [letterType, setLetterType] = useState<LetterType>('referral')
   const [destination, setDestination] = useState<Destination>({ institution: '', department: '', doctor: '' })
-  const [content, setContent] = useState<LetterContent>({ diagnosis: '', onset: '', symptoms: '', course: '' })
+  const [content, setContent] = useState<LetterContent>({ diagnosis: '', onset: '', symptoms: '', course: '', recommendedFrequency: '' })
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generated, setGenerated] = useState(false)
@@ -190,6 +237,7 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
         onset: generated.onset ?? '',
         symptoms: generated.symptoms ?? '',
         course: generated.course ?? '',
+        recommendedFrequency: generated.recommendedFrequency ?? '',
       })
       setGenerated(true)
     } catch (e) {
@@ -250,6 +298,12 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
                 >
                   <ClipboardList className="w-3.5 h-3.5 inline mr-1" />報告書
                 </button>
+                <button
+                  onClick={() => { setLetterType('patient'); setGenerated(false) }}
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${letterType === 'patient' ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}
+                >
+                  👤 患者説明書
+                </button>
               </div>
             </div>
 
@@ -264,8 +318,8 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
               {aiSummaries.length > 0 && <p>AI解析：{aiSummaries.length}件</p>}
             </div>
 
-            {/* 紹介先 */}
-            <div className="space-y-3">
+            {/* 紹介先（患者説明書以外） */}
+            {letterType !== 'patient' && <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-500">{letterType === 'referral' ? '紹介先' : '報告先'}</p>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">医療機関名 <span className="text-red-500">必須</span></label>
@@ -294,7 +348,7 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
                 />
               </div>
-            </div>
+            </div>}
 
             {error && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
@@ -305,7 +359,7 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
 
             <button
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={generating || (letterType !== 'patient' && (!destination.institution.trim() || !destination.doctor.trim()))}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-60 transition-colors"
             >
               <Sparkles className="w-4 h-4" />
@@ -328,8 +382,10 @@ export default function CaseReferralModal({ case_, evaluations, aiSummaries, onC
             <div ref={previewRef} className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 max-w-2xl mx-auto">
               {letterType === 'referral' ? (
                 <ReferralPreview case_={case_} destination={destination} content={content} />
-              ) : (
+              ) : letterType === 'report' ? (
                 <ReportPreview case_={case_} destination={destination} content={content} />
+              ) : (
+                <PatientLetterPreview case_={case_} content={content} />
               )}
             </div>
           </div>

@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void
 }
 
-type LetterType = 'referral' | 'report'
+type LetterType = 'referral' | 'report' | 'patient'
 
 interface Destination {
   institution: string
@@ -28,6 +28,7 @@ interface LetterContent {
   onset: string
   symptoms: string
   course: string
+  recommendedFrequency: string
 }
 
 // 西暦→令和変換
@@ -179,6 +180,56 @@ function ReportPreview({
   )
 }
 
+// ── 患者向け説明書プレビュー ─────────────────────────────────
+function PatientLetterPreview({
+  patient, content,
+}: {
+  patient: Patient
+  content: LetterContent
+}) {
+  const today = toReiwa()
+  return (
+    <div className="font-serif text-sm leading-relaxed text-gray-900 space-y-5">
+      <h2 className="text-center text-xl tracking-[0.3em] font-bold mt-2">治　療　説　明　書</h2>
+      <div className="mt-4 text-right text-sm">{today}</div>
+      <div className="border-b border-gray-300 pb-3">
+        <p>{patient.name} 様</p>
+      </div>
+      {content.diagnosis && (
+        <div>
+          <span className="inline-block w-32 font-semibold">　傷病名　：</span>
+          <span>{content.diagnosis}</span>
+        </div>
+      )}
+      {content.symptoms && (
+        <div>
+          <p className="font-semibold mb-1">　現在の状態</p>
+          <p className="ml-4 whitespace-pre-wrap">{content.symptoms}</p>
+        </div>
+      )}
+      {content.course && (
+        <div>
+          <p className="font-semibold mb-1">　今後の見通し</p>
+          <p className="ml-4 whitespace-pre-wrap">{content.course}</p>
+        </div>
+      )}
+      {content.recommendedFrequency && (
+        <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3">
+          <p className="font-semibold text-teal-800 mb-1">　治療頻度の目安</p>
+          <p className="ml-4 whitespace-pre-wrap text-teal-900">{content.recommendedFrequency}</p>
+        </div>
+      )}
+      <div className="mt-8 pt-4 border-t border-gray-300 text-sm space-y-0.5">
+        <p>所在地　〒７５０－００７５</p>
+        <p>　　　　山口県下関市彦島江の浦町９－１－１４</p>
+        <p>施術所名称　ゆうき整骨院</p>
+        <p>柔道整復師名　西山　勇来</p>
+        <p>T E L　０８３－２６５－４５４５</p>
+      </div>
+    </div>
+  )
+}
+
 // ── メインモーダル ───────────────────────────────────────────
 export default function ReferralLetterModal({ patient, intakes, soapNotes, selectedIntake, selectedSoap, onClose }: Props) {
   // selectedIntake が指定されていればそれを優先、なければ最新の問診票
@@ -196,6 +247,7 @@ export default function ReferralLetterModal({ patient, intakes, soapNotes, selec
     onset: '',
     symptoms: '',
     course: '',
+    recommendedFrequency: '',
   })
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -294,10 +346,11 @@ ${printRef.current.innerHTML}
             {/* 文書種別 */}
             <div>
               <p className="text-xs font-semibold text-gray-600 mb-2">文書種別</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {([
                   { type: 'referral' as const, icon: <ClipboardList className="w-4 h-4" />, label: '紹介状' },
                   { type: 'report' as const, icon: <FileText className="w-4 h-4" />, label: '報告書' },
+                  { type: 'patient' as const, icon: <span className="text-sm">👤</span>, label: '患者説明書' },
                 ] as const).map(opt => (
                   <button
                     key={opt.type}
@@ -316,8 +369,8 @@ ${printRef.current.innerHTML}
               </div>
             </div>
 
-            {/* 宛先情報 */}
-            <div className="space-y-3">
+            {/* 宛先情報（紹介状・報告書のみ） */}
+            {letterType !== 'patient' && <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-600">宛先情報</p>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">医療機関名 <span className="text-red-500">*</span></label>
@@ -349,7 +402,7 @@ ${printRef.current.innerHTML}
                   className={INPUT_CLS}
                 />
               </div>
-            </div>
+            </div>}
 
             {/* データソース確認 */}
             <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-xs text-gray-500 space-y-1">
@@ -375,7 +428,7 @@ ${printRef.current.innerHTML}
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={generating || !destination.institution || !destination.doctor}
+              disabled={generating || (letterType !== 'patient' && (!destination.institution || !destination.doctor))}
               className="w-full py-2.5 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {generating ? (
@@ -390,7 +443,7 @@ ${printRef.current.innerHTML}
                 </>
               )}
             </button>
-            {!destination.institution || !destination.doctor ? (
+            {letterType !== 'patient' && (!destination.institution || !destination.doctor) ? (
               <p className="text-xs text-gray-400 -mt-3">医療機関名と医師名を入力してください</p>
             ) : null}
           </div>
@@ -437,18 +490,32 @@ ${printRef.current.innerHTML}
 
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
-                  {letterType === 'referral' ? '経過（紹介理由）' : '経過（治療経過の報告）'}
+                  {letterType === 'referral' ? '経過（紹介理由）' : letterType === 'report' ? '経過（治療経過の報告）' : '今後の見通し'}
                 </label>
                 <textarea
                   value={content.course}
                   onChange={e => setContent(c => ({ ...c, course: e.target.value }))}
                   placeholder={letterType === 'referral'
                     ? '治療経過と専門的診察が必要な理由など'
-                    : '当院での施術内容・経過・患者さんの状態など'
+                    : letterType === 'report'
+                    ? '当院での施術内容・経過・患者さんの状態など'
+                    : '今後の経過見通しや注意事項など'
                   }
                   className={`${TA_CLS} min-h-[120px]`}
                 />
               </div>
+
+              {letterType === 'patient' && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">治療頻度の目安</label>
+                  <textarea
+                    value={content.recommendedFrequency}
+                    onChange={e => setContent(c => ({ ...c, recommendedFrequency: e.target.value }))}
+                    placeholder="例：最初の2週間は週2〜3回のご来院をお勧めします。痛みが落ち着いたら週1回程度に移行します。"
+                    className={TA_CLS}
+                  />
+                </div>
+              )}
 
             </div>
 
@@ -474,8 +541,10 @@ ${printRef.current.innerHTML}
               >
                 {letterType === 'referral' ? (
                   <ReferralPreview patient={patient} destination={destination} content={content} />
-                ) : (
+                ) : letterType === 'report' ? (
                   <ReportPreview patient={patient} destination={destination} content={content} />
+                ) : (
+                  <PatientLetterPreview patient={patient} content={content} />
                 )}
               </div>
               <p className="text-xs text-gray-400 mt-2 text-right">

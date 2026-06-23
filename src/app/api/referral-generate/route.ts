@@ -41,7 +41,26 @@ ADL困難: ${latestIntake.adlDifficulty?.join('、') || 'なし'}
 
     let prompt = ''
 
-    if (type === 'referral') {
+    if (type === 'patient') {
+      prompt = `あなたは柔道整復師の補助AIです。以下の患者情報をもとに、患者さんへ手渡す「治療説明書」の内容を日本語で作成してください。
+
+患者名: ${patient.name}
+疾患・部位: ${patient.diagnosis || patient.bodyRegion}
+
+${intakeSummary}
+
+SOAPカルテ:
+${soapSummary}
+
+以下のJSON形式で出力してください。マークダウン・余分なテキスト不要：
+{
+  "diagnosis": "傷病名（わかりやすい表現で）",
+  "onset": "",
+  "symptoms": "現在の症状と状態（患者さんが理解しやすい言葉で2〜3文）",
+  "course": "これまでの経過と今後の見通し（専門用語を避けて3〜4文）",
+  "recommendedFrequency": "治療頻度の目安（急性期・回復期・維持期ごとの来院頻度を患者向けにわかりやすく2〜3文で。例：最初の2週間は週2〜3回のご来院をお勧めします。痛みが落ち着いてきたら週1回程度に移行していきます。）"
+}`
+    } else if (type === 'referral') {
       prompt = `あなたは柔道整復師の補助AIです。以下の患者情報をもとに、整形外科宛の紹介状（御紹介書）の本文を日本語で作成してください。
 
 患者名: ${patient.name}
