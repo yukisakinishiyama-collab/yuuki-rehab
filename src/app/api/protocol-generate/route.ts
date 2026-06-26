@@ -128,6 +128,15 @@ const SYSTEM_PROMPT = `あなたは整形外科リハビリテーション専門
   ]
 }`
 
+interface LibraryPaper {
+  title: string
+  source: string
+  year?: string
+  abstract?: string
+  evidenceGrade?: string
+  notes?: string
+}
+
 interface RequestBody {
   patient: {
     name?: string
@@ -139,6 +148,7 @@ interface RequestBody {
     notes?: string
   }
   consentGiven: boolean
+  libraryPapers?: LibraryPaper[]
 }
 
 export async function POST(req: NextRequest) {
@@ -158,6 +168,20 @@ export async function POST(req: NextRequest) {
       ? Math.floor((Date.now() - new Date(patient.eventDate).getTime()) / 86400000)
       : null
 
+    const { libraryPapers } = body
+    const librarySection =
+      libraryPapers && libraryPapers.length > 0
+        ? `\n\n## 院内文献ライブラリ（優先的に引用してください）\n` +
+          libraryPapers
+            .map(
+              (p, i) =>
+                `${i + 1}. 【${p.evidenceGrade ?? '?'}】${p.title}\n   出典: ${p.source}${p.year ? ` (${p.year})` : ''}${
+                  p.abstract ? `\n   概要: ${p.abstract.slice(0, 200)}…` : ''
+                }${p.notes ? `\n   院内メモ: ${p.notes}` : ''}`,
+            )
+            .join('\n')
+        : ''
+
     const userMessage = `以下の患者情報に基づいてリハビリプロトコルを生成してください:
 
 診断名: ${patient.diagnosis ?? '未記入'}
@@ -165,11 +189,12 @@ export async function POST(req: NextRequest) {
 年齢: ${patient.age != null ? `${patient.age}歳` : '未記入'}
 スポーツ: ${patient.sport ?? 'なし'}
 受傷/手術日: ${patient.eventDate ?? '未記入'}${daysSince != null ? `（${daysSince}日経過）` : ''}
-補足: ${patient.notes ?? 'なし'}
+補足: ${patient.notes ?? 'なし'}${librarySection}
 
 4〜5フェーズのリハビリプロトコルを生成してください。
 - 各フェーズには機能的移行基準（criteria-based progression）を含めてください
-- 各フェーズの references フィールドに、上記「引用可能なガイドライン・文献リスト」から疾患・関節に対応する文献を1〜3件引用してください
+- 各フェーズの references フィールドに文献を1〜3件引用してください
+- 「院内文献ライブラリ」に該当する論文がある場合は、システムプロンプトのリストより優先して引用してください
 - リスト外の文献を引用する場合は note に「要確認」を必ず付けてください
 - 引用は実在するガイドラインのみにし、著者名・ジャーナル名・発行年を正確に記述してください`
 

@@ -14,6 +14,7 @@ import {
   Ruler,
   ClipboardList,
   Users,
+  BookOpen,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
 import { logout } from '@/lib/rehab-store'
@@ -40,8 +41,9 @@ const NAV_SECTIONS = [
   {
     section: 'CLINICAL',
     items: [
-      { href: '/protocols', label: 'プロトコル立案', icon: ClipboardList },
-      { href: '/rom',       label: '可動域ノート',   icon: Activity },
+      { href: '/protocols',  label: 'プロトコル立案', icon: ClipboardList },
+      { href: '/literature', label: '文献ライブラリ', icon: BookOpen },
+      { href: '/rom',        label: '可動域ノート',   icon: Activity },
     ],
   },
   {

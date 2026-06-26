@@ -8,8 +8,9 @@ import type { ProtocolPatient, Joint } from '@/types/protocol'
 import {
   savePatient, generateProtocolFromTemplate, saveProtocol
 } from '@/lib/protocol-store'
+import { getPapersByDiagnosis } from '@/lib/literature-store'
 import { nanoid } from 'nanoid'
-import { Cpu, FileText, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Cpu, FileText, AlertCircle, ArrowLeft, CheckCircle, BookOpen } from 'lucide-react'
 
 type Mode = 'select' | 'ai' | 'template'
 
@@ -58,10 +59,24 @@ function NewProtocolPageInner() {
       const patient = savePatient(data)
 
       if (useAI) {
+        // 院内文献ライブラリから関連論文を自動取得
+        const libraryPapers = getPapersByDiagnosis(data.diagnosis ?? '').map(p => ({
+          title: p.title,
+          source: p.journal,
+          year: p.year,
+          abstract: p.abstract,
+          evidenceGrade: p.evidenceGrade,
+          notes: p.notes || undefined,
+        }))
+
         const res = await fetch('/api/protocol-generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ patient: data, consentGiven: true }),
+          body: JSON.stringify({
+            patient: data,
+            consentGiven: true,
+            libraryPapers: libraryPapers.length > 0 ? libraryPapers : undefined,
+          }),
         })
         if (!res.ok) {
           const err = await res.json()
