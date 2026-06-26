@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import type { Phase } from '@/types/protocol'
-import { EVIDENCE_LABELS, EVIDENCE_COLORS } from '@/types/protocol'
+import {
+  EVIDENCE_LABELS, EVIDENCE_COLORS,
+  EVIDENCE_GRADE_LABELS, EVIDENCE_GRADE_COLORS,
+} from '@/types/protocol'
 import CriteriaGauge from './CriteriaGauge'
 import {
   ChevronDown, ChevronUp, AlertTriangle, Edit2, Plus, Trash2,
-  Target, Dumbbell, ShieldOff, Flag
+  Target, Dumbbell, ShieldOff, Flag, BookOpen,
 } from 'lucide-react'
 
 interface Props {
@@ -331,6 +334,42 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, read
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {phase.references && phase.references.length > 0 && (
+                <div>
+                  <h4 className="flex items-center gap-1.5 text-xs font-bold text-[--color-text-secondary]
+                    font-display uppercase tracking-widest mb-2">
+                    <BookOpen className="w-3 h-3" />参考文献・ガイドライン
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {phase.references.map((ref, i) => (
+                      <li key={i} className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                        <div className="flex items-start gap-2">
+                          <span className={`flex-shrink-0 text-[10px] font-bold border rounded px-1.5 py-0.5 mt-0.5 font-display
+                            ${EVIDENCE_GRADE_COLORS[ref.evidenceGrade]}`}>
+                            {ref.evidenceGrade}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-[--color-text-primary] font-body leading-snug">
+                              {ref.title}
+                            </p>
+                            <p className="text-[10px] text-[--color-text-muted] mt-0.5 font-body">
+                              {ref.source}{ref.year ? ` (${ref.year})` : ''}
+                              {ref.note && <span className="text-amber-600 ml-1">— {ref.note}</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 font-body">
+                          {EVIDENCE_GRADE_LABELS[ref.evidenceGrade]}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-slate-400 mt-1.5 font-body">
+                    ※ 引用文献は担当医・PTによる最終確認が必要です
+                  </p>
                 </div>
               )}
             </div>

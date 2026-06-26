@@ -10,6 +10,8 @@ import type {
   SpecialTestResult, QuickMemo, Intake,
 } from '@/types/patient'
 import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
+const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
+const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-600' : 'text-green-600'
 import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
@@ -205,6 +207,39 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
               <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center">S</span>
               <span className="text-xs font-semibold text-blue-700">主観的情報（患者の訴え）</span>
             </div>
+
+            {/* 複数部位・疾患ごとのNRS */}
+            {note.complaints && note.complaints.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {note.complaints.map(c => (
+                  <div key={c.id} className="bg-white border border-gray-200 rounded-xl px-3 py-2 min-w-[140px] shadow-sm">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-xs font-semibold text-gray-700">
+                        {BODY_REGION_LABELS[c.bodyRegion]}
+                        {c.side !== 'na' && `（${SIDE_LABELS_SHORT[c.side]}）`}
+                      </span>
+                      {c.diagnosisLabel && (
+                        <span className="text-[10px] text-gray-400 truncate max-w-[80px]">{c.diagnosisLabel}</span>
+                      )}
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-xl font-bold ${NRS_COLOR(c.nrs)}`}>{c.nrs}</span>
+                      <span className="text-[10px] text-gray-400">/10</span>
+                    </div>
+                    {c.symptoms.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {c.symptoms.map(s => (
+                          <span key={s} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-1.5 py-0.5">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {note.painLocations && note.painLocations.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs text-gray-500 font-medium mb-1">この日の痛み部位</p>

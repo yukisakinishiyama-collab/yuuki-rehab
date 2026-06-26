@@ -540,14 +540,18 @@ const JOINT_ZONES: Record<string, Zone[]> = {
 }
 
 const SILHOUETTE_MAP: Record<string, React.FC> = {
-  '膝関節':     KneeSilhouette,
-  '肩関節':     ShoulderSilhouette,
-  '股関節':     HipSilhouette,
-  '足関節':     AnkleSilhouette,
   '腰部':       LumbarSilhouette,
   '頚部':       CervicalSilhouette,
-  '肘関節':     ElbowSilhouette,
   '手関節・手指': WristSilhouette,
+}
+
+// 参照画像マップ（実際の解剖学的外観図）
+const IMAGE_MAP: Record<string, string> = {
+  '膝関節': '/joints/knee.webp',
+  '肩関節': '/joints/shoulder.webp',
+  '股関節': '/joints/hip.webp',
+  '足関節': '/joints/ankle.webp',
+  '肘関節': '/joints/elbow.webp',
 }
 
 export const SUPPORTED_JOINTS = Object.keys(JOINT_ZONES)
@@ -558,6 +562,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
 
   const zones = JOINT_ZONES[joint]
   const Silhouette = SILHOUETTE_MAP[joint]
+  const imageUrl = IMAGE_MAP[joint]
 
   if (!zones) {
     return (
@@ -611,8 +616,13 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
 
         {/* SVGマップ */}
         <svg viewBox="0 0 200 260" className="w-full max-w-[280px]" style={{ userSelect: 'none' }}>
-          {/* 骨シルエット背景 */}
-          {Silhouette && <Silhouette />}
+          {/* 参照画像背景 or 骨シルエット背景 */}
+          {imageUrl ? (
+            <image href={imageUrl} x="0" y="0" width="200" height="260"
+              preserveAspectRatio="xMidYMid slice" opacity="0.88" />
+          ) : (
+            Silhouette && <Silhouette />
+          )}
 
           {/* インタラクティブゾーン */}
           {zones.map(zone => {

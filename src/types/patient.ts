@@ -24,6 +24,23 @@ export interface SOAPSpecialTest {
 }
 
 // ──────────────────────────────────────────────
+// 複数疾患・部位ごとの愁訴エントリ
+// ──────────────────────────────────────────────
+export const COMPLAINT_SYMPTOMS = [
+  '腫脹', '熱感', 'しびれ', '脱力', '夜間痛', '安静時痛', '動作時痛', '可動域制限',
+] as const
+export type ComplaintSymptom = typeof COMPLAINT_SYMPTOMS[number]
+
+export interface ComplaintEntry {
+  id: string
+  bodyRegion: BodyRegion
+  side: Side
+  diagnosisLabel: string
+  nrs: number
+  symptoms: ComplaintSymptom[]
+}
+
+// ──────────────────────────────────────────────
 // 患者
 // ──────────────────────────────────────────────
 export interface Patient {
@@ -189,6 +206,7 @@ export interface SOAPNote {
   visitDate: string
   visitNumber: number
   // S: Subjective
+  complaints?: ComplaintEntry[]           // 部位別NRS・症状（複数対応）
   painLocations?: string[]   // この日の痛み部位（人体図）
   jointDetailLocations?: Record<string, string[]>  // 関節別詳細部位
   painToday: number
@@ -419,7 +437,8 @@ export interface Intake {
   previousSameInjury: boolean
   previousTreatment: string
 
-  // 痛み
+  // 痛み（複数部位対応）
+  complaints?: ComplaintEntry[]                  // 部位別NRS・症状
   painLocations: string[]                       // 全体人体図
   jointDetailLocations: Record<string, string[]> // 関節別詳細部位
   painNrs: number

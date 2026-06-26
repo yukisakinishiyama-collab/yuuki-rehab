@@ -2,6 +2,37 @@ export type Joint = 'knee' | 'shoulder' | 'hip' | 'ankle' | 'elbow' | 'hand' | '
 
 export type EvidenceLevel = 'guideline' | 'consensus' | 'expert_opinion' | 'needs_review'
 
+// EBM エビデンスグレード（Oxford CEBM 準拠）
+export type EvidenceGrade = 'Ia' | 'Ib' | 'IIa' | 'IIb' | 'III' | 'IV' | 'V'
+
+export const EVIDENCE_GRADE_LABELS: Record<EvidenceGrade, string> = {
+  Ia: 'SR/メタ解析',
+  Ib: 'RCT',
+  IIa: 'コホートSR',
+  IIb: 'コホート研究',
+  III: 'ケースコントロール',
+  IV: '症例集積・専門家意見',
+  V: 'ガイドライン（合意）',
+}
+
+export const EVIDENCE_GRADE_COLORS: Record<EvidenceGrade, string> = {
+  Ia:  'bg-emerald-100 text-emerald-800 border-emerald-200',
+  Ib:  'bg-green-100 text-green-800 border-green-200',
+  IIa: 'bg-teal-100 text-teal-800 border-teal-200',
+  IIb: 'bg-blue-100 text-blue-800 border-blue-200',
+  III: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  IV:  'bg-slate-100 text-slate-700 border-slate-200',
+  V:   'bg-purple-100 text-purple-800 border-purple-200',
+}
+
+export interface Reference {
+  title: string       // 文献・ガイドライン名
+  source: string      // ジャーナル名 / 学会・発行元
+  year?: string       // 発行年
+  evidenceGrade: EvidenceGrade
+  note?: string       // 「要確認」等の注記
+}
+
 export const JOINT_LABELS: Record<Joint, string> = {
   knee: '膝関節',
   shoulder: '肩関節',
@@ -64,6 +95,7 @@ export interface Phase {
   outcomes: string[]
   evidence: EvidenceLevel
   durationWeeks?: string
+  references?: Reference[]
 }
 
 export interface ExpertOpinion {

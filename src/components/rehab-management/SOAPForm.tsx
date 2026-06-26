@@ -4,8 +4,9 @@
 // ──────────────────────────────────────────────
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult } from '@/types/patient'
+import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult, ComplaintEntry } from '@/types/patient'
 import { PHASE_SHORT_LABELS } from '@/types/patient'
+import MultiComplaintInput from './MultiComplaintInput'
 import { SPECIAL_TEST_DESCRIPTIONS } from '@/lib/special-test-descriptions'
 import { saveSOAPNote, getSOAPNotes } from '@/lib/patient-store'
 import {
@@ -21,6 +22,7 @@ interface Props {
 
 interface FormState {
   visitDate: string
+  complaints: ComplaintEntry[]
   painLocations: string[]
   painToday: number
   changeFromLast: string
@@ -337,6 +339,7 @@ const PHASES: RehabPhase[] = [1, 2, 3, 4, 5, 6]
 
 const defaultForm: FormState = {
   visitDate: new Date().toISOString().split('T')[0],
+  complaints: [],
   painLocations: [],
   painToday: 3,
   changeFromLast: '',
@@ -380,13 +383,19 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
 
   function handleSave() {
     const notes = getSOAPNotes(patientId)
+    // complaints があれば最大 NRS を painToday に使用
+    const derivedNrs = form.complaints.length > 0
+      ? Math.max(...form.complaints.map(c => c.nrs))
+      : form.painToday
+
     const note: SOAPNote = {
       id: nanoid(),
       patientId,
       visitDate: form.visitDate,
       visitNumber: notes.length + 1,
+      complaints: form.complaints.length > 0 ? form.complaints : undefined,
       painLocations: form.painLocations,
-      painToday: form.painToday,
+      painToday: derivedNrs,
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
       homeExerciseAdherence: form.homeExerciseAdherence,
@@ -468,6 +477,27 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
         {/* S: Subjective */}
         {activeTab === 'S' && (
           <div className="space-y-4">
+            {/* 複数部位・疾患ごとのNRS・症状 */}
+            <div>
+              <FormLabel>部位別NRS・症状（複数疾患対応）</FormLabel>
+              <div className="mt-1">
+                <MultiComplaintInput
+                  value={form.complaints}
+                  onChange={v => setForm(f => ({ ...f, complaints: v }))}
+                />
+              </div>
+              {form.complaints.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">
+                  部位を追加すると、それぞれのNRS・症状を個別に記録できます
+                </p>
+              )}
+            </div>
+
+            {/* 部位なしの場合のみ全体NRSを表示 */}
+            {form.complaints.length === 0 && (
+              <NRSInput value={form.painToday} onChange={v => setForm(f => ({ ...f, painToday: v }))} label="本日の痛み強度（全体NRS）" />
+            )}
+
             <div>
               <FormLabel>本日の痛み部位（人体図）</FormLabel>
               <div className="mt-1">
@@ -477,7 +507,6 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 />
               </div>
             </div>
-            <NRSInput value={form.painToday} onChange={v => setForm(f => ({ ...f, painToday: v }))} label="本日の痛み強度（NRS）" />
 
             <div>
               <FormLabel>前回からの変化</FormLabel>
