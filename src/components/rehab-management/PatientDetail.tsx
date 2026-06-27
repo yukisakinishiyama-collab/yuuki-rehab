@@ -37,20 +37,43 @@ import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 
 // ── 月次カルテ印刷 ────────────────────────────────────────────
-function printMonthlyChart(patient: Patient, memos: QuickMemo[], yearMonth: string) {
+function printMonthlyChart(
+  patient: Patient,
+  memos: QuickMemo[],
+  tests: SpecialTestRecord[],
+  yearMonth: string,
+) {
   const [year, month] = yearMonth.split('-')
   const title = `リハビリ経過メモ — ${patient.name} — ${year}年${month}月`
   const printDate = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
-  const sorted = [...memos].sort((a, b) => a.memoDate.localeCompare(b.memoDate))
 
-  const rows = sorted.map(m => {
-    const d = new Date(m.memoDate)
+  const resultLabel = (r: string) =>
+    r === 'positive' ? '陽性' : r === 'suspicious' ? '疑陽性' : r === 'negative' ? '陰性' : '不可'
+  const resultColor = (r: string) =>
+    r === 'positive' ? 'color:#b91c1c' : r === 'suspicious' ? 'color:#92400e' : r === 'negative' ? 'color:#166534' : 'color:#6b7280'
+
+  // メモとテストを日付順に統合
+  type Entry = { date: string; kind: 'memo'; memo: QuickMemo } | { date: string; kind: 'test'; test: SpecialTestRecord }
+  const entries: Entry[] = [
+    ...memos.map(m => ({ date: m.memoDate, kind: 'memo' as const, memo: m })),
+    ...tests.map(t => ({ date: t.measuredDate, kind: 'test' as const, test: t })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
+
+  const rows = entries.map(e => {
+    const d = new Date(e.date)
     const label = d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
-    const escaped = m.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
-    return `<tr>
-      <td class="date">${label}</td>
-      <td class="content">${escaped}</td>
-    </tr>`
+    if (e.kind === 'memo') {
+      const escaped = e.memo.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
+      return `<tr><td class="date">${label}</td><td class="kind memo">📝 メモ</td><td class="content">${escaped}</td></tr>`
+    } else {
+      const t = e.test
+      const right = `右:<span style="${resultColor(t.rightResult)}">${resultLabel(t.rightResult)}</span>`
+      const left = `左:<span style="${resultColor(t.leftResult)}">${resultLabel(t.leftResult)}</span>`
+      const total = `総合:<span style="${resultColor(t.result)};font-weight:bold">${resultLabel(t.result)}</span>`
+      const flags = [t.apprehension && '不安感', t.clickSound && 'クリック音', t.limitation && '可動域制限'].filter(Boolean).join('・')
+      const memo = t.memo ? `<br><span style="color:#6b7280;font-size:9pt">${t.memo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : ''
+      return `<tr><td class="date">${label}</td><td class="kind test">🔍 テスト</td><td class="content">${t.testName}（${BODY_REGION_LABELS[t.bodyRegion]}）<br>${right} &nbsp; ${left} &nbsp; ${total}${flags ? `<br><span style="color:#92400e;font-size:9pt">${flags}</span>` : ''}${memo}</td></tr>`
+    }
   }).join('')
 
   const html = `<!DOCTYPE html>
@@ -64,37 +87,35 @@ function printMonthlyChart(patient: Patient, memos: QuickMemo[], yearMonth: stri
     font-size: 11pt; color: #1a1a2e; padding: 20mm 18mm; }
   header { border-bottom: 2px solid #0d9488; padding-bottom: 10px; margin-bottom: 16px; }
   h1 { font-size: 15pt; font-weight: bold; color: #0d9488; }
-  .meta { display: flex; gap: 24px; margin-top: 8px; font-size: 9.5pt; color: #555; }
+  .meta { display: flex; gap: 24px; margin-top: 8px; font-size: 9.5pt; color: #555; flex-wrap: wrap; }
   .meta span { display: flex; gap: 4px; }
   .meta strong { color: #1a1a2e; }
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
   th { background: #f0fdfa; color: #0d9488; font-size: 9pt; font-weight: bold;
     text-align: left; padding: 6px 10px; border: 1px solid #ccece9; }
   td { vertical-align: top; padding: 8px 10px; border: 1px solid #e5e7eb; font-size: 10.5pt; }
-  td.date { white-space: nowrap; width: 110px; color: #374151; font-weight: 600;
-    background: #f9fafb; }
+  td.date { white-space: nowrap; width: 110px; color: #374151; font-weight: 600; background: #f9fafb; }
+  td.kind { white-space: nowrap; width: 72px; font-size: 9pt; color: #6b7280; background: #fafafa; }
+  td.kind.test { color: #7c3aed; }
   td.content { line-height: 1.7; color: #1f2937; }
-  tr:nth-child(even) td.content { background: #fafafa; }
   footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb;
     font-size: 8.5pt; color: #9ca3af; display: flex; justify-content: space-between; }
-  @media print {
-    body { padding: 15mm 14mm; }
-    @page { margin: 0; size: A4; }
-  }
+  @media print { body { padding: 15mm 14mm; } @page { margin: 0; size: A4; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>🗒️ リハビリ経過メモカルテ</h1>
+  <h1>🗒️ リハビリ経過カルテ</h1>
   <div class="meta">
     <span><strong>患者名：</strong>${patient.name}</span>
     <span><strong>対象月：</strong>${year}年${parseInt(month)}月</span>
     ${patient.diagnosisLabel ? `<span><strong>診断：</strong>${patient.diagnosisLabel}</span>` : ''}
-    <span><strong>件数：</strong>${memos.length}件</span>
+    <span><strong>メモ：</strong>${memos.length}件</span>
+    <span><strong>テスト：</strong>${tests.length}件</span>
   </div>
 </header>
 <table>
-  <thead><tr><th style="width:110px">日付</th><th>メモ・経過記録</th></tr></thead>
+  <thead><tr><th style="width:110px">日付</th><th style="width:72px">種別</th><th>内容</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
 <footer>
@@ -110,9 +131,20 @@ function printMonthlyChart(patient: Patient, memos: QuickMemo[], yearMonth: stri
 }
 
 // ── 簡易メモタブ ────────────────────────────────────────────
-function QuickMemoTab({ patient, memos, onUpdate }: {
+const ST_RESULT_LABEL: Record<string, string> = {
+  positive: '陽性', negative: '陰性', suspicious: '疑陽性', unable: '不可',
+}
+const ST_RESULT_COLOR: Record<string, string> = {
+  positive: 'bg-red-100 text-red-700',
+  negative: 'bg-green-100 text-green-700',
+  suspicious: 'bg-yellow-100 text-yellow-700',
+  unable: 'bg-gray-100 text-gray-500',
+}
+
+function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
   patient: Patient
   memos: QuickMemo[]
+  specialTests: SpecialTestRecord[]
   onUpdate: () => void
 }) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -120,14 +152,24 @@ function QuickMemoTab({ patient, memos, onUpdate }: {
   const [saved, setSaved] = useState(false)
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
 
-  // 月別グループ（新しい月順）
-  const byMonth: Record<string, QuickMemo[]> = {}
+  // メモとテストを月別に統合
+  type Entry =
+    | { kind: 'memo'; date: string; data: QuickMemo }
+    | { kind: 'test'; date: string; data: SpecialTestRecord }
+
+  const byMonth: Record<string, Entry[]> = {}
   for (const m of memos) {
     const ym = m.memoDate.slice(0, 7)
     if (!byMonth[ym]) byMonth[ym] = []
-    byMonth[ym].push(m)
+    byMonth[ym].push({ kind: 'memo', date: m.memoDate, data: m })
+  }
+  for (const t of specialTests) {
+    const ym = t.measuredDate.slice(0, 7)
+    if (!byMonth[ym]) byMonth[ym] = []
+    byMonth[ym].push({ kind: 'test', date: t.measuredDate, data: t })
   }
   const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a))
+  const totalEntries = memos.length + specialTests.length
 
   function toggleMonth(ym: string) {
     setCollapsedMonths(prev => {
@@ -166,9 +208,7 @@ function QuickMemoTab({ patient, memos, onUpdate }: {
     <div className="space-y-4">
       {/* 入力エリア */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
-        </div>
+        <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
         <div className="flex items-center gap-3">
           <label className="text-xs text-gray-500 whitespace-nowrap">日付</label>
           <input
@@ -202,15 +242,19 @@ function QuickMemoTab({ patient, memos, onUpdate }: {
         </div>
       </div>
 
-      {/* 月別メモ一覧 */}
-      {memos.length === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-8">まだメモがありません</p>
+      {/* 月別タイムライン */}
+      {totalEntries === 0 ? (
+        <p className="text-center text-sm text-gray-400 py-8">まだ記録がありません</p>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-gray-400 px-1">全 {memos.length}件 · {months.length}ヶ月分</p>
+          <p className="text-xs text-gray-400 px-1">
+            メモ {memos.length}件 · テスト {specialTests.length}件 · {months.length}ヶ月分
+          </p>
 
           {months.map(ym => {
-            const monthMemos = byMonth[ym].sort((a, b) => b.memoDate.localeCompare(a.memoDate))
+            const entries = byMonth[ym].sort((a, b) => b.date.localeCompare(a.date))
+            const monthMemos = entries.filter(e => e.kind === 'memo').map(e => e.data as QuickMemo)
+            const monthTests = entries.filter(e => e.kind === 'test').map(e => e.data as SpecialTestRecord)
             const collapsed = collapsedMonths.has(ym)
 
             return (
@@ -223,47 +267,86 @@ function QuickMemoTab({ patient, memos, onUpdate }: {
                     className="flex items-center gap-2 flex-1 text-left"
                   >
                     <span className="text-sm font-bold text-teal-700">{formatMonthLabel(ym)}</span>
-                    <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
-                      {monthMemos.length}件
-                    </span>
+                    {monthMemos.length > 0 && (
+                      <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                        📝 {monthMemos.length}
+                      </span>
+                    )}
+                    {monthTests.length > 0 && (
+                      <span className="text-xs text-purple-500 bg-purple-50 rounded-full px-2 py-0.5">
+                        🔍 {monthTests.length}
+                      </span>
+                    )}
                     <span className="text-gray-400 text-xs ml-1">{collapsed ? '▶' : '▼'}</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => printMonthlyChart(patient, monthMemos, ym)}
+                    onClick={() => printMonthlyChart(patient, monthMemos, monthTests, ym)}
                     className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-teal-600
                       border border-gray-200 hover:border-teal-300 rounded-lg px-2.5 py-1
                       transition-colors bg-white"
-                    title="この月のメモをカルテとして印刷"
+                    title="この月をカルテとして印刷"
                   >
                     🖨️ カルテ印刷
                   </button>
                 </div>
 
-                {/* メモ一覧（折りたたみ） */}
+                {/* エントリ一覧（折りたたみ） */}
                 {!collapsed && (
                   <div className="divide-y divide-gray-50">
-                    {monthMemos.map(memo => {
-                      const d = new Date(memo.memoDate)
+                    {entries.map(entry => {
+                      const d = new Date(entry.date)
                       const dayLabel = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
-                      return (
-                        <div key={memo.id} className="flex gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors">
-                          <div className="flex-shrink-0 text-center w-14">
-                            <p className="text-xs font-semibold text-teal-700">{dayLabel}</p>
+
+                      if (entry.kind === 'memo') {
+                        const memo = entry.data as QuickMemo
+                        return (
+                          <div key={memo.id} className="flex gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors">
+                            <div className="flex-shrink-0 w-16">
+                              <p className="text-xs font-semibold text-teal-700">{dayLabel}</p>
+                              <p className="text-[10px] text-gray-400 mt-0.5">📝 メモ</p>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(memo.id)}
+                              className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
+                              title="削除"
+                            >×</button>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
+                        )
+                      } else {
+                        const t = entry.data as SpecialTestRecord
+                        return (
+                          <div key={t.id} className="flex gap-3 px-4 py-3 bg-purple-50/30">
+                            <div className="flex-shrink-0 w-16">
+                              <p className="text-xs font-semibold text-purple-600">{dayLabel}</p>
+                              <p className="text-[10px] text-purple-400 mt-0.5">🔍 テスト</p>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800">
+                                {t.testName}
+                                <span className="ml-1.5 text-xs text-gray-400 font-normal">{BODY_REGION_LABELS[t.bodyRegion]}</span>
+                              </p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => (
+                                  <span key={key} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${ST_RESULT_COLOR[t[key]]}`}>
+                                    {['右', '左', '総合'][i]}:{ST_RESULT_LABEL[t[key]]}
+                                  </span>
+                                ))}
+                              </div>
+                              {(t.apprehension || t.clickSound || t.limitation) && (
+                                <p className="text-[10px] text-orange-600 mt-1">
+                                  {[t.apprehension && '不安感', t.clickSound && 'クリック音', t.limitation && '可動域制限'].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
+                              {t.memo && <p className="text-xs text-gray-500 mt-1">{t.memo}</p>}
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(memo.id)}
-                            className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
-                            title="削除"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )
+                        )
+                      }
                     })}
                   </div>
                 )}
@@ -1131,6 +1214,7 @@ export default function PatientDetail({ patient }: Props) {
           <QuickMemoTab
             patient={patient}
             memos={quickMemos}
+            specialTests={specialTests}
             onUpdate={reload}
           />
         )}
@@ -1257,14 +1341,34 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="mt-4 space-y-2">
                     {specialTests.map(t => (
                       <div key={t.id} className="text-xs border border-gray-100 rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-gray-800">{t.testName}</span>
-                          <div className="flex gap-1.5">
-                            <span className={`px-2 py-0.5 rounded-full ${t.result === 'positive' ? 'bg-red-100 text-red-700' : t.result === 'suspicious' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                              {t.result === 'positive' ? '陽性' : t.result === 'suspicious' ? '疑陽性' : t.result === 'negative' ? '陰性' : '不可'}
-                            </span>
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div>
+                            <span className="font-medium text-gray-800">{t.testName}</span>
+                            <span className="ml-2 text-gray-400">{BODY_REGION_LABELS[t.bodyRegion]}</span>
+                            <span className="ml-2 text-gray-400">{t.measuredDate}</span>
+                          </div>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => {
+                              const val = t[key]
+                              const label = ['右', '左', '総合'][i]
+                              const color = val === 'positive' ? 'bg-red-100 text-red-700' : val === 'suspicious' ? 'bg-yellow-100 text-yellow-700' : val === 'unable' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
+                              const text = val === 'positive' ? '陽性' : val === 'suspicious' ? '疑陽性' : val === 'negative' ? '陰性' : '不可'
+                              return (
+                                <span key={key} className={`px-2 py-0.5 rounded-full ${color}`}>
+                                  {label}:{text}
+                                </span>
+                              )
+                            })}
                           </div>
                         </div>
+                        {(t.apprehension || t.clickSound || t.limitation) && (
+                          <div className="flex gap-1.5 mt-1.5">
+                            {t.apprehension && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">不安感あり</span>}
+                            {t.clickSound && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">クリック音</span>}
+                            {t.limitation && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">可動域制限</span>}
+                          </div>
+                        )}
+                        {t.memo && <p className="mt-1.5 text-gray-600">{t.memo}</p>}
                         {t.patientFriendlyExplanation && (
                           <p className="mt-1.5 text-gray-600 bg-blue-50 rounded p-2">{t.patientFriendlyExplanation}</p>
                         )}
