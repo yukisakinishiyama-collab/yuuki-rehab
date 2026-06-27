@@ -258,7 +258,7 @@ function NewProtocolPageInner() {
               患者の個人を特定できる情報（氏名・生年月日等）は入力しないことを強く推奨します。
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800 font-body">
-              送信する情報：疾患名、関節部位、年齢、スポーツ種目、経過日数、補足メモ
+              送信する情報：疾患名、関節部位、年齢、スポーツ種目、経過日数、患者の悩み、補足メモ
             </div>
             <label className={`flex items-start gap-2.5 cursor-pointer group p-3 rounded-xl transition-colors
               ${consentError ? 'bg-red-50 ring-1 ring-red-300' : 'hover:bg-slate-50'}`}

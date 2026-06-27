@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { ProtocolPatient, Joint } from '@/types/protocol'
 import { JOINT_LABELS, PRESET_DIAGNOSES } from '@/types/protocol'
-import { User, Activity, Stethoscope, CalendarDays, StickyNote, Sparkles } from 'lucide-react'
+import { User, Activity, Stethoscope, CalendarDays, StickyNote, Sparkles, MessageCircle } from 'lucide-react'
 
 interface Props {
   initial?: Partial<ProtocolPatient>
@@ -32,6 +32,7 @@ export default function PatientForm({ initial, onSubmit, loading }: Props) {
     joint:        (initial?.joint       ?? '') as Joint | '',
     sport:        initial?.sport        ?? '',
     eventDate:    initial?.eventDate    ?? '',
+    concerns:     initial?.concerns     ?? '',
     notes:        initial?.notes        ?? '',
   })
 
@@ -54,12 +55,34 @@ export default function PatientForm({ initial, onSubmit, loading }: Props) {
       joint:     (form.joint as Joint) || undefined,
       sport:     form.sport     || undefined,
       eventDate: form.eventDate || undefined,
+      concerns:  form.concerns  || undefined,
       notes:     form.notes     || undefined,
     })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+
+      {/* 患者の悩み・現在の症状 */}
+      <div className="bg-teal-50/60 border border-teal-200/70 rounded-2xl p-4">
+        <label className="block text-xs font-semibold text-teal-800 font-display mb-1.5">
+          <span className="flex items-center gap-1.5">
+            <MessageCircle className="w-3.5 h-3.5 text-teal-600" />
+            患者の悩み・現在の症状
+            <span className="text-teal-600/70 font-normal">（AI生成時に優先反映）</span>
+          </span>
+        </label>
+        <textarea
+          value={form.concerns}
+          onChange={e => setForm(f => ({ ...f, concerns: e.target.value }))}
+          rows={3}
+          placeholder="例: 階段の下りが痛い、長時間立っていると膝が腫れる、走り出しが怖い、夜間痛がある"
+          className={`${INPUT_CLS} resize-none bg-white/80`}
+        />
+        <p className="text-[10px] text-teal-700/60 mt-1 font-body">
+          患者が日常で感じている不安・制限・痛みの状況を自由に記入してください。AIがその悩みに対応したプロトコルを生成します。
+        </p>
+      </div>
 
       {/* 疾患プリセット */}
       <div>

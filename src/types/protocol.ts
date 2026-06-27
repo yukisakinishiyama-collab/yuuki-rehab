@@ -66,6 +66,7 @@ export interface ProtocolPatient {
   joint?: Joint
   sport?: string
   eventDate?: string // ISO date
+  concerns?: string  // 患者の悩み・現在の症状（自由記述）
   notes?: string
   createdAt: string
   updatedAt: string

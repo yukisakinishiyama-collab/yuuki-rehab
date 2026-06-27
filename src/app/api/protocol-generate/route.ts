@@ -145,6 +145,7 @@ interface RequestBody {
     joint?: string
     sport?: string
     eventDate?: string
+    concerns?: string
     notes?: string
   }
   consentGiven: boolean
@@ -182,6 +183,10 @@ export async function POST(req: NextRequest) {
             .join('\n')
         : ''
 
+    const concernsSection = patient.concerns
+      ? `\n\n## ⚠️ 患者の悩み・現在の症状（最優先で対応してください）\n${patient.concerns}`
+      : ''
+
     const userMessage = `以下の患者情報に基づいてリハビリプロトコルを生成してください:
 
 診断名: ${patient.diagnosis ?? '未記入'}
@@ -189,9 +194,10 @@ export async function POST(req: NextRequest) {
 年齢: ${patient.age != null ? `${patient.age}歳` : '未記入'}
 スポーツ: ${patient.sport ?? 'なし'}
 受傷/手術日: ${patient.eventDate ?? '未記入'}${daysSince != null ? `（${daysSince}日経過）` : ''}
-補足: ${patient.notes ?? 'なし'}${librarySection}
+補足: ${patient.notes ?? 'なし'}${concernsSection}${librarySection}
 
 4〜5フェーズのリハビリプロトコルを生成してください。
+- 「患者の悩み・現在の症状」が記入されている場合は、その悩みに直接対応する目標・エクササイズ・指導ポイントを各フェーズに含めてください
 - 各フェーズには機能的移行基準（criteria-based progression）を含めてください
 - 各フェーズの references フィールドに文献を1〜3件引用してください
 - 「院内文献ライブラリ」に該当する論文がある場合は、システムプロンプトのリストより優先して引用してください
