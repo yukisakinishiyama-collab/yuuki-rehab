@@ -36,21 +36,112 @@ import IntakeForm from './IntakeForm'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 
+// ── 月次カルテ印刷 ────────────────────────────────────────────
+function printMonthlyChart(patient: Patient, memos: QuickMemo[], yearMonth: string) {
+  const [year, month] = yearMonth.split('-')
+  const title = `リハビリ経過メモ — ${patient.name} — ${year}年${month}月`
+  const printDate = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+  const sorted = [...memos].sort((a, b) => a.memoDate.localeCompare(b.memoDate))
+
+  const rows = sorted.map(m => {
+    const d = new Date(m.memoDate)
+    const label = d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
+    const escaped = m.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
+    return `<tr>
+      <td class="date">${label}</td>
+      <td class="content">${escaped}</td>
+    </tr>`
+  }).join('')
+
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    font-size: 11pt; color: #1a1a2e; padding: 20mm 18mm; }
+  header { border-bottom: 2px solid #0d9488; padding-bottom: 10px; margin-bottom: 16px; }
+  h1 { font-size: 15pt; font-weight: bold; color: #0d9488; }
+  .meta { display: flex; gap: 24px; margin-top: 8px; font-size: 9.5pt; color: #555; }
+  .meta span { display: flex; gap: 4px; }
+  .meta strong { color: #1a1a2e; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #f0fdfa; color: #0d9488; font-size: 9pt; font-weight: bold;
+    text-align: left; padding: 6px 10px; border: 1px solid #ccece9; }
+  td { vertical-align: top; padding: 8px 10px; border: 1px solid #e5e7eb; font-size: 10.5pt; }
+  td.date { white-space: nowrap; width: 110px; color: #374151; font-weight: 600;
+    background: #f9fafb; }
+  td.content { line-height: 1.7; color: #1f2937; }
+  tr:nth-child(even) td.content { background: #fafafa; }
+  footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb;
+    font-size: 8.5pt; color: #9ca3af; display: flex; justify-content: space-between; }
+  @media print {
+    body { padding: 15mm 14mm; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗒️ リハビリ経過メモカルテ</h1>
+  <div class="meta">
+    <span><strong>患者名：</strong>${patient.name}</span>
+    <span><strong>対象月：</strong>${year}年${parseInt(month)}月</span>
+    ${patient.diagnosisLabel ? `<span><strong>診断：</strong>${patient.diagnosisLabel}</span>` : ''}
+    <span><strong>件数：</strong>${memos.length}件</span>
+  </div>
+</header>
+<table>
+  <thead><tr><th style="width:110px">日付</th><th>メモ・経過記録</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<footer>
+  <span>印刷日：${printDate}</span>
+  <span>ゆうき整骨院 — リハビリ管理システム</span>
+</footer>
+<script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`
+
+  const w = window.open('', '_blank', 'width=900,height=700')
+  if (w) { w.document.write(html); w.document.close() }
+}
+
 // ── 簡易メモタブ ────────────────────────────────────────────
-function QuickMemoTab({ patientId, memos, onUpdate }: {
-  patientId: string
+function QuickMemoTab({ patient, memos, onUpdate }: {
+  patient: Patient
   memos: QuickMemo[]
   onUpdate: () => void
 }) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [content, setContent] = useState('')
   const [saved, setSaved] = useState(false)
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+
+  // 月別グループ（新しい月順）
+  const byMonth: Record<string, QuickMemo[]> = {}
+  for (const m of memos) {
+    const ym = m.memoDate.slice(0, 7)
+    if (!byMonth[ym]) byMonth[ym] = []
+    byMonth[ym].push(m)
+  }
+  const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a))
+
+  function toggleMonth(ym: string) {
+    setCollapsedMonths(prev => {
+      const next = new Set(prev)
+      next.has(ym) ? next.delete(ym) : next.add(ym)
+      return next
+    })
+  }
 
   function handleSave() {
     if (!content.trim()) return
     saveQuickMemo({
       id: nanoid(),
-      patientId,
+      patientId: patient.id,
       memoDate: date,
       content: content.trim(),
       createdAt: new Date().toISOString(),
@@ -64,6 +155,11 @@ function QuickMemoTab({ patientId, memos, onUpdate }: {
   function handleDelete(id: string) {
     deleteQuickMemo(id)
     onUpdate()
+  }
+
+  function formatMonthLabel(ym: string) {
+    const [y, m] = ym.split('-')
+    return `${y}年${parseInt(m)}月`
   }
 
   return (
@@ -88,9 +184,7 @@ function QuickMemoTab({ patientId, memos, onUpdate }: {
           placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
           rows={4}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
-          onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave()
-          }}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400">Ctrl+Enter で保存</span>
@@ -108,32 +202,74 @@ function QuickMemoTab({ patientId, memos, onUpdate }: {
         </div>
       </div>
 
-      {/* メモ一覧 */}
+      {/* 月別メモ一覧 */}
       {memos.length === 0 ? (
         <p className="text-center text-sm text-gray-400 py-8">まだメモがありません</p>
       ) : (
-        <div className="space-y-2">
-          <p className="text-xs text-gray-400 px-1">{memos.length}件のメモ</p>
-          {memos.map(memo => (
-            <div key={memo.id} className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex gap-3 group">
-              <div className="flex-shrink-0 text-center">
-                <p className="text-[10px] text-gray-400">{memo.memoDate.slice(0, 7)}</p>
-                <p className="text-lg font-bold text-teal-700 leading-none">{memo.memoDate.slice(8, 10)}</p>
-                <p className="text-[10px] text-gray-400">日</p>
+        <div className="space-y-3">
+          <p className="text-xs text-gray-400 px-1">全 {memos.length}件 · {months.length}ヶ月分</p>
+
+          {months.map(ym => {
+            const monthMemos = byMonth[ym].sort((a, b) => b.memoDate.localeCompare(a.memoDate))
+            const collapsed = collapsedMonths.has(ym)
+
+            return (
+              <div key={ym} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                {/* 月ヘッダー */}
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => toggleMonth(ym)}
+                    className="flex items-center gap-2 flex-1 text-left"
+                  >
+                    <span className="text-sm font-bold text-teal-700">{formatMonthLabel(ym)}</span>
+                    <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                      {monthMemos.length}件
+                    </span>
+                    <span className="text-gray-400 text-xs ml-1">{collapsed ? '▶' : '▼'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => printMonthlyChart(patient, monthMemos, ym)}
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-teal-600
+                      border border-gray-200 hover:border-teal-300 rounded-lg px-2.5 py-1
+                      transition-colors bg-white"
+                    title="この月のメモをカルテとして印刷"
+                  >
+                    🖨️ カルテ印刷
+                  </button>
+                </div>
+
+                {/* メモ一覧（折りたたみ） */}
+                {!collapsed && (
+                  <div className="divide-y divide-gray-50">
+                    {monthMemos.map(memo => {
+                      const d = new Date(memo.memoDate)
+                      const dayLabel = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
+                      return (
+                        <div key={memo.id} className="flex gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors">
+                          <div className="flex-shrink-0 text-center w-14">
+                            <p className="text-xs font-semibold text-teal-700">{dayLabel}</p>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(memo.id)}
+                            className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
+                            title="削除"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(memo.id)}
-                className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
-                title="削除"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -993,7 +1129,7 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── 簡易メモ タブ ── */}
         {activeTab === 'memo' && (
           <QuickMemoTab
-            patientId={patient.id}
+            patient={patient}
             memos={quickMemos}
             onUpdate={reload}
           />
