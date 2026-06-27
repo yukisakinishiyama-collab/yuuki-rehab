@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Protocol, ProtocolPatient } from '@/types/protocol'
 import {
-  getProtocolById, getPatientById, updatePhase, advancePhase, deleteProtocol
+  getProtocolById, getPatientById, updatePhase, advancePhase, deleteProtocol, updateProtocol
 } from '@/lib/protocol-store'
 import { getPatients as getPtPatients, saveRehabPlan } from '@/lib/patient-store'
 import type { Patient as PtPatient } from '@/types/patient'
@@ -15,7 +15,7 @@ import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
-  BookOpen,
+  BookOpen, Edit2, Plus,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
@@ -30,6 +30,8 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [tab, setTab] = useState<Tab>('protocol')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showReflectModal, setShowReflectModal] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
   const [ptPatients, setPtPatients] = useState<PtPatient[]>([])
   const [selectedPtId, setSelectedPtId] = useState('')
   const [reflectDone, setReflectDone] = useState(false)
@@ -46,6 +48,44 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     if (!protocol) return
     updatePhase(protocol.id, phaseId, updates)
     setProtocol(getProtocolById(protocol.id))
+  }
+
+  function handlePhaseDelete(phaseId: string) {
+    if (!protocol) return
+    if (protocol.phases.length <= 1) return
+    const phases = protocol.phases.filter(ph => ph.id !== phaseId)
+      .map((ph, i) => ({ ...ph, order: i + 1 }))
+    const deletedIdx = protocol.phases.findIndex(ph => ph.id === phaseId)
+    const newCurrentIdx = Math.min(protocol.currentPhaseIndex, phases.length - 1)
+    const adjustment = deletedIdx <= protocol.currentPhaseIndex && protocol.currentPhaseIndex > 0 ? -1 : 0
+    updateProtocol(protocol.id, { phases, currentPhaseIndex: Math.max(0, newCurrentIdx + adjustment) })
+    setProtocol(getProtocolById(protocol.id))
+  }
+
+  function handleAddPhase() {
+    if (!protocol) return
+    const newPhase: Phase = {
+      id: nanoid(),
+      order: protocol.phases.length + 1,
+      title: `フェーズ ${protocol.phases.length + 1}`,
+      durationWeeks: '',
+      goals: [],
+      exercises: [],
+      advanceCriteria: [],
+      precautions: [],
+      redFlags: [],
+      outcomes: [],
+      evidence: 'expert_opinion',
+    }
+    updateProtocol(protocol.id, { phases: [...protocol.phases, newPhase] })
+    setProtocol(getProtocolById(protocol.id))
+  }
+
+  function handleTitleSave() {
+    if (!protocol || !titleDraft.trim()) return
+    updateProtocol(protocol.id, { title: titleDraft.trim() })
+    setProtocol(getProtocolById(protocol.id))
+    setEditingTitle(false)
   }
 
   function handleAdvancePhase() {
@@ -124,9 +164,39 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             <ChevronRight className="w-3 h-3" />
             <span className="truncate max-w-[200px]">{protocol.title}</span>
           </div>
-          <h1 className="text-xl font-bold text-[--color-text-primary] font-display leading-tight mb-1.5">
-            {protocol.title}
-          </h1>
+          {editingTitle ? (
+            <div className="flex items-center gap-2 mb-1.5">
+              <input
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleTitleSave(); if (e.key === 'Escape') setEditingTitle(false) }}
+                autoFocus
+                className="text-xl font-bold font-display border-b-2 border-[--color-primary] bg-transparent
+                  focus:outline-none text-[--color-text-primary] flex-1 min-w-0"
+              />
+              <button onClick={handleTitleSave}
+                className="text-xs font-semibold text-white bg-[--color-primary] px-3 py-1 rounded-lg hover:bg-[--color-primary-hover] transition-colors">
+                保存
+              </button>
+              <button onClick={() => setEditingTitle(false)}
+                className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">
+                取消
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mb-1.5 group">
+              <h1 className="text-xl font-bold text-[--color-text-primary] font-display leading-tight">
+                {protocol.title}
+              </h1>
+              <button
+                onClick={() => { setTitleDraft(protocol.title); setEditingTitle(true) }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                title="タイトルを編集"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1.5 text-sm text-[--color-text-secondary] font-body">
               <User className="w-3.5 h-3.5" />
@@ -282,9 +352,19 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 isActive={i === protocol.currentPhaseIndex}
                 isCompleted={i < protocol.currentPhaseIndex}
                 onUpdate={(updates) => handlePhaseUpdate(phase.id, updates)}
+                onDelete={protocol.phases.length > 1 ? () => handlePhaseDelete(phase.id) : undefined}
               />
             </div>
           ))}
+          <button
+            onClick={handleAddPhase}
+            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed
+              border-slate-200 rounded-xl text-sm font-medium text-slate-400
+              hover:border-[--color-primary]/50 hover:text-[--color-primary] hover:bg-teal-50/30
+              transition-all duration-200 font-body no-print"
+          >
+            <Plus className="w-4 h-4" />フェーズを追加
+          </button>
         </div>
       )}
 

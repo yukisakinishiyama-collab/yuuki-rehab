@@ -17,10 +17,11 @@ interface Props {
   isActive: boolean
   isCompleted: boolean
   onUpdate?: (updates: Partial<Phase>) => void
+  onDelete?: () => void
   readOnly?: boolean
 }
 
-export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, readOnly }: Props) {
+export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDelete, readOnly }: Props) {
   const [expanded, setExpanded] = useState(isActive)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(phase)
@@ -106,6 +107,15 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, read
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          {!readOnly && onDelete && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete() }}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+              aria-label="フェーズを削除"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           {!readOnly && (
             <button
               onClick={e => { e.stopPropagation(); setEditing(v => !v); setExpanded(true) }}
@@ -125,100 +135,177 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, read
       {expanded && (
         <div className="px-4 pb-4 border-t border-slate-100">
           {editing ? (
-            <div className="space-y-3 pt-3">
+            <div className="space-y-4 pt-3">
+              {/* ── ラベルヘルパ ── */}
+              {/* フェーズ名 */}
               <div>
-                <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide mb-1 block">
-                  フェーズ名
-                </label>
+                <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide mb-1 block">フェーズ名</label>
                 <input
                   value={draft.title}
                   onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-body
-                    focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
                 />
               </div>
 
+              {/* 期間 */}
               <div>
-                <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide mb-1 block">
-                  目標
-                </label>
+                <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide mb-1 block">期間の目安</label>
+                <input
+                  value={draft.durationWeeks ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, durationWeeks: e.target.value }))}
+                  placeholder="例: 2〜4週間"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                />
+              </div>
+
+              {/* 目標 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide">目標</label>
+                  <button onClick={() => setDraft(d => ({ ...d, goals: [...d.goals, ''] }))}
+                    className="text-xs text-[--color-primary] hover:underline flex items-center gap-1 font-medium font-body">
+                    <Plus className="w-3 h-3" />追加
+                  </button>
+                </div>
                 {draft.goals.map((g, i) => (
-                  <input
-                    key={i}
-                    value={g}
-                    onChange={e => {
-                      const goals = [...draft.goals]
-                      goals[i] = e.target.value
-                      setDraft(d => ({ ...d, goals }))
-                    }}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm mb-1 font-body
-                      focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
-                  />
+                  <div key={i} className="flex gap-1.5 mb-1">
+                    <input
+                      value={g}
+                      onChange={e => { const a = [...draft.goals]; a[i] = e.target.value; setDraft(d => ({ ...d, goals: a })) }}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                    />
+                    <button onClick={() => setDraft(d => ({ ...d, goals: d.goals.filter((_, j) => j !== i) }))}
+                      className="text-slate-300 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
                 ))}
               </div>
 
+              {/* エクササイズ */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide">
-                    エクササイズ
-                  </label>
+                  <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide">エクササイズ</label>
                   <button onClick={addExercise}
                     className="text-xs text-[--color-primary] hover:underline flex items-center gap-1 font-medium font-body">
                     <Plus className="w-3 h-3" />追加
                   </button>
                 </div>
                 {draft.exercises.map((ex, i) => (
-                  <div key={i} className="flex gap-2 mb-1.5">
+                  <div key={i} className="flex gap-1.5 mb-1.5">
                     <input
                       value={ex.name}
-                      onChange={e => {
-                        const exercises = [...draft.exercises]
-                        exercises[i] = { ...exercises[i], name: e.target.value }
-                        setDraft(d => ({ ...d, exercises }))
-                      }}
+                      onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], name: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
                       placeholder="種目名"
-                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1 text-sm font-body
-                        focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
                     />
                     <input
                       value={ex.dose ?? ''}
-                      onChange={e => {
-                        const exercises = [...draft.exercises]
-                        exercises[i] = { ...exercises[i], dose: e.target.value }
-                        setDraft(d => ({ ...d, exercises }))
-                      }}
+                      onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], dose: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
                       placeholder="量・頻度"
-                      className="w-28 border border-slate-200 rounded-lg px-2 py-1 text-sm font-body
-                        focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                      className="w-28 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
                     />
-                    <button onClick={() => removeExercise(i)}
-                      className="text-red-400 hover:text-red-600 transition-colors p-1">
-                      <Trash2 className="w-4 h-4" />
+                    <button onClick={() => removeExercise(i)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
               </div>
 
+              {/* 移行基準 */}
               <div>
-                <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide mb-1 block">
-                  注意事項
-                </label>
-                {draft.precautions.map((p, i) => (
-                  <input
-                    key={i}
-                    value={p}
-                    onChange={e => {
-                      const precautions = [...draft.precautions]
-                      precautions[i] = e.target.value
-                      setDraft(d => ({ ...d, precautions }))
-                    }}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm mb-1 font-body
-                      focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
-                  />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide">移行基準</label>
+                  <button onClick={() => setDraft(d => ({ ...d, advanceCriteria: [...d.advanceCriteria, { label: '', target: '', met: false }] }))}
+                    className="text-xs text-[--color-primary] hover:underline flex items-center gap-1 font-medium font-body">
+                    <Plus className="w-3 h-3" />追加
+                  </button>
+                </div>
+                {draft.advanceCriteria.map((c, i) => (
+                  <div key={i} className="flex gap-1.5 mb-1">
+                    <input
+                      value={c.label}
+                      onChange={e => { const a = [...draft.advanceCriteria]; a[i] = { ...a[i], label: e.target.value }; setDraft(d => ({ ...d, advanceCriteria: a })) }}
+                      placeholder="基準名"
+                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                    />
+                    <input
+                      value={c.target ?? ''}
+                      onChange={e => { const a = [...draft.advanceCriteria]; a[i] = { ...a[i], target: e.target.value }; setDraft(d => ({ ...d, advanceCriteria: a })) }}
+                      placeholder="目標値・目安"
+                      className="w-36 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                    />
+                    <button onClick={() => setDraft(d => ({ ...d, advanceCriteria: d.advanceCriteria.filter((_, j) => j !== i) }))}
+                      className="text-slate-300 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
                 ))}
               </div>
 
-              <div className="flex gap-2 pt-1">
+              {/* 注意事項 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-amber-700 font-display uppercase tracking-wide">注意事項・禁忌</label>
+                  <button onClick={() => setDraft(d => ({ ...d, precautions: [...d.precautions, ''] }))}
+                    className="text-xs text-[--color-primary] hover:underline flex items-center gap-1 font-medium font-body">
+                    <Plus className="w-3 h-3" />追加
+                  </button>
+                </div>
+                {draft.precautions.map((p, i) => (
+                  <div key={i} className="flex gap-1.5 mb-1">
+                    <input
+                      value={p}
+                      onChange={e => { const a = [...draft.precautions]; a[i] = e.target.value; setDraft(d => ({ ...d, precautions: a })) }}
+                      className="flex-1 border border-amber-200 rounded-lg px-3 py-1.5 text-sm font-body focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    />
+                    <button onClick={() => setDraft(d => ({ ...d, precautions: d.precautions.filter((_, j) => j !== i) }))}
+                      className="text-slate-300 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+
+              {/* 中止基準 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-red-700 font-display uppercase tracking-wide">中止基準 / Red Flags</label>
+                  <button onClick={() => setDraft(d => ({ ...d, redFlags: [...d.redFlags, ''] }))}
+                    className="text-xs text-[--color-primary] hover:underline flex items-center gap-1 font-medium font-body">
+                    <Plus className="w-3 h-3" />追加
+                  </button>
+                </div>
+                {draft.redFlags.map((r, i) => (
+                  <div key={i} className="flex gap-1.5 mb-1">
+                    <input
+                      value={r}
+                      onChange={e => { const a = [...draft.redFlags]; a[i] = e.target.value; setDraft(d => ({ ...d, redFlags: a })) }}
+                      className="flex-1 border border-red-200 rounded-lg px-3 py-1.5 text-sm font-body focus:ring-2 focus:ring-red-400 focus:border-transparent"
+                    />
+                    <button onClick={() => setDraft(d => ({ ...d, redFlags: d.redFlags.filter((_, j) => j !== i) }))}
+                      className="text-slate-300 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+
+              {/* 評価指標 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[--color-text-secondary] font-display uppercase tracking-wide">評価指標</label>
+                  <button onClick={() => setDraft(d => ({ ...d, outcomes: [...d.outcomes, ''] }))}
+                    className="text-xs text-[--color-primary] hover:underline flex items-center gap-1 font-medium font-body">
+                    <Plus className="w-3 h-3" />追加
+                  </button>
+                </div>
+                {draft.outcomes.map((o, i) => (
+                  <div key={i} className="flex gap-1.5 mb-1">
+                    <input
+                      value={o}
+                      onChange={e => { const a = [...draft.outcomes]; a[i] = e.target.value; setDraft(d => ({ ...d, outcomes: a })) }}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                    />
+                    <button onClick={() => setDraft(d => ({ ...d, outcomes: d.outcomes.filter((_, j) => j !== i) }))}
+                      className="text-slate-300 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 pt-1 border-t border-slate-100">
                 <button
                   onClick={saveEdit}
                   className="bg-[--color-primary] text-white text-sm px-4 py-1.5 rounded-lg
