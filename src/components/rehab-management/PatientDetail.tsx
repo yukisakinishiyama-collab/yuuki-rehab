@@ -4,6 +4,7 @@
 // ──────────────────────────────────────────────
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
@@ -882,6 +883,12 @@ export default function PatientDetail({ patient }: Props) {
                 >
                   📄 紹介状・報告書
                 </button>
+                <Link
+                  href={`/patients/${patient.id}/return-criteria`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors shadow-sm"
+                >
+                  🏆 復帰基準テスト
+                </Link>
               </div>
             </div>
             {improvementScore && (
