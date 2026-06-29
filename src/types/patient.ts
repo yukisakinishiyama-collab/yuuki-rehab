@@ -194,6 +194,8 @@ export interface SpecialTestRecord {
   limitation: boolean
   memo: string
   patientFriendlyExplanation: string
+  faberDistanceRight?: number
+  faberDistanceLeft?: number
   createdAt: string
 }
 

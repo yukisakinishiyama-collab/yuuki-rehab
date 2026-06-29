@@ -101,6 +101,8 @@ interface FormState {
   limitation: boolean
   memo: string
   patientFriendlyExplanation: string
+  faberDistanceRight: string
+  faberDistanceLeft: string
 }
 
 const defaultForm: FormState = {
@@ -116,6 +118,8 @@ const defaultForm: FormState = {
   limitation: false,
   memo: '',
   patientFriendlyExplanation: '',
+  faberDistanceRight: '',
+  faberDistanceLeft: '',
 }
 
 interface Props {
@@ -128,6 +132,7 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
   const [saved, setSaved] = useState(false)
 
   const templates = SPECIAL_TEST_TEMPLATES[form.bodyRegion] ?? []
+  const isFaber = form.testName === 'FABER test (Patrick)'
 
   function handleSave() {
     if (!form.testName) return alert('テスト名を入力してください')
@@ -146,13 +151,17 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
       limitation: form.limitation,
       memo: form.memo,
       patientFriendlyExplanation: form.patientFriendlyExplanation,
+      ...(isFaber && {
+        faberDistanceRight: form.faberDistanceRight !== '' ? Number(form.faberDistanceRight) : undefined,
+        faberDistanceLeft: form.faberDistanceLeft !== '' ? Number(form.faberDistanceLeft) : undefined,
+      }),
       createdAt: new Date().toISOString(),
     }
     saveSpecialTest(record)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
     onSaved?.()
-    setForm(f => ({ ...f, testName: '', rightResult: 'negative', leftResult: 'negative', result: 'negative', painLocation: '', memo: '', patientFriendlyExplanation: '' }))
+    setForm(f => ({ ...f, testName: '', rightResult: 'negative', leftResult: 'negative', result: 'negative', painLocation: '', memo: '', patientFriendlyExplanation: '', faberDistanceRight: '', faberDistanceLeft: '' }))
   }
 
   return (
@@ -230,6 +239,35 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
             </div>
           ))}
         </div>
+
+        {isFaber && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <FormLabel>床から脛骨粗面（右）</FormLabel>
+              <div className="relative">
+                <Input
+                  type="number"
+                  value={form.faberDistanceRight}
+                  onChange={v => setForm(f => ({ ...f, faberDistanceRight: v }))}
+                  placeholder="例：15"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">cm</span>
+              </div>
+            </div>
+            <div>
+              <FormLabel>床から脛骨粗面（左）</FormLabel>
+              <div className="relative">
+                <Input
+                  type="number"
+                  value={form.faberDistanceLeft}
+                  onChange={v => setForm(f => ({ ...f, faberDistanceLeft: v }))}
+                  placeholder="例：18"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">cm</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <FormLabel>痛みの部位</FormLabel>

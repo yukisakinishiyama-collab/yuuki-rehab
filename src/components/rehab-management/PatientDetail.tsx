@@ -340,6 +340,11 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                                   </span>
                                 ))}
                               </div>
+                              {(t.faberDistanceRight != null || t.faberDistanceLeft != null) && (
+                                <p className="text-[10px] text-blue-600 mt-1">
+                                  床→脛骨粗面: 右 {t.faberDistanceRight ?? '-'}cm / 左 {t.faberDistanceLeft ?? '-'}cm
+                                </p>
+                              )}
                               {(t.apprehension || t.clickSound || t.limitation) && (
                                 <p className="text-[10px] text-orange-600 mt-1">
                                   {[t.apprehension && '不安感', t.clickSound && 'クリック音', t.limitation && '可動域制限'].filter(Boolean).join(' · ')}
@@ -1474,6 +1479,11 @@ export default function PatientDetail({ patient }: Props) {
                             })}
                           </div>
                         </div>
+                        {(t.faberDistanceRight != null || t.faberDistanceLeft != null) && (
+                          <p className="text-xs text-blue-600 mt-1.5">
+                            床→脛骨粗面: 右 {t.faberDistanceRight ?? '-'}cm / 左 {t.faberDistanceLeft ?? '-'}cm
+                          </p>
+                        )}
                         {(t.apprehension || t.clickSound || t.limitation) && (
                           <div className="flex gap-1.5 mt-1.5">
                             {t.apprehension && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">不安感あり</span>}
