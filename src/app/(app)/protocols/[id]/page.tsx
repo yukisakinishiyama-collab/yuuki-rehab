@@ -3,9 +3,10 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Protocol, ProtocolPatient } from '@/types/protocol'
+import type { Protocol, ProtocolPatient, ProtocolAttachment } from '@/types/protocol'
 import {
-  getProtocolById, getPatientById, updatePhase, advancePhase, deleteProtocol, updateProtocol
+  getProtocolById, getPatientById, updatePhase, advancePhase, deleteProtocol, updateProtocol,
+  addAttachment, removeAttachment, updateAttachmentNote,
 } from '@/lib/protocol-store'
 import { getPatients as getPtPatients, saveRehabPlan } from '@/lib/patient-store'
 import type { Patient as PtPatient } from '@/types/patient'
@@ -15,12 +16,12 @@ import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
-  BookOpen, Edit2, Plus,
+  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
 
-type Tab = 'protocol' | 'discussion'
+type Tab = 'protocol' | 'discussion' | 'attachments'
 
 export default function ProtocolDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -325,10 +326,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         {([
           { key: 'protocol', label: 'プロトコル', icon: FileText },
           { key: 'discussion', label: '専門家ディスカッション', icon: MessageSquare },
-        ] as const).map(({ key, label, icon: Icon }) => (
+          {
+            key: 'attachments',
+            label: '添付資料',
+            icon: Paperclip,
+            badge: (protocol.attachments?.length ?? 0) || undefined,
+          },
+        ] as const).map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => setTab(key as Tab)}
             className={`flex items-center gap-1.5 px-4 py-3 text-sm font-semibold
               border-b-2 transition-all duration-200 font-display ${
               tab === key
@@ -338,6 +345,11 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
+            {badge != null && (
+              <span className="ml-1 text-[10px] bg-teal-100 text-teal-700 font-bold px-1.5 py-0.5 rounded-full">
+                {badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -373,6 +385,13 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           discussion={protocol.discussion}
           consensusNotes={protocol.consensusNotes}
           generatedBy={protocol.generatedBy}
+        />
+      )}
+
+      {tab === 'attachments' && (
+        <AttachmentsTab
+          protocol={protocol}
+          onUpdate={() => setProtocol(getProtocolById(protocol.id))}
         />
       )}
 
@@ -499,6 +518,202 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         本プロトコルは臨床意思決定支援を目的とし、医療行為・確定診断を代替しません。最終判断は有資格の医療者が行ってください。
         生成日時: {new Date(protocol.createdAt).toLocaleString('ja-JP')}
       </div>
+    </div>
+  )
+}
+
+// ─── 添付資料タブ ─────────────────────────────────────────────────
+
+const MAX_FILE_BYTES = 8 * 1024 * 1024 // 8MB
+
+function AttachmentsTab({
+  protocol,
+  onUpdate,
+}: {
+  protocol: Protocol
+  onUpdate: () => void
+}) {
+  const [dragging, setDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
+  const attachments = protocol.attachments ?? []
+
+  function readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_BYTES) {
+        alert(`${file.name} は8MBを超えるため添付できません。`)
+        continue
+      }
+      const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+      if (!allowed.includes(file.type)) {
+        alert(`${file.name} はPDF・JPEG・PNG・WebPのみ対応しています。`)
+        continue
+      }
+      const data = await readFileAsBase64(file)
+      addAttachment(protocol.id, {
+        fileName: file.name,
+        fileType: file.type,
+        data,
+        fileSize: file.size,
+        note: '',
+      })
+      onUpdate()
+    }
+    setUploading(false)
+  }
+
+  function viewAttachment(att: ProtocolAttachment) {
+    const bytes = atob(att.data)
+    const ab = new ArrayBuffer(bytes.length)
+    const ia = new Uint8Array(ab)
+    for (let i = 0; i < bytes.length; i++) ia[i] = bytes.charCodeAt(i)
+    const blob = new Blob([ab], { type: att.fileType })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  }
+
+  function handleDelete(id: string) {
+    if (!confirm('この添付ファイルを削除しますか？')) return
+    removeAttachment(protocol.id, id)
+    onUpdate()
+  }
+
+  function saveNote(id: string) {
+    updateAttachmentNote(protocol.id, id, noteDraft)
+    setEditingNoteId(null)
+    onUpdate()
+  }
+
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return `${bytes}B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+  }
+
+  const fileIcon = (type: string) =>
+    type === 'application/pdf' ? '📄' : '🖼️'
+
+  return (
+    <div className="space-y-4">
+
+      {/* ドロップゾーン */}
+      <label
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
+        className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed
+          rounded-2xl cursor-pointer transition-all duration-200 ${
+          dragging
+            ? 'border-teal-500 bg-teal-50 scale-[1.01]'
+            : 'border-slate-200 bg-slate-50 hover:border-teal-400 hover:bg-teal-50/40'
+        }`}
+      >
+        <input
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          multiple
+          className="sr-only"
+          onChange={e => handleFiles(e.target.files)}
+        />
+        {uploading ? (
+          <div className="w-6 h-6 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Upload className={`w-8 h-8 ${dragging ? 'text-teal-600' : 'text-slate-300'}`} />
+        )}
+        <div className="text-center">
+          <p className={`text-sm font-semibold ${dragging ? 'text-teal-700' : 'text-slate-500'}`}>
+            {uploading ? 'アップロード中...' : 'PDFまたは画像をドラッグ＆ドロップ'}
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">または クリックしてファイルを選択（PDF・JPEG・PNG、最大8MB）</p>
+        </div>
+      </label>
+
+      {/* 添付一覧 */}
+      {attachments.length === 0 ? (
+        <div className="text-center py-8 text-slate-400 text-sm">
+          添付ファイルはまだありません。<br />
+          病院からのプロトコルや術後指示書をここに追加できます。
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {attachments.map(att => (
+            <div key={att.id}
+              className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl flex-shrink-0 mt-0.5">{fileIcon(att.fileType)}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{att.fileName}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {formatSize(att.fileSize)} · {new Date(att.addedAt).toLocaleDateString('ja-JP')}
+                  </p>
+
+                  {/* メモ */}
+                  {editingNoteId === att.id ? (
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        value={noteDraft}
+                        onChange={e => setNoteDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveNote(att.id); if (e.key === 'Escape') setEditingNoteId(null) }}
+                        autoFocus
+                        placeholder="例: 〇〇病院 術後プロトコル"
+                        className="flex-1 border border-slate-200 rounded-lg px-2 py-1 text-xs
+                          focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                      />
+                      <button onClick={() => saveNote(att.id)}
+                        className="text-xs font-semibold text-teal-700 hover:text-teal-900">保存</button>
+                      <button onClick={() => setEditingNoteId(null)}
+                        className="text-xs text-slate-400 hover:text-slate-600">取消</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingNoteId(att.id); setNoteDraft(att.note) }}
+                      className="mt-1.5 text-xs text-left w-full"
+                    >
+                      {att.note
+                        ? <span className="text-teal-700 font-medium">{att.note}</span>
+                        : <span className="text-slate-300 italic">メモを追加（病院名・書類種別など）</span>}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => viewAttachment(att)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                    title="開いて確認"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(att.id)}
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                    title="削除"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-400 text-center">
+        ファイルはこのデバイスのローカルストレージに保存されます。
+        個人情報を含む書類の取り扱いには注意してください。
+      </p>
     </div>
   )
 }

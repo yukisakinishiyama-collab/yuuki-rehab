@@ -135,6 +135,14 @@ export const SPECIAL_TEST_DESCRIPTIONS: Record<string, TestDescription> = {
     note: 'FADIRより簡便。多軸インピンジメントの評価にはFADIRと組み合わせる。',
   },
 
+  'Prone External Rotation Test': {
+    target: '股関節外旋可動域・インピンジメント（FAI）・関節唇損傷',
+    position: '腹臥位、膝屈曲90°',
+    method: '膝を90°屈曲した腹臥位で、下腿を内側（股関節外旋方向）へゆっくり倒す。最大外旋角度と症状を左右比較する。骨盤が挙上しないよう固定して計測する。',
+    positive: '①股関節外旋可動域の左右差（10°以上）、②鼠径部・股関節前方の疼痛・詰まり感の再現、③健側と比較した明らかな抵抗感。',
+    note: 'Cam型FAIや関節唇損傷では外旋が制限され疼痛が出やすい。正常値は約40〜45°（個人差あり）。FADIR・FABER testとセットで評価するとFAIの診断精度が向上する。腰椎前弯が増強しないよう腹部にタオルを敷くと安定する。',
+  },
+
   // ────── 足関節 ──────────────────────────────────────────
   'Anterior drawer test（足関節）': {
     target: '前距腓靱帯（ATFL）',

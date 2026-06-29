@@ -11,9 +11,11 @@ import { Card, CardHeader, CardContent, FormLabel, Input, Textarea, ToggleSwitch
 
 const SPECIAL_TEST_TEMPLATES: Record<BodyRegion, string[]> = {
   hip: [
-    'FADIR test', 'FABER test', 'Hip Dial test', 'Log Roll test',
-    'Scour test', 'Stinchfield test', 'Thomas test', 'Ober test',
-    'Trendelenburg test', 'Apprehension test', 'HEER test', 'ER-HEER test',
+    'FADIR test', 'FABER test (Patrick)', 'Prone External Rotation Test',
+    'Hip Dial test', 'Log Roll test', 'Scour test', 'Stinchfield test',
+    'Thomas test', 'Ober test', 'Trendelenburg test',
+    'Apprehension test', 'HEER test', 'ER-HEER test',
+    'Anterior impingement test', 'Hip scour test',
   ],
   knee: [
     'Lachman test', 'Anterior Drawer test', 'Pivot Shift test',

@@ -1,4 +1,4 @@
-import type { ProtocolPatient, Protocol, Phase, Assessment, Milestone } from '@/types/protocol'
+import type { ProtocolPatient, Protocol, Phase, Assessment, Milestone, ProtocolAttachment } from '@/types/protocol'
 import { DEFAULT_MILESTONES } from '@/types/protocol'
 import { getTemplate, findBestTemplate } from '@/data/protocols/templates'
 import { nanoid } from 'nanoid'
@@ -78,6 +78,43 @@ export function updateProtocol(id: string, updates: Partial<Protocol>): void {
 
 export function deleteProtocol(id: string): void {
   set(KEYS.protocols, getProtocols().filter(p => p.id !== id))
+}
+
+// 添付ファイル追加（base64）
+export function addAttachment(
+  protocolId: string,
+  file: Omit<ProtocolAttachment, 'id' | 'addedAt'>,
+): void {
+  const attachment: ProtocolAttachment = {
+    ...file,
+    id: nanoid(),
+    addedAt: new Date().toISOString(),
+  }
+  const protocol = getProtocolById(protocolId)
+  if (!protocol) return
+  updateProtocol(protocolId, {
+    attachments: [...(protocol.attachments ?? []), attachment],
+  })
+}
+
+// 添付ファイル削除
+export function removeAttachment(protocolId: string, attachmentId: string): void {
+  const protocol = getProtocolById(protocolId)
+  if (!protocol) return
+  updateProtocol(protocolId, {
+    attachments: (protocol.attachments ?? []).filter(a => a.id !== attachmentId),
+  })
+}
+
+// 添付ファイルメモ更新
+export function updateAttachmentNote(protocolId: string, attachmentId: string, note: string): void {
+  const protocol = getProtocolById(protocolId)
+  if (!protocol) return
+  updateProtocol(protocolId, {
+    attachments: (protocol.attachments ?? []).map(a =>
+      a.id === attachmentId ? { ...a, note } : a
+    ),
+  })
 }
 
 // フェーズを更新

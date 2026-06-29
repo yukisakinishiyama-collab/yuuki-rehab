@@ -107,6 +107,16 @@ export interface ExpertOpinion {
   cautions: string[]
 }
 
+export interface ProtocolAttachment {
+  id: string
+  fileName: string
+  fileType: string   // 'application/pdf' | 'image/jpeg' etc.
+  data: string       // base64 encoded
+  fileSize: number   // bytes
+  note: string       // 例: '○○病院 術後プロトコル'
+  addedAt: string
+}
+
 export interface Protocol {
   id: string
   patientId: string
@@ -116,6 +126,7 @@ export interface Protocol {
   consensusNotes: string
   generatedBy: 'ai' | 'template'
   currentPhaseIndex: number
+  attachments?: ProtocolAttachment[]
   createdAt: string
   updatedAt: string
 }
