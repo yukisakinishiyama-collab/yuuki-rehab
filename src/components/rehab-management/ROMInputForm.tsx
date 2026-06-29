@@ -88,6 +88,7 @@ const ROM_TEMPLATES: Record<BodyRegion, { movement: string; normal: number; unit
     { movement: '屈曲', normal: 90, unit: 'deg' },
     { movement: '伸展', normal: 0, unit: 'deg' },
   ],
+  functional: [],
 }
 
 interface Props {

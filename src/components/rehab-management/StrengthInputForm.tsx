@@ -63,6 +63,7 @@ const STRENGTH_TEMPLATES: Record<BodyRegion, { movement: string; muscle: string 
   other: [
     { movement: '筋力', muscle: '（部位を指定）' },
   ],
+  functional: [],
 }
 
 const MMT_GRADES: MMTGrade[] = [0, 1, 2, 3, '4-', 4, '4+', '5-', 5]

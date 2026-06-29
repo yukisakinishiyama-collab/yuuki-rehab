@@ -1345,6 +1345,24 @@ export default function PatientDetail({ patient }: Props) {
         {activeTab === 'special' && (
           <div className="space-y-6">
 
+            {/* ── アウトカムスコアへのショートカット ── */}
+            <Card>
+              <CardContent className="py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">📊 部位別アウトカムスコア</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Lysholm / IKDC / ASES / ODI / CAIT / HHS など13種類のスコアを入力・追跡</p>
+                  </div>
+                  <Link
+                    href={`/patients/${patient.id}/outcome-scores`}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 transition-colors whitespace-nowrap flex-shrink-0"
+                  >
+                    スコア入力 →
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* ── 機能評価・競技復帰 セクション ── */}
             <Card>
               <CardHeader>

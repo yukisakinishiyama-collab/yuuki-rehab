@@ -324,15 +324,15 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       {/* タブ */}
       <div className="flex border-b border-slate-200 mb-5 no-print animate-slide-up delay-150">
         {([
-          { key: 'protocol', label: 'プロトコル', icon: FileText },
-          { key: 'discussion', label: '専門家ディスカッション', icon: MessageSquare },
+          { key: 'protocol' as const, label: 'プロトコル', icon: FileText, badge: undefined as number | undefined },
+          { key: 'discussion' as const, label: '専門家ディスカッション', icon: MessageSquare, badge: undefined as number | undefined },
           {
-            key: 'attachments',
+            key: 'attachments' as const,
             label: '添付資料',
             icon: Paperclip,
             badge: (protocol.attachments?.length ?? 0) || undefined,
           },
-        ] as const).map(({ key, label, icon: Icon, badge }) => (
+        ]).map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
             onClick={() => setTab(key as Tab)}
