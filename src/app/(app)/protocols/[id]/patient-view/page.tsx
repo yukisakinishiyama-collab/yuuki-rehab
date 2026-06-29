@@ -32,7 +32,7 @@ export default function PatientViewPage({ params }: { params: Promise<{ id: stri
     <div className="min-h-screen bg-gradient-to-b from-teal-50/60 to-[--color-surface] pb-12">
 
       {/* スティッキーヘッダー ─ サブ画面であることを明示 */}
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200
+      <div className="print:hidden sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200
         px-4 py-3 flex items-center justify-between shadow-sm">
         <Link
           href={`/protocols/${id}`}
