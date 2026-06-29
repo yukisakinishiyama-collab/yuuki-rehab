@@ -37,6 +37,12 @@ const zenKakuGothicNew = Zen_Kaku_Gothic_New({
 export const metadata: Metadata = {
   title: "ゆうき整骨院｜下関のスポーツ障害・術前術後リハビリ専門整骨院",
   description: "山口県下関市のゆうき整骨院。スポーツ障害・術前術後リハビリ・競技復帰に特化した運動療法型整骨院。",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "YUUKI REHAB",
+  },
   icons: {
     icon: "/icon.png.png?v=20260521",
     apple: "/icon.png.png?v=20260521",
@@ -56,6 +62,12 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/icon.png.png?v=20260521" type="image/png" />
         <link rel="apple-touch-icon" href="/icon.png.png?v=20260521" />
+        <meta name="theme-color" content="#0d9488" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="YUUKI REHAB" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
       <body className="min-h-screen bg-[--color-surface] font-body antialiased">
         {children}
