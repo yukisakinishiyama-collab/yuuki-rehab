@@ -8,7 +8,7 @@ export type RehabPhase = 1 | 2 | 3 | 4 | 5 | 6
 export type RiskLevel = 'low' | 'medium' | 'high'
 export type BodyRegion =
   | 'hip' | 'knee' | 'ankle' | 'shoulder' | 'elbow' | 'wrist'
-  | 'cervical' | 'lumbar' | 'thoracic' | 'other'
+  | 'cervical' | 'lumbar' | 'thoracic' | 'other' | 'functional'
 export type Side = 'right' | 'left' | 'bilateral' | 'na'
 export type MMTGrade = 0 | 1 | 2 | 3 | '4-' | 4 | '4+' | '5-' | 5
 export type StrengthUnit = 'kg' | 'N' | 'Nm' | 'bw_ratio' | 'contra_ratio'
@@ -412,6 +412,7 @@ export const BODY_REGION_LABELS: Record<BodyRegion, string> = {
   lumbar: '腰部',
   thoracic: '胸部',
   other: 'その他',
+  functional: '機能評価・復帰テスト',
 }
 
 export const RISK_LABELS: Record<RiskLevel, string> = {

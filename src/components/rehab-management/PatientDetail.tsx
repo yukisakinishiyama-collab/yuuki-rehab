@@ -36,6 +36,8 @@ import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
+import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
+import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
 
 // ── 月次カルテ印刷 ────────────────────────────────────────────
 function printMonthlyChart(
@@ -708,6 +710,7 @@ export default function PatientDetail({ patient }: Props) {
   const [showReferralModal, setShowReferralModal] = useState(false)
   const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
+  const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
 
   useEffect(() => {
     reload()
@@ -725,6 +728,7 @@ export default function PatientDetail({ patient }: Props) {
     setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
+    setReturnAssessments(getReturnAssessments(patient.id))
   }
 
   // 問診票データからプロトコル作成ページへのURLを生成
@@ -1340,6 +1344,90 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── スペシャルテストタブ ── */}
         {activeTab === 'special' && (
           <div className="space-y-6">
+
+            {/* ── 機能評価・競技復帰 セクション ── */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <SectionTitle>🏆 機能評価・競技復帰テスト</SectionTitle>
+                  <Link
+                    href={`/patients/${patient.id}/return-criteria`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                  >
+                    評価ページへ →
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {returnAssessments.length === 0 ? (
+                  <div className="text-center py-6 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <p className="text-sm font-medium text-emerald-700">まだ復帰基準テストが実施されていません</p>
+                    <p className="text-xs text-emerald-500 mt-1 max-w-xs mx-auto">
+                      Lysholm / ACL-RSI / 4-Hop Test Battery / LEFS を実施して定量的な復帰判定を行いましょう
+                    </p>
+                    <Link
+                      href={`/patients/${patient.id}/return-criteria`}
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      🏆 復帰基準テストを実施する
+                    </Link>
+                  </div>
+                ) : (() => {
+                  const latest = returnAssessments[0]
+                  const VERDICT = {
+                    cleared:     { label: '✅ 復帰可能', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', num: 'text-emerald-600' },
+                    conditional: { label: '⚠️ 条件付き',  bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   num: 'text-amber-600'   },
+                    not_ready:   { label: '🔴 未達',      bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-700',     num: 'text-red-600'     },
+                  }[latest.verdict]
+                  return (
+                    <div>
+                      <div className={`rounded-xl border p-4 ${VERDICT.bg} ${VERDICT.border}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className={`text-base font-bold ${VERDICT.text}`}>{VERDICT.label}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {latest.assessmentDate} · {latest.type === 'sport' ? '競技復帰判定' : '日常生活復帰判定'}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className={`text-3xl font-bold ${VERDICT.num}`}>{latest.scores.composite}</div>
+                            <div className="text-xs text-gray-400">/ 100点</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 mt-3">
+                          {([
+                            { label: 'Lysholm', score: latest.scores.symptom,       icon: '🦵', note: '症状' },
+                            { label: 'ACL-RSI', score: latest.scores.psychological, icon: '🧠', note: '心理' },
+                            { label: '4-Hop',   score: latest.scores.functional,    icon: '🏃', note: 'LSI' },
+                            { label: 'LEFS',    score: latest.scores.daily,         icon: '🚶', note: '日常' },
+                          ] as const).map(item => (
+                            <div key={item.label} className="text-center bg-white/70 rounded-lg py-2 px-1">
+                              <div className="text-lg leading-none">{item.icon}</div>
+                              <div className={`text-sm font-bold mt-0.5 ${
+                                item.score >= 80 ? 'text-emerald-600' :
+                                item.score >= 65 ? 'text-amber-600' : 'text-red-600'
+                              }`}>{item.score}</div>
+                              <div className="text-[10px] text-gray-500 leading-tight">{item.label}</div>
+                              <div className="text-[9px] text-gray-400">{item.note}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {latest.notes && (
+                          <p className="text-xs text-gray-600 mt-2 bg-white/60 rounded-lg px-3 py-2">{latest.notes}</p>
+                        )}
+                      </div>
+                      {returnAssessments.length > 1 && (
+                        <p className="text-xs text-gray-400 text-center mt-2">
+                          過去 {returnAssessments.length} 件の評価 — 詳細・履歴は評価ページで確認できます
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* ── 以下 通常スペシャルテスト ── */}
             {specialTests.length > 0 && (
               <Card>
                 <CardHeader><SectionTitle>テスト結果</SectionTitle></CardHeader>
