@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Users,
   BookOpen,
+  CloudUpload,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
 import { logout } from '@/lib/rehab-store'
@@ -79,11 +80,15 @@ function SidebarContent({
   onLogout,
   pathname,
   onOpenQR,
+  onPushSync,
+  syncing,
 }: {
   user: UserType
   onLogout: () => void
   pathname: string
   onOpenQR: () => void
+  onPushSync: () => void
+  syncing: boolean
 }) {
   return (
     <div className="flex flex-col h-full">
@@ -158,6 +163,15 @@ function SidebarContent({
 
         {/* サブアクション */}
         <button
+          onClick={onPushSync}
+          disabled={syncing}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+            text-[12px] text-white/25 hover:text-white/60 transition-colors disabled:opacity-40"
+        >
+          <CloudUpload className="w-3.5 h-3.5 flex-shrink-0" />
+          {syncing ? '同期中...' : 'クラウドに同期'}
+        </button>
+        <button
           onClick={onOpenQR}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
             text-[12px] text-white/25 hover:text-white/60 transition-colors"
@@ -200,6 +214,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.replace('/login')
   }
 
+  async function handlePushSync() {
+    setSyncing(true)
+    const { pushToCloud } = await import('@/lib/sync-service')
+    await pushToCloud()
+    setSyncing(false)
+    alert('クラウドへの同期が完了しました')
+  }
+
   return (
     <AuthGuard>
       {(user) => (
@@ -207,7 +229,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {/* Desktop sidebar */}
           <aside className="hidden md:flex flex-col w-56 bg-[#080e1a] fixed inset-y-0 left-0 z-30
             border-r border-white/[0.05]">
-            <SidebarContent user={user} onLogout={handleLogout} pathname={pathname} onOpenQR={() => setShowQR(true)} />
+            <SidebarContent user={user} onLogout={handleLogout} pathname={pathname} onOpenQR={() => setShowQR(true)} onPushSync={handlePushSync} syncing={syncing} />
             {syncing && (
               <div className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-teal-900/50 text-teal-300 text-[10px] flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
@@ -230,7 +252,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <X className="w-5 h-5" />
                 </button>
-                <SidebarContent user={user} onLogout={handleLogout} pathname={pathname} onOpenQR={() => { setMobileOpen(false); setShowQR(true) }} />
+                <SidebarContent user={user} onLogout={handleLogout} pathname={pathname} onOpenQR={() => { setMobileOpen(false); setShowQR(true) }} onPushSync={handlePushSync} syncing={syncing} />
               </aside>
             </div>
           )}
