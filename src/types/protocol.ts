@@ -82,6 +82,7 @@ export interface Exercise {
   name: string
   dose?: string
   notes?: string
+  videoUrl?: string
 }
 
 export interface Phase {

@@ -9,7 +9,7 @@ import {
 import CriteriaGauge from './CriteriaGauge'
 import {
   ChevronDown, ChevronUp, AlertTriangle, Edit2, Plus, Trash2,
-  Target, Dumbbell, ShieldOff, Flag, BookOpen,
+  Target, Dumbbell, ShieldOff, Flag, BookOpen, PlayCircle,
 } from 'lucide-react'
 
 interface Props {
@@ -44,7 +44,7 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
   function addExercise() {
     setDraft(d => ({
       ...d,
-      exercises: [...d.exercises, { name: '', dose: '', notes: '' }],
+      exercises: [...d.exercises, { name: '', dose: '', notes: '', videoUrl: '' }],
     }))
   }
 
@@ -190,22 +190,30 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
                   </button>
                 </div>
                 {draft.exercises.map((ex, i) => (
-                  <div key={i} className="flex gap-1.5 mb-1.5">
+                  <div key={i} className="mb-2 border border-slate-100 rounded-lg p-2 bg-slate-50">
+                    <div className="flex gap-1.5 mb-1">
+                      <input
+                        value={ex.name}
+                        onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], name: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
+                        placeholder="種目名"
+                        className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent bg-white"
+                      />
+                      <input
+                        value={ex.dose ?? ''}
+                        onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], dose: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
+                        placeholder="量・頻度"
+                        className="w-28 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent bg-white"
+                      />
+                      <button onClick={() => removeExercise(i)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <input
-                      value={ex.name}
-                      onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], name: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
-                      placeholder="種目名"
-                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
+                      value={ex.videoUrl ?? ''}
+                      onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], videoUrl: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
+                      placeholder="YouTube URL（例: https://youtube.com/watch?v=...）"
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent bg-white"
                     />
-                    <input
-                      value={ex.dose ?? ''}
-                      onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], dose: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
-                      placeholder="量・頻度"
-                      className="w-28 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent"
-                    />
-                    <button onClick={() => removeExercise(i)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -350,7 +358,19 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {phase.exercises.map((ex, i) => (
                       <div key={i} className="bg-[--color-surface-raised] rounded-lg border border-slate-100 px-3 py-2">
-                        <div className="text-sm font-semibold text-[--color-text-primary] font-display">{ex.name}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-sm font-semibold text-[--color-text-primary] font-display">{ex.name}</div>
+                          {ex.videoUrl && (
+                            <a
+                              href={ex.videoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-600 font-medium shrink-0 mt-0.5"
+                            >
+                              <PlayCircle className="w-3 h-3" />動画
+                            </a>
+                          )}
+                        </div>
                         {ex.dose && (
                           <div className="metric text-xs text-[--color-text-secondary] mt-0.5">{ex.dose}</div>
                         )}
