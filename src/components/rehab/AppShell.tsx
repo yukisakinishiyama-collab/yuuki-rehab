@@ -199,13 +199,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showQR, setShowQR] = useState(false)
   const [syncing, setSyncing] = useState(false)
 
-  // 起動時にクラウドからデータを取得
+  // 起動時にクラウドからデータを取得し、差分があればリロード
   useEffect(() => {
     import('@/lib/sync-service').then(async ({ pullFromCloud, isSyncEnabled }) => {
       if (!isSyncEnabled()) return
       setSyncing(true)
-      await pullFromCloud()
+      const before = localStorage.getItem('pt_patients')
+      const ok = await pullFromCloud()
       setSyncing(false)
+      if (ok) {
+        const after = localStorage.getItem('pt_patients')
+        if (before !== after) window.location.reload()
+      }
     })
   }, [])
 
