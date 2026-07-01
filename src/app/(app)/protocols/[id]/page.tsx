@@ -13,10 +13,11 @@ import type { Patient as PtPatient } from '@/types/patient'
 import PhaseCard from '@/components/protocol/PhaseCard'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
+import ProtocolSearchModal from '@/components/protocol/ProtocolSearchModal'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
-  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload,
+  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
@@ -36,6 +37,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [ptPatients, setPtPatients] = useState<PtPatient[]>([])
   const [selectedPtId, setSelectedPtId] = useState('')
   const [reflectDone, setReflectDone] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
 
   useEffect(() => {
     const p = getProtocolById(id)
@@ -357,6 +359,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       {/* コンテンツ */}
       {tab === 'protocol' && (
         <div className="space-y-3">
+          <div className="flex justify-end no-print">
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-1.5 text-sm text-teal-700 bg-teal-50 border
+                border-teal-200 px-3 py-2 rounded-xl hover:bg-teal-100 transition-colors font-display font-semibold"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              分からない用語を調べる
+            </button>
+          </div>
           {protocol.phases.map((phase, i) => (
             <div key={phase.id} className="animate-slide-up" style={{ animationDelay: `${i * 60}ms` }}>
               <PhaseCard
@@ -511,6 +523,13 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             )}
           </div>
         </div>
+      )}
+
+      {showSearch && (
+        <ProtocolSearchModal
+          onClose={() => setShowSearch(false)}
+          protocolContext={`プロトコル: ${protocol.title}\nフェーズ: ${protocol.phases.map(p => p.title).join('、')}`}
+        />
       )}
 
       {/* 印刷用免責 */}
