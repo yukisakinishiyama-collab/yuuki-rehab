@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { Phase, ExpertOpinion } from '@/types/protocol'
+import { findVideoUrl } from '@/lib/exercise-video-map'
 
 const rawKey = process.env.ANTHROPIC_API_KEY ?? ''
 const keyMatch = rawKey.match(/sk-ant-[A-Za-z0-9_\-]+/)
@@ -235,6 +236,15 @@ export async function POST(req: NextRequest) {
         hint: message.stop_reason === 'max_tokens' ? 'レスポンスがトークン上限に達しました' : undefined,
       }, { status: 500 })
     }
+
+    // 各フェーズのエクササイズに動画URLを自動付与
+    data.phases = data.phases.map(phase => ({
+      ...phase,
+      exercises: phase.exercises.map(ex => ({
+        ...ex,
+        videoUrl: ex.videoUrl || findVideoUrl(ex.name) || '',
+      })),
+    }))
 
     return NextResponse.json({ protocol: data, generatedBy: 'ai' })
   } catch (err) {

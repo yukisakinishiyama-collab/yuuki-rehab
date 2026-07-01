@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Phase } from '@/types/protocol'
+import { findVideoUrl } from '@/lib/exercise-video-map'
 import {
   EVIDENCE_LABELS, EVIDENCE_COLORS,
   EVIDENCE_GRADE_LABELS, EVIDENCE_GRADE_COLORS,
@@ -194,7 +195,13 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
                     <div className="flex gap-1.5 mb-1">
                       <input
                         value={ex.name}
-                        onChange={e => { const a = [...draft.exercises]; a[i] = { ...a[i], name: e.target.value }; setDraft(d => ({ ...d, exercises: a })) }}
+                        onChange={e => {
+                          const a = [...draft.exercises]
+                          const name = e.target.value
+                          const autoUrl = findVideoUrl(name)
+                          a[i] = { ...a[i], name, videoUrl: a[i].videoUrl || autoUrl || '' }
+                          setDraft(d => ({ ...d, exercises: a }))
+                        }}
                         placeholder="種目名"
                         className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-body focus:ring-2 focus:ring-[--color-primary] focus:border-transparent bg-white"
                       />
