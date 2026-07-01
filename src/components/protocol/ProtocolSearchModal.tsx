@@ -6,6 +6,7 @@ import { Search, X, Loader2, BookOpen, AlertCircle } from 'lucide-react'
 interface Props {
   onClose: () => void
   protocolContext?: string
+  initialQuery?: string
 }
 
 interface Message {
@@ -13,32 +14,34 @@ interface Message {
   text: string
 }
 
-export default function ProtocolSearchModal({ onClose, protocolContext }: Props) {
-  const [query, setQuery] = useState('')
+export default function ProtocolSearchModal({ onClose, protocolContext, initialQuery }: Props) {
+  const [query, setQuery] = useState(initialQuery ?? '')
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // initialQueryがあれば開いた瞬間に自動検索
   useEffect(() => {
-    inputRef.current?.focus()
+    if (initialQuery?.trim()) {
+      sendQuery(initialQuery.trim())
+    } else {
+      inputRef.current?.focus()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  async function handleSearch(e?: React.FormEvent) {
-    e?.preventDefault()
-    const q = query.trim()
+  async function sendQuery(q: string) {
     if (!q || loading) return
-
     setQuery('')
     setError('')
     setMessages(prev => [...prev, { role: 'user', text: q }])
     setLoading(true)
-
     try {
       const res = await fetch('/api/protocol-search', {
         method: 'POST',
@@ -53,6 +56,11 @@ export default function ProtocolSearchModal({ onClose, protocolContext }: Props)
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleSearch(e?: React.FormEvent) {
+    e?.preventDefault()
+    sendQuery(query.trim())
   }
 
   const suggestions = [

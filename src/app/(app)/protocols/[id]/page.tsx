@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Protocol, ProtocolPatient, ProtocolAttachment } from '@/types/protocol'
@@ -38,6 +38,9 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [selectedPtId, setSelectedPtId] = useState('')
   const [reflectDone, setReflectDone] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [initialQuery, setInitialQuery] = useState('')
+  const [selectionPopup, setSelectionPopup] = useState<{ text: string; x: number; y: number } | null>(null)
+  const protocolContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const p = getProtocolById(id)
@@ -46,6 +49,47 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     setProtocol(p)
     setPatient(getPatientById(p.patientId))
   }, [id, router])
+
+  useEffect(() => {
+    function handleMouseUp(e: MouseEvent) {
+      // 入力欄・ボタン上での選択は無視
+      const target = e.target as HTMLElement
+      if (target.closest('input, textarea, button, a, [role="button"]')) return
+      // プロトコルコンテンツ内での選択のみ対象
+      if (!protocolContentRef.current?.contains(target)) return
+
+      setTimeout(() => {
+        const sel = window.getSelection()
+        const text = sel?.toString().trim() ?? ''
+        if (text.length < 2 || text.length > 100) {
+          setSelectionPopup(null)
+          return
+        }
+        const range = sel?.getRangeAt(0)
+        const rect = range?.getBoundingClientRect()
+        if (!rect) return
+        setSelectionPopup({
+          text,
+          x: rect.left + rect.width / 2,
+          y: rect.top + window.scrollY - 8,
+        })
+      }, 10)
+    }
+
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-selection-popup]')) {
+        setSelectionPopup(null)
+      }
+    }
+
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousedown', handleMouseDown)
+    }
+  }, [])
 
   function handlePhaseUpdate(phaseId: string, updates: Partial<Phase>) {
     if (!protocol) return
@@ -151,7 +195,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const isComplete = allCriteriaMet && protocol.currentPhaseIndex === protocol.phases.length - 1
 
   return (
-    <div className="max-w-4xl mx-auto font-body">
+    <div className="max-w-4xl mx-auto font-body" ref={protocolContentRef}>
       {/* 免責（印刷時は表示） */}
       <div className="no-print mb-2">
         <DisclaimerBanner compact />
@@ -525,9 +569,42 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
+      {selectionPopup && (
+        <div
+          data-selection-popup
+          style={{
+            position: 'fixed',
+            left: selectionPopup.x,
+            top: selectionPopup.y - 40,
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+          }}
+        >
+          <button
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => {
+              setInitialQuery(selectionPopup.text)
+              setShowSearch(true)
+              setSelectionPopup(null)
+              window.getSelection()?.removeAllRanges()
+            }}
+            className="flex items-center gap-1.5 bg-slate-800 text-white text-xs font-semibold
+              px-3 py-1.5 rounded-full shadow-lg hover:bg-slate-700 transition-colors
+              font-display whitespace-nowrap"
+          >
+            <HelpCircle className="w-3 h-3" />
+            「{selectionPopup.text.length > 15 ? selectionPopup.text.slice(0, 15) + '…' : selectionPopup.text}」を調べる
+          </button>
+          {/* 吹き出し三角 */}
+          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0
+            border-x-4 border-x-transparent border-t-4 border-t-slate-800" />
+        </div>
+      )}
+
       {showSearch && (
         <ProtocolSearchModal
-          onClose={() => setShowSearch(false)}
+          onClose={() => { setShowSearch(false); setInitialQuery('') }}
+          initialQuery={initialQuery}
           protocolContext={`プロトコル: ${protocol.title}\nフェーズ: ${protocol.phases.map(p => p.title).join('、')}`}
         />
       )}
