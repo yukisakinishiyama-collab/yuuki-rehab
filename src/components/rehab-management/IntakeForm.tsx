@@ -13,6 +13,7 @@ import {
 } from './shared'
 import BodyMap from './BodyMap'
 import JointDetailMap, { SUPPORTED_JOINTS } from './JointDetailMap'
+import IntakeFlowchart, { type FlowchartResult } from './IntakeFlowchart'
 
 interface Props {
   patientId: string
@@ -151,7 +152,7 @@ interface AIResult {
   priorityAssessment?: string
 }
 
-type TabKey = 'basic' | 'pain_location' | 'detail' | 'life' | 'ai'
+type TabKey = 'basic' | 'pain_location' | 'flow' | 'detail' | 'life' | 'ai'
 
 // 関節名（日本語）→ Protocol Joint キーのマッピング
 const JOINT_NAME_TO_KEY: Record<string, string> = {
@@ -177,10 +178,12 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
   const [aiResult, setAiResult] = useState<AIResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [protocolPrefill, setProtocolPrefill] = useState<ProtocolPrefill | null>(null)
+  const [flowResults, setFlowResults] = useState<Record<string, FlowchartResult>>({})
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: 'basic', label: '基本情報' },
     { key: 'pain_location', label: '痛み部位' },
+    { key: 'flow', label: '問診フローチャート' },
     { key: 'detail', label: '詳細' },
     { key: 'life', label: '生活情報' },
     { key: 'ai', label: 'AI分析' },
@@ -254,6 +257,8 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
       aiDifferentials: aiResult?.differentials?.map(d => `${d.diagnosis}（${d.likelihood}）`),
       aiProtocol: aiResult?.protocol,
       aiReasoning: aiResult?.reasoning,
+      // 問診フローチャート結果
+      flowchartResults: Object.keys(flowResults).length > 0 ? flowResults : undefined,
       createdAt: new Date().toISOString(),
     }
     saveIntake(intake)
@@ -277,6 +282,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
 
     setForm(defaultForm)
     setAiResult(null)
+    setFlowResults({})
     onSaved?.()
   }
 
@@ -435,6 +441,24 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Tab: 問診フローチャート ── */}
+        {tab === 'flow' && (
+          <div className="space-y-4">
+            {selectedJoints.length === 0 && (
+              <p className="text-sm text-gray-400">
+                先に「痛み部位」タブで痛みのある部位を選択してください。
+              </p>
+            )}
+            {selectedJoints.map(joint => (
+              <IntakeFlowchart
+                key={joint}
+                joint={joint}
+                onComplete={result => setFlowResults(r => ({ ...r, [joint]: result }))}
+              />
+            ))}
           </div>
         )}
 
@@ -709,7 +733,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
             <button
               type="button"
               onClick={() => {
-                const keys: TabKey[] = ['basic', 'pain_location', 'detail', 'life', 'ai']
+                const keys: TabKey[] = ['basic', 'pain_location', 'flow', 'detail', 'life', 'ai']
                 const idx = keys.indexOf(tab)
                 if (idx < keys.length - 1) setTab(keys[idx + 1])
               }}

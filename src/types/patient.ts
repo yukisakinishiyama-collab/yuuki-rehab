@@ -467,6 +467,15 @@ export interface Intake {
   aiProtocol?: string
   aiReasoning?: string
 
+  // 問診フローチャート結果（関節別）
+  flowchartResults?: Record<string, {
+    path: { question: string; answer: string }[]
+    redFlag: boolean
+    diagnosis: string[]
+    recommendedTests: string[]
+    advice: string
+  }>
+
   // 施術者入力
   suspectedDiagnosis: string
   therapistNotes: string
