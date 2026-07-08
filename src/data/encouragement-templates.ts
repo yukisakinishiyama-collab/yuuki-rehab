@@ -3,13 +3,11 @@
 // {name} は患者氏名に置き換えて使用する
 // ──────────────────────────────────────────────
 
-export interface EncouragementCategory {
-  id: string
-  label: string
-  templates: string[]
-}
+import type { TemplateCategory } from '@/types/templates'
 
-export const ENCOURAGEMENT_TEMPLATES: EncouragementCategory[] = [
+export type EncouragementCategory = TemplateCategory
+
+export const ENCOURAGEMENT_TEMPLATES: TemplateCategory[] = [
   {
     id: 'effort',
     label: '頑張り・継続をねぎらう',

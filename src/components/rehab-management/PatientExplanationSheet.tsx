@@ -11,6 +11,9 @@ import ExerciseIllustration from './ExerciseIllustration'
 import { generatePatientFriendlyMessage } from '@/lib/rehab-algorithms'
 import { getExplanationOverride, saveExplanationOverride } from '@/lib/patient-store'
 import { ENCOURAGEMENT_TEMPLATES } from '@/data/encouragement-templates'
+import { STATUS_MESSAGE_TEMPLATES, NEXT_GOAL_TEMPLATES, ADDITIONAL_NOTE_TEMPLATES } from '@/data/explanation-templates'
+import { resolveTemplateCategories } from '@/lib/template-utils'
+import TemplatePicker from './TemplatePicker'
 
 const emptyOverride = (patientId: string): ExplanationOverride => ({
   id: nanoid(),
@@ -41,17 +44,15 @@ export default function PatientExplanationSheet({
   const printRef = useRef<HTMLDivElement>(null)
   const savedOverride = getExplanationOverride(patient.id) ?? emptyOverride(patient.id)
   const [draft, setDraft] = useState<ExplanationOverride | null>(null)
-  const [templateOpen, setTemplateOpen] = useState(false)
-  const [templateCategory, setTemplateCategory] = useState(ENCOURAGEMENT_TEMPLATES[0].id)
   const editing = draft !== null
+
+  const statusTemplates = resolveTemplateCategories(STATUS_MESSAGE_TEMPLATES, patient.name)
+  const encouragementTemplates = resolveTemplateCategories(ENCOURAGEMENT_TEMPLATES, patient.name)
+  const nextGoalTemplates = resolveTemplateCategories(NEXT_GOAL_TEMPLATES, patient.name)
+  const noteTemplates = resolveTemplateCategories(ADDITIONAL_NOTE_TEMPLATES, patient.name)
 
   function startEditing() {
     setDraft(savedOverride)
-  }
-
-  function applyTemplate(text: string) {
-    setDraft(d => d && ({ ...d, customEncouragement: text.replace('{name}', patient.name) }))
-    setTemplateOpen(false)
   }
 
   function handleSaveOverride() {
@@ -110,7 +111,13 @@ export default function PatientExplanationSheet({
         <div className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-4 print:hidden space-y-4">
           <p className="text-sm font-bold text-teal-700">説明書の内容を編集（空欄の項目は自動生成の文章を使用します）</p>
           <div>
-            <FormLabel>現在の状態メッセージ</FormLabel>
+            <div className="flex items-center justify-between mb-1.5">
+              <FormLabel>現在の状態メッセージ</FormLabel>
+              <TemplatePicker
+                categories={statusTemplates}
+                onSelect={text => setDraft(d => d && ({ ...d, customStatusMessage: text }))}
+              />
+            </div>
             <Textarea
               value={draft.customStatusMessage}
               onChange={v => setDraft(d => d && ({ ...d, customStatusMessage: v }))}
@@ -121,48 +128,11 @@ export default function PatientExplanationSheet({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <FormLabel>スタッフからの応援メッセージ</FormLabel>
-              <button
-                type="button"
-                onClick={() => setTemplateOpen(v => !v)}
-                className="text-xs text-teal-600 hover:text-teal-800 font-medium whitespace-nowrap"
-              >
-                {templateOpen ? '✕ 定型文を閉じる' : '📋 定型文から選ぶ'}
-              </button>
+              <TemplatePicker
+                categories={encouragementTemplates}
+                onSelect={text => setDraft(d => d && ({ ...d, customEncouragement: text }))}
+              />
             </div>
-
-            {templateOpen && (
-              <div className="mb-2 rounded-lg border border-teal-100 bg-teal-50/50 p-3 space-y-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {ENCOURAGEMENT_TEMPLATES.map(cat => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setTemplateCategory(cat.id)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                        templateCategory === cat.id
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-white text-gray-600 border border-gray-200 hover:border-teal-300'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {ENCOURAGEMENT_TEMPLATES.find(c => c.id === templateCategory)?.templates.map((t, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => applyTemplate(t)}
-                      className="block w-full text-left text-xs text-gray-700 bg-white border border-gray-100 rounded-lg px-3 py-2 hover:border-teal-300 hover:bg-teal-50 transition-colors"
-                    >
-                      {t.replace('{name}', patient.name)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <Textarea
               value={draft.customEncouragement}
               onChange={v => setDraft(d => d && ({ ...d, customEncouragement: v }))}
@@ -171,7 +141,13 @@ export default function PatientExplanationSheet({
             />
           </div>
           <div>
-            <FormLabel>次の目標</FormLabel>
+            <div className="flex items-center justify-between mb-1.5">
+              <FormLabel>次の目標</FormLabel>
+              <TemplatePicker
+                categories={nextGoalTemplates}
+                onSelect={text => setDraft(d => d && ({ ...d, customNextGoal: text }))}
+              />
+            </div>
             <Textarea
               value={draft.customNextGoal}
               onChange={v => setDraft(d => d && ({ ...d, customNextGoal: v }))}
@@ -180,7 +156,13 @@ export default function PatientExplanationSheet({
             />
           </div>
           <div>
-            <FormLabel>追加の一言（任意）</FormLabel>
+            <div className="flex items-center justify-between mb-1.5">
+              <FormLabel>追加の一言（任意）</FormLabel>
+              <TemplatePicker
+                categories={noteTemplates}
+                onSelect={text => setDraft(d => d && ({ ...d, customNote: text }))}
+              />
+            </div>
             <Textarea
               value={draft.customNote}
               onChange={v => setDraft(d => d && ({ ...d, customNote: v }))}

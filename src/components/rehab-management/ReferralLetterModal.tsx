@@ -5,6 +5,8 @@
 import { useState, useRef } from 'react'
 import type { Patient, Intake, SOAPNote } from '@/types/patient'
 import { X, Printer, Sparkles, AlertCircle, FileText, ClipboardList } from 'lucide-react'
+import { REPORT_COURSE_TEMPLATES } from '@/data/report-templates'
+import TemplatePicker from './TemplatePicker'
 
 interface Props {
   patient: Patient
@@ -489,9 +491,16 @@ ${printRef.current.innerHTML}
               )}
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  {letterType === 'referral' ? '経過（紹介理由）' : letterType === 'report' ? '経過（治療経過の報告）' : '今後の見通し'}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs text-gray-500">
+                    {letterType === 'referral' ? '経過（紹介理由）' : letterType === 'report' ? '経過（治療経過の報告）' : '今後の見通し'}
+                  </label>
+                  <TemplatePicker
+                    key={letterType}
+                    categories={REPORT_COURSE_TEMPLATES[letterType]}
+                    onSelect={text => setContent(c => ({ ...c, course: text }))}
+                  />
+                </div>
                 <textarea
                   value={content.course}
                   onChange={e => setContent(c => ({ ...c, course: e.target.value }))}
