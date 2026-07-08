@@ -9,12 +9,24 @@ interface Props {
   onClose: () => void
 }
 
+// localhost・プライベートIPなど、同一LAN内でのみ到達可能なホストかどうか
+function isPrivateHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+  )
+}
+
 export default function QRLoginModal({ onClose }: Props) {
   const [localUrl, setLocalUrl] = useState<string>('')
   const [token, setToken] = useState<string>('')
   const [remaining, setRemaining] = useState(30 * 60)
   const [ngrokUrl, setNgrokUrl] = useState<string>('')
   const [showNgrok, setShowNgrok] = useState(false)
+  const [isLocalNetwork, setIsLocalNetwork] = useState(true)
 
   function generate() {
     const t = generateQRToken()
@@ -23,7 +35,11 @@ export default function QRLoginModal({ onClose }: Props) {
   }
 
   useEffect(() => {
-    const host = window.location.host.replace('localhost', '192.168.11.51')
+    const local = isPrivateHost(window.location.hostname)
+    setIsLocalNetwork(local)
+    // 開発時（localhost）はスマホから到達できないため、同一LAN内のPCのIPに置き換える。
+    // 本番公開URL（Vercelなど）はそのまま使えば既にどこからでもアクセス可能。
+    const host = local ? window.location.host.replace('localhost', '192.168.11.51') : window.location.host
     const protocol = window.location.protocol
     setLocalUrl(`${protocol}//${host}`)
     // 保存済みngrok URLを復元
@@ -52,7 +68,7 @@ export default function QRLoginModal({ onClose }: Props) {
   const minutes = Math.floor(remaining / 60)
   const seconds = remaining % 60
   const expired = remaining <= 0
-  const isExternal = !!ngrokUrl
+  const isExternal = !!ngrokUrl || !isLocalNetwork
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -127,7 +143,8 @@ export default function QRLoginModal({ onClose }: Props) {
             </p>
           </div>
 
-          {/* ngrok設定 */}
+          {/* ngrok設定（ローカル開発環境のみ表示。公開URLでは不要） */}
+          {isLocalNetwork && (
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <button
               onClick={() => setShowNgrok(!showNgrok)}
@@ -169,6 +186,7 @@ export default function QRLoginModal({ onClose }: Props) {
               </div>
             )}
           </div>
+          )}
 
           {/* 使い方 */}
           <div className="space-y-1.5">
