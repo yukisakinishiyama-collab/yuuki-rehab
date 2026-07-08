@@ -4,7 +4,8 @@
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
-  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake
+  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake,
+  ExplanationOverride
 } from '@/types/patient'
 import { SAMPLE_PATIENTS, SAMPLE_EVALUATIONS, SAMPLE_EXERCISES, SAMPLE_SOAP_NOTES } from './patient-data'
 
@@ -25,6 +26,7 @@ const KEYS = {
   retentionRisks: 'pt_retention_risks',
   quickMemos: 'pt_quick_memos',
   intakes: 'pt_intakes',
+  explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
   version: 'pt_version',
 } as const
@@ -214,6 +216,19 @@ export function saveIntake(intake: Intake): void {
 
 export function deleteIntake(id: string): void {
   set(KEYS.intakes, getIntakes().filter(i => i.id !== id))
+}
+
+// ── 患者説明書 上書き設定 ──
+export function getExplanationOverride(patientId: string): ExplanationOverride | undefined {
+  return get<ExplanationOverride>(KEYS.explanationOverrides).find(o => o.patientId === patientId)
+}
+
+export function saveExplanationOverride(override: ExplanationOverride): void {
+  const list = get<ExplanationOverride>(KEYS.explanationOverrides)
+  const idx = list.findIndex(o => o.patientId === override.patientId)
+  if (idx >= 0) list[idx] = override
+  else list.push(override)
+  set(KEYS.explanationOverrides, list)
 }
 
 // ── 運動マスタ ──

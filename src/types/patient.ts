@@ -343,6 +343,19 @@ export interface AttendanceRecord {
 }
 
 // ──────────────────────────────────────────────
+// 患者説明書 上書き設定
+// ──────────────────────────────────────────────
+export interface ExplanationOverride {
+  id: string
+  patientId: string
+  customStatusMessage: string  // 「現在の状態」の上書き（空欄なら自動生成メッセージを使用）
+  customEncouragement: string  // スタッフからの応援メッセージ（空欄なら自動生成メッセージを使用）
+  customNextGoal: string       // 「次の目標」の上書き（空欄ならSOAPカルテ/自動生成を使用）
+  customNote: string           // 追加の一言（任意）
+  updatedAt: string
+}
+
+// ──────────────────────────────────────────────
 // 離脱リスク
 // ──────────────────────────────────────────────
 export interface RetentionRisk {

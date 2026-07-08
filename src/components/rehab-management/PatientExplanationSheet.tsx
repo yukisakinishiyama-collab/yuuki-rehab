@@ -2,12 +2,24 @@
 // ──────────────────────────────────────────────
 // 患者説明シート（印刷・PDF対応）
 // ──────────────────────────────────────────────
-import { useRef } from 'react'
-import type { Patient, Evaluation, SOAPNote, ROMRecord, StrengthRecord, PatientExercise, Exercise, RehabPhase } from '@/types/patient'
+import { useRef, useState } from 'react'
+import { nanoid } from 'nanoid'
+import type { Patient, Evaluation, SOAPNote, ROMRecord, StrengthRecord, PatientExercise, Exercise, RehabPhase, ExplanationOverride } from '@/types/patient'
 import { PHASE_SHORT_LABELS } from '@/types/patient'
-import { ProgressGauge, PhaseStepper } from './shared'
+import { ProgressGauge, PhaseStepper, Textarea, FormLabel } from './shared'
 import ExerciseIllustration from './ExerciseIllustration'
 import { generatePatientFriendlyMessage } from '@/lib/rehab-algorithms'
+import { getExplanationOverride, saveExplanationOverride } from '@/lib/patient-store'
+
+const emptyOverride = (patientId: string): ExplanationOverride => ({
+  id: nanoid(),
+  patientId,
+  customStatusMessage: '',
+  customEncouragement: '',
+  customNextGoal: '',
+  customNote: '',
+  updatedAt: '',
+})
 
 interface Props {
   patient: Patient
@@ -26,6 +38,21 @@ export default function PatientExplanationSheet({
   romRecords, strengthRecords, patientExercises, exercises,
 }: Props) {
   const printRef = useRef<HTMLDivElement>(null)
+  const savedOverride = getExplanationOverride(patient.id) ?? emptyOverride(patient.id)
+  const [draft, setDraft] = useState<ExplanationOverride | null>(null)
+  const editing = draft !== null
+
+  function startEditing() {
+    setDraft(savedOverride)
+  }
+
+  function handleSaveOverride() {
+    if (!draft) return
+    saveExplanationOverride({ ...draft, updatedAt: new Date().toISOString() })
+    setDraft(null)
+  }
+
+  const override = draft ?? savedOverride
 
   const msg = generatePatientFriendlyMessage({
     phase: currentPhase,
@@ -36,6 +63,10 @@ export default function PatientExplanationSheet({
     improvementScore,
     nextGoal: soapNote?.nextGoal ?? '',
   })
+
+  const statusMessage = override.customStatusMessage || msg.statusMessage
+  const encouragementMessage = override.customEncouragement || msg.encouragementMessage
+  const nextGoalMessage = override.customNextGoal || soapNote?.nextGoal || msg.nextGoalMessage
 
   const assignedExercises = patientExercises
     .filter(pe => pe.status === 'active')
@@ -48,8 +79,15 @@ export default function PatientExplanationSheet({
 
   return (
     <div>
-      {/* 印刷ボタン */}
-      <div className="flex justify-end mb-4 print:hidden">
+      {/* 編集・印刷ボタン */}
+      <div className="flex justify-end gap-2 mb-4 print:hidden">
+        <button
+          type="button"
+          onClick={() => (editing ? setDraft(null) : startEditing())}
+          className="px-5 py-2 bg-white border border-teal-300 text-teal-700 text-sm font-medium rounded-lg hover:bg-teal-50 flex items-center gap-2"
+        >
+          {editing ? '✕ 編集を閉じる' : '✏️ 内容を編集'}
+        </button>
         <button
           type="button"
           onClick={handlePrint}
@@ -58,6 +96,65 @@ export default function PatientExplanationSheet({
           🖨 印刷・PDF保存
         </button>
       </div>
+
+      {/* 編集パネル */}
+      {draft && (
+        <div className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-4 print:hidden space-y-4">
+          <p className="text-sm font-bold text-teal-700">説明書の内容を編集（空欄の項目は自動生成の文章を使用します）</p>
+          <div>
+            <FormLabel>現在の状態メッセージ</FormLabel>
+            <Textarea
+              value={draft.customStatusMessage}
+              onChange={v => setDraft(d => d && ({ ...d, customStatusMessage: v }))}
+              placeholder={msg.statusMessage}
+              rows={2}
+            />
+          </div>
+          <div>
+            <FormLabel>スタッフからの応援メッセージ</FormLabel>
+            <Textarea
+              value={draft.customEncouragement}
+              onChange={v => setDraft(d => d && ({ ...d, customEncouragement: v }))}
+              placeholder={msg.encouragementMessage}
+              rows={2}
+            />
+          </div>
+          <div>
+            <FormLabel>次の目標</FormLabel>
+            <Textarea
+              value={draft.customNextGoal}
+              onChange={v => setDraft(d => d && ({ ...d, customNextGoal: v }))}
+              placeholder={soapNote?.nextGoal || msg.nextGoalMessage}
+              rows={2}
+            />
+          </div>
+          <div>
+            <FormLabel>追加の一言（任意）</FormLabel>
+            <Textarea
+              value={draft.customNote}
+              onChange={v => setDraft(d => d && ({ ...d, customNote: v }))}
+              placeholder="例：次回は一緒に階段の昇り降りを確認しましょう"
+              rows={2}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDraft(null)}
+              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveOverride}
+              className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700"
+            >
+              保存
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 説明シート本体 */}
       <div
@@ -91,6 +188,24 @@ export default function PatientExplanationSheet({
           ※ このシートは医師の診断を代替するものではありません。強い痛み・しびれ・夜間痛・発熱などの症状が現れた場合は、医療機関の受診をご検討ください。
         </div>
 
+        {/* 応援メッセージ */}
+        <section className="mb-6">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-amber-800 flex items-center gap-1.5">🎉 応援メッセージ</p>
+              {!!soapNote?.visitNumber && (
+                <span className="text-xs font-bold text-amber-700 bg-white px-2.5 py-1 rounded-full border border-amber-200 whitespace-nowrap">
+                  {soapNote.visitNumber}回目のご来院
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-800 leading-relaxed font-medium">{encouragementMessage}</p>
+            {override.customNote && (
+              <p className="text-sm text-amber-700 mt-2 leading-relaxed">{override.customNote}</p>
+            )}
+          </div>
+        </section>
+
         {/* 現在の状態 */}
         <section className="mb-6">
           <h2 className="text-base font-bold text-teal-700 mb-3 flex items-center gap-2">
@@ -98,7 +213,7 @@ export default function PatientExplanationSheet({
             現在の状態
           </h2>
           <div className="bg-teal-50 rounded-xl p-4">
-            <p className="text-sm font-bold text-teal-800 mb-2">{msg.statusMessage}</p>
+            <p className="text-sm font-bold text-teal-800 mb-2">{statusMessage}</p>
             <p className="text-sm text-gray-700 leading-relaxed">{msg.phaseExplanation}</p>
           </div>
         </section>
@@ -183,7 +298,7 @@ export default function PatientExplanationSheet({
             次の目標
           </h2>
           <div className="bg-blue-50 rounded-xl p-4">
-            <p className="text-sm font-bold text-blue-800">{soapNote?.nextGoal || msg.nextGoalMessage}</p>
+            <p className="text-sm font-bold text-blue-800">{nextGoalMessage}</p>
           </div>
         </section>
 
