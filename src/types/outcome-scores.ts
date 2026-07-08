@@ -15,6 +15,8 @@ export type ScoreId =
   | 'odi' | 'ndi' | 'joa_l'
   // 腕・肘・手
   | 'dash'
+  // 全身（関節リウマチなど炎症性疾患の疼痛・活動性評価）
+  | 'rapid3'
 
 export interface OutcomeScoreRecord {
   id: string

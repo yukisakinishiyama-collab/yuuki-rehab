@@ -22,6 +22,7 @@ const REGION_TABS: { id: BodyRegion; label: string; icon: string }[] = [
   { id: 'lumbar',   label: '腰部',     icon: '🧍' },
   { id: 'cervical', label: '頚部',     icon: '🔄' },
   { id: 'elbow',    label: '肘・腕・手', icon: '✋' },
+  { id: 'other',    label: '全身・その他', icon: '🩺' },
 ]
 
 const COLOR_MAP = {

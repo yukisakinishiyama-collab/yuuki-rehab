@@ -771,6 +771,67 @@ const dash: ScoreDef = {
   },
 }
 
+// ────────── RAPID3 ──────────
+const rapid3: ScoreDef = {
+  id: 'rapid3', shortName: 'RAPID3', fullName: 'RAPID3（関節リウマチ等の疾患活動性簡易評価）',
+  regions: ['other'], maxScore: 30, higherIsBetter: false, unit: '点',
+  reference: 'Pincus et al. (2008) Clin Exp Rheumatol; MDHAQ由来の患者自己記入式指標（血液検査不要）',
+  items: [
+    { id: 'f1', question: '服を着る（ボタン留め・靴ひも結びを含む）', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f2', question: 'ベッドから起き上がる・寝床に入る', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f3', question: 'コップやグラスを口元まで持ち上げる', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f4', question: '屋外の平らな道を歩く', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f5', question: '全身を洗う・拭く', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f6', question: '床にある衣類を拾うためにかがむ', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f7', question: '蛇口をひねって開閉する', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f8', question: '車・バス・電車などの乗り降りをする', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f9', question: '2〜3km程度歩く（希望する場合）', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'f10', question: 'レクリエーション活動・スポーツに参加する（希望する場合）', type: 'radio', options: [
+      { value: 0, label: '全く困難なく行える' }, { value: 1, label: '多少の困難を伴う' },
+      { value: 2, label: 'かなりの困難を伴う' }, { value: 3, label: '行うことができない' }] },
+    { id: 'pain', question: '現在の関節の痛みの強さ（VAS）', type: 'slider', min: 0, max: 10,
+      hint: '0＝痛みなし、10＝想像しうる最大の痛み' },
+    { id: 'global', question: '関節リウマチなどの症状は、全体としてどの程度あなたに影響していますか？（患者全般評価）', type: 'slider', min: 0, max: 10,
+      hint: '0＝非常に良好（影響なし）、10＝非常に不良（大きく影響）' },
+  ],
+  thresholds: [
+    { label: '寛解相当（Near Remission）', min: 0, max: 3, color: 'green' },
+    { label: '低疾患活動性（Low）', min: 4, max: 6, color: 'yellow' },
+    { label: '中等度疾患活動性（Moderate）', min: 7, max: 12, color: 'orange' },
+    { label: '高疾患活動性（High）', min: 13, max: 30, color: 'red' },
+  ],
+  calculate(a) {
+    const funcKeys = Array.from({ length: 10 }, (_, i) => `f${i + 1}`)
+    const answeredFunc = funcKeys.filter(k => a[k] !== undefined)
+    const funcSum = answeredFunc.reduce((s, k) => s + (a[k] ?? 0), 0)
+    const fn = answeredFunc.length > 0 ? (funcSum / answeredFunc.length) * (10 / 3) : 0
+    const pn = a['pain'] ?? 0
+    const ptga = a['global'] ?? 0
+    const total = Math.round(fn + pn + ptga)
+    const subscores = { 身体機能: Math.round(fn * 10) / 10, 疼痛: pn, 患者全般評価: ptga }
+    const t = this.thresholds.find(th => total >= th.min && total <= th.max) ?? this.thresholds[this.thresholds.length - 1]
+    return { total, subscores, interp: t.label, color: t.color }
+  },
+}
+
 // ── エクスポート ──
 export const SCORE_DEFS: Record<ScoreId, ScoreDef> = {
   lysholm, ikdc, tegner,
@@ -779,6 +840,7 @@ export const SCORE_DEFS: Record<ScoreId, ScoreDef> = {
   hhs, hoos_jr: hoosJr,
   odi, ndi, joa_l: joaL,
   dash,
+  rapid3,
 }
 
 export const REGION_SCORES: Record<string, ScoreId[]> = {
@@ -791,6 +853,6 @@ export const REGION_SCORES: Record<string, ScoreId[]> = {
   elbow:    ['dash'],
   wrist:    ['dash'],
   thoracic: [],
-  other:    ['lysholm', 'ases', 'odi', 'ndi', 'dash'],
+  other:    ['rapid3', 'lysholm', 'ases', 'odi', 'ndi', 'dash'],
   functional: ['lysholm', 'ikdc', 'tegner', 'ases', 'cait', 'atrs', 'hhs'],
 }
