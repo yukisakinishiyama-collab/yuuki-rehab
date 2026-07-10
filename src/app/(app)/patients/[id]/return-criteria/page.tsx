@@ -439,8 +439,10 @@ export default function ReturnCriteriaPage({
   const { id: patientId } = use(params)
   const router = useRouter()
   const patient = getPatient(patientId)
-  // 患者の登録部位から対象を自動判定（股関節登録の患者のみ股関節版フォームを表示）
-  const region: AssessmentRegion = patient?.bodyRegion === 'hip' ? 'hip' : 'knee'
+  // 初期値は患者の登録部位から推定するが、手動で切り替え可能
+  const [region, setRegion] = useState<AssessmentRegion>(
+    patient?.bodyRegion === 'hip' ? 'hip' : 'knee'
+  )
 
   // フォーム状態
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('sport')
@@ -541,16 +543,35 @@ export default function ReturnCriteriaPage({
         </Link>
         <span className="text-slate-300">/</span>
         <span className="text-sm font-semibold text-slate-700">復帰基準テスト</span>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-          region === 'hip' ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-blue-50 text-blue-700 border-blue-200'
-        }`}>
-          対象部位: {region === 'hip' ? '股関節' : '膝'}
-        </span>
       </div>
 
       {/* ── タイプ選択・日付 ── */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
         <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">
+              対象部位
+              {patient.bodyRegion !== 'hip' && patient.bodyRegion !== 'knee' && (
+                <span className="ml-1 text-slate-400 font-normal">（登録部位からは自動判定できないため選択してください）</span>
+              )}
+            </p>
+            <div className="flex gap-2">
+              {([
+                { value: 'knee', label: '膝' },
+                { value: 'hip',  label: '股関節' },
+              ] as const).map(({ value, label }) => (
+                <button key={value}
+                  onClick={() => setRegion(value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                    region === value
+                      ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1.5">評価の種別</p>
             <div className="flex gap-2">
