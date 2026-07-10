@@ -16,6 +16,7 @@ import {
   Users,
   BookOpen,
   CloudUpload,
+  Dumbbell,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
 import { logout } from '@/lib/rehab-store'
@@ -45,6 +46,7 @@ const NAV_SECTIONS = [
       { href: '/protocols',  label: 'プロトコル立案', icon: ClipboardList },
       { href: '/literature', label: '文献ライブラリ', icon: BookOpen },
       { href: '/rom',        label: '可動域ノート',   icon: Activity },
+      { href: '/drills',     label: '競技復帰ドリル', icon: Dumbbell },
     ],
   },
   {
