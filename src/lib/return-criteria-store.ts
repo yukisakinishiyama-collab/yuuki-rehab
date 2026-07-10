@@ -3,8 +3,11 @@ import type {
   LysholmData,
   AclRsiItems,
   HopTestsData,
+  HipSymptomData,
+  HipFunctionData,
   Verdict,
   AssessmentType,
+  AssessmentRegion,
 } from '@/types/return-criteria'
 import { nanoid } from 'nanoid'
 
@@ -13,7 +16,9 @@ const KEY = 'returnCriteria'
 function load(): ReturnCriteriaAssessment[] {
   if (typeof window === 'undefined') return []
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '[]')
+    const list: ReturnCriteriaAssessment[] = JSON.parse(localStorage.getItem(KEY) ?? '[]')
+    // region追加前に保存された記録は膝として扱う
+    return list.map(a => ({ ...a, region: a.region ?? ('knee' as AssessmentRegion) }))
   } catch { return [] }
 }
 
@@ -59,6 +64,24 @@ export function calcLefs(items: number[]): number {
   return Math.round((raw / 80) * 100)
 }
 
+// Harris Hip Score（症状評価、10項目合計100点）
+export function calcHipSymptom(d: HipSymptomData): number {
+  return d.pain + d.limp + d.support + d.distance + d.stairs +
+         d.shoes + d.sitting + d.transport + d.deformity + d.rom
+}
+
+// 片脚立位保持時間・シングルレッグステップダウンのLSI平均。
+// Trendelenburg徴候陽性（殿筋機能低下）の場合は減点する
+export function calcHipFunction(d: HipFunctionData): number {
+  const vals = [
+    lsi(d.singleLegStance.involved, d.singleLegStance.uninvolved),
+    lsi(d.stepDown.involved,        d.stepDown.uninvolved),
+  ].filter(v => v > 0)
+  if (!vals.length) return 0
+  const base = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+  return d.trendelenburg === 'positive' ? Math.max(0, base - 15) : base
+}
+
 // 重み付き合計スコア
 // 競技復帰: 症状25% + 心理30% + 機能35% + 日常10%
 // 日常復帰: 症状30% + 心理20% + 機能20% + 日常30%
@@ -86,35 +109,52 @@ export function getAssessments(patientId: string): ReturnCriteriaAssessment[] {
     .sort((a, b) => b.assessmentDate.localeCompare(a.assessmentDate))
 }
 
-export function saveAssessment(
-  patientId: string,
-  assessmentDate: string,
-  type: AssessmentType,
-  lysholm: LysholmData,
-  aclRsi: AclRsiItems,
-  hopTests: HopTestsData,
-  lefs: number[],
-  notes: string,
-): ReturnCriteriaAssessment {
-  const symptom     = calcLysholm(lysholm)
-  const psychological = calcAclRsi(aclRsi)
-  const functional  = calcHopLsi(hopTests)
-  const daily       = calcLefs(lefs)
-  const composite   = calcComposite(symptom, psychological, functional, daily, type)
-  const verdict     = getVerdict(composite)
+interface SaveKneeInput {
+  region: 'knee'
+  patientId: string
+  assessmentDate: string
+  type: AssessmentType
+  lysholm: LysholmData
+  hopTests: HopTestsData
+  aclRsi: AclRsiItems
+  lefs: number[]
+  notes: string
+}
+
+interface SaveHipInput {
+  region: 'hip'
+  patientId: string
+  assessmentDate: string
+  type: AssessmentType
+  hipSymptom: HipSymptomData
+  hipFunction: HipFunctionData
+  aclRsi: AclRsiItems
+  lefs: number[]
+  notes: string
+}
+
+export function saveAssessment(input: SaveKneeInput | SaveHipInput): ReturnCriteriaAssessment {
+  const symptom = input.region === 'knee' ? calcLysholm(input.lysholm) : calcHipSymptom(input.hipSymptom)
+  const functional = input.region === 'knee' ? calcHopLsi(input.hopTests) : calcHipFunction(input.hipFunction)
+  const psychological = calcAclRsi(input.aclRsi)
+  const daily = calcLefs(input.lefs)
+  const composite = calcComposite(symptom, psychological, functional, daily, input.type)
+  const verdict = getVerdict(composite)
 
   const record: ReturnCriteriaAssessment = {
     id: nanoid(),
-    patientId,
-    assessmentDate,
-    type,
-    lysholm,
-    aclRsi,
-    hopTests,
-    lefs,
+    patientId: input.patientId,
+    assessmentDate: input.assessmentDate,
+    type: input.type,
+    region: input.region,
+    ...(input.region === 'knee'
+      ? { lysholm: input.lysholm, hopTests: input.hopTests }
+      : { hipSymptom: input.hipSymptom, hipFunction: input.hipFunction }),
+    aclRsi: input.aclRsi,
+    lefs: input.lefs,
     scores: { symptom, psychological, functional, daily, composite },
     verdict,
-    notes,
+    notes: input.notes,
     createdAt: new Date().toISOString(),
   }
 

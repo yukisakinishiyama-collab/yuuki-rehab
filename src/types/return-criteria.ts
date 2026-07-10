@@ -5,6 +5,8 @@
 
 export type AssessmentType = 'sport' | 'daily'
 export type Verdict = 'cleared' | 'conditional' | 'not_ready'
+// 対象部位。既存データ（region未設定）は膝として扱う
+export type AssessmentRegion = 'knee' | 'hip'
 
 // ── Lysholm Knee Score (Lysholm 1982; Tegner & Lysholm 1985) ──────
 // 各項目のスコア値を直接格納（0-100合計）
@@ -53,16 +55,58 @@ export interface HopTestsData {
 // 合計0-80点 → 100点換算
 export type LefsItems = number[] & { length: 20 }
 
+// ── Harris Hip Score (Harris 1969, J Bone Joint Surg Am) ─────────
+// 股関節用の症状評価。膝のLysholmに相当する位置づけ（10項目・合計100点）
+export interface HipSymptomData {
+  pain: 0 | 10 | 20 | 30 | 40 | 44
+  limp: 0 | 5 | 8 | 11
+  support: 0 | 2 | 3 | 5 | 7 | 11
+  distance: 0 | 2 | 5 | 8 | 11
+  stairs: 0 | 1 | 2 | 4
+  shoes: 0 | 2 | 4
+  sitting: 0 | 3 | 5
+  transport: 0 | 1
+  deformity: 0 | 4
+  rom: 0 | 1 | 3 | 4 | 5
+}
+
+export const HIP_SYMPTOM_DEFAULT: HipSymptomData = {
+  pain: 44, limp: 11, support: 11, distance: 11, stairs: 4,
+  shoes: 4, sitting: 5, transport: 1, deformity: 4, rom: 5,
+}
+
+// ── 股関節機能テスト（片脚立位・シングルレッグステップダウン・Trendelenburg徴候）
+// 膝の4-Hop Test Batteryに相当する位置づけ
+export interface HipFunctionData {
+  singleLegStance: HopLimb   // 片脚立位保持時間（秒）
+  stepDown: HopLimb          // 30秒間のシングルレッグ・ステップダウン回数
+  trendelenburg: 'negative' | 'positive'  // Trendelenburg徴候（陽性=殿筋機能低下の指標）
+}
+
+export const HIP_FUNCTION_DEFAULT: HipFunctionData = {
+  singleLegStance: { involved: 0, uninvolved: 0 },
+  stepDown: { involved: 0, uninvolved: 0 },
+  trendelenburg: 'negative',
+}
+
 // ── 統合アセスメント ─────────────────────────────────────────────
 export interface ReturnCriteriaAssessment {
   id: string
   patientId: string
   assessmentDate: string
   type: AssessmentType
+  region: AssessmentRegion
 
-  lysholm: LysholmData
+  // 膝用（region === 'knee'）
+  lysholm?: LysholmData
+  hopTests?: HopTestsData
+
+  // 股関節用（region === 'hip'）
+  hipSymptom?: HipSymptomData
+  hipFunction?: HipFunctionData
+
+  // 部位共通
   aclRsi: AclRsiItems
-  hopTests: HopTestsData
   lefs: number[]   // 20 items
 
   // 計算済みスコア (0-100)

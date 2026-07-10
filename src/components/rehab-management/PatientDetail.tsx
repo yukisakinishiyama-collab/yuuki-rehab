@@ -1391,7 +1391,9 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="text-center py-6 bg-emerald-50 rounded-xl border border-emerald-100">
                     <p className="text-sm font-medium text-emerald-700">まだ復帰基準テストが実施されていません</p>
                     <p className="text-xs text-emerald-500 mt-1 max-w-xs mx-auto">
-                      Lysholm / ACL-RSI / 4-Hop Test Battery / LEFS を実施して定量的な復帰判定を行いましょう
+                      {patient.bodyRegion === 'hip'
+                        ? 'Harris Hip Score / RSI / 片脚立位・ステップダウン / LEFS を実施して定量的な復帰判定を行いましょう'
+                        : 'Lysholm / ACL-RSI / 4-Hop Test Battery / LEFS を実施して定量的な復帰判定を行いましょう'}
                     </p>
                     <Link
                       href={`/patients/${patient.id}/return-criteria`}
@@ -1423,12 +1425,20 @@ export default function PatientDetail({ patient }: Props) {
                           </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2 mt-3">
-                          {([
-                            { label: 'Lysholm', score: latest.scores.symptom,       icon: '🦵', note: '症状' },
-                            { label: 'ACL-RSI', score: latest.scores.psychological, icon: '🧠', note: '心理' },
-                            { label: '4-Hop',   score: latest.scores.functional,    icon: '🏃', note: 'LSI' },
-                            { label: 'LEFS',    score: latest.scores.daily,         icon: '🚶', note: '日常' },
-                          ] as const).map(item => (
+                          {(latest.region === 'hip'
+                            ? [
+                                { label: 'HHS',  score: latest.scores.symptom,       icon: '🦵', note: '症状' },
+                                { label: 'RSI',  score: latest.scores.psychological, icon: '🧠', note: '心理' },
+                                { label: '機能',  score: latest.scores.functional,    icon: '🏃', note: 'LSI' },
+                                { label: 'LEFS', score: latest.scores.daily,         icon: '🚶', note: '日常' },
+                              ]
+                            : [
+                                { label: 'Lysholm', score: latest.scores.symptom,       icon: '🦵', note: '症状' },
+                                { label: 'ACL-RSI', score: latest.scores.psychological, icon: '🧠', note: '心理' },
+                                { label: '4-Hop',   score: latest.scores.functional,    icon: '🏃', note: 'LSI' },
+                                { label: 'LEFS',    score: latest.scores.daily,         icon: '🚶', note: '日常' },
+                              ]
+                          ).map(item => (
                             <div key={item.label} className="text-center bg-white/70 rounded-lg py-2 px-1">
                               <div className="text-lg leading-none">{item.icon}</div>
                               <div className={`text-sm font-bold mt-0.5 ${

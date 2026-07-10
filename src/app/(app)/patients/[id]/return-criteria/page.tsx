@@ -10,13 +10,14 @@ import {
 import {
   getAssessments, saveAssessment, deleteAssessment,
   calcLysholm, calcAclRsi, calcHopLsi, calcLefs, calcComposite, getVerdict,
+  calcHipSymptom, calcHipFunction,
 } from '@/lib/return-criteria-store'
 import { getPatient } from '@/lib/patient-store'
 import type {
-  LysholmData, AclRsiItems, HopTestsData, AssessmentType,
-  ReturnCriteriaAssessment,
+  LysholmData, AclRsiItems, HopTestsData, AssessmentType, AssessmentRegion,
+  HipSymptomData, HipFunctionData, ReturnCriteriaAssessment,
 } from '@/types/return-criteria'
-import { LYSHOLM_DEFAULT } from '@/types/return-criteria'
+import { LYSHOLM_DEFAULT, HIP_SYMPTOM_DEFAULT, HIP_FUNCTION_DEFAULT } from '@/types/return-criteria'
 
 // ─── 定数 ──────────────────────────────────────────────────────────
 
@@ -34,6 +35,107 @@ const ACL_RSI_QUESTIONS = [
   { text: '活動することで膝にさらなるダメージを与えると心配だ', negative: true },
   { text: '活動中に他者と接触することが怖い', negative: true },
 ] as const
+
+// 股関節版は「膝」を「股関節」に置き換えたテキストを使用する
+function getRsiQuestions(region: AssessmentRegion) {
+  if (region === 'knee') return ACL_RSI_QUESTIONS
+  return ACL_RSI_QUESTIONS.map(q => ({ ...q, text: q.text.replaceAll('膝', '股関節') }))
+}
+
+// ── Harris Hip Score（股関節の症状評価。Lysholmに相当） ─────────────
+const HIP_SYMPTOM_FIELDS: {
+  key: keyof HipSymptomData
+  label: string
+  options: { score: number; label: string }[]
+}[] = [
+  {
+    key: 'pain',
+    label: '痛み（最も重要な項目）',
+    options: [
+      { score: 44, label: '痛みなし' },
+      { score: 40, label: '軽微（時々、活動に支障なし）' },
+      { score: 30, label: '軽度（通常の活動はできる。稀に中程度の痛み）' },
+      { score: 20, label: '中程度（活動が制限される。時々強い痛み）' },
+      { score: 10, label: '強い痛み（著しく活動が制限される）' },
+      { score: 0,  label: '完全な機能障害（かばって歩けない）' },
+    ],
+  },
+  {
+    key: 'limp',
+    label: '歩行：跛行',
+    options: [
+      { score: 11, label: 'なし' }, { score: 8, label: '軽度' },
+      { score: 5, label: '中程度' }, { score: 0, label: '重度または歩行不可' },
+    ],
+  },
+  {
+    key: 'support',
+    label: '歩行：補助具',
+    options: [
+      { score: 11, label: '不要' }, { score: 7, label: '杖（長距離のみ）' },
+      { score: 5, label: '杖（常時）' }, { score: 3, label: '松葉杖（1本）' },
+      { score: 2, label: '松葉杖（2本）' }, { score: 0, label: '歩行不可' },
+    ],
+  },
+  {
+    key: 'distance',
+    label: '歩行距離',
+    options: [
+      { score: 11, label: '無制限' }, { score: 8, label: '6ブロック（約500m）以上' },
+      { score: 5, label: '2〜3ブロック（200m程度）' }, { score: 2, label: '室内のみ' },
+      { score: 0, label: '歩行不可' },
+    ],
+  },
+  {
+    key: 'stairs',
+    label: '階段昇降',
+    options: [
+      { score: 4, label: '手すりなしで通常通り' }, { score: 2, label: '手すりを使えば通常通り' },
+      { score: 1, label: '何らかの方法で可能' }, { score: 0, label: '不可' },
+    ],
+  },
+  {
+    key: 'shoes',
+    label: '靴・靴下の着脱',
+    options: [
+      { score: 4, label: '容易にできる' }, { score: 2, label: '困難だができる' }, { score: 0, label: '不可' },
+    ],
+  },
+  {
+    key: 'sitting',
+    label: '座位',
+    options: [
+      { score: 5, label: '1時間以上普通の椅子に楽に座れる' },
+      { score: 3, label: '30分は高い椅子に座れる' },
+      { score: 0, label: '座位が不快' },
+    ],
+  },
+  {
+    key: 'transport',
+    label: '公共交通機関の利用',
+    options: [
+      { score: 1, label: '可能' }, { score: 0, label: '不可' },
+    ],
+  },
+  {
+    key: 'deformity',
+    label: '変形（固定屈曲拘縮・外転拘縮・肢長差など）',
+    options: [
+      { score: 4, label: '変形なし（または軽微）' }, { score: 0, label: '変形あり' },
+    ],
+  },
+  {
+    key: 'rom',
+    label: '関節可動域（総合的な評価）',
+    options: [
+      { score: 5, label: 'ほぼ正常（屈曲≥110°、外転≥20°、内旋≥15°）' },
+      { score: 4, label: '軽度制限（屈曲80-109°）' },
+      { score: 3, label: '中程度制限（屈曲60-79°）' },
+      { score: 1, label: '高度制限（屈曲<60°）' },
+      { score: 0, label: '著しい制限' },
+    ],
+  },
+]
 
 const LEFS_ACTIVITIES = [
   '職場・学校での通常業務',
@@ -337,6 +439,8 @@ export default function ReturnCriteriaPage({
   const { id: patientId } = use(params)
   const router = useRouter()
   const patient = getPatient(patientId)
+  // 患者の登録部位から対象を自動判定（股関節登録の患者のみ股関節版フォームを表示）
+  const region: AssessmentRegion = patient?.bodyRegion === 'hip' ? 'hip' : 'knee'
 
   // フォーム状態
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('sport')
@@ -344,6 +448,7 @@ export default function ReturnCriteriaPage({
     new Date().toISOString().split('T')[0]
   )
   const [lysholm, setLysholm] = useState<LysholmData>({ ...LYSHOLM_DEFAULT })
+  const [hipSymptom, setHipSymptom] = useState<HipSymptomData>({ ...HIP_SYMPTOM_DEFAULT })
   const [aclRsi, setAclRsi] = useState<AclRsiItems>(
     Array(12).fill(5) as AclRsiItems
   )
@@ -353,6 +458,7 @@ export default function ReturnCriteriaPage({
     crossover: { involved: 0, uninvolved: 0 },
     timed:     { involved: 0, uninvolved: 0 },
   })
+  const [hipFunction, setHipFunction] = useState<HipFunctionData>({ ...HIP_FUNCTION_DEFAULT })
   const [lefs, setLefs] = useState<number[]>(Array(20).fill(4))
   const [notes, setNotes] = useState('')
   const [saved, setSaved] = useState(false)
@@ -363,15 +469,17 @@ export default function ReturnCriteriaPage({
   )
   const [showHistory, setShowHistory] = useState(false)
 
+  const rsiQuestions = useMemo(() => getRsiQuestions(region), [region])
+
   // ライブスコア
   const scores = useMemo(() => {
-    const symptom       = calcLysholm(lysholm)
+    const symptom       = region === 'knee' ? calcLysholm(lysholm) : calcHipSymptom(hipSymptom)
     const psychological = calcAclRsi(aclRsi)
-    const functional    = calcHopLsi(hopTests)
+    const functional    = region === 'knee' ? calcHopLsi(hopTests) : calcHipFunction(hipFunction)
     const daily         = calcLefs(lefs)
     const composite     = calcComposite(symptom, psychological, functional, daily, assessmentType)
     return { symptom, psychological, functional, daily, composite }
-  }, [lysholm, aclRsi, hopTests, lefs, assessmentType])
+  }, [region, lysholm, hipSymptom, aclRsi, hopTests, hipFunction, lefs, assessmentType])
 
   const verdict = getVerdict(scores.composite)
 
@@ -384,8 +492,9 @@ export default function ReturnCriteriaPage({
 
   function handleSave() {
     const record = saveAssessment(
-      patientId, assessmentDate, assessmentType,
-      lysholm, aclRsi, hopTests, lefs, notes,
+      region === 'knee'
+        ? { region, patientId, assessmentDate, type: assessmentType, lysholm, hopTests, aclRsi, lefs, notes }
+        : { region, patientId, assessmentDate, type: assessmentType, hipSymptom, hipFunction, aclRsi, lefs, notes }
     )
     setHistory(prev => [record, ...prev])
     setSaved(true)
@@ -432,6 +541,11 @@ export default function ReturnCriteriaPage({
         </Link>
         <span className="text-slate-300">/</span>
         <span className="text-sm font-semibold text-slate-700">復帰基準テスト</span>
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+          region === 'hip' ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+        }`}>
+          対象部位: {region === 'hip' ? '股関節' : '膝'}
+        </span>
       </div>
 
       {/* ── タイプ選択・日付 ── */}
@@ -471,7 +585,8 @@ export default function ReturnCriteriaPage({
         {/* ── 左: フォーム ── */}
         <div className="lg:col-span-3 space-y-4">
 
-          {/* Lysholm */}
+          {/* Lysholm（膝） */}
+          {region === 'knee' && (
           <Section
             title="症状評価 — Lysholm Knee Score"
             subtitle="Lysholm 1982 / Tegner & Lysholm 1985"
@@ -509,11 +624,55 @@ export default function ReturnCriteriaPage({
               ))}
             </div>
           </Section>
+          )}
+
+          {/* Harris Hip Score（股関節） */}
+          {region === 'hip' && (
+          <Section
+            title="症状評価 — Harris Hip Score"
+            subtitle="Harris (1969) J Bone Joint Surg Am"
+            score={scores.symptom}
+            threshold={assessmentType === 'sport' ? 85 : 75}
+            open={openSections.lysholm}
+            onToggle={() => toggleSection('lysholm')}
+            color="blue"
+          >
+            <div className="space-y-4">
+              {HIP_SYMPTOM_FIELDS.map(({ key, label, options }) => (
+                <div key={key}>
+                  <p className="text-xs font-semibold text-slate-600 mb-1.5">{label}</p>
+                  <div className="space-y-1">
+                    {options.map(opt => (
+                      <label key={opt.score}
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm
+                          ${hipSymptom[key] === opt.score
+                            ? 'bg-blue-50 text-blue-800 font-medium'
+                            : 'hover:bg-slate-50 text-slate-600'}`}
+                      >
+                        <input type="radio"
+                          checked={hipSymptom[key] === opt.score}
+                          onChange={() => setHipSymptom(d => ({ ...d, [key]: opt.score }))}
+                          className="accent-blue-600"
+                        />
+                        <span className="flex-1">{opt.label}</span>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                          hipSymptom[key] === opt.score ? 'bg-blue-200 text-blue-900' : 'bg-slate-100 text-slate-500'
+                        }`}>{opt.score}点</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+          )}
 
           {/* ACL-RSI */}
           <Section
-            title="心理的準備度 — ACL-RSI"
-            subtitle="Webster et al. 2008, Br J Sports Med（カットオフ ≥65）"
+            title={region === 'knee' ? '心理的準備度 — ACL-RSI' : '心理的準備度 — RSI（股関節版）'}
+            subtitle={region === 'knee'
+              ? 'Webster et al. 2008, Br J Sports Med（カットオフ ≥65）'
+              : 'ACL-RSI（Webster et al. 2008）の概念を股関節傷害向けに表現を調整（カットオフ ≥65）'}
             score={scores.psychological}
             threshold={65}
             open={openSections.aclRsi}
@@ -525,7 +684,7 @@ export default function ReturnCriteriaPage({
                 各質問に対して、現在の気持ちをスライダーで選んでください。<br />
                 <span className="text-purple-700 font-semibold">0 = 全くそう思わない　→　10 = 完全にそう思う</span>
               </p>
-              {ACL_RSI_QUESTIONS.map((q, i) => (
+              {rsiQuestions.map((q, i) => (
                 <div key={i}>
                   <div className="flex items-start justify-between gap-3 mb-1.5">
                     <p className="text-xs font-medium text-slate-700">
@@ -555,7 +714,8 @@ export default function ReturnCriteriaPage({
             </div>
           </Section>
 
-          {/* Hop Tests */}
+          {/* Hop Tests（膝） */}
+          {region === 'knee' && (
           <Section
             title="機能テスト — 4 Hop Test Battery (LSI)"
             subtitle="Grindem et al. 2016, BJSM（LSI ≥90%が競技復帰基準）"
@@ -628,6 +788,102 @@ export default function ReturnCriteriaPage({
               })}
             </div>
           </Section>
+          )}
+
+          {/* 股関節機能テスト */}
+          {region === 'hip' && (
+          <Section
+            title="機能テスト — 片脚立位・ステップダウン・Trendelenburg徴候"
+            subtitle="臨床所見に基づく股関節機能評価（LSI ≥90%が競技復帰の目安）"
+            score={scores.functional}
+            threshold={assessmentType === 'sport' ? 90 : 80}
+            open={openSections.hop}
+            onToggle={() => toggleSection('hop')}
+            color="teal"
+          >
+            <div className="space-y-4">
+              <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2.5">
+                患肢と健肢の両方を計測してください。<br />
+                LSI（肢体対称性指数）= 患肢 / 健肢 × 100<br />
+                <span className="font-semibold text-teal-700">Trendelenburg徴候が陽性の場合はスコアから減点されます</span>
+              </p>
+
+              {([
+                { key: 'singleLegStance', label: '片脚立位保持時間', unit: '秒', desc: '骨盤を水平に保ったまま片脚立位を保持できる時間' },
+                { key: 'stepDown',        label: 'シングルレッグ・ステップダウン', unit: '回', desc: '30秒間で、骨盤の傾きを保ったままできた回数' },
+              ] as const).map(({ key, label, unit, desc }) => {
+                const test = hipFunction[key]
+                const lsiVal = test.involved && test.uninvolved
+                  ? Math.min(100, Math.round((test.involved / test.uninvolved) * 100))
+                  : null
+                return (
+                  <div key={key} className="border border-slate-100 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
+                    <p className="text-[10px] text-slate-400 mb-2.5">{desc}</p>
+                    <div className="grid grid-cols-3 gap-2 items-end">
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
+                        <input type="number" min="0" step="0.1"
+                          value={test.involved || ''}
+                          onChange={e => setHipFunction(d => ({
+                            ...d, [key]: { ...d[key], involved: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-center
+                            focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
+                        <input type="number" min="0" step="0.1"
+                          value={test.uninvolved || ''}
+                          onChange={e => setHipFunction(d => ({
+                            ...d, [key]: { ...d[key], uninvolved: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-center
+                            focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-semibold text-slate-500 mb-1">LSI</p>
+                        <p className={`text-lg font-bold ${
+                          lsiVal === null ? 'text-slate-300'
+                            : lsiVal >= 90 ? 'text-emerald-600'
+                            : lsiVal >= 80 ? 'text-amber-500'
+                            : 'text-red-500'
+                        }`}>{lsiVal !== null ? `${lsiVal}%` : '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              <div className="border border-slate-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-slate-700 mb-0.5">Trendelenburg徴候</p>
+                <p className="text-[10px] text-slate-400 mb-2.5">片脚立位時に反対側の骨盤が下がる場合は陽性（中殿筋機能低下の指標）</p>
+                <div className="flex gap-2">
+                  {([
+                    { value: 'negative', label: '陰性' },
+                    { value: 'positive', label: '陽性' },
+                  ] as const).map(opt => (
+                    <button key={opt.value}
+                      onClick={() => setHipFunction(d => ({ ...d, trendelenburg: opt.value }))}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                        hipFunction.trendelenburg === opt.value
+                          ? opt.value === 'positive'
+                            ? 'bg-red-500 text-white border-red-500'
+                            : 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-teal-400'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Section>
+          )}
 
           {/* LEFS */}
           <Section
@@ -713,13 +969,13 @@ export default function ReturnCriteriaPage({
 
           {/* スコアバー */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
-            <ScoreBar label="症状 (Lysholm)" score={scores.symptom}
+            <ScoreBar label={region === 'knee' ? '症状 (Lysholm)' : '症状 (HHS)'} score={scores.symptom}
               threshold={assessmentType === 'sport' ? 85 : 75}
               icon={Activity} color="text-blue-500" />
-            <ScoreBar label="心理的準備度 (ACL-RSI)" score={scores.psychological}
+            <ScoreBar label={region === 'knee' ? '心理的準備度 (ACL-RSI)' : '心理的準備度 (RSI)'} score={scores.psychological}
               threshold={65}
               icon={Brain} color="text-purple-500" />
-            <ScoreBar label="機能テスト (Hop LSI)" score={scores.functional}
+            <ScoreBar label={region === 'knee' ? '機能テスト (Hop LSI)' : '機能テスト (股関節LSI)'} score={scores.functional}
               threshold={assessmentType === 'sport' ? 90 : 80}
               icon={Zap} color="text-teal-500" />
             <ScoreBar label="日常生活 (LEFS)" score={scores.daily}
