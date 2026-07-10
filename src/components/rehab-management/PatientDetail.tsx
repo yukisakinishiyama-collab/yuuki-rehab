@@ -38,6 +38,8 @@ import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
 import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
+import DrillsBrowser from '@/components/site/DrillsBrowser'
+import { guessDrillDiseaseSlug } from '@/lib/drill-match'
 
 // ── 月次カルテ印刷 ────────────────────────────────────────────
 function printMonthlyChart(
@@ -692,7 +694,7 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'explanation'
+type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'drills' | 'explanation'
 
 interface Props {
   patient: Patient
@@ -863,8 +865,11 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'special', label: 'スペシャルテスト', icon: '🔍' },
     { key: 'progress', label: '進捗', icon: '📈' },
     { key: 'exercises', label: '運動メニュー', icon: '🏃' },
+    { key: 'drills', label: '競技復帰ドリル', icon: '🏅' },
     { key: 'explanation', label: '患者説明', icon: '📄' },
   ]
+
+  const guessedDrillSlug = guessDrillDiseaseSlug(patient.diagnosisLabel, patient.bodyRegion)
 
   return (
     <div className="space-y-0">
@@ -1594,6 +1599,18 @@ export default function PatientDetail({ patient }: Props) {
                   ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── 競技復帰ドリルタブ ── */}
+        {activeTab === 'drills' && (
+          <div>
+            <p className="text-xs text-gray-400 mb-4">
+              {guessedDrillSlug
+                ? `診断名「${patient.diagnosisLabel}」から関連するドリルを表示しています。絞り込み条件は自由に変更できます。`
+                : '患者の診断名から自動で絞り込めなかったため、全疾患を表示しています。上の絞り込みから選択してください。'}
+            </p>
+            <DrillsBrowser initialDiseaseSlug={guessedDrillSlug} />
           </div>
         )}
 
