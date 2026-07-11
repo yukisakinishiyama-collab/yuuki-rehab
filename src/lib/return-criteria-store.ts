@@ -5,6 +5,12 @@ import type {
   HopTestsData,
   HipSymptomData,
   HipFunctionData,
+  ShoulderSymptomData,
+  ShoulderFunctionData,
+  AnkleSymptomData,
+  AnkleFunctionData,
+  LumbarSymptomData,
+  LumbarFunctionData,
   Verdict,
   AssessmentType,
   AssessmentRegion,
@@ -82,6 +88,60 @@ export function calcHipFunction(d: HipFunctionData): number {
   return d.trendelenburg === 'positive' ? Math.max(0, base - 15) : base
 }
 
+// ASES肩スコア（痛みVAS由来50点 + 機能10項目[0-30]を50点換算）
+export function calcShoulderSymptom(d: ShoulderSymptomData): number {
+  const funcSum = d.f1 + d.f2 + d.f3 + d.f4 + d.f5 + d.f6 + d.f7 + d.f8 + d.f9 + d.f10
+  return Math.round(d.pain + (funcSum / 30) * 50)
+}
+
+// 座位シングルアーム・ショットパット＋上肢版Y-BalanceのLSI平均。
+// 肩甲骨ディスキネジス陽性の場合は減点する
+export function calcShoulderFunction(d: ShoulderFunctionData): number {
+  const vals = [
+    lsi(d.seatedShotPut.involved, d.seatedShotPut.uninvolved),
+    lsi(d.yBalanceReach.involved, d.yBalanceReach.uninvolved),
+  ].filter(v => v > 0)
+  if (!vals.length) return 0
+  const base = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+  return d.scapularDyskinesis === 'positive' ? Math.max(0, base - 15) : base
+}
+
+// 上肢日常生活機能（QuickDASH参考の11項目、1-5尺度）→ 0-100点（高いほど良い方向に反転）
+export function calcShoulderDaily(items: number[]): number {
+  if (!items.length) return 0
+  const sum = items.reduce((s, v) => s + (v || 0), 0)
+  const raw = ((sum / items.length) - 1) * 25
+  return Math.round(100 - Math.max(0, Math.min(100, raw)))
+}
+
+// CAIT（9項目・30点満点）を100点換算
+export function calcAnkleSymptom(d: AnkleSymptomData): number {
+  const raw = d.q1 + d.q2 + d.q3 + d.q4 + d.q5 + d.q6 + d.q7 + d.q8 + d.q9
+  return Math.round((raw / 30) * 100)
+}
+
+// Y-Balance前方リーチ・Figure-8ホップテストのLSI平均
+export function calcAnkleFunction(d: AnkleFunctionData): number {
+  const vals = [
+    lsi(d.yBalanceAnterior.involved, d.yBalanceAnterior.uninvolved),
+    lsi(d.figure8Hop.involved,       d.figure8Hop.uninvolved, true), // 時間は逆転
+  ].filter(v => v > 0)
+  if (!vals.length) return 0
+  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+}
+
+// ODI（9項目・45点満点、性生活項目は除外）→ 障害度%を100点換算後に反転（高いほど良い）
+export function calcLumbarSymptom(d: LumbarSymptomData): number {
+  const raw = d.s1 + d.s2 + d.s3 + d.s4 + d.s5 + d.s6 + d.s7 + d.s8 + d.s9
+  const disabilityPercent = Math.round((raw / 45) * 100)
+  return 100 - disabilityPercent
+}
+
+// サイドブリッジ保持時間の左右差（LSI）
+export function calcLumbarFunction(d: LumbarFunctionData): number {
+  return lsi(d.sideBridge.involved, d.sideBridge.uninvolved)
+}
+
 // 重み付き合計スコア
 // 競技復帰: 症状25% + 心理30% + 機能35% + 日常10%
 // 日常復帰: 症状30% + 心理20% + 機能20% + 日常30%
@@ -133,11 +193,82 @@ interface SaveHipInput {
   notes: string
 }
 
-export function saveAssessment(input: SaveKneeInput | SaveHipInput): ReturnCriteriaAssessment {
-  const symptom = input.region === 'knee' ? calcLysholm(input.lysholm) : calcHipSymptom(input.hipSymptom)
-  const functional = input.region === 'knee' ? calcHopLsi(input.hopTests) : calcHipFunction(input.hipFunction)
+interface SaveShoulderInput {
+  region: 'shoulder'
+  patientId: string
+  assessmentDate: string
+  type: AssessmentType
+  shoulderSymptom: ShoulderSymptomData
+  shoulderFunction: ShoulderFunctionData
+  aclRsi: AclRsiItems
+  shoulderDaily: number[]
+  notes: string
+}
+
+interface SaveAnkleInput {
+  region: 'ankle'
+  patientId: string
+  assessmentDate: string
+  type: AssessmentType
+  ankleSymptom: AnkleSymptomData
+  ankleFunction: AnkleFunctionData
+  aclRsi: AclRsiItems
+  lefs: number[]
+  notes: string
+}
+
+interface SaveLumbarInput {
+  region: 'lumbar'
+  patientId: string
+  assessmentDate: string
+  type: AssessmentType
+  lumbarSymptom: LumbarSymptomData
+  lumbarFunction: LumbarFunctionData
+  aclRsi: AclRsiItems
+  lefs: number[]
+  notes: string
+}
+
+type SaveInput = SaveKneeInput | SaveHipInput | SaveShoulderInput | SaveAnkleInput | SaveLumbarInput
+
+export function saveAssessment(input: SaveInput): ReturnCriteriaAssessment {
+  let symptom: number, functional: number, daily: number
+  let regionData: Partial<ReturnCriteriaAssessment>
+
+  switch (input.region) {
+    case 'knee':
+      symptom = calcLysholm(input.lysholm)
+      functional = calcHopLsi(input.hopTests)
+      daily = calcLefs(input.lefs)
+      regionData = { lysholm: input.lysholm, hopTests: input.hopTests, lefs: input.lefs }
+      break
+    case 'hip':
+      symptom = calcHipSymptom(input.hipSymptom)
+      functional = calcHipFunction(input.hipFunction)
+      daily = calcLefs(input.lefs)
+      regionData = { hipSymptom: input.hipSymptom, hipFunction: input.hipFunction, lefs: input.lefs }
+      break
+    case 'shoulder':
+      symptom = calcShoulderSymptom(input.shoulderSymptom)
+      functional = calcShoulderFunction(input.shoulderFunction)
+      daily = calcShoulderDaily(input.shoulderDaily)
+      regionData = { shoulderSymptom: input.shoulderSymptom, shoulderFunction: input.shoulderFunction, shoulderDaily: input.shoulderDaily }
+      break
+    case 'ankle':
+      symptom = calcAnkleSymptom(input.ankleSymptom)
+      functional = calcAnkleFunction(input.ankleFunction)
+      daily = calcLefs(input.lefs)
+      regionData = { ankleSymptom: input.ankleSymptom, ankleFunction: input.ankleFunction, lefs: input.lefs }
+      break
+    case 'lumbar':
+      symptom = calcLumbarSymptom(input.lumbarSymptom)
+      functional = calcLumbarFunction(input.lumbarFunction)
+      daily = calcLefs(input.lefs)
+      regionData = { lumbarSymptom: input.lumbarSymptom, lumbarFunction: input.lumbarFunction, lefs: input.lefs }
+      break
+  }
+
   const psychological = calcAclRsi(input.aclRsi)
-  const daily = calcLefs(input.lefs)
   const composite = calcComposite(symptom, psychological, functional, daily, input.type)
   const verdict = getVerdict(composite)
 
@@ -147,11 +278,8 @@ export function saveAssessment(input: SaveKneeInput | SaveHipInput): ReturnCrite
     assessmentDate: input.assessmentDate,
     type: input.type,
     region: input.region,
-    ...(input.region === 'knee'
-      ? { lysholm: input.lysholm, hopTests: input.hopTests }
-      : { hipSymptom: input.hipSymptom, hipFunction: input.hipFunction }),
+    ...regionData,
     aclRsi: input.aclRsi,
-    lefs: input.lefs,
     scores: { symptom, psychological, functional, daily, composite },
     verdict,
     notes: input.notes,
