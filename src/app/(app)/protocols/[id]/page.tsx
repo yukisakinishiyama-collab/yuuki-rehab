@@ -17,7 +17,7 @@ import ProtocolSearchModal from '@/components/protocol/ProtocolSearchModal'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
-  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle,
+  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
@@ -36,11 +36,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [titleDraft, setTitleDraft] = useState('')
   const [ptPatients, setPtPatients] = useState<PtPatient[]>([])
   const [selectedPtId, setSelectedPtId] = useState('')
+  const [ptSearch, setPtSearch] = useState('')
   const [reflectDone, setReflectDone] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [initialQuery, setInitialQuery] = useState('')
   const [selectionPopup, setSelectionPopup] = useState<{ text: string; x: number; y: number } | null>(null)
   const protocolContentRef = useRef<HTMLDivElement>(null)
+
+  const filteredPtPatients = ptSearch
+    ? ptPatients.filter(p => p.name.includes(ptSearch) || (p.kana && p.kana.includes(ptSearch)))
+    : ptPatients
 
   useEffect(() => {
     const p = getProtocolById(id)
@@ -151,6 +156,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   function handleOpenReflect() {
     setPtPatients(getPtPatients())
     setSelectedPtId('')
+    setPtSearch('')
     setReflectDone(false)
     setShowReflectModal(true)
   }
@@ -505,17 +511,40 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                     先に患者を登録してください。
                   </div>
                 ) : (
-                  <select
-                    value={selectedPtId}
-                    onChange={e => setSelectedPtId(e.target.value)}
-                    className="w-full h-10 rounded-md border border-gray-200 bg-white px-3 text-sm
-                      focus:outline-none focus:ring-2 focus:ring-teal-600 mb-4"
-                  >
-                    <option value="">患者を選択...</option>
-                    {ptPatients.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}　{p.kana && `（${p.kana}）`}</option>
-                    ))}
-                  </select>
+                  <>
+                    <div className="relative mb-2">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={ptSearch}
+                        onChange={e => setPtSearch(e.target.value)}
+                        placeholder="氏名・カナで検索..."
+                        className="w-full h-10 rounded-md border border-gray-200 bg-white pl-9 pr-3 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-teal-600"
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-xl mb-4 divide-y divide-gray-100">
+                      {filteredPtPatients.length === 0 ? (
+                        <p className="text-sm text-gray-400 p-4 text-center">該当する患者が見つかりません</p>
+                      ) : (
+                        filteredPtPatients.map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSelectedPtId(p.id)}
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                              selectedPtId === p.id
+                                ? 'bg-teal-50 text-teal-800 font-semibold'
+                                : 'hover:bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            {p.name}
+                            {p.kana && <span className={selectedPtId === p.id ? 'text-teal-500 font-normal' : 'text-gray-400 font-normal'}>　（{p.kana}）</span>}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
                 )}
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800">
                   プロトコルの全{protocol.phases.length}フェーズがリハビリ計画として登録されます。
