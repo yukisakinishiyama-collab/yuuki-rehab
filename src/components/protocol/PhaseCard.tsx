@@ -9,7 +9,7 @@ import {
 } from '@/types/protocol'
 import CriteriaGauge from './CriteriaGauge'
 import {
-  ChevronDown, ChevronUp, AlertTriangle, Edit2, Plus, Trash2,
+  ChevronDown, ChevronUp, AlertTriangle, Edit2, Plus, Trash2, Save,
   Target, Dumbbell, ShieldOff, Flag, BookOpen, PlayCircle,
 } from 'lucide-react'
 
@@ -26,6 +26,16 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
   const [expanded, setExpanded] = useState(isActive)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(phase)
+  const [prevPhaseForDraft, setPrevPhaseForDraft] = useState(phase)
+
+  // 編集中でない間は、保存済みの最新phaseにdraftを同期し続ける（レンダー中に調整）。
+  // これを怠ると、以前保存した内容から更新されない古いdraftを基準に
+  // 移行基準のチェック操作（onToggle）が実行され、最新の編集内容が
+  // 古い内容で上書きされて消える不具合が起きる。
+  if (phase !== prevPhaseForDraft && !editing) {
+    setPrevPhaseForDraft(phase)
+    setDraft(phase)
+  }
 
   function toggleCriterion(index: number) {
     if (!onUpdate) return
@@ -117,9 +127,9 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
-          {!readOnly && (
+          {!readOnly && !editing && (
             <button
-              onClick={e => { e.stopPropagation(); setEditing(v => !v); setExpanded(true) }}
+              onClick={e => { e.stopPropagation(); setEditing(true); setExpanded(true) }}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               aria-label="編集"
             >
@@ -324,9 +334,10 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
                 <button
                   onClick={saveEdit}
                   className="bg-[--color-primary] text-white text-sm px-4 py-1.5 rounded-lg
-                    hover:bg-[--color-primary-hover] transition-colors font-display font-medium"
+                    hover:bg-[--color-primary-hover] transition-colors font-display font-medium
+                    flex items-center gap-1.5"
                 >
-                  保存
+                  <Save className="w-3.5 h-3.5" />変更を保存して登録
                 </button>
                 <button
                   onClick={() => { setDraft(phase); setEditing(false) }}
