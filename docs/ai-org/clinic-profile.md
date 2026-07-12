@@ -2,6 +2,7 @@
 
 > Executive AI 指示（2026-07-12）に基づき登録。Research AI / Marketing AI は本ファイルを一次参照とすること。
 > 変更は CEO 承認事項。数値未確定項目は確定次第、本ファイルを更新する。
+> 各 AI の役割定義・運用ルールは `Yuki_AI_OS/`（00_System.md 〜 09_Automation_AI.md）を参照。
 
 ## 院情報
 
