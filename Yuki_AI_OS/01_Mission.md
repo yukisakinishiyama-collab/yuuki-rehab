@@ -42,6 +42,9 @@ Yuki AI OS 全体が判断に迷ったときに立ち返る最上位の価値基
 
 リソース配分の目安：MEO 5 : Instagram 3 : SEO 2。チャネル間の整合（同一テーマ・同一表現基準）は Executive AI が担保する。
 
+チャネル内の詳細優先順位（CEO 指示・2026-07-12）：
+①MEO / Google ビジネスプロフィール ②Google 口コミ ③Instagram ④Google 投稿 ⑤note ⑥ホームページ SEO ⑦YouTube ⑧X / Threads
+
 ## 守るべきルール
 
 1. すべての施策は「注力領域1〜6のどれに効くか」を明示してから着手する

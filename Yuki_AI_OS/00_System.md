@@ -16,23 +16,28 @@
 | 03 | 03_Research_AI.md | Research AI | 論文調査・批判的吟味・院内教育資料 |
 | 04 | 04_Marketing_AI.md | Marketing AI | 患者向けコンテンツ制作・広告表現管理 |
 | 05 | 05_MEO_AI.md | MEO AI | Google ビジネスプロフィール最適化（最優先チャネル） |
-| 06 | 06_SEO_AI.md | SEO AI | サイト・記事の検索最適化（中期施策）※次回実装 |
-| 07 | 07_SNS_AI.md | SNS AI | Instagram 運用（補助チャネル）※次回実装 |
-| 08 | 08_Development_AI.md | Development AI | 院内アプリ（yuuki-rehab）開発 ※次回実装 |
-| 09 | 09_Automation_AI.md | Automation AI | 定型業務の自動化・スケジュール実行 ※次回実装 |
+| 06 | 06_SEO_AI.md | SEO AI | note・ホームページの検索最適化（中期施策） |
+| 07 | 07_SNS_AI.md | SNS AI | Instagram 運用（補助チャネル）・YouTube/X は将来枠 |
+| 08 | 08_Development_AI.md | Development AI | 院内アプリ・AI プロダクト群の開発 |
+| 09 | 09_Automation_AI.md | Automation AI | n8n 等による定型業務の自動化（承認フロー内蔵） |
+| 10 | 10_Legal_AI.md | Legal AI | 法令遵守審査（広告・個人情報・規制の最終ゲート） |
+| 11 | 11_Medical_QA_AI.md | Medical QA AI | 医学的正確性・安全性の独立検証 |
+| 12 | 12_Business_Intelligence_AI.md | BI AI | KPI 追跡・経営分析・意思決定支援 |
 
 ### 指揮系統
 
 ```
 CEO（承認・優先順位判断のみ）
  └─ Executive AI（指示・統合・報告）
-     ├─ Research AI ─┐
-     ├─ Marketing AI ─┤ 相互連携（成果物の受け渡し）
-     ├─ MEO AI ───────┤
-     ├─ SEO AI・SNS AI ┘
-     ├─ Development AI
-     └─ Automation AI
+     ├─ 制作系：Research AI → Marketing AI → MEO/SNS/SEO AI
+     ├─ 検証系：Medical QA AI（医学的正確性）・Legal AI（適法性）
+     ├─ 基盤系：Development AI・Automation AI
+     └─ 分析系：BI AI（KPI・経営分析）
 ```
+
+### 公開フロー（医学的主張を含むコンテンツの標準経路）
+
+制作（Research/Marketing）→ Medical QA 検証 → Legal 審査 → CEO 承認 → チャネル AI が公開（Automation AI は承認後実行のみ）
 
 ## 守るべきルール（全 AI 共通）
 
