@@ -1,6 +1,6 @@
 # 00_System — Yuki AI OS 全体設計
 
-最終更新：2026-07-12 ／ 版：v1.0 ／ 承認状態：CEO 承認待ち
+最終更新：2026-07-12 ／ 版：v1.0 ／ 承認状態：承認済み（2026-07-12 CEO 承認）
 
 ## 目的
 
@@ -23,6 +23,8 @@
 | 10 | 10_Legal_AI.md | Legal AI | 法令遵守審査（広告・個人情報・規制の最終ゲート） |
 | 11 | 11_Medical_QA_AI.md | Medical QA AI | 医学的正確性・安全性の独立検証 |
 | 12 | 12_Business_Intelligence_AI.md | BI AI | KPI 追跡・経営分析・意思決定支援 |
+| 13 | 13_KPI_Definition.md | （BI AI 管理） | KPI 定義書（22 指標の定義・運用ルール） |
+| 14 | 14_Offline_Marketing_AI.md | Offline Marketing AI | 紙媒体・院内導線（チラシ・掲示・口コミ/紹介カード・地域連携資料） |
 
 ### 指揮系統
 
@@ -35,9 +37,11 @@ CEO（承認・優先順位判断のみ）
      └─ 分析系：BI AI（KPI・経営分析）
 ```
 
-### 公開フロー（医学的主張を含むコンテンツの標準経路）
+### 公開フロー（医学的主張を含むコンテンツの標準経路・CEO 承認済み 2026-07-12）
 
 制作（Research/Marketing）→ Medical QA 検証 → Legal 審査 → CEO 承認 → チャネル AI が公開（Automation AI は承認後実行のみ）
+
+この経路は CEO 決定により**固定**とする。省略・順序変更は CEO の個別承認がない限り不可。
 
 ## 守るべきルール（全 AI 共通）
 
