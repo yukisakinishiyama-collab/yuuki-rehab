@@ -110,6 +110,77 @@ export async function composeFinal(opts: {
 }
 
 /**
+ * note見出し画像（1.91:1）用のオーバーレイ。
+ * - タイトルは中央寄せ・2行以内・安全領域内（端に寄せない）
+ * - 院名は控えめに下部中央
+ * - 長い注意書きは入れない
+ */
+function buildNoteCoverSvg(opts: {
+  width: number;
+  height: number;
+  title: string;
+  subtitle?: string;
+  safe: { top: number; right: number; bottom: number; left: number };
+}): string {
+  const { width: w, height: h, safe } = opts;
+  const titleLines = wrapTitle(opts.title, 14).slice(0, 2); // 2行以内
+  const titleSize = Math.round(w / 17); // 1280pxなら約75px
+  const subSize = Math.round(titleSize * 0.42);
+  const clinicSize = Math.round(w / 46);
+
+  // タイトルブロックを縦中央よりやや上に配置（安全領域内）
+  const titleBlockH = titleLines.length * Math.round(titleSize * 1.3);
+  const blockTop = Math.max(safe.top, Math.round(h * 0.32) - titleBlockH / 2);
+
+  const titleSpans = titleLines
+    .map((line, i) => `<tspan x="${w / 2}" dy="${i === 0 ? 0 : Math.round(titleSize * 1.3)}">${esc(line)}</tspan>`)
+    .join('');
+
+  const subtitleSvg = opts.subtitle
+    ? `<text x="${w / 2}" y="${blockTop + titleBlockH + Math.round(subSize * 1.6)}" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="${subSize}" fill="#F0F4FA">${esc(opts.subtitle)}</text>`
+    : '';
+
+  // 可読性のための上下グラデーション・スクリム
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1B2A4A" stop-opacity="0.72"/>
+      <stop offset="45%" stop-color="#1B2A4A" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#1B2A4A" stop-opacity="0.72"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="${w}" height="${h}" fill="url(#scrim)"/>
+  <text x="${w / 2}" y="${blockTop + titleSize}" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="${titleSize}" font-weight="bold" fill="#FFFFFF">${titleSpans}</text>
+  ${subtitleSvg}
+  <rect x="${w / 2 - Math.round(w * 0.09)}" y="${h - safe.bottom - Math.round(clinicSize * 1.9)}" width="${Math.round(w * 0.18)}" height="${Math.max(3, Math.round(w / 320))}" fill="#D86018"/>
+  <text x="${w / 2}" y="${h - safe.bottom - Math.round(clinicSize * 0.6)}" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="${clinicSize}" fill="#FFFFFF" opacity="0.92">ゆうき整骨院｜下関市彦島</text>
+</svg>`;
+}
+
+export async function composeNoteCover(opts: {
+  sourcePng: Buffer;
+  outWidth: number;
+  outHeight: number;
+  title: string;
+  subtitle?: string;
+  safe: { top: number; right: number; bottom: number; left: number };
+  outFile: string;
+}): Promise<void> {
+  const svg = buildNoteCoverSvg({
+    width: opts.outWidth,
+    height: opts.outHeight,
+    title: opts.title,
+    subtitle: opts.subtitle,
+    safe: opts.safe,
+  });
+  await sharp(opts.sourcePng)
+    .resize(opts.outWidth, opts.outHeight, { fit: 'cover', position: 'centre' })
+    .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+    .png()
+    .toFile(opts.outFile);
+}
+
+/**
  * モックモード用: 単色のプレースホルダ画像を生成する（API課金なしで全工程を検証するため）
  */
 export async function mockImage(width: number, height: number): Promise<Buffer> {

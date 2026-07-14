@@ -73,6 +73,14 @@ if (!mock && !openaiKey) {
   process.exit(1);
 }
 
+// --platform 指定時は媒体別オーケストレーターへ委譲（未指定なら以下の既存フローを維持）
+const platform = getOpt('--platform');
+if (platform) {
+  const { runMultiPlatform } = await import('./multi-platform.mts');
+  const code = await runMultiPlatform({ theme, platform, quality, mock, anthropicKey: anthropicKey!, openaiKey, repoRoot });
+  process.exit(code);
+}
+
 const anthropic = new Anthropic({ apiKey: anthropicKey });
 
 // --- ステップ1-3: 本文案とImageSpecをClaudeで生成 ---
