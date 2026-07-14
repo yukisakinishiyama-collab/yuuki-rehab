@@ -206,13 +206,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     import('@/lib/sync-service').then(async ({ pullFromCloud, isSyncEnabled }) => {
       if (!isSyncEnabled()) return
       setSyncing(true)
-      const before = localStorage.getItem('pt_patients')
-      const ok = await pullFromCloud()
+      const { ok, changed } = await pullFromCloud()
       setSyncing(false)
-      if (ok) {
-        const after = localStorage.getItem('pt_patients')
-        if (before !== after) window.location.reload()
-      }
+      if (ok && changed) window.location.reload()
     })
   }, [])
 

@@ -187,6 +187,8 @@ function loadData(): StoreData {
 function saveData(data: StoreData): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  // 保存後にクラウドへ自動同期（設定済みの場合のみ）
+  import('./sync-service').then(({ scheduleSync }) => scheduleSync());
 }
 
 function generateId(): string {

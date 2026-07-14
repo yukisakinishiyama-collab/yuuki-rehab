@@ -8,7 +8,8 @@ const SYNC_SECRET = process.env.NEXT_PUBLIC_SYNC_SECRET ?? ''
 const SYNC_ENDPOINT = '/api/sync'
 
 // 同期から除外するキー（一時データ・認証情報）
-const EXCLUDE_KEYS = ['rehabStore_session', 'pt_initialized']
+// rehabUser: ログインセッション。同期すると別端末のログイン状態が混ざるため除外
+const EXCLUDE_KEYS = ['rehabStore_session', 'pt_initialized', 'rehabUser']
 
 // デバウンス用タイマー
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -45,27 +46,31 @@ export async function pushToCloud(): Promise<boolean> {
 
 // ────────────────────────────────
 // クラウドから全データをプル
+// 戻り値: ok=通信成功, changed=ローカルデータが更新されたか
 // ────────────────────────────────
-export async function pullFromCloud(): Promise<boolean> {
-  if (!SYNC_SECRET) return false
+export async function pullFromCloud(): Promise<{ ok: boolean; changed: boolean }> {
+  if (!SYNC_SECRET) return { ok: false, changed: false }
 
   try {
     const res = await fetch(SYNC_ENDPOINT, {
       headers: { 'x-sync-secret': SYNC_SECRET },
     })
-    if (!res.ok) return false
+    if (!res.ok) return { ok: false, changed: false }
 
     const { data } = await res.json()
-    if (!data || typeof data !== 'object') return false
+    if (!data || typeof data !== 'object') return { ok: false, changed: false }
 
+    let changed = false
     for (const [key, value] of Object.entries(data as Record<string, string>)) {
-      if (typeof value === 'string') {
+      if (typeof value !== 'string' || EXCLUDE_KEYS.includes(key)) continue
+      if (localStorage.getItem(key) !== value) {
         localStorage.setItem(key, value)
+        changed = true
       }
     }
-    return true
+    return { ok: true, changed }
   } catch {
-    return false
+    return { ok: false, changed: false }
   }
 }
 

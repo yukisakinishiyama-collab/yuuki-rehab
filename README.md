@@ -24,9 +24,19 @@ npm run start
 ```
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
 BLOB_READ_WRITE_TOKEN=vercel_blob_xxxxxxxxxxxx   # 動画アップロード用（任意）
+
+# スマホ⇔PC データ共有（任意、詳細は SYNC_SETUP.md）
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
+SYNC_SECRET=（同期用の合言葉）
+NEXT_PUBLIC_SYNC_SECRET=（SYNC_SECRET と同じ値）
 ```
 
 `ANTHROPIC_API_KEY` が未設定の場合、AI 専門家パネル機能と AI プロトコル生成は使用できません（テンプレートモードは常時利用可能です）。
+
+## スマホ ⇔ パソコンのデータ共有
+
+Supabase を使ったクラウド同期に対応しています。設定すると、アプリ起動時にクラウドから最新データを取得し、保存のたびに自動でクラウドへ送信されます。セットアップ手順は [SYNC_SETUP.md](SYNC_SETUP.md) を参照してください。
 
 ## 主な機能
 

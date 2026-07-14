@@ -36,6 +36,8 @@ function get<T>(key: string): T[] {
 function set<T>(key: string, data: T[]): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(key, JSON.stringify(data))
+  // 保存後にクラウドへ自動同期（設定済みの場合のみ）
+  import('./sync-service').then(({ scheduleSync }) => scheduleSync())
 }
 
 export function initStore(): void {
