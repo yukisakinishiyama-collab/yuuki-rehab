@@ -37,6 +37,24 @@ node tools/sns-automation/check-compliance.mjs --all   # note-converter/ と dra
 
 終了コードで判定できる（NGあり=1）ため、公開前の機械チェックとして他ツールにも組み込める。
 
+### 3. 投稿管理表チェック — `check-posts.mjs`
+
+スプレッドシート「ゆうき整骨院_投稿管理表」をCSVでダウンロードして渡すと、
+全投稿のNG表現チェックと、本文未作成の記事枠の洗い出しを一括で行う。
+
+```bash
+node tools/sns-automation/check-posts.mjs 投稿管理表.csv
+```
+
+### 4. 口コミ返信の下書き生成 — `generate-review-reply.mjs`
+
+Google口コミの本文を渡すと、ガイドラインに配慮した返信案を3案生成する。
+低評価にも対応（謝罪→改善姿勢→窓口案内の構成）。
+
+```bash
+node tools/sns-automation/generate-review-reply.mjs "口コミの本文" --stars 5
+```
+
 ## ワークフロー（note記事の場合）
 
 ```
