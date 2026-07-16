@@ -269,6 +269,12 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
   }
 
   // どのステップにも該当しない自由入力 → メニュー再提示
+  // LINE_TEXT_FALLBACK=off の場合は何も返さない（LINE公式アカウント側の
+  // 応答メッセージ（キーワード自動応答）と併用するための二重返信対策。
+  // 緊急判定・引き継ぎ判定は上で処理済みなので安全系は常に有効）
+  if (input.kind === 'text' && process.env.LINE_TEXT_FALLBACK === 'off') {
+    return { replies: [], patch: {} }
+  }
   return {
     replies: [
       {

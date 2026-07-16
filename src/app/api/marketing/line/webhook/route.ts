@@ -71,8 +71,8 @@ function describeInput(input: EngineInput): string {
   return input.text ?? ''
 }
 
-function processEvent(userId: string, displayName: string | undefined, input: EngineInput) {
-  const contact = getContact(userId, displayName)
+async function processEvent(userId: string, displayName: string | undefined, input: EngineInput) {
+  const contact = await getContact(userId, displayName)
   const result = advanceScenario(contact, input)
   Object.assign(contact, result.patch)
   if (result.notify) contact.needsAttention = contact.needsAttention || result.notify
@@ -100,7 +100,7 @@ function processEvent(userId: string, displayName: string | undefined, input: En
   result.replies.forEach((reply) => {
     log.push({ at: now, from: 'bot', text: reply.type === 'text' ? reply.text : `${reply.text}\n[${reply.buttons.map((b) => b.label).join(' / ')}]` })
   })
-  saveContact(contact, log)
+  await saveContact(contact, log)
   return result
 }
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         input: EngineInput
       }
       if (!userId || !input) throw new Error('bad request')
-      const result = processEvent(`sim_${userId}`, displayName, input)
+      const result = await processEvent(`sim_${userId}`, displayName, input)
       return NextResponse.json({ ok: true, replies: result.replies, notify: result.notify ?? null })
     } catch {
       return NextResponse.json({ error: 'invalid simulator request' }, { status: 400 })
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
     if (!input) continue
 
-    const result = processEvent(userId, undefined, input)
+    const result = await processEvent(userId, undefined, input)
     const replyToken = event.replyToken as string | undefined
     if (replyToken) {
       try {

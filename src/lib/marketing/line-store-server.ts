@@ -1,13 +1,18 @@
 /**
- * LINE顧客のサーバー側永続化（Phase 2: JSONファイル）
+ * LINE顧客のサーバー側永続化
  *
- * Webhookはサーバーで動くため、localStorageではなくファイルに保存する。
- * 開発環境: リポジトリ直下 .data/（gitignore済み）
- * サーバーレス環境: /tmp フォールバック（再起動で消える暫定。Phase 3でSupabaseへ移行）
+ * - Supabase設定時（SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY）: Postgresに保存（本番用）
+ * - 未設定時: JSONファイル保存（ローカル開発用。サーバーレスでは/tmp暫定）
+ * どちらも同じ非同期インターフェースで提供し、呼び出し側は保存先を意識しない。
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { createSupabaseServer } from '@/lib/supabase-server'
 import type { LineChatMessage, LineContact } from './line-types'
+
+const TABLE = 'marketing_line_contacts'
+
+// ── ファイルフォールバック ──────────────────────────────────────
 
 interface LineDb {
   contacts: Record<string, LineContact>
@@ -23,7 +28,7 @@ function dbPath(): string {
   }
 }
 
-function load(): LineDb {
+function fileLoad(): LineDb {
   try {
     return JSON.parse(fs.readFileSync(dbPath(), 'utf-8')) as LineDb
   } catch {
@@ -31,14 +36,13 @@ function load(): LineDb {
   }
 }
 
-function save(db: LineDb) {
+function fileSave(db: LineDb) {
   fs.writeFileSync(dbPath(), JSON.stringify(db, null, 2))
 }
 
-export function getContact(userId: string, displayName?: string): LineContact {
-  const db = load()
-  const existing = db.contacts[userId]
-  if (existing) return existing
+// ── 共通 ────────────────────────────────────────────────────────
+
+function newContact(userId: string, displayName?: string): LineContact {
   const now = new Date().toISOString()
   return {
     userId,
@@ -56,28 +60,61 @@ export function getContact(userId: string, displayName?: string): LineContact {
   }
 }
 
-export function saveContact(contact: LineContact, newMessages: LineChatMessage[] = []) {
-  const db = load()
+export async function getContact(userId: string, displayName?: string): Promise<LineContact> {
+  const supabase = createSupabaseServer()
+  if (supabase) {
+    const { data } = await supabase.from(TABLE).select('data').eq('user_id', userId).maybeSingle()
+    if (data?.data) return data.data as LineContact
+    return newContact(userId, displayName)
+  }
+  return fileLoad().contacts[userId] ?? newContact(userId, displayName)
+}
+
+export async function saveContact(contact: LineContact, newMessages: LineChatMessage[] = []): Promise<void> {
   contact.lastActiveAt = new Date().toISOString()
   contact.messages = [...contact.messages, ...newMessages].slice(-200)
+
+  const supabase = createSupabaseServer()
+  if (supabase) {
+    await supabase.from(TABLE).upsert({ user_id: contact.userId, data: contact })
+    return
+  }
+  const db = fileLoad()
   db.contacts[contact.userId] = contact
-  save(db)
+  fileSave(db)
 }
 
-export function listContacts(): LineContact[] {
-  return Object.values(load().contacts).sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))
+export async function listContacts(): Promise<LineContact[]> {
+  const supabase = createSupabaseServer()
+  if (supabase) {
+    const { data } = await supabase.from(TABLE).select('data').limit(1000)
+    const contacts = (data ?? []).map((row) => row.data as LineContact)
+    return contacts.sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))
+  }
+  return Object.values(fileLoad().contacts).sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))
 }
 
-export function patchContact(
+export async function patchContact(
   userId: string,
   patch: Partial<Pick<LineContact, 'tags' | 'handoff' | 'memo' | 'needsAttention' | 'reserved' | 'optedOut'>>,
-): LineContact | null {
-  const db = load()
+): Promise<LineContact | null> {
+  const supabase = createSupabaseServer()
+  if (supabase) {
+    const { data } = await supabase.from(TABLE).select('data').eq('user_id', userId).maybeSingle()
+    if (!data?.data) return null
+    const contact = data.data as LineContact
+    Object.assign(contact, patch)
+    if (patch.handoff === false) contact.step = 'idle'
+    await supabase.from(TABLE).upsert({ user_id: userId, data: contact })
+    return contact
+  }
+
+  const db = fileLoad()
   const contact = db.contacts[userId]
   if (!contact) return null
   Object.assign(contact, patch)
   if (patch.handoff === false) contact.step = 'idle' // 対応終了→自動応答再開
   db.contacts[userId] = contact
-  save(db)
+  fileSave(db)
   return contact
 }

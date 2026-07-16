@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     })
 
   // コンバージョン（LINE顧客のタグ・状態から集計）
-  const contacts = listContacts()
+  const contacts = await listContacts()
   const conversions = {
     contacts: contacts.length,
     reserved: contacts.filter((c) => c.tags.includes('予約済み') || c.reserved).length,

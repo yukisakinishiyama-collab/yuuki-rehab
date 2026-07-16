@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { listContacts, patchContact } from '@/lib/marketing/line-store-server'
 
 export async function GET() {
-  return NextResponse.json({ ok: true, contacts: listContacts() })
+  return NextResponse.json({ ok: true, contacts: await listContacts() })
 }
 
 export async function PATCH(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest) {
     for (const key of allowed) {
       if (key in patch) safePatch[key] = patch[key]
     }
-    const contact = patchContact(userId, safePatch)
+    const contact = await patchContact(userId, safePatch)
     if (!contact) return NextResponse.json({ error: '顧客が見つかりません' }, { status: 404 })
     return NextResponse.json({ ok: true, contact })
   } catch {
