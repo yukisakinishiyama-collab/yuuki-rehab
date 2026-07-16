@@ -39,9 +39,17 @@ yarn-error.log*
 # uploads (client videos - not for git)
 /public/uploads/
 
+# SNS自動化: AI生成画像の承認用成果物（Gitにはコミットしない）
+/content/
+/tools/sns-automation/drafts/*.png
+/tools/sns-automation/reports/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 # Claude Code worktrees（サブエージェントの一時ディレクトリ）
 .claude/worktrees/
+
+# マーケティングハブのローカルデータ（LINE顧客など）
+.data/

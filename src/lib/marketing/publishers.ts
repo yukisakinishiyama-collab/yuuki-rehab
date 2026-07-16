@@ -1,0 +1,125 @@
+/**
+ * 媒体別の公開処理（指示書14・15章）
+ *
+ * 方針: API未承認・未接続でもアプリを止めない。
+ * - トークン等が未設定の媒体は「手動投稿（action_required）」として、
+ *   手動投稿用データと管理画面への導線を返す
+ * - MARKETING_MODE=mock では常に模擬成功（外部送信なし）
+ * - トークン設定済みの媒体のみ実APIを呼ぶ
+ */
+import type { Channel, GeneratedContent } from './types'
+
+export type PublishOutcome =
+  | { kind: 'published'; url?: string; message: string }
+  | { kind: 'action_required'; reason: string; manualUrl: string }
+  | { kind: 'error'; message: string }
+
+const MOCK = process.env.MARKETING_MODE === 'mock'
+
+export async function publishToChannel(channel: Channel, content: GeneratedContent): Promise<PublishOutcome> {
+  if (MOCK) {
+    return { kind: 'published', url: `https://example.com/mock/${channel}/${Date.now()}`, message: 'モックモードで公開を模擬しました（外部送信なし）' }
+  }
+
+  switch (channel) {
+    case 'instagram_feed':
+    case 'instagram_carousel':
+    case 'instagram_reel':
+      return publishInstagram(channel, content)
+    case 'google_business':
+      return publishGoogleBusiness()
+    case 'line_broadcast':
+      return publishLineBroadcast(content)
+    case 'note':
+      return {
+        kind: 'action_required',
+        reason: 'noteは公式投稿APIが提供されていないため手動投稿です。本文をコピーして投稿してください。',
+        manualUrl: 'https://note.com/notes/new',
+      }
+    default:
+      return { kind: 'error', message: '未対応の媒体です' }
+  }
+}
+
+/** Instagram Graph API（コンテンツ公開）。トークン・画像が揃っている場合のみ実行 */
+async function publishInstagram(channel: Channel, content: GeneratedContent): Promise<PublishOutcome> {
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN
+  const igUserId = process.env.INSTAGRAM_USER_ID
+  const manualUrl = 'https://www.instagram.com/'
+
+  if (!token || !igUserId) {
+    return {
+      kind: 'action_required',
+      reason: 'Instagram API未接続のため手動投稿です（接続手順は「接続状況」画面を参照）。本文をコピーして投稿してください。',
+      manualUrl,
+    }
+  }
+  const imageUrl = content.imageText ? undefined : undefined // 画像アセット連携はPhase 5（画像管理）で拡張
+  if (!imageUrl) {
+    return {
+      kind: 'action_required',
+      reason: 'Instagramへの自動投稿には公開画像URLが必要です（画像管理はPhase 5で対応）。本文コピーで手動投稿してください。',
+      manualUrl,
+    }
+  }
+  if (channel !== 'instagram_feed') {
+    return { kind: 'action_required', reason: 'カルーセル・リールの自動投稿は段階対応中です。手動投稿してください。', manualUrl }
+  }
+
+  try {
+    const caption = `${content.body}\n\n${content.hashtags.join(' ')}`
+    const createRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: imageUrl, caption, access_token: token }),
+    })
+    const createData = await createRes.json()
+    if (!createRes.ok) throw new Error(createData.error?.message ?? 'メディア作成に失敗')
+
+    const publishRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creation_id: createData.id, access_token: token }),
+    })
+    const publishData = await publishRes.json()
+    if (!publishRes.ok) throw new Error(publishData.error?.message ?? '公開に失敗')
+    return { kind: 'published', url: `https://www.instagram.com/p/${publishData.id}/`, message: 'Instagramへ公開しました' }
+  } catch (error) {
+    return { kind: 'error', message: `Instagram APIエラー: ${error instanceof Error ? error.message : '不明'}` }
+  }
+}
+
+/** Google Business Profile。API承認制のため、承認されるまでは常に手動投稿モード（指示書15章） */
+async function publishGoogleBusiness(): Promise<PublishOutcome> {
+  return {
+    kind: 'action_required',
+    reason: 'Google Business Profile APIは利用申請の承認待ちです。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
+    manualUrl: 'https://business.google.com/',
+  }
+}
+
+/** 公式LINE配信（Broadcast）。トークン設定時のみ実配信 */
+async function publishLineBroadcast(content: GeneratedContent): Promise<PublishOutcome> {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  if (!token) {
+    return {
+      kind: 'action_required',
+      reason: 'LINEチャネル未接続のため手動配信です。本文をコピーしてLINE Official Account Managerから配信してください。',
+      manualUrl: 'https://manager.line.biz/',
+    }
+  }
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ messages: [{ type: 'text', text: `${content.hook}\n\n${content.body}` }] }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`)
+    }
+    return { kind: 'published', message: 'LINE友だちへ配信しました' }
+  } catch (error) {
+    return { kind: 'error', message: `LINE配信エラー: ${error instanceof Error ? error.message : '不明'}` }
+  }
+}
