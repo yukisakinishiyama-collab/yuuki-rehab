@@ -137,6 +137,27 @@ function ComposeInner() {
     }
     const result = transitionVariant(project.id, variant.id, next, options)
     setMessage(result.ok ? `${STATUS_LABELS[next]} に変更しました` : result.message ?? '')
+
+    // 予約が成立したら、指定時刻に公開処理を行うサーバージョブを登録する（重複はサーバー側で防止）
+    if (result.ok && next === 'scheduled' && options?.scheduledAt) {
+      fetch('/api/marketing/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          variantId: variant.id,
+          channel: variant.channel,
+          theme: project.theme,
+          content: variant.content,
+          scheduledAt: options.scheduledAt,
+        }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.ok) setMessage(`予約しました。公開予定 ${options!.scheduledAt}（投稿ジョブに登録済み）`)
+        })
+        .catch(() => setMessage('予約は保存しましたが、ジョブ登録に失敗しました。投稿ジョブ画面から再登録してください。'))
+    }
     refresh()
   }
 
