@@ -4,13 +4,14 @@
  * rehab-store.ts と同じ流儀。Phase 3でDB移行するため、
  * このモジュールの関数シグネチャを外部契約として維持する。
  */
-import type { AuditLogEntry, ClinicProfile, ContentProject, ContentVariant, PostStatus } from './types'
+import type { AuditLogEntry, ClinicProfile, ContentProject, ContentVariant, PostStatus, Reference } from './types'
 import { DEFAULT_CLINIC_PROFILE } from './clinic'
 
 const KEYS = {
   projects: 'yuuki_mk_projects',
   profile: 'yuuki_mk_clinic_profile',
   audit: 'yuuki_mk_audit_log',
+  references: 'yuuki_mk_references',
 } as const
 
 const isBrowser = () => typeof window !== 'undefined'
@@ -125,6 +126,29 @@ export function updateVariantContent(projectId: string, variantId: string, updat
   variant.editedAt = new Date().toISOString()
   if (variant.status !== 'draft') variant.status = 'draft'
   saveProject(project)
+}
+
+// ── 参考資料ライブラリ（指示書9章） ──────────────────────────────
+
+export function loadReferences(): Reference[] {
+  return read<Reference[]>(KEYS.references, [])
+}
+
+export function saveReference(reference: Reference) {
+  const references = loadReferences()
+  const index = references.findIndex((r) => r.id === reference.id)
+  if (index >= 0) references[index] = reference
+  else references.unshift(reference)
+  write(KEYS.references, references)
+  appendAudit(reference.approved ? '参考資料を承認' : '参考資料を保存', reference.title.slice(0, 40))
+}
+
+export function deleteReference(id: string) {
+  write(
+    KEYS.references,
+    loadReferences().filter((r) => r.id !== id),
+  )
+  appendAudit('参考資料を削除', id)
 }
 
 // ── 監査ログ ───────────────────────────────────────────────────

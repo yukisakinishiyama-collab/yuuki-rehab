@@ -152,6 +152,24 @@ export interface ClinicProfile {
   defaultTone: string
 }
 
+/** 参考資料（論文・ガイドライン等）ライブラリ（指示書9章） */
+export interface Reference {
+  id: string
+  title: string
+  authors: string
+  year: string
+  journal: string
+  doi: string
+  pubmedId: string
+  url: string
+  design: string // 研究デザイン（RCT・システマティックレビュー・症例報告など）
+  subjects: string // 対象者
+  findings: string // 主な結果
+  limitations: string // 限界
+  approved: boolean // 管理者確認済み（承認済みのみ生成に使用）
+  createdAt: string
+}
+
 /** 監査ログ */
 export interface AuditLogEntry {
   id: string

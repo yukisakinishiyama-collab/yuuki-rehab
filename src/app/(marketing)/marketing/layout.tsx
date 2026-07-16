@@ -10,6 +10,8 @@ const NAV = [
   { href: '/marketing/line', label: 'LINE導線' },
   { href: '/marketing/jobs', label: '投稿ジョブ' },
   { href: '/marketing/analytics', label: '効果測定' },
+  { href: '/marketing/references', label: '論文・根拠' },
+  { href: '/marketing/reviews', label: '口コミ返信' },
   { href: '/marketing/settings', label: '基本設定' },
 ]
 

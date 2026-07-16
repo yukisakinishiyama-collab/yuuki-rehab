@@ -31,6 +31,9 @@ export const NG_RULES: Rule[] = [
   { pattern: /(がん|癌|腫瘍)(が|も)(治|消え)/g, reason: '重大疾病の治癒標榜（違法）', suggestion: '削除。医科受診を促す記載に変更' },
   { pattern: /(他|病)院(では|より)(治らない|優れ|劣)/g, reason: '他院の否定・比較優良広告', suggestion: '削除' },
   { pattern: /無痛/g, reason: '痛みの不在の断定', suggestion: '「痛みに配慮した施術」' },
+  { pattern: /医師も知らない/g, reason: '医療への不信をあおる表現', suggestion: '削除' },
+  { pattern: /成功率\s*\d+\s*[%％]/g, reason: '出典のない成功率の提示', suggestion: '削除、または出典・条件を明示' },
+  { pattern: /(ビフォー\s*アフター|before\s*after|施術前後の(写真|画像))/gi, reason: 'ビフォーアフターは条件（詳細な説明の併記等）を満たさない限り原則不可', suggestion: '削除、または施術内容・費用・リスクの詳細説明を併記' },
 ]
 
 /** 注意レベル: 文脈によっては問題になりうるグレー表現 */
@@ -39,6 +42,9 @@ export const WARN_RULES: Rule[] = [
   { pattern: /即効/g, reason: '効果の即時性の強調', suggestion: '「早期の改善を目指す」' },
   { pattern: /(治した|治します)/g, reason: '治癒の断定', suggestion: '「施術・サポートを行った」' },
   { pattern: /根本(治療|改善|から治)/g, reason: '根本治療の標榜は根拠説明が必要', suggestion: '「原因の評価に基づく施術」' },
+  { pattern: /患者様?の(声|体験談)/g, reason: '体験談の広告利用は原則不可（一般化に注意）', suggestion: '個別の感想を効果の根拠として使わない' },
+  { pattern: /(みなさん|皆さん|多くの方)が(改善|良くなっ|満足)/g, reason: '体験の一般化', suggestion: '「状態に合わせてご提案します」' },
+  { pattern: /口コミで(評判|人気|話題)/g, reason: '評判の強調（誘引性）', suggestion: '客観的事実の記載に変更' },
 ]
 
 /** テキスト1件をチェックして所見リストを返す */

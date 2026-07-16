@@ -7,7 +7,15 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { checkContent } from '@/lib/marketing/compliance'
-import { loadClinicProfile, saveProject, findProject, transitionVariant, updateVariantContent, appendAudit } from '@/lib/marketing/store'
+import {
+  loadClinicProfile,
+  loadReferences,
+  saveProject,
+  findProject,
+  transitionVariant,
+  updateVariantContent,
+  appendAudit,
+} from '@/lib/marketing/store'
 import {
   CHANNEL_LABELS,
   OBJECTIVES,
@@ -228,6 +236,31 @@ function ComposeInner() {
         </button>
         {showDetail && (
           <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm sm:col-span-2">
+              <span className="text-slate-600">承認済みの根拠から選ぶ（論文・根拠ライブラリ）</span>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  const ref = loadReferences().find((r) => r.id === e.target.value)
+                  if (ref) {
+                    setDetail({
+                      ...detail,
+                      evidence: `${ref.title}（${[ref.authors, ref.year, ref.journal].filter(Boolean).join(', ')}）${ref.doi ? ` DOI:${ref.doi}` : ''}${ref.pubmedId ? ` PMID:${ref.pubmedId}` : ''}。主な結果: ${ref.findings || '記載なし'}。限界: ${ref.limitations || '記載なし'}`,
+                    })
+                  }
+                }}
+                className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+              >
+                <option value="">（選択すると根拠資料欄に自動入力されます）</option>
+                {loadReferences()
+                  .filter((r) => r.approved)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title}（{r.year || '年不明'}）
+                    </option>
+                  ))}
+              </select>
+            </label>
             {(
               [
                 ['audience', '対象者（例：部活動をする学生と保護者）'],
@@ -400,6 +433,14 @@ function ComposeInner() {
                 >
                   本文をコピー
                 </button>
+                <a
+                  href={`/api/marketing/image?title=${encodeURIComponent(activeVariant.content.imageText || activeVariant.content.title || project.theme)}&subtitle=${encodeURIComponent(activeVariant.content.hook.slice(0, 40))}&size=${activeVariant.channel === 'google_business' ? 'google' : activeVariant.channel === 'note' ? 'note' : 'instagram'}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold"
+                >
+                  テンプレ画像を作る
+                </a>
               </div>
             </div>
           )}

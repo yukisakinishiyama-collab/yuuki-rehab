@@ -31,17 +31,29 @@ npm run dev
 - 承認なしの外部公開は構造的に不可能（Phase 1は自動投稿機能自体が存在しない）
 - 承認・公開・設定変更はすべて監査ログ（基本設定画面で閲覧可）
 
-## 今後のフェーズ
+## 実装済みフェーズ（Phase 1〜5）
 
-- Phase 2: LINE友だち追加シナリオ・顧客管理・リッチメニュー管理（既存Webhook基盤を再利用）
-- Phase 3: Instagram / Google Business Profile 接続・予約投稿ジョブ・DB移行（Supabase）
-- Phase 4: 効果測定（UTM・コンバージョン）／ Phase 5: 論文ライブラリ・口コミ返信UI
+- **Phase 1**: 投稿作成→AI生成（6媒体）→表現チェック→承認→カレンダー
+- **Phase 2**: LINE初回導線（7つの相談入口・緊急判定・人への引き継ぎ）・顧客管理・会話シミュレーター
+- **Phase 3**: 予約投稿ジョブ（重複防止・リトライ・履歴）・Vercel Cron・API接続確認・手動投稿の代替運用
+- **Phase 4**: 効果測定（計測リンク /api/marketing/go・LINEファネル・フォロー候補の自動抽出）
+- **Phase 5**: 論文・根拠ライブラリ（承認制→生成連携）・口コミ返信支援・表現チェック強化（ビフォーアフター/体験談一般化等）・テンプレート画像生成（/api/marketing/image・sharp製でAPIキー不要）
 
 詳細な調査結果と方針は [PLAN.md](./PLAN.md) を参照。
 
-## 既知の制限（Phase 1）
+## 本番運用に切り替える手順（概要）
 
-- データはブラウザのlocalStorage保存（同一PC・同一ブラウザでのみ共有。Phase 3でDB化）
-- 外部への自動投稿は未実装（本文コピー→手動投稿の運用）
-- 画像生成は未接続（OPENAI_API_KEY設定後、Phase 1後半で有効化）
+1. `MARKETING_MODE=mock` を削除 → AI生成が実APIに
+2. Vercelに環境変数を設定（ANTHROPIC_API_KEY、APP_URL、CRON_SECRET）
+3. LINE実接続: LINE DevelopersでMessaging API有効化 → SECRET/TOKEN設定 → Webhook URL登録
+4. Instagram: Meta開発者アプリ＋プロアカウント接続 → INSTAGRAM_ACCESS_TOKEN/USER_ID設定（画像連携までは手動投稿モード）
+5. Google Business Profile: API利用申請（承認まで手動投稿モードで運用可能）
+
+## 既知の制限
+
+- 投稿・院情報はブラウザのlocalStorage、LINE顧客・ジョブ・計測はサーバーの `.data/` JSON保存
+  （Vercel本番ではサーバーデータが永続しないため、実LINE運用前にSupabase移行が必要）
+- Instagram自動投稿は公開画像URLの連携（画像ストレージ）が前提。それまでは手動対応待ち→本文コピー運用
+- A/Bテスト・AIによる改善提案は未実装（今後の改善候補）
+- 自動テスト（Vitest/Playwright）は未整備。現状は手動E2E＋ビルドで担保
 - `react-hooks/set-state-in-effect` のlint指摘はリポジトリ全体の既知事項（既存ページと同パターン）
