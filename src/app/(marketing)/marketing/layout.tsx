@@ -7,6 +7,7 @@ const NAV = [
   { href: '/marketing', label: 'ダッシュボード' },
   { href: '/marketing/compose', label: '投稿を作る' },
   { href: '/marketing/calendar', label: '投稿カレンダー' },
+  { href: '/marketing/line', label: 'LINE導線' },
   { href: '/marketing/settings', label: '基本設定' },
 ]
 
