@@ -11,12 +11,19 @@ import { INTENT_LABELS, type BotReply, type IntentKey, type LineContact } from '
 
 const P = DEFAULT_CLINIC_PROFILE
 
-/** 予約URLに流入元パラメータを付与（指示書4-5） */
+/**
+ * 予約URLに流入元パラメータを付与（指示書4-5）。
+ * APP_URL設定時はクリック計測エンドポイント経由（/api/marketing/go）にする。
+ */
 export function reserveUrlWith(intent?: string): string {
+  const qs = `source=line&campaign=first_visit${intent ? `&intent=${intent}` : ''}`
+  const app = process.env.APP_URL
+  if (app) {
+    return `${app.replace(/\/$/, '')}/api/marketing/go?d=reserve&${qs}`
+  }
   const base = P.reserveUrl
   const sep = base.includes('?') ? '&' : '?'
-  const params = `source=line&campaign=first_visit${intent ? `&intent=${intent}` : ''}`
-  return `${base}${sep}${params}`
+  return `${base}${sep}${qs}`
 }
 
 // ── 緊急性判定（ルールベース・指示書4-3） ───────────────────────

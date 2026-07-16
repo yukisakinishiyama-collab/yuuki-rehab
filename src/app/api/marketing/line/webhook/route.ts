@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { advanceScenario, type EngineInput } from '@/lib/marketing/line-scenario'
 import { getContact, saveContact } from '@/lib/marketing/line-store-server'
+import { recordEvent } from '@/lib/marketing/analytics-store-server'
 import type { BotReply, LineChatMessage } from '@/lib/marketing/line-types'
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET ?? ''
@@ -75,6 +76,24 @@ function processEvent(userId: string, displayName: string | undefined, input: En
   const result = advanceScenario(contact, input)
   Object.assign(contact, result.patch)
   if (result.notify) contact.needsAttention = contact.needsAttention || result.notify
+
+  // 効果測定イベント（個人情報は保存しない・指示書17章）
+  try {
+    if (input.kind === 'follow') recordEvent('line_follow', {}, userId)
+    if (result.patch.intent && result.patch.step === 'ask_part') {
+      recordEvent('line_intent', { intent: result.patch.intent }, userId)
+    }
+    if (result.patch.step === 'guide') {
+      recordEvent('line_guide', { intent: contact.intent ?? result.patch.intent ?? '' }, userId)
+      if (result.patch.intent && (result.patch.intent === 'price' || result.patch.intent === 'reserve' || result.patch.intent === 'lost')) {
+        recordEvent('line_intent', { intent: result.patch.intent }, userId)
+      }
+    }
+    if (result.patch.step === 'urgent') recordEvent('line_urgent', {}, userId)
+    if (result.patch.step === 'human') recordEvent('line_handoff', { reason: result.patch.needsAttention ?? '' }, userId)
+  } catch {
+    // 計測失敗は応答を止めない
+  }
 
   const now = new Date().toISOString()
   const log: LineChatMessage[] = [{ at: now, from: 'user', text: describeInput(input) }]
