@@ -191,12 +191,17 @@ export async function GET() {
     storageError = (error instanceof Error ? error.message : 'unknown').slice(0, 120)
   }
 
+  // キー自体は返さず、取り違え調査用の指紋（先頭・長さ）のみ返す
+  const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+  const keyFingerprint = rawKey ? `${rawKey.slice(0, 10)}…(len:${rawKey.length})` : 'unset'
+  const urlHost = (process.env.SUPABASE_URL ?? '').replace(/^https?:\/\//, '').slice(0, 30)
+
   return NextResponse.json({
     ok: true,
     channelConfigured: Boolean(CHANNEL_SECRET && ACCESS_TOKEN),
     mode: CHANNEL_SECRET && ACCESS_TOKEN ? 'live' : 'simulator-only',
     storage,
     storageOk,
-    ...(storageError ? { storageError } : {}),
+    ...(storageError ? { storageError, keyFingerprint, urlHost } : {}),
   })
 }
