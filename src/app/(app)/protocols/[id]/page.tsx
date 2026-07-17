@@ -13,17 +13,16 @@ import type { Patient as PtPatient } from '@/types/patient'
 import PhaseCard from '@/components/protocol/PhaseCard'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
-import ProtocolSearchModal from '@/components/protocol/ProtocolSearchModal'
 import ProtocolChat from '@/components/protocol/ProtocolChat'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
-  BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
-  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search, Bot,
+  BarChart2, Cpu, FileText, AlertCircle, CheckCircle,
+  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search, Bot, Users,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
 
-type Tab = 'protocol' | 'discussion' | 'ai-chat' | 'attachments'
+type Tab = 'protocol' | 'discussion' | 'attachments'
 
 export default function ProtocolDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -39,8 +38,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [selectedPtId, setSelectedPtId] = useState('')
   const [ptSearch, setPtSearch] = useState('')
   const [reflectDone, setReflectDone] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
-  const [initialQuery, setInitialQuery] = useState('')
+  const [pendingQuestion, setPendingQuestion] = useState('')
   const [selectionPopup, setSelectionPopup] = useState<{ text: string; x: number; y: number } | null>(null)
   const protocolContentRef = useRef<HTMLDivElement>(null)
 
@@ -66,7 +64,11 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
 
       setTimeout(() => {
         const sel = window.getSelection()
-        const text = sel?.toString().trim() ?? ''
+        // 箇条書き記号・改行・連続空白を除去して正規化
+        const text = (sel?.toString() ?? '')
+          .replace(/\s+/g, ' ')
+          .replace(/^[·・•\s]+/, '')
+          .trim()
         if (text.length < 2 || text.length > 100) {
           setSelectionPopup(null)
           return
@@ -378,10 +380,9 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       <div className="flex border-b border-slate-200 mb-5 no-print animate-slide-up delay-150">
         {([
           { key: 'protocol' as const, label: 'プロトコル', icon: FileText, badge: undefined as number | undefined },
-          { key: 'discussion' as const, label: '専門家ディスカッション', icon: MessageSquare, badge: undefined as number | undefined },
           {
-            key: 'ai-chat' as const,
-            label: 'AI相談',
+            key: 'discussion' as const,
+            label: 'AI相談・ディスカッション',
             icon: Bot,
             badge: (protocol.aiChat?.length ?? 0) || undefined,
           },
@@ -416,14 +417,17 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       {/* コンテンツ */}
       {tab === 'protocol' && (
         <div className="space-y-3">
-          <div className="flex justify-end no-print">
+          <div className="flex justify-end items-center gap-2 no-print">
+            <span className="text-xs text-slate-400 font-body hidden sm:inline">
+              分からない用語はテキストを選択するとAIに質問できます
+            </span>
             <button
-              onClick={() => setShowSearch(true)}
+              onClick={() => setTab('discussion')}
               className="flex items-center gap-1.5 text-sm text-teal-700 bg-teal-50 border
                 border-teal-200 px-3 py-2 rounded-xl hover:bg-teal-100 transition-colors font-display font-semibold"
             >
-              <HelpCircle className="w-3.5 h-3.5" />
-              分からない用語を調べる
+              <Bot className="w-3.5 h-3.5" />
+              AIに質問・相談
             </button>
           </div>
           {protocol.phases.map((phase, i) => (
@@ -450,19 +454,32 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {tab === 'discussion' && (
-        <ExpertPanel
-          discussion={protocol.discussion}
-          consensusNotes={protocol.consensusNotes}
-          generatedBy={protocol.generatedBy}
-        />
-      )}
+        <div className="space-y-6">
+          {/* インタラクティブなAI相談 */}
+          <ProtocolChat
+            protocol={protocol}
+            patient={patient}
+            onUpdate={() => setProtocol(getProtocolById(protocol.id))}
+            initialQuestion={pendingQuestion}
+            onQuestionConsumed={() => setPendingQuestion('')}
+          />
 
-      {tab === 'ai-chat' && (
-        <ProtocolChat
-          protocol={protocol}
-          patient={patient}
-          onUpdate={() => setProtocol(getProtocolById(protocol.id))}
-        />
+          {/* 専門家パネルの見解（生成時の静的ディスカッション） */}
+          {protocol.discussion.length > 0 && (
+            <div>
+              <h3 className="flex items-center gap-2 text-xs font-bold text-[--color-text-secondary]
+                font-display uppercase tracking-widest mb-3">
+                <Users className="w-3.5 h-3.5" />
+                専門家パネルの見解
+              </h3>
+              <ExpertPanel
+                discussion={protocol.discussion}
+                consensusNotes={protocol.consensusNotes}
+                generatedBy={protocol.generatedBy}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {tab === 'attachments' && (
@@ -627,8 +644,9 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           <button
             onMouseDown={e => e.preventDefault()}
             onClick={() => {
-              setInitialQuery(selectionPopup.text)
-              setShowSearch(true)
+              // AI相談タブに切り替えて選択語を自動送信
+              setPendingQuestion(`「${selectionPopup.text}」について教えてください`)
+              setTab('discussion')
               setSelectionPopup(null)
               window.getSelection()?.removeAllRanges()
             }}
@@ -637,20 +655,12 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
               font-display whitespace-nowrap"
           >
             <HelpCircle className="w-3 h-3" />
-            「{selectionPopup.text.length > 15 ? selectionPopup.text.slice(0, 15) + '…' : selectionPopup.text}」を調べる
+            「{selectionPopup.text.length > 15 ? selectionPopup.text.slice(0, 15) + '…' : selectionPopup.text}」をAIに質問
           </button>
           {/* 吹き出し三角 */}
           <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0
             border-x-4 border-x-transparent border-t-4 border-t-slate-800" />
         </div>
-      )}
-
-      {showSearch && (
-        <ProtocolSearchModal
-          onClose={() => { setShowSearch(false); setInitialQuery('') }}
-          initialQuery={initialQuery}
-          protocolContext={`プロトコル: ${protocol.title}\nフェーズ: ${protocol.phases.map(p => p.title).join('、')}`}
-        />
       )}
 
       {/* 印刷用免責 */}

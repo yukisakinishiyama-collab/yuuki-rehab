@@ -10,6 +10,9 @@ interface Props {
   protocol: Protocol
   patient: ProtocolPatient
   onUpdate: () => void
+  /** タブ切替時に自動送信する質問（用語選択ポップアップなどからの連携用） */
+  initialQuestion?: string
+  onQuestionConsumed?: () => void
 }
 
 // プロトコル全体をAIに渡すコンテキスト文字列へ変換
@@ -50,7 +53,7 @@ function serializeProtocol(protocol: Protocol, patient: ProtocolPatient): string
   return lines.join('\n')
 }
 
-export default function ProtocolChat({ protocol, patient, onUpdate }: Props) {
+export default function ProtocolChat({ protocol, patient, onUpdate, initialQuestion, onQuestionConsumed }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -63,6 +66,19 @@ export default function ProtocolChat({ protocol, patient, onUpdate }: Props) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, loading])
+
+  // 用語選択ポップアップなどから渡された質問を自動送信
+  // StrictMode等によるeffect二重実行での重複送信をrefで防止
+  const consumedQuestionRef = useRef<string | null>(null)
+  useEffect(() => {
+    const q = initialQuestion?.trim()
+    if (q && consumedQuestionRef.current !== q) {
+      consumedQuestionRef.current = q
+      sendMessage(q)
+      onQuestionConsumed?.()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion])
 
   async function sendMessage(text: string) {
     const q = text.trim()

@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react'
 import type { Protocol, Assessment, ProtocolPatient } from '@/types/protocol'
 import MilestonePanel from './MilestonePanel'
 import ProgressChart from './ProgressChart'
-import { Eye, EyeOff, Star, ShieldAlert, Flame, Sprout, Activity, Dumbbell, Trophy, Printer } from 'lucide-react'
+import { findVideoUrl } from '@/lib/exercise-video-map'
+import { Eye, EyeOff, Star, ShieldAlert, Flame, Sprout, Activity, Dumbbell, Trophy, Printer, PlayCircle } from 'lucide-react'
 
 interface Props {
   patient: ProtocolPatient
@@ -248,7 +249,10 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
             今取り組む運動
           </div>
           <div className="space-y-2">
-            {currentPhase.exercises.slice(0, 8).map((ex, i) => (
+            {currentPhase.exercises.slice(0, 8).map((ex, i) => {
+              // 動画URL未設定でも運動名からマップを自動検索
+              const videoUrl = ex.videoUrl || findVideoUrl(ex.name)
+              return (
               <div key={i} className="bg-[--color-surface-raised] rounded-xl px-3 py-2.5">
                 <div className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-[--color-primary-light] text-[--color-primary-hover]
@@ -259,6 +263,17 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
                     <div className="text-sm font-semibold text-[--color-text-primary] font-display">{ex.name}</div>
                     {ex.dose && <div className="metric text-xs text-[--color-text-muted]">{ex.dose}</div>}
                   </div>
+                  {videoUrl && (
+                    <a
+                      href={videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="print:hidden flex items-center gap-1 text-xs text-red-500 hover:text-red-600
+                        font-semibold flex-shrink-0 bg-red-50 border border-red-100 rounded-full px-2.5 py-1"
+                    >
+                      <PlayCircle className="w-3.5 h-3.5" />動画を見る
+                    </a>
+                  )}
                 </div>
                 {/* 印刷時チェックボックス（7日分） */}
                 <div className="hidden print:flex gap-1.5 mt-2 pl-9">
@@ -273,7 +288,7 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
                   </span>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
