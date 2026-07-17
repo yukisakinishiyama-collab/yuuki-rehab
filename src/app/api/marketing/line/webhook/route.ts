@@ -174,6 +174,7 @@ export async function GET() {
   // データ保存先の疎通も確認する（秘密情報は返さない）
   let storageOk = false
   let storage = 'file'
+  let storageError: string | undefined
   try {
     const { createSupabaseServer } = await import('@/lib/supabase-server')
     const supabase = createSupabaseServer()
@@ -181,11 +182,13 @@ export async function GET() {
       storage = 'supabase'
       const { error } = await supabase.from('marketing_line_contacts').select('user_id').limit(1)
       storageOk = !error
+      if (error) storageError = String(error.message ?? error.code ?? 'unknown').slice(0, 120)
     } else {
       storageOk = true
     }
-  } catch {
+  } catch (error) {
     storageOk = false
+    storageError = (error instanceof Error ? error.message : 'unknown').slice(0, 120)
   }
 
   return NextResponse.json({
@@ -194,5 +197,6 @@ export async function GET() {
     mode: CHANNEL_SECRET && ACCESS_TOKEN ? 'live' : 'simulator-only',
     storage,
     storageOk,
+    ...(storageError ? { storageError } : {}),
   })
 }
