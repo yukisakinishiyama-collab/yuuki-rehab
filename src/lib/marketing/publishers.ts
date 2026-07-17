@@ -41,7 +41,28 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
   }
 }
 
-/** Instagram Graph API（コンテンツ公開）。トークン・画像が揃っている場合のみ実行 */
+/**
+ * 投稿画像を自動で用意する：テンプレート画像を生成してVercel Blobに公開し、
+ * Instagram APIに渡せる公開URLを返す。失敗時はnull（手動投稿へフォールバック）。
+ */
+async function ensurePublicImageUrl(content: GeneratedContent): Promise<string | null> {
+  try {
+    const { renderTemplateImage } = await import('./image-template')
+    const { put } = await import('@vercel/blob')
+    const title = content.imageText || content.title || content.hook
+    const png = await renderTemplateImage(title, content.hook.slice(0, 40), 'instagram')
+    const blob = await put(`marketing/ig-${Date.now()}.png`, png, {
+      access: 'public',
+      contentType: 'image/png',
+    })
+    return blob.url
+  } catch (error) {
+    console.error('投稿画像の自動生成に失敗:', error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+/** Instagram Graph API（コンテンツ公開）。トークン設定時は画像も自動生成して完全自動投稿 */
 async function publishInstagram(channel: Channel, content: GeneratedContent): Promise<PublishOutcome> {
   const token = process.env.INSTAGRAM_ACCESS_TOKEN
   const igUserId = process.env.INSTAGRAM_USER_ID
@@ -54,16 +75,17 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
       manualUrl,
     }
   }
-  const imageUrl = content.imageText ? undefined : undefined // 画像アセット連携はPhase 5（画像管理）で拡張
+  if (channel !== 'instagram_feed') {
+    return { kind: 'action_required', reason: 'カルーセル・リールの自動投稿は段階対応中です。手動投稿してください。', manualUrl }
+  }
+
+  const imageUrl = await ensurePublicImageUrl(content)
   if (!imageUrl) {
     return {
       kind: 'action_required',
-      reason: 'Instagramへの自動投稿には公開画像URLが必要です（画像管理はPhase 5で対応）。本文コピーで手動投稿してください。',
+      reason: '投稿画像の自動生成に失敗しました（Blobストレージの設定を確認）。テンプレ画像をダウンロードして手動投稿してください。',
       manualUrl,
     }
-  }
-  if (channel !== 'instagram_feed') {
-    return { kind: 'action_required', reason: 'カルーセル・リールの自動投稿は段階対応中です。手動投稿してください。', manualUrl }
   }
 
   try {

@@ -1,0 +1,22 @@
+# 予約投稿ジョブの自動実行（15分間隔）
+#
+# Vercel無料プランのCronは1日1回のため、GitHub Actionsで補強する。
+# リポジトリの Settings → Secrets and variables → Actions に
+# MARKETING_CRON_SECRET（Vercelの CRON_SECRET と同じ値）を登録すると有効になる。
+name: marketing-publish-jobs
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # UTC基準・15分ごと
+  workflow_dispatch: {} # 手動実行も可能
+
+jobs:
+  run-due-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 期限のきた投稿ジョブを実行
+        run: |
+          curl -fsS -X POST "https://yuuki-rehab.vercel.app/api/marketing/jobs/run" \
+            -H "Authorization: Bearer ${{ secrets.MARKETING_CRON_SECRET }}" \
+            -H "Content-Type: application/json"
