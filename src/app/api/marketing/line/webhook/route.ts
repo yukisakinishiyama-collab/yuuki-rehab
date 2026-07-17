@@ -24,33 +24,36 @@ function verifySignature(body: string, signature: string | null): boolean {
   return hash === signature
 }
 
-/** BotReply → LINE Messaging APIメッセージ形式 */
+/** BotReply → LINE Messaging APIメッセージ形式（ボタンは見やすいカード型のFlex Messageで送る） */
 function toLineMessages(replies: BotReply[]): unknown[] {
   return replies.map((reply) => {
     if (reply.type === 'text') return { type: 'text', text: reply.text }
-    // ボタンはクイックリプライ（URL系はボタンテンプレート）で表現する
-    const urlButtons = reply.buttons.filter((b) => b.url)
-    if (urlButtons.length > 0) {
-      return {
-        type: 'template',
-        altText: reply.text,
-        template: {
-          type: 'buttons',
-          text: reply.text.slice(0, 160),
-          actions: reply.buttons.slice(0, 4).map((b) =>
-            b.url ? { type: 'uri', label: b.label.slice(0, 20), uri: b.url } : { type: 'postback', label: b.label.slice(0, 20), data: b.data ?? '' },
-          ),
-        },
-      }
-    }
     return {
-      type: 'text',
-      text: reply.text,
-      quickReply: {
-        items: reply.buttons.slice(0, 13).map((b) => ({
-          type: 'action',
-          action: { type: 'postback', label: b.label.slice(0, 20), data: b.data ?? '', displayText: b.label },
-        })),
+      type: 'flex',
+      altText: reply.text.slice(0, 300),
+      contents: {
+        type: 'bubble',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'md',
+          paddingAll: 'lg',
+          contents: [
+            { type: 'text', text: reply.text.slice(0, 500), wrap: true, size: 'sm', color: '#334155' },
+            { type: 'separator', margin: 'md' },
+            ...reply.buttons.slice(0, 10).map((b, index) => ({
+              type: 'button',
+              style: index === 0 ? 'primary' : 'secondary',
+              color: index === 0 ? '#0f766e' : '#e6fffb',
+              height: 'sm',
+              margin: 'sm',
+              action: b.url
+                ? { type: 'uri', label: b.label.slice(0, 40), uri: b.url }
+                : { type: 'postback', label: b.label.slice(0, 40), data: b.data ?? '', displayText: b.label },
+            })),
+          ],
+        },
+        styles: { body: { backgroundColor: '#ffffff' } },
       },
     }
   })
