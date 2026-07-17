@@ -118,6 +118,14 @@ export interface ProtocolAttachment {
   addedAt: string
 }
 
+// AI相談のチャットメッセージ
+export interface ProtocolChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
+}
+
 export interface Protocol {
   id: string
   patientId: string
@@ -128,6 +136,7 @@ export interface Protocol {
   generatedBy: 'ai' | 'template'
   currentPhaseIndex: number
   attachments?: ProtocolAttachment[]
+  aiChat?: ProtocolChatMessage[]
   createdAt: string
   updatedAt: string
 }

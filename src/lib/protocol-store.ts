@@ -1,4 +1,4 @@
-import type { ProtocolPatient, Protocol, Phase, Assessment, Milestone, ProtocolAttachment } from '@/types/protocol'
+import type { ProtocolPatient, Protocol, Phase, Assessment, Milestone, ProtocolAttachment, ProtocolChatMessage } from '@/types/protocol'
 import { DEFAULT_MILESTONES } from '@/types/protocol'
 import { getTemplate, findBestTemplate } from '@/data/protocols/templates'
 import { nanoid } from 'nanoid'
@@ -115,6 +115,27 @@ export function updateAttachmentNote(protocolId: string, attachmentId: string, n
       a.id === attachmentId ? { ...a, note } : a
     ),
   })
+}
+
+// ─── AI相談チャット ──────────────────────────────────────────────────────────
+export function appendChatMessage(
+  protocolId: string,
+  msg: Omit<ProtocolChatMessage, 'id' | 'createdAt'>,
+): ProtocolChatMessage {
+  const message: ProtocolChatMessage = {
+    ...msg,
+    id: nanoid(),
+    createdAt: new Date().toISOString(),
+  }
+  const protocol = getProtocolById(protocolId)
+  if (protocol) {
+    updateProtocol(protocolId, { aiChat: [...(protocol.aiChat ?? []), message] })
+  }
+  return message
+}
+
+export function clearChat(protocolId: string): void {
+  updateProtocol(protocolId, { aiChat: [] })
 }
 
 // フェーズを更新

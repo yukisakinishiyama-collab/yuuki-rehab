@@ -14,15 +14,16 @@ import PhaseCard from '@/components/protocol/PhaseCard'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import ProtocolSearchModal from '@/components/protocol/ProtocolSearchModal'
+import ProtocolChat from '@/components/protocol/ProtocolChat'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, MessageSquare, Cpu, FileText, AlertCircle, CheckCircle,
-  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search,
+  BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search, Bot,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
 
-type Tab = 'protocol' | 'discussion' | 'attachments'
+type Tab = 'protocol' | 'discussion' | 'ai-chat' | 'attachments'
 
 export default function ProtocolDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -379,6 +380,12 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           { key: 'protocol' as const, label: 'プロトコル', icon: FileText, badge: undefined as number | undefined },
           { key: 'discussion' as const, label: '専門家ディスカッション', icon: MessageSquare, badge: undefined as number | undefined },
           {
+            key: 'ai-chat' as const,
+            label: 'AI相談',
+            icon: Bot,
+            badge: (protocol.aiChat?.length ?? 0) || undefined,
+          },
+          {
             key: 'attachments' as const,
             label: '添付資料',
             icon: Paperclip,
@@ -447,6 +454,14 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           discussion={protocol.discussion}
           consensusNotes={protocol.consensusNotes}
           generatedBy={protocol.generatedBy}
+        />
+      )}
+
+      {tab === 'ai-chat' && (
+        <ProtocolChat
+          protocol={protocol}
+          patient={patient}
+          onUpdate={() => setProtocol(getProtocolById(protocol.id))}
         />
       )}
 
