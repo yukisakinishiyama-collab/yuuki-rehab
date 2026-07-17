@@ -138,9 +138,14 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
         const changes = computeMetricChanges(assessments)
         const highlight = changes.filter(c => c.judgment === 'improved').slice(0, 3)
         return (
-          <div className="bg-[--color-surface-card] rounded-2xl border border-slate-200 shadow-sm
+          <div className="bg-[--color-surface-card] rounded-3xl border border-teal-100 shadow-sm
             overflow-hidden mb-5 animate-slide-up delay-100">
-            <div className="bg-gradient-to-b from-sky-50/70 to-transparent px-4 pt-4 pb-1">
+            <div className="relative px-4 pt-4 pb-1"
+              style={{ background: 'linear-gradient(180deg, #f0f9ff 0%, rgba(255,255,255,0) 85%)' }}>
+              <div className="absolute top-3.5 left-4 text-[9px] font-bold text-teal-600/70
+                tracking-[0.25em] font-display uppercase">
+                Recovery Journey
+              </div>
               <JourneyIllustration
                 phaseCount={protocol.phases.length}
                 currentPhaseIndex={protocol.currentPhaseIndex}
