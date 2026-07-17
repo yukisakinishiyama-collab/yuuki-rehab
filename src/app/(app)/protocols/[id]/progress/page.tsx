@@ -6,7 +6,7 @@ import Link from 'next/link'
 import type { Protocol, ProtocolPatient, Assessment, Milestone } from '@/types/protocol'
 import {
   getProtocolById, getPatientById, getAssessmentsByProtocol,
-  saveAssessment, deleteAssessment, initMilestones,
+  saveAssessment, deleteAssessment, initMilestones, updatePatient,
 } from '@/lib/protocol-store'
 import {
   computeMetricChanges, overallProgress, daysSinceStart,
@@ -218,6 +218,8 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
             currentPhaseIndex={protocol.currentPhaseIndex}
             onSave={handleSave}
             onCancel={() => setShowForm(false)}
+            protocolPatient={patient}
+            onLinkChart={(chartId) => { updatePatient(patient.id, { linkedPatientId: chartId }); reload() }}
           />
         </div>
       )}

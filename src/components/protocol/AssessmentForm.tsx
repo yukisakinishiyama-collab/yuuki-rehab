@@ -1,8 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import type { Assessment, Phase } from '@/types/protocol'
-import { Plus, Trash2, Calendar, ChevronDown } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import type { Assessment, Phase, ProtocolPatient } from '@/types/protocol'
+import type { SpecialTestRecord } from '@/types/patient'
+import {
+  JOINT_TO_REGION, resolveChartPatient, getChartPatientList,
+  pullLatestMetrics, pullLatestSpecialTests, pushRomToChart,
+  TEST_RESULT_LABELS,
+} from '@/lib/clinical-sync'
+import { Plus, Trash2, Calendar, ChevronDown, Link2, Download, FlaskConical } from 'lucide-react'
 
 const METRIC_PRESETS = [
   { key: 'pain',     label: '疼痛 (NRS 0–10)',   min: 0,   max: 10  },
@@ -20,6 +26,10 @@ interface Props {
   currentPhaseIndex: number
   onSave: (assessment: Omit<Assessment, 'id'>) => void
   onCancel: () => void
+  /** カルテ連携用: プロトコル患者情報 */
+  protocolPatient?: ProtocolPatient
+  /** カルテ患者とのリンクを保存するコールバック */
+  onLinkChart?: (chartPatientId: string) => void
 }
 
 interface MetricEntry {
@@ -39,6 +49,7 @@ const INPUT_CLS = [
 
 export default function AssessmentForm({
   patientId, protocolId, phases, currentPhaseIndex, onSave, onCancel,
+  protocolPatient, onLinkChart,
 }: Props) {
   const [date, setDate]     = useState(new Date().toISOString().split('T')[0])
   const [phaseId, setPhaseId] = useState(phases[currentPhaseIndex]?.id ?? '')
@@ -50,6 +61,60 @@ export default function AssessmentForm({
   ])
   const [customKey,   setCustomKey]   = useState('')
   const [customLabel, setCustomLabel] = useState('')
+
+  // ── カルテ連携 ──
+  const [linkVersion, setLinkVersion] = useState(0) // リンク直後の再解決用
+  const [selectedChartId, setSelectedChartId] = useState('')
+  const [syncToChart, setSyncToChart] = useState(true)
+  const [pulledInfo, setPulledInfo] = useState<string[]>([])
+  const [specialTests, setSpecialTests] = useState<SpecialTestRecord[]>([])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const link = useMemo(() => protocolPatient ? resolveChartPatient(protocolPatient) : { patient: null, explicit: false }, [protocolPatient, linkVersion])
+  const chartPatients = useMemo(() => getChartPatientList(), [])
+  const region = protocolPatient?.joint
+    ? JOINT_TO_REGION[protocolPatient.joint]
+    : link.patient?.bodyRegion ?? 'other'
+
+  function handleLink() {
+    if (!selectedChartId) return
+    onLinkChart?.(selectedChartId)
+    setLinkVersion(v => v + 1)
+  }
+
+  function handlePull() {
+    if (!link.patient) return
+    const pulled = pullLatestMetrics(link.patient.id, region)
+    if (pulled.length === 0) {
+      setPulledInfo(['カルテに取り込める記録がまだありません'])
+    } else {
+      setMetrics(prev => {
+        const next = [...prev]
+        for (const p of pulled) {
+          const idx = next.findIndex(m => m.key === p.key)
+          const preset = METRIC_PRESETS.find(x => x.key === p.key)
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], value: String(p.value) }
+          } else if (preset) {
+            next.push({ key: preset.key, label: preset.label, value: String(p.value) })
+          }
+        }
+        return next
+      })
+      setPulledInfo(pulled.map(p =>
+        `${METRIC_PRESETS.find(x => x.key === p.key)?.label ?? p.key}: ${p.value}（${new Date(p.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} ${p.source}）`
+      ))
+    }
+    setSpecialTests(pullLatestSpecialTests(link.patient.id, region))
+  }
+
+  function appendTestsToNotes() {
+    if (specialTests.length === 0) return
+    const summary = 'スペシャルテスト: ' + specialTests.map(t =>
+      `${t.testName} ${TEST_RESULT_LABELS[t.result]}（${new Date(t.measuredDate).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}）`
+    ).join('、')
+    setNotes(n => n ? `${n}\n${summary}` : summary)
+  }
 
   function addPreset(key: string) {
     if (metrics.some(m => m.key === key)) return
@@ -77,12 +142,17 @@ export default function AssessmentForm({
       alert('少なくとも1つの指標を入力してください')
       return
     }
+    const metricValues = Object.fromEntries(filled.map(m => [m.key, parseFloat(m.value)]))
+    // カルテ連携: ROM値をカルテのROM記録へ書き戻す
+    if (syncToChart && link.patient) {
+      pushRomToChart(link.patient.id, region, date, metricValues)
+    }
     onSave({
       patientId,
       protocolId,
       phaseId: phaseId || undefined,
       date,
-      metrics: Object.fromEntries(filled.map(m => [m.key, parseFloat(m.value)])),
+      metrics: metricValues,
       notes: notes || undefined,
     })
   }
@@ -91,6 +161,120 @@ export default function AssessmentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* カルテ連携パネル */}
+      {protocolPatient && (
+        <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3.5 space-y-2.5">
+          {link.patient ? (
+            <>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-3.5 h-3.5 text-teal-600" />
+                  <span className="text-xs font-bold text-teal-800 font-display">
+                    カルテ連携: {link.patient.name}
+                  </span>
+                  {!link.explicit && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedChartId(link.patient!.id); onLinkChart?.(link.patient!.id); setLinkVersion(v => v + 1) }}
+                      className="text-[10px] text-teal-600 bg-white border border-teal-200 rounded-full px-2 py-0.5
+                        hover:bg-teal-100 transition-colors"
+                      title="氏名一致による自動候補です。クリックでリンクを確定します"
+                    >
+                      氏名一致 · リンクを確定
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePull}
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-teal-600
+                    px-3 py-1.5 rounded-lg hover:bg-teal-700 transition-colors font-display"
+                >
+                  <Download className="w-3 h-3" />カルテから最新値を取り込む
+                </button>
+              </div>
+
+              {pulledInfo.length > 0 && (
+                <ul className="text-[11px] text-teal-800 bg-white/70 rounded-lg px-3 py-2 space-y-0.5">
+                  {pulledInfo.map((line, i) => <li key={i}>· {line}</li>)}
+                </ul>
+              )}
+
+              {/* スペシャルテスト（カルテの最新結果） */}
+              {specialTests.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-teal-700 font-display uppercase tracking-wider">
+                      <FlaskConical className="w-3 h-3" />スペシャルテスト（カルテ最新）
+                    </span>
+                    <button
+                      type="button"
+                      onClick={appendTestsToNotes}
+                      className="text-[10px] text-teal-600 hover:underline"
+                    >
+                      メモへ追記
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {specialTests.map(t => (
+                      <span key={t.id} className={`text-[10px] font-semibold rounded-full px-2 py-1 border ${
+                        t.result === 'positive'   ? 'bg-red-50 border-red-200 text-red-700' :
+                        t.result === 'negative'   ? 'bg-teal-50 border-teal-200 text-teal-700' :
+                        t.result === 'suspicious' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                                    'bg-slate-50 border-slate-200 text-slate-500'
+                      }`}>
+                        {t.testName} {TEST_RESULT_LABELS[t.result]}
+                        <span className="metric ml-1 opacity-60">
+                          {new Date(t.measuredDate).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 text-[11px] text-teal-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={syncToChart}
+                  onChange={e => setSyncToChart(e.target.checked)}
+                  className="accent-teal-600"
+                />
+                保存時にROM値をカルテのROM記録にも反映する
+              </label>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link2 className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-xs text-slate-500">カルテ未連携 —</span>
+              <select
+                value={selectedChartId}
+                onChange={e => setSelectedChartId(e.target.value)}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white
+                  focus:outline-none focus:ring-2 focus:ring-teal-500/40 max-w-[180px]"
+              >
+                <option value="">カルテ患者を選択...</option>
+                {chartPatients.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleLink}
+                disabled={!selectedChartId}
+                className="text-xs font-bold text-white bg-teal-600 px-3 py-1.5 rounded-lg
+                  hover:bg-teal-700 disabled:opacity-40 transition-colors font-display"
+              >
+                リンクする
+              </button>
+              <span className="text-[10px] text-slate-400 w-full">
+                リンクするとROM・スペシャルテスト・痛みNRSをカルテと相互反映できます
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 日付・フェーズ */}
       <div className="grid grid-cols-2 gap-3">
         <div>

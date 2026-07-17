@@ -68,6 +68,8 @@ export interface ProtocolPatient {
   eventDate?: string // ISO date
   concerns?: string  // 患者の悩み・現在の症状（自由記述）
   notes?: string
+  /** 患者管理（/patients カルテ）の患者IDへのリンク。ROM・スペシャルテスト連携に使用 */
+  linkedPatientId?: string
   createdAt: string
   updatedAt: string
 }
