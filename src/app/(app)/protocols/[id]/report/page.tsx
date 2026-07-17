@@ -259,31 +259,73 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             </div>
           </div>
 
-          {/* 03 できるようになったこと */}
+          {/* 03 できるようになったこと（スタンプラリー風: 全マイルストーンを表示） */}
           <div className="report-section mb-6">
-            <SectionHeader no="03" title="できるようになったこと" accent="#f59e0b" />
-            {achievedMs.length === 0 ? (
+            <SectionHeader no="03" title="できるようになったこと — スタンプラリー" accent="#f59e0b" />
+            {milestones.length === 0 ? (
               <p className="text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-100 px-4 py-3">
                 これから一つずつ「できた！」を増やしていきましょう。
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {achievedMs.map(m => (
-                  <div key={m.id} className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-                    style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-                    <span className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center
-                      text-base flex-shrink-0">
-                      {m.icon ?? '⭐'}
-                    </span>
-                    <span className="text-xs font-bold text-amber-900 flex-1">{m.label}</span>
-                    {m.date && (
-                      <span className="metric text-[10px] font-semibold text-amber-500">
-                        {new Date(m.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-4 gap-2.5 mt-3">
+                  {milestones.map((m, idx) => {
+                    const isNext = !m.achieved && milestones.findIndex(x => !x.achieved) === idx
+                    return (
+                      <div key={m.id}
+                        className="relative flex flex-col items-center rounded-2xl px-1.5 pt-4 pb-2.5 text-center"
+                        style={m.achieved
+                          ? { background: '#fef3c7', border: '2px solid #f59e0b' }
+                          : isNext
+                            ? { background: '#fff7ed', border: '2px dashed #fb923c' }
+                            : { background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        {/* 達成チェックバッジ */}
+                        {m.achieved && (
+                          <span className="absolute -top-2 -right-1.5 w-5 h-5 rounded-full flex items-center
+                            justify-center shadow-sm" style={{ background: '#f59e0b' }}>
+                            <svg width="10" height="10" viewBox="0 0 10 10">
+                              <path d="M1.5,5 L4,7.5 L8.5,2.5" fill="none" stroke="white"
+                                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </span>
+                        )}
+                        {/* つぎの目標バッジ */}
+                        {isNext && (
+                          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[8px] font-bold
+                            text-white px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm"
+                            style={{ background: '#fb923c' }}>
+                            つぎはこれ！
+                          </span>
+                        )}
+                        {/* スタンプ円 */}
+                        <span className="w-11 h-11 rounded-full flex items-center justify-center text-[20px] mb-1.5"
+                          style={m.achieved
+                            ? { background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', boxShadow: '0 2px 6px rgba(245,158,11,0.4)' }
+                            : { background: 'white', border: '2px dashed #cbd5e1' }}>
+                          <span style={m.achieved ? undefined : { filter: 'grayscale(1)', opacity: 0.35 }}>
+                            {m.icon ?? '⭐'}
+                          </span>
+                        </span>
+                        <span className={`text-[10px] font-bold leading-tight ${
+                          m.achieved ? 'text-amber-900' : isNext ? 'text-orange-800' : 'text-slate-400'
+                        }`}>
+                          {m.label}
+                        </span>
+                        <span className="metric text-[9px] font-semibold mt-0.5"
+                          style={{ color: m.achieved && m.date ? '#d97706' : 'transparent' }}>
+                          {m.achieved && m.date
+                            ? `${new Date(m.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} 達成`
+                            : '·'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-[11px] font-bold text-amber-700 mt-2.5 text-center">
+                  {milestones.length}個のうち {achievedMs.length}個 達成！
+                  {achievedMs.length > 0 && ' この調子で進んでいきましょう'}
+                </p>
+              </>
             )}
           </div>
 
