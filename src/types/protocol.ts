@@ -137,6 +137,8 @@ export interface Protocol {
   currentPhaseIndex: number
   attachments?: ProtocolAttachment[]
   aiChat?: ProtocolChatMessage[]
+  /** がんばりレポートに印刷するスタッフからのメッセージ */
+  reportComment?: string
   createdAt: string
   updatedAt: string
 }

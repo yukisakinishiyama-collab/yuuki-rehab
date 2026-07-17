@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import type { Milestone } from '@/types/protocol'
-import { achieveMilestone, getMilestones, initMilestones } from '@/lib/protocol-store'
+import { achieveMilestone, getMilestones, initMilestones, getAssessments } from '@/lib/protocol-store'
 import Confetti from './Confetti'
-import { Flame, Trophy, CheckCircle, Target, Sparkles } from 'lucide-react'
+import { ClipboardCheck, Trophy, CheckCircle, Target, Sparkles } from 'lucide-react'
 
 interface Props {
   patientId: string
@@ -21,7 +21,7 @@ const ENCOURAGE_MESSAGES = [
 export default function MilestonePanel({ patientId, simpleMode }: Props) {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [celebrating, setCelebrating] = useState<string | null>(null)
-  const [streak, setStreak] = useState(0)
+  const [recordCount, setRecordCount] = useState(0)
 
   useEffect(() => {
     const ms = getMilestones(patientId)
@@ -31,7 +31,8 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
     } else {
       setMilestones(ms)
     }
-    setStreak(Math.floor(Math.random() * 10) + 1)
+    // 実データ: この患者の評価記録の回数
+    setRecordCount(getAssessments(patientId).length)
   }, [patientId])
 
   function handleAchieve(id: string) {
@@ -91,10 +92,10 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
           </div>
           <div className="text-center bg-white/10 rounded-xl px-4 py-2.5">
             <div className="flex items-center gap-1 mb-0.5">
-              <Flame className="w-4 h-4 text-[--color-accent]" />
-              <span className="metric text-2xl font-bold text-white">{streak}</span>
+              <ClipboardCheck className="w-4 h-4 text-[--color-accent]" />
+              <span className="metric text-2xl font-bold text-white">{recordCount}</span>
             </div>
-            <div className="text-xs text-white/60 font-body">日連続</div>
+            <div className="text-xs text-white/60 font-body">評価記録</div>
           </div>
         </div>
 

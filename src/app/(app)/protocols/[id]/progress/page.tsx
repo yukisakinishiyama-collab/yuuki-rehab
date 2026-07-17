@@ -3,17 +3,22 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Protocol, ProtocolPatient, Assessment } from '@/types/protocol'
+import type { Protocol, ProtocolPatient, Assessment, Milestone } from '@/types/protocol'
 import {
   getProtocolById, getPatientById, getAssessmentsByProtocol,
-  saveAssessment, deleteAssessment
+  saveAssessment, deleteAssessment, initMilestones,
 } from '@/lib/protocol-store'
+import {
+  computeMetricChanges, overallProgress, daysSinceStart,
+} from '@/lib/progress-utils'
+import { JourneyIllustration, ProgressRing } from '@/components/protocol/RehabIllustrations'
 import ProgressChart from '@/components/protocol/ProgressChart'
 import AssessmentForm from '@/components/protocol/AssessmentForm'
 import MilestonePanel from '@/components/protocol/MilestonePanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import {
-  Plus, ChevronRight, Trash2, Calendar, BarChart2, Trophy, TrendingUp
+  Plus, ChevronRight, Trash2, Calendar, BarChart2, Trophy, TrendingUp,
+  TrendingDown, Award, CalendarDays, ClipboardCheck, Star,
 } from 'lucide-react'
 
 type Tab = 'chart' | 'records' | 'milestones'
@@ -34,6 +39,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
   const [protocol, setProtocol] = useState<Protocol | null>(null)
   const [patient, setPatient] = useState<ProtocolPatient | null>(null)
   const [assessments, setAssessments] = useState<Assessment[]>([])
+  const [milestones, setMilestones] = useState<Milestone[]>([])
   const [showForm, setShowForm] = useState(false)
   const [tab, setTab] = useState<Tab>('chart')
 
@@ -43,6 +49,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
     setProtocol(p)
     setPatient(getPatientById(p.patientId))
     setAssessments(getAssessmentsByProtocol(id).sort((a, b) => a.date.localeCompare(b.date)))
+    setMilestones(initMilestones(p.patientId))
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
@@ -93,19 +100,102 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
             {patient.name ?? '匿名患者'} · {protocol.title}
           </div>
         </div>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold font-display
-            transition-colors shadow-sm ${
-            showForm
-              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              : 'bg-[--color-primary] text-white hover:bg-[--color-primary-hover]'
-          }`}
-        >
-          <Plus className={`w-4 h-4 transition-transform ${showForm ? 'rotate-45' : ''}`} />
-          {showForm ? '閉じる' : '評価を記録'}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/protocols/${id}/report`}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold font-display
+              bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100
+              transition-colors shadow-sm"
+          >
+            <Award className="w-4 h-4" />
+            <span className="hidden sm:inline">がんばりレポート</span>
+            <span className="sm:hidden">レポート</span>
+          </Link>
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold font-display
+              transition-colors shadow-sm ${
+              showForm
+                ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                : 'bg-[--color-primary] text-white hover:bg-[--color-primary-hover]'
+            }`}
+          >
+            <Plus className={`w-4 h-4 transition-transform ${showForm ? 'rotate-45' : ''}`} />
+            {showForm ? '閉じる' : '評価を記録'}
+          </button>
+        </div>
       </div>
+
+      {/* ヒーロー: 回復の旅サマリー */}
+      {(() => {
+        const currentPhase = protocol.phases[protocol.currentPhaseIndex]
+        const criteriaPct = currentPhase && currentPhase.advanceCriteria.length > 0
+          ? currentPhase.advanceCriteria.filter(c => c.met).length / currentPhase.advanceCriteria.length
+          : 0
+        const progressPct = Math.round(overallProgress(protocol) * 100)
+        const days = daysSinceStart(patient.eventDate, protocol.createdAt)
+        const achieved = milestones.filter(m => m.achieved).length
+        const changes = computeMetricChanges(assessments)
+        const highlight = changes.filter(c => c.judgment === 'improved').slice(0, 3)
+        return (
+          <div className="bg-[--color-surface-card] rounded-2xl border border-slate-200 shadow-sm
+            overflow-hidden mb-5 animate-slide-up delay-100">
+            <div className="bg-gradient-to-b from-sky-50/70 to-transparent px-4 pt-4 pb-1">
+              <JourneyIllustration
+                phaseCount={protocol.phases.length}
+                currentPhaseIndex={protocol.currentPhaseIndex}
+                criteriaPct={criteriaPct}
+              />
+            </div>
+            <div className="px-5 pb-5 pt-2">
+              <div className="flex items-center gap-5 flex-wrap">
+                <ProgressRing pct={progressPct} size={92} label="達成" />
+                <div className="flex items-center gap-5 flex-wrap flex-1">
+                  {[
+                    { Icon: CalendarDays,   value: days,                                 unit: '日', label: 'リハビリ継続' },
+                    { Icon: ClipboardCheck, value: assessments.length,                   unit: '回', label: '評価記録' },
+                    { Icon: Star,           value: `${achieved}/${milestones.length}`,   unit: '',   label: 'マイルストーン' },
+                  ].map(({ Icon, value, unit, label }) => (
+                    <div key={label} className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[--color-primary-light] flex items-center justify-center">
+                        <Icon className="w-4 h-4 text-[--color-primary]" />
+                      </div>
+                      <div>
+                        <div className="metric text-lg font-bold text-[--color-text-primary] leading-none">
+                          {value}<span className="text-[10px] text-[--color-text-muted] ml-0.5">{unit}</span>
+                        </div>
+                        <div className="text-[10px] text-[--color-text-muted] mt-0.5">{label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {currentPhase && (
+                  <div className="text-right">
+                    <div className="text-[10px] text-[--color-text-muted]">現在のフェーズ</div>
+                    <div className="text-sm font-bold text-[--color-primary] font-display">
+                      {currentPhase.title}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {highlight.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
+                  {highlight.map(c => (
+                    <span key={c.key} className="flex items-center gap-1.5 text-xs bg-teal-50
+                      border border-teal-100 text-teal-800 rounded-full px-3 py-1.5 font-medium">
+                      {c.delta < 0
+                        ? <TrendingDown className="w-3.5 h-3.5 text-teal-600" />
+                        : <TrendingUp className="w-3.5 h-3.5 text-teal-600" />}
+                      {c.info.shortLabel}
+                      <span className="metric">{c.first}{c.info.unit} → {c.latest}{c.info.unit}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* 評価入力フォーム */}
       {showForm && (
