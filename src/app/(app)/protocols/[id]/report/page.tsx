@@ -16,8 +16,9 @@ import {
   computeMetricChanges, overallProgress, daysSinceStart, generatePraise,
   type MetricChange,
 } from '@/lib/progress-utils'
+import Image from 'next/image'
 import {
-  JourneyIllustration, ProgressRing, EffortStamp, CheeringBuddy,
+  JourneyIllustration, ProgressRing, EffortStamp,
 } from '@/components/protocol/RehabIllustrations'
 import ProgressChart from '@/components/protocol/ProgressChart'
 import {
@@ -150,7 +151,15 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             </div>
           </div>
           <div className="flex-shrink-0">
-            <CheeringBuddy size={92} />
+            {/* Canvaで生成した応援イラスト（public/illustrations/rehab-cheer.png） */}
+            <Image
+              src="/illustrations/rehab-cheer.png"
+              alt="スタッフが患者のリハビリを応援するイラスト"
+              width={1200}
+              height={851}
+              priority
+              className="h-28 w-auto"
+            />
           </div>
         </div>
 
