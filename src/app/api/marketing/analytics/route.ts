@@ -8,7 +8,7 @@ import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
 export async function GET(request: NextRequest) {
   const days = Math.min(Number(request.nextUrl.searchParams.get('days') ?? 30), 365)
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  const events = listEvents(since)
+  const events = await listEvents(since)
 
   const count = (kind: string) => events.filter((e) => e.kind === kind).length
   const uniq = (kind: string) => new Set(events.filter((e) => e.kind === kind).map((e) => e.actor ?? Math.random())).size
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     }))
 
   // 投稿実績（媒体別）
-  const jobs = listJobs().filter((j) => j.createdAt >= since)
+  const jobs = (await listJobs()).filter((j) => j.createdAt >= since)
   const postStats: Record<string, { published: number; pending: number; failed: number }> = {}
   jobs.forEach((j) => {
     if (!postStats[j.channel]) postStats[j.channel] = { published: 0, pending: 0, failed: 0 }

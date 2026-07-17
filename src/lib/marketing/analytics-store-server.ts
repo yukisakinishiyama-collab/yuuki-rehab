@@ -2,10 +2,11 @@
  * 効果測定イベントストア（指示書17章）
  *
  * 個人を特定しない集計用イベントのみを記録する（userIdはLINE内部IDの
- * 末尾ハッシュのみ保持し、氏名等は保存しない）。
+ * ハッシュのみ保持し、氏名等は保存しない）。
+ * 保存先はKVストア（Supabase設定時はPostgres・未設定時はローカルファイル）。
+ * 日別バケット（analytics:YYYY-MM-DD）に分けて追記する。
  */
-import fs from 'node:fs'
-import path from 'node:path'
+import { kvGet, kvList, kvSet } from './kv-store-server'
 
 export type AnalyticsEventKind =
   | 'line_follow' // 友だち追加
@@ -24,43 +25,24 @@ export interface AnalyticsEvent {
   actor?: string
 }
 
-interface AnalyticsDb {
-  events: AnalyticsEvent[]
+const DAY_KEY = (day: string) => `analytics:${day}`
+
+export async function recordEvent(kind: AnalyticsEventKind, meta: Record<string, string> = {}, actor?: string) {
+  const at = new Date().toISOString()
+  const day = at.slice(0, 10)
+  const bucket = (await kvGet<AnalyticsEvent[]>(DAY_KEY(day))) ?? []
+  bucket.push({ at, kind, meta, actor: actor ? anonymize(actor) : undefined })
+  // 1日あたり上限（暴走・攻撃対策）
+  await kvSet(DAY_KEY(day), bucket.slice(-5000))
 }
 
-function dbPath(): string {
-  const local = path.join(process.cwd(), '.data')
-  try {
-    fs.mkdirSync(local, { recursive: true })
-    return path.join(local, 'marketing-analytics.json')
-  } catch {
-    return path.join('/tmp', 'marketing-analytics.json')
-  }
-}
-
-function load(): AnalyticsDb {
-  try {
-    return JSON.parse(fs.readFileSync(dbPath(), 'utf-8')) as AnalyticsDb
-  } catch {
-    return { events: [] }
-  }
-}
-
-export function recordEvent(kind: AnalyticsEventKind, meta: Record<string, string> = {}, actor?: string) {
-  const db = load()
-  db.events.push({
-    at: new Date().toISOString(),
-    kind,
-    meta,
-    actor: actor ? anonymize(actor) : undefined,
-  })
-  // 直近2万件のみ保持
-  db.events = db.events.slice(-20000)
-  fs.writeFileSync(dbPath(), JSON.stringify(db))
-}
-
-export function listEvents(sinceIso: string): AnalyticsEvent[] {
-  return load().events.filter((e) => e.at >= sinceIso)
+export async function listEvents(sinceIso: string): Promise<AnalyticsEvent[]> {
+  const sinceDay = sinceIso.slice(0, 10)
+  const buckets = await kvList<AnalyticsEvent[]>('analytics:')
+  return buckets
+    .filter((b) => b.key.slice('analytics:'.length) >= sinceDay)
+    .flatMap((b) => b.value)
+    .filter((e) => e.at >= sinceIso)
 }
 
 /** LINE userIdなどをそのまま保存しないための単純ハッシュ */

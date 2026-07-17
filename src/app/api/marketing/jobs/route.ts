@@ -14,14 +14,14 @@ const CreateSchema = z.object({
 })
 
 export async function GET() {
-  return NextResponse.json({ ok: true, jobs: listJobs() })
+  return NextResponse.json({ ok: true, jobs: await listJobs() })
 }
 
 export async function POST(request: NextRequest) {
   try {
     const input = CreateSchema.parse(await request.json())
     if (!(input.channel in CHANNEL_LABELS)) throw new Error('bad channel')
-    const { job, duplicated } = createJob({
+    const { job, duplicated } = await createJob({
       idempotencyKey: `${input.variantId}`,
       projectId: input.projectId,
       variantId: input.variantId,

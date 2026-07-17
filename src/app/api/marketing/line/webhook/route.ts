@@ -111,7 +111,13 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text()
 
   // ── シミュレーター経路（開発・検証用。本番のLINEユーザーには一切送信しない） ──
+  // セキュリティ: 本番（チャネル設定済み）ではシミュレーターを無効化し、
+  // 第三者による偽データ注入を防ぐ。ローカル開発（チャネル未設定 or mock）でのみ有効。
+  const simulatorAllowed = !CHANNEL_SECRET || process.env.MARKETING_MODE === 'mock'
   if (request.headers.get('x-marketing-simulator') === '1') {
+    if (!simulatorAllowed) {
+      return NextResponse.json({ error: '本番環境ではシミュレーターは使用できません' }, { status: 403 })
+    }
     try {
       const { userId, displayName, input } = JSON.parse(rawBody) as {
         userId: string
@@ -165,9 +171,28 @@ export async function POST(request: NextRequest) {
 
 /** 接続状態の確認用（管理画面のAPI接続確認に使用） */
 export async function GET() {
+  // データ保存先の疎通も確認する（秘密情報は返さない）
+  let storageOk = false
+  let storage = 'file'
+  try {
+    const { createSupabaseServer } = await import('@/lib/supabase-server')
+    const supabase = createSupabaseServer()
+    if (supabase) {
+      storage = 'supabase'
+      const { error } = await supabase.from('marketing_line_contacts').select('user_id').limit(1)
+      storageOk = !error
+    } else {
+      storageOk = true
+    }
+  } catch {
+    storageOk = false
+  }
+
   return NextResponse.json({
     ok: true,
     channelConfigured: Boolean(CHANNEL_SECRET && ACCESS_TOKEN),
     mode: CHANNEL_SECRET && ACCESS_TOKEN ? 'live' : 'simulator-only',
+    storage,
+    storageOk,
   })
 }

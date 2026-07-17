@@ -87,9 +87,15 @@ export async function saveContact(contact: LineContact, newMessages: LineChatMes
 export async function listContacts(): Promise<LineContact[]> {
   const supabase = createSupabaseServer()
   if (supabase) {
-    const { data } = await supabase.from(TABLE).select('data').limit(1000)
+    // 同テーブルをKV領域として共用しているため、予約プレフィックス行を除外する
+    const { data } = await supabase
+      .from(TABLE)
+      .select('data')
+      .not('user_id', 'like', 'job:%')
+      .not('user_id', 'like', 'analytics:%')
+      .limit(1000)
     const contacts = (data ?? []).map((row) => row.data as LineContact)
-    return contacts.sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))
+    return contacts.sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''))
   }
   return Object.values(fileLoad().contacts).sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))
 }

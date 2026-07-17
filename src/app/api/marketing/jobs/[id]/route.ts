@@ -4,7 +4,7 @@ import { getJob, updateJob } from '@/lib/marketing/jobs-store-server'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!getJob(id)) return NextResponse.json({ error: 'ジョブが見つかりません' }, { status: 404 })
+  if (!(await getJob(id))) return NextResponse.json({ error: 'ジョブが見つかりません' }, { status: 404 })
 
   try {
     const body = (await request.json()) as {
@@ -13,7 +13,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       scheduledAt?: string
     }
 
-    const job = updateJob(id, (j) => {
+    const job = await updateJob(id, (j) => {
       if (body.action === 'cancel') {
         j.status = 'cancelled'
       }

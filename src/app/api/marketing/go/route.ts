@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     if (value) meta[key] = value.slice(0, 60)
   }
   try {
-    recordEvent('link_click', meta)
+    await recordEvent('link_click', meta)
   } catch {
     // 計測の失敗で患者の遷移を止めない
   }

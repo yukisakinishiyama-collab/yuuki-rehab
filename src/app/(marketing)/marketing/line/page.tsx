@@ -95,13 +95,15 @@ export default function LinePage() {
         <section className="rounded-xl border border-slate-200 bg-white p-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold">友だち（{contacts.length}）</h2>
-            <button
-              type="button"
-              onClick={() => simulate({ kind: 'follow' }, `demo${Date.now() % 1000}`)}
-              className="rounded bg-teal-700 px-2 py-1 text-xs font-bold text-white"
-            >
-              ＋友だち追加を試す
-            </button>
+            {!channelConfigured && (
+              <button
+                type="button"
+                onClick={() => simulate({ kind: 'follow' }, `demo${Date.now() % 1000}`)}
+                className="rounded bg-teal-700 px-2 py-1 text-xs font-bold text-white"
+              >
+                ＋友だち追加を試す
+              </button>
+            )}
           </div>
           <ul className="mt-2 max-h-[480px] space-y-1 overflow-y-auto">
             {contacts.map((c) => (
@@ -186,8 +188,8 @@ export default function LinePage() {
                 {selected.messages.length === 0 && <p className="text-xs text-slate-400">まだ会話がありません</p>}
               </div>
 
-              {/* シミュレーター入力 */}
-              {selected.userId.startsWith('sim_') && (
+              {/* シミュレーター入力（本番チャネル接続時はサーバー側で無効のため非表示） */}
+              {selected.userId.startsWith('sim_') && !channelConfigured && (
                 <div className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
                   <p className="text-xs font-bold text-teal-800">シミュレーター（患者側の操作を再現）</p>
                   {simButtons.length > 0 && (
