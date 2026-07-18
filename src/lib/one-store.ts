@@ -25,6 +25,8 @@ export interface Consultation {
 
 interface OneStoreData {
   consultations: Consultation[];
+  /** 「今日の行動」を実行した日（ローカル日付 'YYYY-MM-DD'、昇順とは限らない） */
+  doneDates: string[];
 }
 
 const STORAGE_KEY = 'project-one-store-v1';
@@ -47,16 +49,22 @@ export function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+function emptyData(): OneStoreData {
+  return { consultations: [], doneDates: [] };
+}
+
 function load(): OneStoreData {
-  if (typeof window === 'undefined') return { consultations: [] };
+  if (typeof window === 'undefined') return emptyData();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { consultations: [] };
-    const data = JSON.parse(raw) as OneStoreData;
-    if (!Array.isArray(data.consultations)) return { consultations: [] };
-    return data;
+    if (!raw) return emptyData();
+    const data = JSON.parse(raw) as Partial<OneStoreData>;
+    return {
+      consultations: Array.isArray(data.consultations) ? data.consultations : [],
+      doneDates: Array.isArray(data.doneDates) ? data.doneDates : [],
+    };
   } catch {
-    return { consultations: [] };
+    return emptyData();
   }
 }
 
@@ -146,6 +154,53 @@ export function getTodayAction(date = new Date()): string {
   const seed =
     date.getFullYear() * 372 + (date.getMonth() + 1) * 31 + date.getDate();
   return DAILY_ACTIONS[seed % DAILY_ACTIONS.length];
+}
+
+// ========================
+// 「できた！」記録・連続日数（端末内で完結・オフライン動作）
+// ========================
+
+const EMPTY_DATES: string[] = [];
+const MAX_DONE_DATES = 400;
+
+export function toLocalDateKey(date = new Date()): string {
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
+/** クライアント側スナップショット（useSyncExternalStore 用） */
+export function getDoneDates(): string[] {
+  if (typeof window === 'undefined') return EMPTY_DATES;
+  if (!cache) cache = load();
+  return cache.doneDates;
+}
+
+/** SSR/プリレンダー用スナップショット（常に空） */
+export function getServerDoneDates(): string[] {
+  return EMPTY_DATES;
+}
+
+/** 今日の行動を「できた！」として記録する（同日2回目以降は無視） */
+export function markTodayDone() {
+  const data = load();
+  const key = toLocalDateKey();
+  if (data.doneDates.includes(key)) return;
+  data.doneDates = [...data.doneDates, key].slice(-MAX_DONE_DATES);
+  save(data);
+}
+
+/** 連続日数。今日が未実行なら昨日までの連続を返す（0時リセットで途切れて見えないように） */
+export function calcStreak(doneDates: string[], today = new Date()): number {
+  const set = new Set(doneDates);
+  const d = new Date(today);
+  if (!set.has(toLocalDateKey(d))) d.setDate(d.getDate() - 1);
+  let streak = 0;
+  while (set.has(toLocalDateKey(d))) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
 }
 
 // ========================

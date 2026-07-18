@@ -14,7 +14,7 @@ Android 先行リリース時は本アプリを TWA (Trusted Web Activity) / Web
 | AI回答 | `/api/one-chat` (Anthropic Haiku・200字以内 + JSON構造化出力) |
 | 履歴 | `/one/history` — 端末内 localStorage |
 | お気に入り | `/one/favorites` — ☆トグル |
-| 今日の行動 | ホーム上部カード + AI回答ごとの行動提案（端末内で決定・オフライン動作） |
+| 今日の行動 | ホーム上部カード + AI回答ごとの行動提案（端末内で決定・オフライン動作）。「できた！」記録と連続日数表示付き |
 
 不採用機能（SNS・チャット・ランキング・広告・課金等）は実装していない。
 
@@ -34,14 +34,26 @@ Android 先行リリース時は本アプリを TWA (Trusted Web Activity) / Web
 
 ```
 src/app/(project-one)/one/           # 画面（layout + 3ページ）
-src/components/one/                  # OneNav（下部ナビ）/ ConsultationCard
-src/lib/one-store.ts                 # localStorage ストア + オフライン回答 + 今日の行動
+src/components/one/                  # OneNav（下部ナビ）/ ConsultationCard / OneServiceWorker
+src/lib/one-store.ts                 # localStorage ストア + オフライン回答 + 今日の行動 + できた！記録
 src/app/api/one-chat/route.ts        # AI回答 API（Anthropic Haiku）
+public/one.webmanifest               # PWA マニフェスト（scope: /one, standalone）
+public/one-sw.js                     # Service Worker（/one 限定オフラインシェル）
+public/one-icon-{192,512}.png        # アプリアイコン
 ```
+
+## v0.2（改善スプリント1）で追加
+
+- **できた！記録 + 連続日数**: 今日の行動カードに「できた！」ボタン。実行日は端末内に
+  記録し、連続日数をバッジ表示（継続率向上・グループB提案）。今日未実行でも昨日までの
+  連続は維持表示され、0時に突然リセットされて見えない。
+- **PWA 化**: マニフェスト + Service Worker（本番のみ登録・scope は /one 限定なので
+  既存サイトに影響なし）。ページは network-first / ビルド資産は cache-first で、
+  一度開けば圏外でも起動できるオフラインシェルが完成。ホーム画面追加 → TWA での
+  Google Play 配信の土台。
 
 ## 今後（毎月改善サイクルの候補）
 
-1. PWA 化（Service Worker で完全オフラインシェル）→ TWA で Google Play 配信
-2. クラッシュ・利用率・レビューの計測基盤（クラッシュ率0.5%目標の実測）
-3. 今日の行動の「できた！」記録と連続日数表示（継続率向上）
-4. iOS 展開（同一コードベースの Capacitor ラップ）
+1. クラッシュ・利用率・レビューの計測基盤（クラッシュ率0.5%目標の実測）
+2. TWA パッケージング（Bubblewrap）で Google Play 配信
+3. iOS 展開（同一コードベースの Capacitor ラップ）

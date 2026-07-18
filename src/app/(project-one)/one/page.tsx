@@ -1,12 +1,18 @@
 'use client';
 
 import { useRef, useState, useSyncExternalStore } from 'react';
-import { Send, Sun, Star } from 'lucide-react';
+import { Send, Sun, Star, CheckCircle2, Flame } from 'lucide-react';
 import {
   addConsultation,
+  calcStreak,
+  getDoneDates,
   getOfflineAnswer,
+  getServerDoneDates,
   getTodayAction,
+  markTodayDone,
+  subscribe,
   toggleFavorite,
+  toLocalDateKey,
   type Consultation,
 } from '@/lib/one-store';
 
@@ -35,6 +41,11 @@ export default function OneHomePage() {
     getTodayActionSnapshot,
     getTodayActionServer
   );
+
+  // できた！記録と連続日数（端末内で完結）
+  const doneDates = useSyncExternalStore(subscribe, getDoneDates, getServerDoneDates);
+  const doneToday = doneDates.includes(toLocalDateKey());
+  const streak = calcStreak(doneDates);
 
   async function handleSubmit() {
     const q = question.trim();
@@ -91,11 +102,34 @@ export default function OneHomePage() {
         aria-label="今日の行動"
         className="rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white shadow-md"
       >
-        <p className="flex items-center gap-2 text-sm font-bold tracking-wide">
-          <Sun size={20} aria-hidden />
-          きょうの行動
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-2 text-sm font-bold tracking-wide">
+            <Sun size={20} aria-hidden />
+            きょうの行動
+          </p>
+          {streak > 0 && (
+            <p className="flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-sm font-bold">
+              <Flame size={16} aria-hidden />
+              れんぞく{streak}日
+            </p>
+          )}
+        </div>
         <p className="mt-2 text-xl font-bold leading-relaxed">{todayAction}</p>
+        {doneToday ? (
+          <p className="mt-4 flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-white/20 text-lg font-bold">
+            <CheckCircle2 size={22} aria-hidden />
+            きょうは できた！
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={markTodayDone}
+            className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-white text-lg font-bold text-blue-600 shadow-sm transition-all active:scale-[0.98]"
+          >
+            <CheckCircle2 size={22} aria-hidden />
+            できた！
+          </button>
+        )}
       </section>
 
       {/* 悩み相談 */}

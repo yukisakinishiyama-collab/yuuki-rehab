@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from 'next';
 import OneNav from '@/components/one/OneNav';
+import OneServiceWorker from '@/components/one/OneServiceWorker';
 
 export const metadata: Metadata = {
   title: 'ONE｜まいにちのAIそうだん',
   description:
     '説明書なしで使える、買い切り型AIライフアシスタント。悩みをひとこと話すと、やさしい答えと「今日の行動」が届きます。',
   robots: { index: false },
+  manifest: '/one.webmanifest',
+  icons: { icon: '/one-icon-192.png', apple: '/one-icon-192.png' },
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'ONE' },
 };
 
 export const viewport: Viewport = {
@@ -26,6 +30,7 @@ export default function OneLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <OneNav />
+      <OneServiceWorker />
     </div>
   );
 }
