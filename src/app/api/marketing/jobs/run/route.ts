@@ -6,12 +6,16 @@
  * - CRON_SECRET 設定時は Authorization: Bearer で保護
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { refreshInstagramTokenIfNeeded } from '@/lib/marketing/instagram-token'
 import { dueJobs, recordAttempt, updateJob } from '@/lib/marketing/jobs-store-server'
 import { publishToChannel } from '@/lib/marketing/publishers'
 
 export const maxDuration = 120
 
 async function run() {
+  // IGトークンの定期延長（60日期限対策）。失敗してもジョブ処理は続行する
+  await refreshInstagramTokenIfNeeded()
+
   const jobs = await dueJobs()
   const results: Array<{ id: string; channel: string; outcome: string }> = []
 

@@ -13,7 +13,7 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 const TABLE = 'marketing_line_contacts'
 
 /** LINE顧客一覧などがKV行を誤って拾わないための予約プレフィックス */
-export const KV_PREFIXES = ['job:', 'analytics:'] as const
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')
@@ -40,7 +40,8 @@ function fileSave(db: Record<string, unknown>) {
 export async function kvGet<T>(key: string): Promise<T | null> {
   const supabase = createSupabaseServer()
   if (supabase) {
-    const { data } = await supabase.from(TABLE).select('data').eq('user_id', key).maybeSingle()
+    const { data, error } = await supabase.from(TABLE).select('data').eq('user_id', key).maybeSingle()
+    if (error) throw new Error(`KV読み込みに失敗 (${key}): ${error.message}`)
     return (data?.data as T) ?? null
   }
   return (fileLoad()[key] as T) ?? null
@@ -49,7 +50,9 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 export async function kvSet(key: string, value: unknown): Promise<void> {
   const supabase = createSupabaseServer()
   if (supabase) {
-    await supabase.from(TABLE).upsert({ user_id: key, data: value })
+    // エラーを握りつぶすと「保存成功」と嘘をついてデータを失うため、必ず失敗を伝える
+    const { error } = await supabase.from(TABLE).upsert({ user_id: key, data: value })
+    if (error) throw new Error(`KV保存に失敗 (${key}): ${error.message}`)
     return
   }
   const db = fileLoad()
@@ -60,7 +63,8 @@ export async function kvSet(key: string, value: unknown): Promise<void> {
 export async function kvDelete(key: string): Promise<void> {
   const supabase = createSupabaseServer()
   if (supabase) {
-    await supabase.from(TABLE).delete().eq('user_id', key)
+    const { error } = await supabase.from(TABLE).delete().eq('user_id', key)
+    if (error) throw new Error(`KV削除に失敗 (${key}): ${error.message}`)
     return
   }
   const db = fileLoad()
@@ -72,7 +76,8 @@ export async function kvDelete(key: string): Promise<void> {
 export async function kvList<T>(prefix: string): Promise<Array<{ key: string; value: T }>> {
   const supabase = createSupabaseServer()
   if (supabase) {
-    const { data } = await supabase.from(TABLE).select('user_id, data').like('user_id', `${prefix}%`).limit(2000)
+    const { data, error } = await supabase.from(TABLE).select('user_id, data').like('user_id', `${prefix}%`).limit(2000)
+    if (error) throw new Error(`KV一覧の取得に失敗 (${prefix}): ${error.message}`)
     return (data ?? []).map((row) => ({ key: row.user_id as string, value: row.data as T }))
   }
   return Object.entries(fileLoad())

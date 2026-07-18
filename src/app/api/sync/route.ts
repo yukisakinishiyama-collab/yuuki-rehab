@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServer } from '@/lib/supabase-server'
+import { kvGet, kvSet } from '@/lib/marketing/kv-store-server'
+
+/**
+ * リハビリアプリのクラウド同期（localStorage全体のバックアップ）
+ *
+ * 旧実装は専用テーブル clinic_sync を使っていたが、SUPABASE_URLの移行
+ * （yuuki-marketingプロジェクト）でテーブルが無くなったため、
+ * DDL不要のKVストア（sync:プレフィックス）に移行した。
+ */
+const SYNC_KEY = 'sync:clinic'
+
+type SyncRecord = {
+  payload: Record<string, string>
+  updatedAt: string
+}
 
 // リクエスト認証チェック
 function isAuthorized(req: NextRequest): boolean {
@@ -15,22 +29,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createSupabaseServer()
-  if (!supabase) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
+  try {
+    const record = await kvGet<SyncRecord>(SYNC_KEY)
+    return NextResponse.json({ data: record?.payload ?? {}, updated_at: record?.updatedAt ?? null })
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : '取得に失敗' }, { status: 500 })
   }
-
-  const { data, error } = await supabase
-    .from('clinic_sync')
-    .select('data, updated_at')
-    .eq('id', 'main')
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ data: data?.data ?? {}, updated_at: data?.updated_at })
 }
 
 // POST: クラウドへデータを保存
@@ -39,21 +43,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createSupabaseServer()
-  if (!supabase) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
+  try {
+    const body = await req.json()
+    const { data: payload } = body
+    if (!payload || typeof payload !== 'object') {
+      return NextResponse.json({ error: 'dataがありません' }, { status: 400 })
+    }
+    await kvSet(SYNC_KEY, { payload, updatedAt: new Date().toISOString() } satisfies SyncRecord)
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : '保存に失敗' }, { status: 500 })
   }
-
-  const body = await req.json()
-  const { data: payload } = body
-
-  const { error } = await supabase
-    .from('clinic_sync')
-    .upsert({ id: 'main', data: payload, updated_at: new Date().toISOString() })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ ok: true })
 }

@@ -28,12 +28,18 @@ export interface AnalyticsEvent {
 const DAY_KEY = (day: string) => `analytics:${day}`
 
 export async function recordEvent(kind: AnalyticsEventKind, meta: Record<string, string> = {}, actor?: string) {
-  const at = new Date().toISOString()
-  const day = at.slice(0, 10)
-  const bucket = (await kvGet<AnalyticsEvent[]>(DAY_KEY(day))) ?? []
-  bucket.push({ at, kind, meta, actor: actor ? anonymize(actor) : undefined })
-  // 1日あたり上限（暴走・攻撃対策）
-  await kvSet(DAY_KEY(day), bucket.slice(-5000))
+  // 計測はベストエフォート: await されずに呼ばれる箇所があるため、
+  // ここで例外を握らないと未処理Promise拒否でリクエスト自体を壊しかねない
+  try {
+    const at = new Date().toISOString()
+    const day = at.slice(0, 10)
+    const bucket = (await kvGet<AnalyticsEvent[]>(DAY_KEY(day))) ?? []
+    bucket.push({ at, kind, meta, actor: actor ? anonymize(actor) : undefined })
+    // 1日あたり上限（暴走・攻撃対策）
+    await kvSet(DAY_KEY(day), bucket.slice(-5000))
+  } catch (error) {
+    console.error('計測イベントの記録に失敗:', error instanceof Error ? error.message : error)
+  }
 }
 
 export async function listEvents(sinceIso: string): Promise<AnalyticsEvent[]> {

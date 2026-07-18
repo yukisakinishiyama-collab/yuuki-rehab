@@ -62,9 +62,10 @@ async function ensurePublicImageUrl(content: GeneratedContent): Promise<string |
   }
 }
 
-/** Instagram Graph API（コンテンツ公開）。トークン設定時は画像も自動生成して完全自動投稿 */
+/** Instagram API（コンテンツ公開）。トークン設定時は画像も自動生成して完全自動投稿 */
 async function publishInstagram(channel: Channel, content: GeneratedContent): Promise<PublishOutcome> {
-  const token = process.env.INSTAGRAM_ACCESS_TOKEN
+  const { getInstagramToken, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
+  const token = await getInstagramToken()
   const igUserId = process.env.INSTAGRAM_USER_ID
   const manualUrl = 'https://www.instagram.com/'
 
@@ -89,8 +90,9 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
   }
 
   try {
+    // Instagramログイン方式のトークンは graph.instagram.com が接続先（graph.facebook.com では認証エラーになる）
     const caption = `${content.body}\n\n${content.hashtags.join(' ')}`
-    const createRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
+    const createRes = await fetch(`${INSTAGRAM_GRAPH_HOST}/v21.0/${igUserId}/media`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image_url: imageUrl, caption, access_token: token }),
@@ -98,14 +100,26 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
     const createData = await createRes.json()
     if (!createRes.ok) throw new Error(createData.error?.message ?? 'メディア作成に失敗')
 
-    const publishRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
+    const publishRes = await fetch(`${INSTAGRAM_GRAPH_HOST}/v21.0/${igUserId}/media_publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ creation_id: createData.id, access_token: token }),
     })
     const publishData = await publishRes.json()
     if (!publishRes.ok) throw new Error(publishData.error?.message ?? '公開に失敗')
-    return { kind: 'published', url: `https://www.instagram.com/p/${publishData.id}/`, message: 'Instagramへ公開しました' }
+
+    // メディアIDのままではURLにならないため、permalink（実際の投稿URL）を取得する（失敗しても投稿自体は成功扱い）
+    let postUrl = 'https://www.instagram.com/'
+    try {
+      const linkRes = await fetch(
+        `${INSTAGRAM_GRAPH_HOST}/v21.0/${publishData.id}?fields=permalink&access_token=${encodeURIComponent(token)}`
+      )
+      const linkData = await linkRes.json()
+      if (linkRes.ok && linkData.permalink) postUrl = linkData.permalink
+    } catch {
+      /* permalink取得失敗は無視 */
+    }
+    return { kind: 'published', url: postUrl, message: 'Instagramへ公開しました' }
   } catch (error) {
     return { kind: 'error', message: `Instagram APIエラー: ${error instanceof Error ? error.message : '不明'}` }
   }

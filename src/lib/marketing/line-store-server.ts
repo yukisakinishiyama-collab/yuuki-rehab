@@ -8,6 +8,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createSupabaseServer } from '@/lib/supabase-server'
+import { KV_PREFIXES } from './kv-store-server'
 import type { LineChatMessage, LineContact } from './line-types'
 
 const TABLE = 'marketing_line_contacts'
@@ -88,12 +89,11 @@ export async function listContacts(): Promise<LineContact[]> {
   const supabase = createSupabaseServer()
   if (supabase) {
     // 同テーブルをKV領域として共用しているため、予約プレフィックス行を除外する
-    const { data } = await supabase
-      .from(TABLE)
-      .select('data')
-      .not('user_id', 'like', 'job:%')
-      .not('user_id', 'like', 'analytics:%')
-      .limit(1000)
+    let query = supabase.from(TABLE).select('data').limit(1000)
+    for (const prefix of KV_PREFIXES) {
+      query = query.not('user_id', 'like', `${prefix}%`)
+    }
+    const { data } = await query
     const contacts = (data ?? []).map((row) => row.data as LineContact)
     return contacts.sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''))
   }
