@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import OneNav from '@/components/one/OneNav';
 import OneServiceWorker from '@/components/one/OneServiceWorker';
+import OneMetrics from '@/components/one/OneMetrics';
 
 export const metadata: Metadata = {
   title: 'ONE｜まいにちのAIそうだん',
@@ -31,6 +32,7 @@ export default function OneLayout({ children }: { children: React.ReactNode }) {
       </main>
       <OneNav />
       <OneServiceWorker />
+      <OneMetrics />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   toLocalDateKey,
   type Consultation,
 } from '@/lib/one-store';
+import { track } from '@/lib/one-metrics';
 
 // 今日の行動は端末内で決まる。サーバー側は空文字にしてハイドレーション差異を回避
 const noopSubscribe = () => () => {};
@@ -74,6 +75,7 @@ export default function OneHomePage() {
       action = fb.action;
       offline = true;
     }
+    track(offline ? 'consult_offline' : 'consult_success');
 
     const saved = addConsultation({ question: q, answer, action, offline });
     setResult(saved);
@@ -123,7 +125,10 @@ export default function OneHomePage() {
         ) : (
           <button
             type="button"
-            onClick={markTodayDone}
+            onClick={() => {
+              markTodayDone();
+              track('action_done');
+            }}
             className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-white text-lg font-bold text-blue-600 shadow-sm transition-all active:scale-[0.98]"
           >
             <CheckCircle2 size={22} aria-hidden />

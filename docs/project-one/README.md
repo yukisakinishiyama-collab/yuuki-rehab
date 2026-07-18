@@ -52,8 +52,20 @@ public/one-icon-{192,512}.png        # アプリアイコン
   一度開けば圏外でも起動できるオフラインシェルが完成。ホーム画面追加 → TWA での
   Google Play 配信の土台。
 
+## v0.3（改善スプリント2）で追加 — 計測基盤
+
+- **匿名メトリクス** (`src/lib/one-metrics.ts`): app_open / consult_success /
+  consult_offline / action_done / crash の5イベントのみ。相談・回答の本文は
+  一切送信しない。端末IDはランダム匿名ID。
+- **送信は sendBeacon バッチ1回**（バックグラウンド移行時）。圏外なら端末内
+  キューに残して次回送信 — 通信量最小の方針を計測でも守る。
+- **クラッシュ捕捉**: window error / unhandledrejection + `/one` 専用エラー
+  バウンダリ（`error.tsx`、ワンタップ復帰UI）。
+- **受信側** (`/api/one-metrics`): DBなし方針のため JSON Lines の構造化ログ
+  として出力（Vercel ログ / Log Drain で集計）。クラッシュ率 = crash ÷ app_open。
+  本格運用時はここを BigQuery 等への転送に差し替える。
+
 ## 今後（毎月改善サイクルの候補）
 
-1. クラッシュ・利用率・レビューの計測基盤（クラッシュ率0.5%目標の実測）
-2. TWA パッケージング（Bubblewrap）で Google Play 配信
-3. iOS 展開（同一コードベースの Capacitor ラップ）
+1. TWA パッケージング（Bubblewrap）で Google Play 配信
+2. iOS 展開（同一コードベースの Capacitor ラップ）
