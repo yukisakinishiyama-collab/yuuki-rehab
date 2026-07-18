@@ -41,25 +41,51 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
   }
 }
 
-/**
- * 投稿画像を自動で用意する：テンプレート画像を生成してVercel Blobに公開し、
- * Instagram APIに渡せる公開URLを返す。失敗時はnull（手動投稿へフォールバック）。
- */
-async function ensurePublicImageUrl(content: GeneratedContent): Promise<string | null> {
+/** テンプレート画像を生成してVercel Blobに公開し、Instagram APIに渡せる公開URLを返す */
+async function uploadTemplateImage(title: string, subtitle: string, name: string): Promise<string> {
+  const { renderTemplateImage } = await import('./image-template')
+  const { put } = await import('@vercel/blob')
+  const png = await renderTemplateImage(title, subtitle, 'instagram')
+  const blob = await put(name, png, { access: 'public', contentType: 'image/png' })
+  return blob.url
+}
+
+/** メディアコンテナ作成（Instagramログイン方式は graph.instagram.com が接続先） */
+async function igCreateContainer(
+  host: string,
+  igUserId: string,
+  token: string,
+  payload: Record<string, unknown>,
+): Promise<string> {
+  const res = await fetch(`${host}/v21.0/${igUserId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, access_token: token }),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.id) throw new Error(data.error?.message ?? 'メディア作成に失敗')
+  return data.id as string
+}
+
+/** コンテナを公開し、投稿URL（permalink）を返す */
+async function igPublishContainer(host: string, igUserId: string, token: string, creationId: string): Promise<string> {
+  const res = await fetch(`${host}/v21.0/${igUserId}/media_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creation_id: creationId, access_token: token }),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.id) throw new Error(data.error?.message ?? '公開に失敗')
+
+  // メディアIDのままではURLにならないため、permalink（実際の投稿URL）を取得する（失敗しても投稿自体は成功扱い）
   try {
-    const { renderTemplateImage } = await import('./image-template')
-    const { put } = await import('@vercel/blob')
-    const title = content.imageText || content.title || content.hook
-    const png = await renderTemplateImage(title, content.hook.slice(0, 40), 'instagram')
-    const blob = await put(`marketing/ig-${Date.now()}.png`, png, {
-      access: 'public',
-      contentType: 'image/png',
-    })
-    return blob.url
-  } catch (error) {
-    console.error('投稿画像の自動生成に失敗:', error instanceof Error ? error.message : error)
-    return null
+    const linkRes = await fetch(`${host}/v21.0/${data.id}?fields=permalink&access_token=${encodeURIComponent(token)}`)
+    const linkData = await linkRes.json()
+    if (linkRes.ok && linkData.permalink) return linkData.permalink as string
+  } catch {
+    /* permalink取得失敗は無視 */
   }
+  return 'https://www.instagram.com/'
 }
 
 /** Instagram API（コンテンツ公開）。トークン設定時は画像も自動生成して完全自動投稿 */
@@ -76,52 +102,48 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
       manualUrl,
     }
   }
-  if (channel !== 'instagram_feed') {
-    return { kind: 'action_required', reason: 'カルーセル・リールの自動投稿は段階対応中です。手動投稿してください。', manualUrl }
+  if (channel === 'instagram_reel') {
+    return { kind: 'action_required', reason: 'リールは動画素材が必要なため手動投稿です。本文をコピーして投稿してください。', manualUrl }
   }
 
-  const imageUrl = await ensurePublicImageUrl(content)
-  if (!imageUrl) {
-    return {
-      kind: 'action_required',
-      reason: '投稿画像の自動生成に失敗しました（Blobストレージの設定を確認）。テンプレ画像をダウンロードして手動投稿してください。',
-      manualUrl,
-    }
-  }
+  const caption = `${content.body}\n\n${content.hashtags.join(' ')}`
+  const slides = (content.slides ?? []).slice(0, 10) // IGカルーセルの上限は10枚
 
   try {
-    // Instagramログイン方式のトークンは graph.instagram.com が接続先（graph.facebook.com では認証エラーになる）
-    const caption = `${content.body}\n\n${content.hashtags.join(' ')}`
-    const createRes = await fetch(`${INSTAGRAM_GRAPH_HOST}/v21.0/${igUserId}/media`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: imageUrl, caption, access_token: token }),
-    })
-    const createData = await createRes.json()
-    if (!createRes.ok) throw new Error(createData.error?.message ?? 'メディア作成に失敗')
-
-    const publishRes = await fetch(`${INSTAGRAM_GRAPH_HOST}/v21.0/${igUserId}/media_publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ creation_id: createData.id, access_token: token }),
-    })
-    const publishData = await publishRes.json()
-    if (!publishRes.ok) throw new Error(publishData.error?.message ?? '公開に失敗')
-
-    // メディアIDのままではURLにならないため、permalink（実際の投稿URL）を取得する（失敗しても投稿自体は成功扱い）
-    let postUrl = 'https://www.instagram.com/'
-    try {
-      const linkRes = await fetch(
-        `${INSTAGRAM_GRAPH_HOST}/v21.0/${publishData.id}?fields=permalink&access_token=${encodeURIComponent(token)}`
-      )
-      const linkData = await linkRes.json()
-      if (linkRes.ok && linkData.permalink) postUrl = linkData.permalink
-    } catch {
-      /* permalink取得失敗は無視 */
+    let creationId: string
+    if (channel === 'instagram_carousel' && slides.length >= 2) {
+      // カルーセル: スライドごとに画像を生成→子コンテナ→親コンテナの順で組み立てる
+      const ts = Date.now()
+      const childIds: string[] = []
+      for (const [i, slide] of slides.entries()) {
+        const url = await uploadTemplateImage(slide.heading, slide.body.slice(0, 40), `marketing/ig-${ts}-s${i + 1}.png`)
+        childIds.push(await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, { image_url: url, is_carousel_item: true }))
+      }
+      creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, {
+        media_type: 'CAROUSEL',
+        children: childIds.join(','),
+        caption,
+      })
+    } else {
+      // フィード単枚（カルーセル指定でもスライドが足りなければ1枚投稿に落とす）
+      const title = content.imageText || content.title || content.hook
+      const url = await uploadTemplateImage(title, content.hook.slice(0, 40), `marketing/ig-${Date.now()}.png`)
+      creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, { image_url: url, caption })
     }
+
+    const postUrl = await igPublishContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, creationId)
     return { kind: 'published', url: postUrl, message: 'Instagramへ公開しました' }
   } catch (error) {
-    return { kind: 'error', message: `Instagram APIエラー: ${error instanceof Error ? error.message : '不明'}` }
+    const message = error instanceof Error ? error.message : '不明'
+    // 画像生成・Blob起因の失敗は手動投稿へフォールバック（リトライしても回復しないため）
+    if (/BLOB|blob/.test(message)) {
+      return {
+        kind: 'action_required',
+        reason: `投稿画像の公開に失敗しました（${message}）。テンプレ画像をダウンロードして手動投稿してください。`,
+        manualUrl,
+      }
+    }
+    return { kind: 'error', message: `Instagram APIエラー: ${message}` }
   }
 }
 

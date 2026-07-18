@@ -8,6 +8,8 @@ import { CHANNEL_LABELS } from '@/lib/marketing/types'
 interface Connections {
   mode: string
   connections: Record<string, boolean>
+  /** 実疎通チェックの結果（envがある項目のみ）。okでも定期確認を推奨 */
+  details?: Record<string, { ok: boolean; note: string }>
 }
 
 const JOB_STATUS_LABEL: Record<PublishJob['status'], { label: string; tone: string }> = {
@@ -33,14 +35,25 @@ export default function JobsPage() {
   const [conn, setConn] = useState<Connections | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [jobsError, setJobsError] = useState('')
 
   const refresh = useCallback(async () => {
+    // 片方のAPIが失敗しても、もう片方の表示は生かす
     const [jobsRes, connRes] = await Promise.all([
-      fetch('/api/marketing/jobs').then((r) => r.json()),
-      fetch('/api/marketing/connections').then((r) => r.json()),
+      fetch('/api/marketing/jobs')
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .catch((e: Error) => ({ error: e.message })),
+      fetch('/api/marketing/connections')
+        .then((r) => r.json())
+        .catch(() => null),
     ])
-    setJobs(jobsRes.jobs ?? [])
-    setConn(connRes)
+    if ('error' in jobsRes) {
+      setJobsError(`ジョブ一覧の取得に失敗しました（${jobsRes.error}）。保存先（Supabase）の設定を確認してください。`)
+    } else {
+      setJobsError('')
+      setJobs(jobsRes.jobs ?? [])
+    }
+    if (connRes) setConn(connRes)
   }, [])
 
   useEffect(() => {
@@ -90,11 +103,19 @@ export default function JobsPage() {
         <ul className="mt-2 grid gap-2 sm:grid-cols-2">
           {CONNECTION_ITEMS.map((item) => {
             const connected = conn?.connections?.[item.key]
+            const detail = conn?.details?.[item.key]
+            // 設定済みでも疎通NGなら黄色で警告（トークン失効などの早期発見用）
+            const dotColor = !connected ? 'bg-slate-300' : detail && !detail.ok ? 'bg-amber-400' : 'bg-emerald-500'
             return (
-              <li key={item.key} className="flex items-center gap-2 rounded-lg border border-slate-100 p-2 text-sm">
-                <span className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                <span className="font-medium">{item.label}</span>
-                <span className="ml-auto text-xs text-slate-400">{connected ? '接続済み' : item.hint}</span>
+              <li key={item.key} className="rounded-lg border border-slate-100 p-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                  <span className="font-medium">{item.label}</span>
+                  <span className="ml-auto text-xs text-slate-400">{connected ? '接続済み' : item.hint}</span>
+                </div>
+                {detail ? (
+                  <p className={`mt-1 pl-4 text-xs ${detail.ok ? 'text-slate-500' : 'text-amber-600'}`}>{detail.note}</p>
+                ) : null}
               </li>
             )
           })}
@@ -107,6 +128,7 @@ export default function JobsPage() {
       {/* ジョブ一覧 */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-bold">ジョブ一覧（{jobs.length}）</h2>
+        {jobsError ? <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-700">{jobsError}</p> : null}
         {jobs.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">「投稿を作る」で承認→予約すると、ここにジョブが並びます。</p>
         ) : (
