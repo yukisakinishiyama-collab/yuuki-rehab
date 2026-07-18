@@ -65,7 +65,17 @@ public/one-icon-{192,512}.png        # アプリアイコン
   として出力（Vercel ログ / Log Drain で集計）。クラッシュ率 = crash ÷ app_open。
   本格運用時はここを BigQuery 等への転送に差し替える。
 
+## ストア配信準備（スプリント3・4）
+
+- **Android / Google Play**: [twa.md](./twa.md) — Bubblewrap 用設定
+  (`tools/one-twa/twa-manifest.json`) と Digital Asset Links
+  (`public/.well-known/assetlinks.json`、要フィンガープリント差し替え) を同梱。
+  有料アプリ（980〜1,980円・買い切り）として提出する。
+- **iOS / App Store**: [ios.md](./ios.md) — Capacitor リモートURL方式。
+  設定テンプレートは `tools/one-capacitor/capacitor.config.ts`。
+  本リポジトリには依存を追加しない（Web ビルドへの影響ゼロ）。
+
 ## 今後（毎月改善サイクルの候補）
 
-1. TWA パッケージング（Bubblewrap）で Google Play 配信
-2. iOS 展開（同一コードベースの Capacitor ラップ）
+1. 発売後: メトリクス実測値（クラッシュ率・オフライン率・継続率）に基づく改善
+2. 「今日の行動」ローカル通知リマインダー（iOS 審査対策のネイティブ付加価値）

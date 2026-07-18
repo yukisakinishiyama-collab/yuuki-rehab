@@ -1,0 +1,27 @@
+{
+  "packageId": "jp.projectone.one",
+  "host": "yuuki-rehab.vercel.app",
+  "name": "ONE まいにちのAIそうだん",
+  "launcherName": "ONE",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#2563eb",
+  "navigationColor": "#ffffff",
+  "navigationColorDark": "#ffffff",
+  "backgroundColor": "#ffffff",
+  "startUrl": "/one",
+  "iconUrl": "https://yuuki-rehab.vercel.app/one-icon-512.png",
+  "maskableIconUrl": "https://yuuki-rehab.vercel.app/one-icon-512.png",
+  "webManifestUrl": "https://yuuki-rehab.vercel.app/one.webmanifest",
+  "appVersionName": "0.3.0",
+  "appVersionCode": 3,
+  "minSdkVersion": 21,
+  "fallbackType": "customtabs",
+  "enableNotifications": false,
+  "isChromeOSOnly": false,
+  "shortcuts": [],
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "one-release"
+  }
+}
