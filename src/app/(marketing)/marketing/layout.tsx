@@ -1,11 +1,27 @@
 import Link from 'next/link'
+import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
+import { PwaRegister } from './PwaRegister'
 
-export const metadata = { title: 'ゆうき整骨院 マーケティングハブ' }
+// マーケハブを独立PWAとして設定（/marketing 起点・ネイビーテーマ）
+export const metadata: Metadata = {
+  title: 'ゆうき整骨院 マーケティングハブ',
+  manifest: '/marketing-app.webmanifest',
+  appleWebApp: { capable: true, title: 'ゆうきマーケ', statusBarStyle: 'default' },
+  icons: {
+    icon: '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#16233d',
+}
 
 const NAV = [
   { href: '/marketing', label: 'ダッシュボード' },
   { href: '/marketing/compose', label: '投稿を作る' },
+  { href: '/marketing/videos', label: '動画ストック' },
   { href: '/marketing/calendar', label: '投稿カレンダー' },
   { href: '/marketing/line', label: 'LINE導線' },
   { href: '/marketing/jobs', label: '投稿ジョブ' },
@@ -18,6 +34,7 @@ const NAV = [
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <PwaRegister />
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/marketing" className="text-lg font-bold text-slate-900">
