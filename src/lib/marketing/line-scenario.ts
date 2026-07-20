@@ -198,7 +198,22 @@ export interface EngineResult {
 }
 
 export function advanceScenario(contact: LineContact, input: EngineInput): EngineResult {
-  // 人対応中は自動応答しない（指示書4-7）
+  // 明示的な「スタッフに相談する」ボタンは、人対応中でも毎回確認を返す（無反応を防ぐ）。
+  // 自由入力への沈黙（スタッフの手動対応を邪魔しない）は下の handoff 判定で維持する。
+  if (input.kind === 'postback' && input.data === 'handoff') {
+    return {
+      replies: [handoffReply()],
+      patch: {
+        step: 'human',
+        handoff: true,
+        needsAttention: 'スタッフ対応の希望',
+        tags: mergeTags(contact.tags, ['要スタッフ対応']),
+      },
+      notify: 'LINE要対応: スタッフ対応の希望',
+    }
+  }
+
+  // 人対応中は自由入力に自動応答しない（指示書4-7）
   if (contact.handoff) {
     return { replies: [], patch: {} }
   }
@@ -219,8 +234,8 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
     }
   }
 
-  // 引き継ぎ判定（4-7）
-  const handoffReason = input.data === 'handoff' ? 'スタッフ対応の希望' : text ? checkHandoff(text) : null
+  // 引き継ぎ判定（テキストからの検知・4-7）
+  const handoffReason = text ? checkHandoff(text) : null
   if (handoffReason) {
     return {
       replies: [handoffReply()],
