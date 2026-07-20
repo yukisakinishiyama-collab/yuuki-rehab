@@ -97,12 +97,22 @@ function handoffReply(): BotReply {
 }
 
 function reserveButtons(intent?: IntentKey): BotReply {
+  // 連絡先ボタン: 固定電話に加え、設定があれば携帯（時間外・急ぎ用）も併記する
+  const phoneButtons: Array<{ label: string; data?: string; url?: string }> = [
+    { label: `電話（固定 ${P.phone}）`, url: `tel:${P.phone.replace(/-/g, '')}` },
+  ]
+  if (P.emergencyPhone) {
+    phoneButtons.push({
+      label: `電話（携帯 ${P.emergencyPhone}）`,
+      url: `tel:${P.emergencyPhone.replace(/-/g, '')}`,
+    })
+  }
   return {
     type: 'buttons',
-    text: 'ご案内は以上です。ご都合のよい方法をお選びください😊',
+    text: 'ご案内は以上です。ご都合のよい方法をお選びください😊（お急ぎのときはお電話が確実です）',
     buttons: [
       { label: 'Web予約へ進む（24時間・即確定）', url: reserveUrlWith(intent) },
-      { label: '電話する', url: `tel:${P.phone.replace(/-/g, '')}` },
+      ...phoneButtons,
       { label: '料金を確認する', data: 'intent:price' },
       { label: 'スタッフに相談する', data: 'handoff' },
     ],
