@@ -48,6 +48,21 @@ function buildMessage(b: NotifyBody): string {
   return lines.join('\n')
 }
 
+/**
+ * 診断用GET（秘密値は返さない）。環境変数が本番に反映されているかの確認専用。
+ * 変数の有無・長さ・先頭2文字の指紋のみ返す（取り違え・空白混入の検出用）。
+ */
+export async function GET() {
+  const fp = (v: string | undefined) => (v ? `set(len:${v.length},head:${v.slice(0, 2)})` : 'unset')
+  return NextResponse.json({
+    ok: true,
+    secret: fp(process.env.RESERVATION_NOTIFY_SECRET),
+    lineToken: fp(process.env.LINE_CHANNEL_ACCESS_TOKEN),
+    targetUserId: fp(process.env.RESERVATION_NOTIFY_LINE_USER_ID),
+    whoamiKeyword: fp(process.env.LINE_WHOAMI_KEYWORD),
+  })
+}
+
 export async function POST(request: NextRequest) {
   if (!process.env.RESERVATION_NOTIFY_SECRET) {
     return NextResponse.json({ error: 'not configured' }, { status: 503 })
