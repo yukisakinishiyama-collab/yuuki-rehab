@@ -24,10 +24,12 @@ import {
   type ContentProject,
   type ContentVariant,
 } from '@/lib/marketing/types'
+import { useMarketingRole } from '@/lib/marketing/use-role'
 
 const ALL_CHANNELS = Object.keys(CHANNEL_LABELS) as Channel[]
 
 function ComposeInner() {
+  const { isAdmin } = useMarketingRole()
   const params = useSearchParams()
   const projectIdFromUrl = params.get('project')
 
@@ -403,17 +405,17 @@ function ComposeInner() {
                     承認申請
                   </button>
                 )}
-                {(activeVariant.status === 'draft' || activeVariant.status === 'review') && (
+                {isAdmin && (activeVariant.status === 'draft' || activeVariant.status === 'review') && (
                   <button type="button" onClick={() => doTransition(activeVariant, 'approved')} className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">
                     承認する
                   </button>
                 )}
-                {activeVariant.status === 'approved' && (
+                {isAdmin && activeVariant.status === 'approved' && (
                   <button type="button" onClick={() => doTransition(activeVariant, 'scheduled')} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white">
                     承認して予約する
                   </button>
                 )}
-                {(activeVariant.status === 'approved' || activeVariant.status === 'scheduled') && (
+                {isAdmin && (activeVariant.status === 'approved' || activeVariant.status === 'scheduled') && (
                   <button
                     type="button"
                     onClick={() => {
@@ -425,6 +427,9 @@ function ComposeInner() {
                   >
                     公開済みにする
                   </button>
+                )}
+                {!isAdmin && (activeVariant.status === 'review' || activeVariant.status === 'approved') && (
+                  <span className="self-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">承認・予約・公開は院長のみ</span>
                 )}
                 <button
                   type="button"

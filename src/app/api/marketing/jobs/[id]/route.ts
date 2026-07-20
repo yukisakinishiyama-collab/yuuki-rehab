@@ -1,8 +1,12 @@
 /** 個別ジョブ操作: 取消・手動再実行・手動投稿完了・日時変更 */
 import { NextRequest, NextResponse } from 'next/server'
 import { getJob, updateJob } from '@/lib/marketing/jobs-store-server'
+import { requireAdmin } from '@/lib/marketing/auth'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // ジョブの取消・再実行・公開完了・日時変更＝公開制御。管理者（院長）のみ許可。
+  const denied = requireAdmin(request)
+  if (denied) return denied
   const { id } = await params
   if (!(await getJob(id))) return NextResponse.json({ error: 'ジョブが見つかりません' }, { status: 404 })
 

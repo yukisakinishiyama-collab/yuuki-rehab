@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createJob, listJobs } from '@/lib/marketing/jobs-store-server'
 import { CHANNEL_LABELS, type Channel } from '@/lib/marketing/types'
+import { requireAdmin } from '@/lib/marketing/auth'
 
 const CreateSchema = z.object({
   projectId: z.string().min(1),
@@ -18,6 +19,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // 予約投稿の作成＝公開の予約・承認。管理者（院長）のみ許可。
+  const denied = requireAdmin(request)
+  if (denied) return denied
   try {
     const input = CreateSchema.parse(await request.json())
     if (!(input.channel in CHANNEL_LABELS)) throw new Error('bad channel')

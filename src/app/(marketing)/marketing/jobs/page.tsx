@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PublishJob } from '@/lib/marketing/jobs-store-server'
 import { CHANNEL_LABELS } from '@/lib/marketing/types'
+import { useMarketingRole } from '@/lib/marketing/use-role'
 
 interface Connections {
   mode: string
@@ -31,6 +32,7 @@ const CONNECTION_ITEMS: Array<{ key: string; label: string; hint: string }> = [
 ]
 
 export default function JobsPage() {
+  const { isAdmin } = useMarketingRole()
   const [jobs, setJobs] = useState<PublishJob[]>([])
   const [conn, setConn] = useState<Connections | null>(null)
   const [message, setMessage] = useState('')
@@ -91,9 +93,13 @@ export default function JobsPage() {
             {conn.mode === 'mock' ? 'モックモード（外部送信なし）' : '本番モード'}
           </span>
         )}
-        <button type="button" onClick={runNow} disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-          期限のきたジョブを今すぐ実行
-        </button>
+        {isAdmin ? (
+          <button type="button" onClick={runNow} disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+            期限のきたジョブを今すぐ実行
+          </button>
+        ) : (
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">スタッフ（編集）権限：閲覧のみ・公開操作は院長</span>
+        )}
         {message && <span className="text-sm text-slate-600">{message}</span>}
       </div>
 
@@ -160,24 +166,26 @@ export default function JobsPage() {
                         >
                           本文をコピー
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const url = window.prompt('投稿したURLがあれば入力してください（空欄でもOK）') ?? undefined
-                            patchJob(job.id, { action: 'manual_complete', publishedUrl: url || undefined })
-                          }}
-                          className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800"
-                        >
-                          手動投稿を完了にする
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const url = window.prompt('投稿したURLがあれば入力してください（空欄でもOK）') ?? undefined
+                              patchJob(job.id, { action: 'manual_complete', publishedUrl: url || undefined })
+                            }}
+                            className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800"
+                          >
+                            手動投稿を完了にする
+                          </button>
+                        )}
                       </>
                     )}
-                    {job.status === 'failed' && (
+                    {isAdmin && job.status === 'failed' && (
                       <button type="button" onClick={() => patchJob(job.id, { action: 'retry' })} className="rounded border border-blue-400 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800">
                         再実行
                       </button>
                     )}
-                    {(job.status === 'pending' || job.status === 'action_required') && (
+                    {isAdmin && (job.status === 'pending' || job.status === 'action_required') && (
                       <>
                         <button
                           type="button"

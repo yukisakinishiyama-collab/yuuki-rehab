@@ -1,7 +1,9 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
 import { PwaRegister } from './PwaRegister'
+import { ROLE_COOKIE } from '@/lib/marketing/auth-shared'
 
 // マーケハブを独立PWAとして設定（/marketing 起点・ネイビーテーマ）
 export const metadata: Metadata = {
@@ -31,7 +33,16 @@ const NAV = [
   { href: '/marketing/settings', label: '基本設定' },
 ]
 
-export default function MarketingLayout({ children }: { children: ReactNode }) {
+export default async function MarketingLayout({ children }: { children: ReactNode }) {
+  // proxy が発行する役割Cookie。本番（認証有効）でのみ存在する
+  const roleCookie = (await cookies()).get(ROLE_COOKIE)?.value
+  const roleBadge =
+    roleCookie === 'staff'
+      ? { label: 'スタッフ（編集）', tone: 'bg-slate-100 text-slate-600' }
+      : roleCookie === 'admin'
+        ? { label: '院長（管理者）', tone: 'bg-teal-100 text-teal-800' }
+        : null
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <PwaRegister />
@@ -40,6 +51,9 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           <Link href="/marketing" className="text-lg font-bold text-slate-900">
             ゆうき整骨院 <span className="text-teal-700">マーケティングハブ</span>
           </Link>
+          {roleBadge && (
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${roleBadge.tone}`}>{roleBadge.label}</span>
+          )}
           <nav className="flex flex-wrap gap-1 text-sm font-medium">
             {NAV.map((item) => (
               <Link

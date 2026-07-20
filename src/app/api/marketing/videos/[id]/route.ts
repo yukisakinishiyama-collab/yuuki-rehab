@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { deleteVideo, getVideo, saveVideo } from '@/lib/marketing/video-store-server'
 import type { StockVideo } from '@/lib/marketing/video-types'
+import { requireAdmin } from '@/lib/marketing/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // 動画削除は管理者（院長）のみ許可。
+  const denied = requireAdmin(request)
+  if (denied) return denied
   const { id } = await params
   try {
     await deleteVideo(id)
