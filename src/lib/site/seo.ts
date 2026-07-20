@@ -74,6 +74,50 @@ export function medicalClinicJsonLd(): Record<string, unknown> {
   }
 }
 
+/** パンくずの構造化データ（BreadcrumbList）。{name,url} 配列から生成 */
+export function breadcrumbJsonLd(
+  items: { name: string; url: string }[],
+): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((it, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: it.name,
+      item: it.url,
+    })),
+  }
+}
+
+/** 症状スラッグ → パンくず表示名（症状ページ共通） */
+export const SYMPTOM_NAMES: Record<string, string> = {
+  acl: 'ACL（前十字靱帯）リハビリ',
+  meniscus: '半月板リハビリ',
+  'ankle-sprain': '足関節捻挫',
+  'muscle-strain': '肉離れ',
+  'baseball-shoulder': '野球肩・肩の痛み',
+  'baseball-elbow': '野球肘',
+  'shin-splints': 'シンスプリント',
+  'knee-pain': '膝の痛み',
+  'hip-pain': '股関節痛',
+  osgood: 'オスグッド病',
+  severs: 'シーバー病',
+  spondylolysis: '腰椎分離症',
+  'lower-back': '腰痛・スポーツ腰部障害',
+  wrist: '手関節・手首の痛み',
+}
+
+/** 症状ページ用のパンくず（ホーム > 症状一覧 > 各症状） */
+export function symptomBreadcrumbJsonLd(slug: string): Record<string, unknown> {
+  const name = SYMPTOM_NAMES[slug] ?? '症状'
+  return breadcrumbJsonLd([
+    { name: 'ホーム', url: `${SITE_URL}/` },
+    { name: '症状・お悩み一覧', url: `${SITE_URL}/symptoms` },
+    { name, url: `${SITE_URL}/symptoms/${slug}` },
+  ])
+}
+
 /** FAQ の構造化データ（FAQPage）。Q&A 配列から生成する */
 export function faqPageJsonLd(
   items: { q: string; a: string }[],

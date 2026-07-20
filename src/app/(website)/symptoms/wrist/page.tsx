@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import SymptomBreadcrumbJsonLd from '@/components/site/SymptomBreadcrumbJsonLd'
 import Link from 'next/link'
 import { CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react'
 
@@ -46,6 +47,7 @@ const phases = [
 export default function WristPage() {
   return (
     <div>
+      <SymptomBreadcrumbJsonLd slug="wrist" />
       <section className="bg-gradient-to-br from-navy to-blue-800 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4">
           <nav className="flex items-center gap-2 text-blue-300 text-sm mb-6">
