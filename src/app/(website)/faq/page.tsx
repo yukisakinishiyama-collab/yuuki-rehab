@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import JsonLd from '@/components/site/JsonLd'
+import { faqPageJsonLd } from '@/lib/site/seo'
 
 const faqs = [
   {
@@ -104,8 +106,13 @@ function FaqItem({ q, a, link }: { q: string; a: string; link?: string }) {
 }
 
 export default function FaqPage() {
+  // 全カテゴリの Q&A を平坦化して FAQPage 構造化データを生成
+  const faqJsonLd = faqPageJsonLd(
+    faqs.flatMap((cat) => cat.items.map(({ q, a }) => ({ q, a }))),
+  )
   return (
     <div>
+      <JsonLd data={faqJsonLd} />
       <section className="bg-gradient-to-br from-navy to-blue-800 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 text-center">
           <span className="text-blue-300 text-sm font-bold tracking-widest uppercase">FAQ</span>

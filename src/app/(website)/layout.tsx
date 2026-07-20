@@ -2,8 +2,12 @@
 import Header from '@/components/site/Header'
 import Footer from '@/components/site/Footer'
 import LineFloatButton from '@/components/site/LineFloatButton'
+import JsonLd from '@/components/site/JsonLd'
+import { SITE_URL, medicalClinicJsonLd } from '@/lib/site/seo'
 
 export const metadata: Metadata = {
+  // 相対パスの OG/canonical を絶対URLへ解決する基準
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'ゆうき整骨院｜下関のスポーツ障害・術前術後リハビリ専門整骨院',
     template: '%s｜ゆうき整骨院',
@@ -28,6 +32,8 @@ export const metadata: Metadata = {
 export default function WebsiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      {/* 医院の構造化データ（全公開ページ共通・検索/AIに院情報を明示） */}
+      <JsonLd data={medicalClinicJsonLd()} />
       <Header />
       <main className="pt-16 md:pt-20">{children}</main>
       <Footer />
