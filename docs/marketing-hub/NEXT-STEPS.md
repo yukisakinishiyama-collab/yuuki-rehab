@@ -76,10 +76,11 @@ create trigger trg_marketing_videos_updated
 - `(website)/layout.tsx` — `metadataBase` 設定＋全公開ページに医院JSON-LD
 - `(website)/faq/page.tsx` — 12問のFAQPage構造化データ
 - `robots.ts` — 内部スタッフアプリ経路をdisallow／`sitemap.ts` — 公開 `/drills` 追加
+- 症状14ページ — `BreadcrumbList`（ホーム>症状一覧>各症状）を `SymptomBreadcrumbJsonLd` で付与（commit `519aae2`）
 
-検証済み（dev）: 両JSON-LDのHTML出力・電話 `+81-83-265-4545`・FAQ12件・robots.txt/sitemap.xml反映・コンソールエラー無し。
+検証済み（dev）: 全JSON-LDのHTML出力・電話 `+81-83-265-4545`・FAQ12件・ACLパンくず3階層・robots.txt/sitemap.xml反映・コンソールエラー無し。
 
-**未実装（任意・低優先）:** 各症状ページのBreadcrumbList／canonical、blog個別記事のArticle（現状blogは一覧のみで記事ページ無し）。
+**未実装（任意・低優先）:** 各ページの `canonical`、blog個別記事のArticle（現状blogは一覧のみで記事ページ無し）。
 **※検索順位・AI引用は保証しない**旨を院長に明示すること。
 
 ---
