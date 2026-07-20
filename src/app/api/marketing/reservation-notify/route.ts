@@ -48,19 +48,6 @@ function buildMessage(b: NotifyBody): string {
   return lines.join('\n')
 }
 
-/** 診断用GET（秘密値は返さない・有無と指紋のみ）。設定確認後に削除する。 */
-export async function GET() {
-  const fp = (v: string | undefined) => (v ? `set(len:${v.length},head:${v.slice(0, 2)})` : 'UNSET')
-  return NextResponse.json({
-    ok: true,
-    marker: 'diag-v2',
-    secret: fp(process.env.RESERVATION_NOTIFY_SECRET),
-    lineToken: fp(process.env.LINE_CHANNEL_ACCESS_TOKEN),
-    targetUserId: fp(process.env.RESERVATION_NOTIFY_LINE_USER_ID),
-    whoami: fp(process.env.LINE_WHOAMI_KEYWORD),
-  })
-}
-
 export async function POST(request: NextRequest) {
   if (!process.env.RESERVATION_NOTIFY_SECRET) {
     return NextResponse.json({ error: 'not configured' }, { status: 503 })
