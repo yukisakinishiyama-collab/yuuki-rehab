@@ -17,7 +17,7 @@ export const DEFAULT_CLINIC_PROFILE: ClinicProfile = {
   hours: '月〜金 10:00-13:00・15:00-20:00、土 10:00-15:00',
   closedDays: '日曜・祝日',
   reserveUrl: RESERVE_URL,
-  lineUrl: 'https://lin.ee/432amljv',
+  lineUrl: 'https://lin.ee/uaGKbfk',
   googleMapUrl: 'https://maps.google.com/?cid=6709983637345638461',
   instagramUrl: 'https://www.instagram.com/yu.ki__seikotsuin',
   parking: '駐車場あり（院前）',
