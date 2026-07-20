@@ -6,14 +6,20 @@
  *
  * 保護対象: /marketing と /api/marketing 一式
  * 除外（外部から呼ばれる必要があるもの）:
- * - /api/marketing/line/webhook … LINEサーバーからの通知（署名検証で保護）
- * - /api/marketing/go           … 患者がタップする計測リンク
- * - /api/marketing/jobs/run     … Vercel Cron（CRON_SECRETで保護）
+ * - /api/marketing/line/webhook       … LINEサーバーからの通知（署名検証で保護）
+ * - /api/marketing/go                 … 患者がタップする計測リンク
+ * - /api/marketing/jobs/run           … Vercel Cron（CRON_SECRETで保護）
+ * - /api/marketing/reservation-notify … GAS予約システムからの通知（RESERVATION_NOTIFY_SECRETで保護）
  */
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/api/marketing/line/webhook', '/api/marketing/go', '/api/marketing/jobs/run']
+const PUBLIC_PATHS = [
+  '/api/marketing/line/webhook',
+  '/api/marketing/go',
+  '/api/marketing/jobs/run',
+  '/api/marketing/reservation-notify',
+]
 
 export function proxy(request: NextRequest) {
   const password = process.env.MARKETING_ADMIN_PASSWORD

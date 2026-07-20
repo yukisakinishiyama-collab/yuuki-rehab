@@ -13,6 +13,7 @@ export const DEFAULT_CLINIC_PROFILE: ClinicProfile = {
   name: 'ゆうき整骨院',
   address: '山口県下関市彦島江の浦町9丁目1-14',
   phone: '083-265-4545',
+  emergencyPhone: '090-5702-7731',
   hours: '月〜金 10:00-13:00・15:00-20:00、土 10:00-15:00',
   closedDays: '日曜・祝日',
   reserveUrl: RESERVE_URL,

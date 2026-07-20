@@ -147,7 +147,21 @@ export async function POST(request: NextRequest) {
     if (event.type === 'follow') input = { kind: 'follow' }
     if (event.type === 'message') {
       const message = event.message as { type?: string; text?: string }
-      if (message.type === 'text') input = { kind: 'text', text: message.text ?? '' }
+      if (message.type === 'text') {
+        // 院長のuserID取得用キーワード（予約通知の送信先設定に使う）。
+        // 送信者自身のuserIdを返すだけで他人の情報は出さない。LINE_WHOAMI_KEYWORD設定時のみ有効。
+        const whoami = process.env.LINE_WHOAMI_KEYWORD
+        if (whoami && (message.text ?? '').trim() === whoami) {
+          const replyToken = event.replyToken as string | undefined
+          if (replyToken) {
+            await replyToLine(replyToken, [
+              { type: 'text', text: `あなたのLINE userIdはこちらです（予約通知の送信先に設定します）：\n${userId}` },
+            ])
+          }
+          continue
+        }
+        input = { kind: 'text', text: message.text ?? '' }
+      }
     }
     if (event.type === 'postback') {
       const postback = event.postback as { data?: string }

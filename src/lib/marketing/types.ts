@@ -136,6 +136,8 @@ export interface ClinicProfile {
   name: string
   address: string
   phone: string
+  /** 診療時間外・急ぎの連絡用の直通番号（LINE緊急応答で案内）。空なら案内しない */
+  emergencyPhone?: string
   hours: string
   closedDays: string
   reserveUrl: string
