@@ -8,7 +8,20 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/dashboard/', '/patient/', '/staff/'],
+        // 内部スタッフアプリ（(app)グループ）と管理系は検索対象外にする
+        disallow: [
+          '/cases/',
+          '/dashboard/',
+          '/gonio/',
+          '/literature/',
+          '/marketing/',
+          '/patient/',
+          '/patients/',
+          '/protocols/',
+          '/rom/',
+          '/sports/',
+          '/staff/',
+        ],
       },
     ],
     sitemap: `${BASE_URL}/sitemap.xml`,
