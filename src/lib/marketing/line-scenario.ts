@@ -213,14 +213,15 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
     }
   }
 
-  // 人対応中は自由入力に自動応答しない（指示書4-7）
-  if (contact.handoff) {
+  // 人対応中でも「ボタン操作(postback)」には応答する（患者が能動的にボットを使う操作のため）。
+  // 沈黙するのは自由入力(テキスト)だけ＝スタッフの手動対応を邪魔しない（指示書4-7）。
+  if (contact.handoff && input.kind === 'text') {
     return { replies: [], patch: {} }
   }
 
-  // 友だち追加 → 選択メニュー（4-1）
+  // 友だち追加 → 選択メニュー（4-1）。再追加時は人対応フラグをリセットして通常フローに戻す
   if (input.kind === 'follow') {
-    return { replies: [intentMenu()], patch: { step: 'idle', tags: ['初めての方'] } }
+    return { replies: [intentMenu()], patch: { step: 'idle', handoff: false, tags: ['初めての方'] } }
   }
 
   const text = input.text ?? ''
