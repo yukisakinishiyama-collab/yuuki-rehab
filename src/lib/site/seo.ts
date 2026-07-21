@@ -118,6 +118,54 @@ export function symptomBreadcrumbJsonLd(slug: string): Record<string, unknown> {
   ])
 }
 
+/** 症状スラッグ → 正式な疾患名（MedicalCondition の about に使う） */
+export const SYMPTOM_CONDITIONS: Record<string, string> = {
+  acl: '前十字靱帯損傷（ACL損傷）',
+  meniscus: '半月板損傷',
+  'ankle-sprain': '足関節捻挫',
+  'muscle-strain': '肉離れ（筋挫傷）',
+  'baseball-shoulder': '野球肩（投球障害肩）',
+  'baseball-elbow': '野球肘（内側側副靱帯・離断性骨軟骨炎など）',
+  'shin-splints': 'シンスプリント（脛骨過労性骨膜炎）',
+  'knee-pain': '膝の痛み（腸脛靱帯炎・膝蓋腱炎など）',
+  'hip-pain': '股関節痛（股関節唇損傷など）',
+  osgood: 'オスグッド・シュラッター病',
+  severs: 'シーバー病（踵骨骨端症）',
+  spondylolysis: '腰椎分離症',
+  'lower-back': '腰痛（スポーツ腰部障害）',
+  wrist: '手関節障害（TFCC損傷など）',
+}
+
+/**
+ * 症状ページ用の MedicalWebPage 構造化データ。
+ * 「このページは○○という疾患について扱う医療情報である」とAI/検索に明示する。
+ * 生成AIが疾患名クエリでこのページを参照しやすくなる。
+ */
+export function symptomMedicalWebPageJsonLd(
+  slug: string,
+): Record<string, unknown> {
+  const condition = SYMPTOM_CONDITIONS[slug] ?? SYMPTOM_NAMES[slug] ?? '症状'
+  const url = `${SITE_URL}/symptoms/${slug}`
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'MedicalWebPage',
+    url,
+    inLanguage: 'ja',
+    name: `${condition}｜下関のリハビリ対応`,
+    about: {
+      '@type': 'MedicalCondition',
+      name: condition,
+    },
+    // 施術主体（院）を関連付け、地域医療情報としての文脈を与える
+    mainEntityOfPage: url,
+    audience: { '@type': 'MedicalAudience', audienceType: 'Patient' },
+    medicalAudience: 'Patient',
+    lastReviewed: new Date().toISOString().slice(0, 10),
+    provider: { '@id': `${SITE_URL}/#clinic` },
+    specialty: 'Physiotherapy',
+  }
+}
+
 /** FAQ の構造化データ（FAQPage）。Q&A 配列から生成する */
 export function faqPageJsonLd(
   items: { q: string; a: string }[],
