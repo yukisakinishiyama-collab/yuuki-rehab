@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { use } from 'react'
 import { getPatient, initPatientStore } from '@/lib/patient-store'
+import { recordRecentView } from '@/lib/patient-ui-prefs'
 import type { Patient } from '@/types/patient'
 import PatientDetail from '@/components/rehab-management/PatientDetail'
 
@@ -18,6 +19,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     const p = getPatient(id)
     setPatient(p ?? null)
     setLoading(false)
+    // 患者一覧の「最近閲覧」用に閲覧履歴を記録
+    if (p) recordRecentView(p.id)
   }, [id])
 
   if (loading) {
