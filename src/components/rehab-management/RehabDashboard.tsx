@@ -3,11 +3,15 @@
 // リハビリ管理ダッシュボード
 // ──────────────────────────────────────────────
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Users, AlertTriangle, Activity, TrendingUp, Clock, Award, ChevronRight } from 'lucide-react'
+import { Users, AlertTriangle, Activity, TrendingUp, Clock, Award, ChevronRight, Route } from 'lucide-react'
 import type { Patient, SOAPNote } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
 import { getPatients, getSOAPNotes, initPatientStore } from '@/lib/patient-store'
+import {
+  getProtocols, getPatients as getProtocolPatients,
+} from '@/lib/protocol-store'
 import { calculateRetentionRisk, getDaysSinceLastVisit } from '@/lib/rehab-algorithms'
 import { RetentionRiskBadge } from './shared'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -15,12 +19,21 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
+// この患者にリンクされたプロトコルの進行情報
+interface ProtocolInfo {
+  id: string
+  phaseTitle: string
+  order: number
+  total: number
+}
+
 interface PatientStat {
   patient: Patient
   latestNote?: SOAPNote
   visitCount: number
   riskLevel: 'low' | 'medium' | 'high'
   daysSinceLastVisit: number
+  protocolInfo?: ProtocolInfo
 }
 
 export default function RehabDashboard() {
@@ -30,6 +43,33 @@ export default function RehabDashboard() {
   useEffect(() => {
     initPatientStore()
     const patients = getPatients()
+
+    // カルテ患者 → リンク済みプロトコル（明示リンク優先、氏名一致は一意の場合のみ）
+    const protocols = getProtocols()
+    const protocolPatients = getProtocolPatients()
+    const nameCount = new Map<string, number>()
+    for (const pp of protocolPatients) {
+      if (pp.name) nameCount.set(pp.name, (nameCount.get(pp.name) ?? 0) + 1)
+    }
+    const protocolByChartId = new Map<string, ProtocolInfo>()
+    for (const p of patients) {
+      const pp = protocolPatients.find(x => x.linkedPatientId === p.id)
+        ?? (nameCount.get(p.name) === 1 ? protocolPatients.find(x => x.name === p.name) : undefined)
+      if (!pp) continue
+      const protos = protocols
+        .filter(pr => pr.patientId === pp.id)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      const proto = protos[0]
+      if (!proto) continue
+      const phase = proto.phases[proto.currentPhaseIndex]
+      protocolByChartId.set(p.id, {
+        id: proto.id,
+        phaseTitle: phase?.title ?? '',
+        order: proto.currentPhaseIndex + 1,
+        total: proto.phases.length,
+      })
+    }
+
     const allStats: PatientStat[] = patients.map(p => {
       const notes = getSOAPNotes(p.id).sort((a, b) => b.visitDate.localeCompare(a.visitDate))
       const latestNote = notes[0]
@@ -53,6 +93,7 @@ export default function RehabDashboard() {
         visitCount: notes.length,
         riskLevel: risk.level,
         daysSinceLastVisit: days,
+        protocolInfo: protocolByChartId.get(p.id),
       }
     })
     setStats(allStats)
@@ -217,10 +258,15 @@ function PatientRow({ stat, onClick }: { stat: PatientStat; onClick: () => void 
     : 'text-green-600'
 
   return (
-    <button
-      type="button"
+    // プロトコルへのリンクを内包するため button ではなく div role="button" を使用
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="w-full text-left rounded-lg border border-gray-100 bg-white p-3 hover:border-teal-200 hover:bg-teal-50/30 transition-colors group"
+      onKeyDown={e => { if (e.key === 'Enter') onClick() }}
+      className="w-full text-left rounded-lg border border-gray-100 bg-white p-3 cursor-pointer
+        hover:border-teal-200 hover:bg-teal-50/30 transition-colors group
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/50"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -235,6 +281,20 @@ function PatientRow({ stat, onClick }: { stat: PatientStat; onClick: () => void 
             <p className="text-xs text-gray-400 mt-0.5">
               {stat.visitCount}回来院 · {stat.daysSinceLastVisit > 0 ? `${stat.daysSinceLastVisit}日前` : '本日'}
             </p>
+            {/* リンク済みプロトコルの進行状況（クリックで進捗管理へ直行） */}
+            {stat.protocolInfo && (
+              <Link
+                href={`/protocols/${stat.protocolInfo.id}/progress`}
+                onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold
+                  text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5
+                  hover:border-teal-300 hover:text-teal-700 hover:bg-teal-50 transition-colors"
+                title="プロトコル進捗管理を開く"
+              >
+                <Route className="w-3 h-3" />
+                P{stat.protocolInfo.order}/{stat.protocolInfo.total} {stat.protocolInfo.phaseTitle}
+              </Link>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -247,6 +307,6 @@ function PatientRow({ stat, onClick }: { stat: PatientStat; onClick: () => void 
           <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
         </div>
       </div>
-    </button>
+    </div>
   )
 }

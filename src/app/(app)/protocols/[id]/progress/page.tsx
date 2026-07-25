@@ -16,12 +16,13 @@ import ProgressChart from '@/components/protocol/ProgressChart'
 import AssessmentForm from '@/components/protocol/AssessmentForm'
 import MilestonePanel from '@/components/protocol/MilestonePanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
+import SoapTab from '@/components/protocol/SoapTab'
 import {
   Plus, ChevronRight, Trash2, Calendar, BarChart2, Trophy, TrendingUp,
-  TrendingDown, Award, CalendarDays, ClipboardCheck, Star,
+  TrendingDown, Award, CalendarDays, ClipboardCheck, Star, NotebookPen,
 } from 'lucide-react'
 
-type Tab = 'chart' | 'records' | 'milestones'
+type Tab = 'chart' | 'records' | 'soap' | 'milestones'
 
 const METRIC_LABEL_MAP: Record<string, string> = {
   pain:     '疼痛(NRS)',
@@ -72,6 +73,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
   const TABS = [
     { key: 'chart' as const,      label: 'トレンドグラフ', icon: BarChart2 },
     { key: 'records' as const,    label: '記録一覧',       icon: Calendar },
+    { key: 'soap' as const,       label: '来院記録',       icon: NotebookPen },
     { key: 'milestones' as const, label: 'マイルストーン', icon: Trophy },
   ]
 
@@ -392,6 +394,16 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
               )
             })
           )}
+        </div>
+      )}
+
+      {/* 来院記録（SOAP・カルテと共有） */}
+      {tab === 'soap' && (
+        <div className="animate-slide-up">
+          <SoapTab
+            protocolPatient={patient}
+            onLinkChart={(chartId) => { updatePatient(patient.id, { linkedPatientId: chartId }); reload() }}
+          />
         </div>
       )}
 
