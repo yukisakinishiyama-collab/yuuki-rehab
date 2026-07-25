@@ -14,10 +14,12 @@ import PhaseCard from '@/components/protocol/PhaseCard'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import ProtocolChat from '@/components/protocol/ProtocolChat'
+import { resolveChartPatient } from '@/lib/clinical-sync'
 import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, Cpu, FileText, AlertCircle, CheckCircle,
   BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search, Bot, Users,
+  Link2, Link2Off,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
@@ -202,6 +204,8 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const allCriteriaMet = currentPhase?.advanceCriteria.every(c => c.met) ?? false
   const canAdvance = allCriteriaMet && protocol.currentPhaseIndex < protocol.phases.length - 1
   const isComplete = allCriteriaMet && protocol.currentPhaseIndex === protocol.phases.length - 1
+  // カルテ連携状態（ヘッダーのステータスチップ用）
+  const chartLink = resolveChartPatient(patient)
 
   return (
     <div className="max-w-4xl mx-auto font-body" ref={protocolContentRef}>
@@ -270,6 +274,28 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 bg-[--color-primary-light] px-2 py-0.5 rounded-full font-display font-semibold">
                 <FileText className="w-3 h-3" />テンプレート
               </span>
+            )}
+            {/* カルテ連携ステータス（連携済み: カルテへ / 未連携: 来院記録タブへ誘導） */}
+            {chartLink.patient ? (
+              <Link
+                href={`/patients/${chartLink.patient.id}`}
+                className="inline-flex items-center gap-1 text-xs text-teal-700
+                  bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full font-display font-semibold
+                  hover:bg-teal-100 transition-colors"
+                title="カルテ（患者管理）を開く"
+              >
+                <Link2 className="w-3 h-3" />カルテ連携済み
+              </Link>
+            ) : (
+              <Link
+                href={`/protocols/${id}/progress`}
+                className="inline-flex items-center gap-1 text-xs text-slate-500
+                  bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full font-display font-semibold
+                  hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                title="進捗管理の来院記録タブからカルテ患者とリンクできます"
+              >
+                <Link2Off className="w-3 h-3" />カルテ未連携
+              </Link>
             )}
           </div>
         </div>
