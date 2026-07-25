@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Users,
   BookOpen,
+  BookMarked,
   CloudUpload,
   Dumbbell,
 } from 'lucide-react'
@@ -44,6 +45,7 @@ const NAV_SECTIONS = [
     section: 'CLINICAL',
     items: [
       { href: '/protocols',  label: 'プロトコル立案', icon: ClipboardList },
+      { href: '/diseases',   label: '疾患ライブラリ', icon: BookMarked },
       { href: '/literature', label: '文献ライブラリ', icon: BookOpen },
       { href: '/rom',        label: '可動域ノート',   icon: Activity },
       { href: '/drills',     label: '競技復帰ドリル', icon: Dumbbell },
