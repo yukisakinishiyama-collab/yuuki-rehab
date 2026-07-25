@@ -13,7 +13,7 @@ import type {
 import {
   getPatients as getChartPatients, getPatient as getChartPatient,
   getROMRecords, getStrengthRecords, getSpecialTests, getEvaluations,
-  saveROMRecord,
+  saveROMRecord, savePatient as saveChartPatient,
 } from '@/lib/patient-store'
 
 // プロトコルの関節 → カルテの部位
@@ -191,4 +191,40 @@ export const TEST_RESULT_LABELS: Record<SpecialTestRecord['result'], string> = {
   negative: '陰性',
   suspicious: '疑い',
   unable: '実施不可',
+}
+
+/**
+ * プロトコル作成時の入力から、カルテ（患者管理）の患者を新規作成する。
+ * 生年月日・連絡先などプロトコル側にない項目は空のまま作成し、
+ * 後からカルテの患者編集で補完できるようにする。
+ */
+export function createChartPatientFromProtocol(input: {
+  name: string
+  joint?: Joint
+  diagnosis?: string
+  eventDate?: string
+  concerns?: string
+  notes?: string
+}): ChartPatient {
+  const now = new Date().toISOString()
+  const patient: ChartPatient = {
+    id: nanoid(),
+    name: input.name,
+    kana: '',
+    birthDate: '',
+    gender: 'other',
+    phone: '',
+    emergencyContact: '',
+    mainComplaint: input.concerns ?? input.diagnosis ?? '',
+    bodyRegion: input.joint ? JOINT_TO_REGION[input.joint] : 'other',
+    diagnosisLabel: input.diagnosis ?? '',
+    onsetDate: input.eventDate ?? '',
+    firstVisitDate: now.split('T')[0],
+    status: 'active',
+    therapistNotes: input.notes ?? '',
+    createdAt: now,
+    updatedAt: now,
+  }
+  saveChartPatient(patient)
+  return patient
 }

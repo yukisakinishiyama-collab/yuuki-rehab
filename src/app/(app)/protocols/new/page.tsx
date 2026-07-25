@@ -2,12 +2,13 @@
 
 import { useState, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import PatientForm from '@/components/protocol/PatientForm'
+import PatientForm, { type ChartLinkChoice } from '@/components/protocol/PatientForm'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import type { ProtocolPatient, Joint } from '@/types/protocol'
 import {
   savePatient, generateProtocolFromTemplate, saveProtocol
 } from '@/lib/protocol-store'
+import { createChartPatientFromProtocol } from '@/lib/clinical-sync'
 import { getPapersByDiagnosis } from '@/lib/literature-store'
 import { nanoid } from 'nanoid'
 import { Cpu, FileText, AlertCircle, ArrowLeft, CheckCircle, BookOpen } from 'lucide-react'
@@ -39,24 +40,46 @@ function NewProtocolPageInner() {
   const [consentError, setConsentError] = useState(false)
   const [showConsentModal, setShowConsentModal] = useState(false)
   const [pendingData, setPendingData] = useState<Omit<ProtocolPatient, 'id' | 'createdAt' | 'updatedAt'> | null>(null)
+  const [pendingChartLink, setPendingChartLink] = useState<ChartLinkChoice | undefined>(undefined)
 
-  async function handleFormSubmit(data: Omit<ProtocolPatient, 'id' | 'createdAt' | 'updatedAt'>) {
+  async function handleFormSubmit(
+    data: Omit<ProtocolPatient, 'id' | 'createdAt' | 'updatedAt'>,
+    chartLink?: ChartLinkChoice,
+  ) {
     if (mode === 'ai') {
       setPendingData(data)
+      setPendingChartLink(chartLink)
       setShowConsentModal(true)
       return
     }
-    await generateProtocol(data, false)
+    await generateProtocol(data, false, chartLink)
   }
 
   async function generateProtocol(
     data: Omit<ProtocolPatient, 'id' | 'createdAt' | 'updatedAt'>,
     useAI: boolean,
+    chartLink?: ChartLinkChoice,
   ) {
     setLoading(true)
     setError(null)
     try {
-      const patient = savePatient(data)
+      // カルテ連携: 既存患者へのリンク or カルテ患者の同時作成
+      let linkedPatientId: string | undefined
+      if (chartLink?.mode === 'link' && chartLink.chartPatientId) {
+        linkedPatientId = chartLink.chartPatientId
+      } else if (chartLink?.mode === 'create' && data.name) {
+        const chartPatient = createChartPatientFromProtocol({
+          name: data.name,
+          joint: data.joint,
+          diagnosis: data.diagnosis,
+          eventDate: data.eventDate,
+          concerns: data.concerns,
+          notes: data.notes,
+        })
+        linkedPatientId = chartPatient.id
+      }
+
+      const patient = savePatient({ ...data, linkedPatientId })
 
       if (useAI) {
         // 院内文献ライブラリから関連論文を自動取得
@@ -286,7 +309,7 @@ function NewProtocolPageInner() {
                   if (!consentChecked) { setConsentError(true); return }
                   setConsentError(false)
                   setShowConsentModal(false)
-                  await generateProtocol(pendingData!, true)
+                  await generateProtocol(pendingData!, true, pendingChartLink)
                 }}
                 disabled={loading}
                 className="flex-1 bg-[#4c1d95] text-white py-2.5 rounded-xl text-sm font-bold

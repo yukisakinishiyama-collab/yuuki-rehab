@@ -1,13 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { ProtocolPatient, Joint } from '@/types/protocol'
 import { JOINT_LABELS, PRESET_DIAGNOSES } from '@/types/protocol'
-import { User, Activity, Stethoscope, CalendarDays, StickyNote, Sparkles, MessageCircle } from 'lucide-react'
+import { getChartPatientList } from '@/lib/clinical-sync'
+import {
+  User, Activity, Stethoscope, CalendarDays, StickyNote, Sparkles, MessageCircle, Link2,
+} from 'lucide-react'
+
+/** カルテ（患者管理）との連携方法 */
+export interface ChartLinkChoice {
+  mode: 'create' | 'link' | 'none'
+  chartPatientId?: string
+}
 
 interface Props {
   initial?: Partial<ProtocolPatient>
-  onSubmit: (data: Omit<ProtocolPatient, 'id' | 'createdAt' | 'updatedAt'>) => void
+  onSubmit: (
+    data: Omit<ProtocolPatient, 'id' | 'createdAt' | 'updatedAt'>,
+    chartLink?: ChartLinkChoice,
+  ) => void
   loading?: boolean
 }
 
@@ -36,6 +48,18 @@ export default function PatientForm({ initial, onSubmit, loading }: Props) {
     notes:        initial?.notes        ?? '',
   })
 
+  // ── カルテ連携の選択 ──
+  const [chartMode, setChartMode] = useState<ChartLinkChoice['mode']>('create')
+  const [chartId, setChartId] = useState('')
+  const chartPatients = useMemo(() => getChartPatientList(), [])
+  // 氏名が既存カルテ患者と一致（一意）する場合はリンク候補を提示
+  const nameMatch = useMemo(() => {
+    const name = form.name.trim()
+    if (!name) return null
+    const matches = chartPatients.filter(p => p.name === name)
+    return matches.length === 1 ? matches[0] : null
+  }, [form.name, chartPatients])
+
   function handleDiagnosisPreset(key: string) {
     const preset = PRESET_DIAGNOSES.find(p => p.key === key)
     if (!preset) return
@@ -48,6 +72,21 @@ export default function PatientForm({ initial, onSubmit, loading }: Props) {
       alert('疾患名または関節部位のいずれかを入力してください')
       return
     }
+    // カルテ連携の解決
+    let chartLink: ChartLinkChoice = { mode: 'none' }
+    if (chartMode === 'link' && chartId) {
+      chartLink = { mode: 'link', chartPatientId: chartId }
+    } else if (chartMode === 'create') {
+      if (nameMatch) {
+        // 同名の既存カルテ患者がいる場合は二重登録を避けてリンクする
+        chartLink = { mode: 'link', chartPatientId: nameMatch.id }
+      } else if (form.name.trim()) {
+        chartLink = { mode: 'create' }
+      } else {
+        // 患者名がなければカルテ登録はできない（匿名プロトコルとして続行）
+        chartLink = { mode: 'none' }
+      }
+    }
     onSubmit({
       name:      form.name      || undefined,
       age:       form.age       ? parseInt(form.age) : undefined,
@@ -57,7 +96,7 @@ export default function PatientForm({ initial, onSubmit, loading }: Props) {
       eventDate: form.eventDate || undefined,
       concerns:  form.concerns  || undefined,
       notes:     form.notes     || undefined,
-    })
+    }, chartLink)
   }
 
   return (
@@ -213,6 +252,74 @@ export default function PatientForm({ initial, onSubmit, loading }: Props) {
             onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))}
             className={INPUT_CLS}
           />
+        </div>
+      </div>
+
+      {/* カルテ連携（リハビリ状況・来院記録と一緒に作成） */}
+      <div className="border border-slate-200 rounded-2xl p-4 bg-[--color-surface-raised]/50">
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <Link2 className="w-3.5 h-3.5 text-teal-600" />
+          <span className="text-xs font-semibold text-[--color-text-secondary] font-display">
+            カルテ（患者管理・リハビリ状況）との連携
+          </span>
+        </div>
+        <div className="space-y-2">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="chartMode"
+              checked={chartMode === 'create'}
+              onChange={() => setChartMode('create')}
+              className="mt-0.5 accent-teal-600"
+            />
+            <span className="text-sm text-[--color-text-primary] font-body">
+              カルテにも患者を登録する
+              <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-1.5 py-0.5 ml-1.5 font-semibold">推奨</span>
+              <span className="block text-[11px] text-[--color-text-muted] mt-0.5">
+                {nameMatch
+                  ? `同名のカルテ患者「${nameMatch.name}」が見つかったため、新規登録せずにリンクします`
+                  : form.name.trim()
+                    ? 'リハビリ状況・来院記録（SOAP）・ROM評価とすぐに連携できます'
+                    : '患者名を入力すると登録できます（未入力の場合は連携なしで作成）'}
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="chartMode"
+              checked={chartMode === 'link'}
+              onChange={() => setChartMode('link')}
+              className="mt-0.5 accent-teal-600"
+            />
+            <span className="text-sm text-[--color-text-primary] font-body flex-1">
+              既存のカルテ患者とリンクする
+              {chartMode === 'link' && (
+                <select
+                  value={chartId}
+                  onChange={e => setChartId(e.target.value)}
+                  className={`${INPUT_CLS} mt-1.5`}
+                >
+                  <option value="">── カルテ患者を選択 ──</option>
+                  {chartPatients.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.diagnosisLabel && `（${p.diagnosisLabel}）`}</option>
+                  ))}
+                </select>
+              )}
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="chartMode"
+              checked={chartMode === 'none'}
+              onChange={() => setChartMode('none')}
+              className="mt-0.5 accent-teal-600"
+            />
+            <span className="text-sm text-[--color-text-muted] font-body">
+              連携しない（プロトコル単体で作成）
+            </span>
+          </label>
         </div>
       </div>
 
