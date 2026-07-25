@@ -1,9 +1,48 @@
 // 疾患ページのアクセサと検索
-// 現状は静的データ（src/data/diseases）を参照。
-// 将来の管理画面追加時は localStorage オーバーレイをここに実装する。
+// 本文は静的データ（src/data/diseases）を参照し、
+// 監修記録・文献確認状態は localStorage オーバーレイ（disease_reviews）で管理する。
+// （既存のクラウド同期は全キー対象のため、監修記録も院内デバイス間で同期される）
 
 import type { DiseasePage, DiseaseCategory, PlannedDisease } from '@/types/disease'
 import { DISEASE_PAGES, PLANNED_CATALOG } from '@/data/diseases'
+
+// ─── 監修記録オーバーレイ ───────────────────────────────────────
+
+export interface DiseaseReview {
+  pageId: string
+  /** 監修者名（医師）。空でない場合「監修済み」扱い */
+  supervisor: string
+  reviewedAt: string
+  note?: string
+  /** 原文確認が完了した文献のインデックス */
+  verifiedRefs: number[]
+  updatedAt: string
+}
+
+const REVIEW_KEY = 'disease_reviews'
+
+function readReviews(): DiseaseReview[] {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(localStorage.getItem(REVIEW_KEY) ?? '[]') as DiseaseReview[]
+  } catch {
+    return []
+  }
+}
+
+export function getReview(pageId: string): DiseaseReview | undefined {
+  return readReviews().find(r => r.pageId === pageId)
+}
+
+export function saveReview(review: Omit<DiseaseReview, 'updatedAt'>): void {
+  const reviews = readReviews().filter(r => r.pageId !== review.pageId)
+  reviews.push({ ...review, updatedAt: new Date().toISOString() })
+  localStorage.setItem(REVIEW_KEY, JSON.stringify(reviews))
+}
+
+export function clearReview(pageId: string): void {
+  localStorage.setItem(REVIEW_KEY, JSON.stringify(readReviews().filter(r => r.pageId !== pageId)))
+}
 
 export function getDiseasePages(): DiseasePage[] {
   return DISEASE_PAGES

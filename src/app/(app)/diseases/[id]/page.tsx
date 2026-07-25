@@ -3,7 +3,7 @@
 // 疾患ライブラリ - 疾患詳細ページ
 // 表示レベル（基本/専門/研究）・患者説明モード・確実性/確認状態ラベル対応。
 // ──────────────────────────────────────────────
-import { useState, useMemo, use } from 'react'
+import { useState, useMemo, useEffect, use } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -16,7 +16,7 @@ import type {
 import {
   DISEASE_CATEGORY_LABELS, CERTAINTY_LABELS, REVIEW_STATUS_LABELS, URGENCY_LABELS,
 } from '@/types/disease'
-import { getDiseasePage } from '@/lib/disease-store'
+import { getDiseasePage, getReview, type DiseaseReview } from '@/lib/disease-store'
 
 // ── 確実性・確認状態のラベルチップ ──
 function CertaintyChip({ certainty }: { certainty?: ContentBlock['certainty'] }) {
@@ -104,6 +104,13 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
   const [level, setLevel] = useState<DisplayLevel>('pro')
   const [patientMode, setPatientMode] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [review, setReview] = useState<DiseaseReview | undefined>(undefined)
+
+  // 監修記録（localStorageオーバーレイ）の読み込み
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReview(getReview(id))
+  }, [id])
 
   const urgencyStyle = useMemo(() => ({
     emergency:  'bg-red-600 text-white',
@@ -148,10 +155,11 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
               <span className="text-[10px] font-bold text-[--color-primary] bg-[--color-primary-light] rounded-full px-2 py-0.5 font-display">
                 {DISEASE_CATEGORY_LABELS[page.category]}
               </span>
-              {/* 監修状態: supervisor 未設定なら下書きであることを明示 */}
-              {page.meta.supervisor ? (
+              {/* 監修状態: 静的データまたは監修記録（管理画面で登録）があれば監修済み表示 */}
+              {(review?.supervisor || page.meta.supervisor) ? (
                 <span className="text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2 py-0.5">
-                  医療監修: {page.meta.supervisor}
+                  医療監修: {review?.supervisor ?? page.meta.supervisor}
+                  {review?.reviewedAt && `（${review.reviewedAt}）`}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
@@ -478,20 +486,26 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
 
           <Section title="参考文献">
             <ol className="space-y-2">
-              {page.references.map((r, i) => (
+              {page.references.map((r, i) => {
+                const refVerified = r.verified || (review?.verifiedRefs.includes(i) ?? false)
+                return (
                 <li key={i} className="text-xs text-slate-600 leading-relaxed">
                   <span className="metric text-slate-400">[{i + 1}]</span>{' '}
                   {r.authors}. {r.title}. <i>{r.source}</i>. {r.year}.
                   {r.doi && <span className="metric"> doi:{r.doi}</span>}
                   {r.pmid && <span className="metric"> PMID:{r.pmid}</span>}
-                  {!r.verified && (
+                  {refVerified ? (
+                    <span className="text-[9px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded px-1 py-px ml-1.5">
+                      原文確認済み
+                    </span>
+                  ) : (
                     <span className="text-[9px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded px-1 py-px ml-1.5">
                       原文未確認
                     </span>
                   )}
                   {r.note && <span className="block text-slate-400 mt-0.5">{r.note}</span>}
                 </li>
-              ))}
+              )})}
             </ol>
             <p className="text-[11px] text-orange-600 bg-orange-50 rounded-lg px-3 py-2 mt-3">
               「原文未確認」の文献は実在・内容の確認が完了していません。引用・院外提供の前に必ず原文を確認してください。
@@ -505,6 +519,12 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <p>作成日 {page.meta.createdAt} ／ 最終更新 {page.meta.updatedAt} ／ 次回見直し {page.meta.nextReviewDue}</p>
             <p>参照ガイドライン: {page.meta.guidelineVersions.join('、') || '—'}</p>
+            {review?.supervisor && (
+              <p className="text-teal-700">
+                · {review.reviewedAt} 医療監修: {review.supervisor}
+                {review.note && `（${review.note}）`}
+              </p>
+            )}
             {page.meta.changeLog.map((c, i) => <p key={i}>· {c}</p>)}
           </div>
         </div>

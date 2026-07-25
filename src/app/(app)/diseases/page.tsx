@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  Search, BookMarked, ChevronRight, ShieldAlert, Stethoscope,
+  Search, BookMarked, ChevronRight, ShieldAlert, Stethoscope, ShieldCheck,
 } from 'lucide-react'
 import type { DiseaseCategory } from '@/types/disease'
 import { DISEASE_CATEGORY_LABELS } from '@/types/disease'
@@ -33,11 +33,20 @@ export default function DiseaseListPage() {
   return (
     <div className="max-w-4xl mx-auto font-body space-y-5">
       {/* ヘッダー */}
-      <div className="animate-slide-up">
-        <h1 className="text-2xl font-bold text-[--color-text-primary] font-display">疾患ライブラリ</h1>
-        <p className="text-sm text-[--color-text-muted] mt-1">
-          専門職向けの疾患・症例リファレンス · {totalCreated}/{totalPlanned} ページ作成済み
-        </p>
+      <div className="flex items-center justify-between animate-slide-up">
+        <div>
+          <h1 className="text-2xl font-bold text-[--color-text-primary] font-display">疾患ライブラリ</h1>
+          <p className="text-sm text-[--color-text-muted] mt-1">
+            専門職向けの疾患・症例リファレンス · {totalCreated}/{totalPlanned} ページ作成済み
+          </p>
+        </div>
+        <Link
+          href="/diseases/admin"
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-white border
+            border-slate-200 px-3.5 py-2 rounded-xl hover:border-teal-300 transition-colors font-display"
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />管理・監修
+        </Link>
       </div>
 
       {/* 医療安全表示 */}
