@@ -339,7 +339,8 @@ function PatientCard({ patient, notes, riskLevel, pinned, onTogglePin, onClick }
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{patient.name}</span>
-            <span className="text-sm text-gray-400">{age}歳</span>
+            {/* 生年月日未入力の患者では年齢を表示しない（NaN歳の防止） */}
+            {Number.isFinite(age) && <span className="text-sm text-gray-400">{age}歳</span>}
             <Badge variant="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
             <Badge variant={riskVariant[riskLevel]}>
               離脱リスク{RISK_LABELS[riskLevel]}
