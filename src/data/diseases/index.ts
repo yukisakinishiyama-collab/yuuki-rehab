@@ -16,6 +16,9 @@ import { ANKLE_PAGES_1 } from './ankle1'
 import { ANKLE_PAGES_2 } from './ankle2'
 import { ANKLE_PAGES_3 } from './ankle3'
 import { ANKLE_PAGES_4 } from './ankle4'
+import { SHOULDER_PAGES_1 } from './shoulder1'
+import { SHOULDER_PAGES_2 } from './shoulder2'
+import { SHOULDER_PAGES_3 } from './shoulder3'
 
 export const DISEASE_PAGES: DiseasePage[] = [
   ACL_INJURY,
@@ -31,6 +34,9 @@ export const DISEASE_PAGES: DiseasePage[] = [
   ...ANKLE_PAGES_2,
   ...ANKLE_PAGES_3,
   ...ANKLE_PAGES_4,
+  ...SHOULDER_PAGES_1,
+  ...SHOULDER_PAGES_2,
+  ...SHOULDER_PAGES_3,
 ]
 
 export const PLANNED_CATALOG: Record<DiseaseCategory, PlannedDisease[]> = {
