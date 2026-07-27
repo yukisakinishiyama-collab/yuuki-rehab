@@ -12,6 +12,10 @@ import { HIP_PAGES_3 } from './hip3'
 import { KNEE_PAGES_1 } from './knee1'
 import { KNEE_PAGES_2 } from './knee2'
 import { KNEE_PAGES_3 } from './knee3'
+import { ANKLE_PAGES_1 } from './ankle1'
+import { ANKLE_PAGES_2 } from './ankle2'
+import { ANKLE_PAGES_3 } from './ankle3'
+import { ANKLE_PAGES_4 } from './ankle4'
 
 export const DISEASE_PAGES: DiseasePage[] = [
   ACL_INJURY,
@@ -23,6 +27,10 @@ export const DISEASE_PAGES: DiseasePage[] = [
   ...KNEE_PAGES_1,
   ...KNEE_PAGES_2,
   ...KNEE_PAGES_3,
+  ...ANKLE_PAGES_1,
+  ...ANKLE_PAGES_2,
+  ...ANKLE_PAGES_3,
+  ...ANKLE_PAGES_4,
 ]
 
 export const PLANNED_CATALOG: Record<DiseaseCategory, PlannedDisease[]> = {
