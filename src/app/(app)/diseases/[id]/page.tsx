@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
   ArrowLeft, ShieldAlert, BookMarked, ClipboardCopy, ClipboardCheck,
-  FileText, Users, AlertTriangle, ChevronDown, Route,
+  FileText, Users, AlertTriangle, ChevronDown, Route, ExternalLink,
 } from 'lucide-react'
 import type {
   ContentBlock, DisplayLevel, DifferentialGroup,
@@ -17,6 +17,8 @@ import {
   DISEASE_CATEGORY_LABELS, CERTAINTY_LABELS, REVIEW_STATUS_LABELS, URGENCY_LABELS,
 } from '@/types/disease'
 import { getDiseasePage, getReview, type DiseaseReview } from '@/lib/disease-store'
+import { buildExternalRefs } from '@/data/diseases/external-refs'
+import AnatomyDiagram from '@/components/disease/AnatomyDiagram'
 
 // ── 確実性・確認状態のラベルチップ ──
 function CertaintyChip({ certainty }: { certainty?: ContentBlock['certainty'] }) {
@@ -312,7 +314,10 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          <Section title="解剖学"><Blocks blocks={page.anatomy} level={level} /></Section>
+          <Section title="解剖学">
+            <AnatomyDiagram category={page.category} />
+            <Blocks blocks={page.anatomy} level={level} />
+          </Section>
           <Section title="疫学"><Blocks blocks={page.epidemiology} level={level} /></Section>
           <Section title="病態・発生機序"><Blocks blocks={page.mechanism} level={level} /></Section>
           <Section title="代表的な主訴"><Blocks blocks={page.symptoms} level={level} /></Section>
@@ -509,6 +514,32 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
             </ol>
             <p className="text-[11px] text-orange-600 bg-orange-50 rounded-lg px-3 py-2 mt-3">
               「原文未確認」の文献は実在・内容の確認が完了していません。引用・院外提供の前に必ず原文を確認してください。
+            </p>
+          </Section>
+
+          <Section title="外部参考リンク・画像">
+            <div className="space-y-2">
+              {buildExternalRefs(page).map((ref, i) => (
+                <a
+                  key={i}
+                  href={ref.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5
+                    hover:border-[--color-primary]/40 hover:shadow-sm transition-all group"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-[--color-primary] flex-shrink-0 mt-0.5" />
+                  <span className="min-w-0">
+                    <span className="text-sm font-semibold text-[--color-text-primary] font-display">{ref.label}</span>
+                    <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">{ref.note}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 mt-3 leading-relaxed">
+              上記は外部サイトの検索結果ページへのリンクです。表示される論文・画像の内容・正確性・
+              著作権/ライセンスは本アプリでは保証していません。特に画像を院内資料等へ転用する際は、
+              各画像のライセンス表示（CC-BY等）と出典表記の要否を必ずご確認ください。
             </p>
           </Section>
 
