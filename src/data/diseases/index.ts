@@ -9,6 +9,9 @@ import { MENISCUS_INJURY } from './meniscus'
 import { HIP_PAGES_1 } from './hip1'
 import { HIP_PAGES_2 } from './hip2'
 import { HIP_PAGES_3 } from './hip3'
+import { KNEE_PAGES_1 } from './knee1'
+import { KNEE_PAGES_2 } from './knee2'
+import { KNEE_PAGES_3 } from './knee3'
 
 export const DISEASE_PAGES: DiseasePage[] = [
   ACL_INJURY,
@@ -17,6 +20,9 @@ export const DISEASE_PAGES: DiseasePage[] = [
   ...HIP_PAGES_1,
   ...HIP_PAGES_2,
   ...HIP_PAGES_3,
+  ...KNEE_PAGES_1,
+  ...KNEE_PAGES_2,
+  ...KNEE_PAGES_3,
 ]
 
 export const PLANNED_CATALOG: Record<DiseaseCategory, PlannedDisease[]> = {
