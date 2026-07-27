@@ -6,11 +6,17 @@ import type { DiseasePage, DiseaseCategory, PlannedDisease } from '@/types/disea
 import { ACL_INJURY } from './acl'
 import { ANKLE_LATERAL_SPRAIN } from './ankle-sprain'
 import { MENISCUS_INJURY } from './meniscus'
+import { HIP_PAGES_1 } from './hip1'
+import { HIP_PAGES_2 } from './hip2'
+import { HIP_PAGES_3 } from './hip3'
 
 export const DISEASE_PAGES: DiseasePage[] = [
   ACL_INJURY,
   ANKLE_LATERAL_SPRAIN,
   MENISCUS_INJURY,
+  ...HIP_PAGES_1,
+  ...HIP_PAGES_2,
+  ...HIP_PAGES_3,
 ]
 
 export const PLANNED_CATALOG: Record<DiseaseCategory, PlannedDisease[]> = {
