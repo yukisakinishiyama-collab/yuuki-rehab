@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 type NotifyBody = {
-  kind?: 'new' | 'cancel'
+  kind?: 'new' | 'cancel' | 'reminder'
   reservationNo?: string
   name?: string
   kana?: string
@@ -23,6 +23,8 @@ type NotifyBody = {
   date?: string
   time?: string
   symptom?: string
+  /** kind:'reminder' 用。指定時はこの本文をそのまま送る（GAS側で整形済みの前提） */
+  text?: string
 }
 
 function authorized(request: NextRequest): boolean {
@@ -34,6 +36,8 @@ function authorized(request: NextRequest): boolean {
 
 /** 通知本文を組み立てる（院長が一目で分かる形式） */
 function buildMessage(b: NotifyBody): string {
+  // リマインド等、GAS側で整形済みの本文はそのまま送る
+  if (b.text) return b.text
   const head = b.kind === 'cancel' ? '❌ 予約キャンセル' : '🗓 新規予約が入りました'
   const lines = [
     head,
