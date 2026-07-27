@@ -303,7 +303,7 @@ export const KNEE_PAGES_1: DiseasePage[] = [
         method: '腹臥位で膝30°/90°での下腿外旋角を左右比較。',
         positive: '外旋増大（30°のみ=PLC、両方=PLC+PCL示唆）',
         caution: '複合損傷の見逃し防止に重要。判定は医師と共有。',
-        status: 'needs_literature', level: 'pro',
+        status: 'needs_literature',
       },
     ],
     differentials: [
