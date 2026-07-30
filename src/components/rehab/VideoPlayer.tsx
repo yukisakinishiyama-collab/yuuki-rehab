@@ -5,9 +5,10 @@ import dynamic from 'next/dynamic'
 import type { VideoComment, SavedAnnotation } from '@/types/rehab'
 import {
   Play, Pause, SkipBack, SkipForward,
-  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot, Crosshair, Box,
+  Volume2, VolumeX, Maximize, PenLine, Scan, CircleDot, Crosshair, Box, Ruler,
 } from 'lucide-react'
 import VideoAnnotationOverlay from './VideoAnnotationOverlay'
+import KinoveaToolsOverlay from './KinoveaToolsOverlay'
 import MotionCaptureOverlay from './MotionCaptureOverlay'
 import MarkerTrackerOverlay from './MarkerTrackerOverlay'
 import MarkerSetupPanel from './MarkerSetupPanel'
@@ -18,7 +19,7 @@ import type { ROMItem, Landmark } from '@/lib/pose-analyzer'
 // Three.js は SSR 非対応のため dynamic import
 const Skeleton3DView = dynamic(() => import('./Skeleton3DView'), { ssr: false })
 
-const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
+const SPEEDS = [0.1, 0.25, 0.5, 1, 1.5, 2]
 const FRAME = 1 / 30
 
 interface Props {
@@ -54,6 +55,7 @@ export default function VideoPlayer({
   const [markerConfigs,       setMarkerConfigs]       = useState<MarkerConfig[]>([])
   const [virtualMarkerActive, setVirtualMarkerActive] = useState(false)
   const [view3D,              setView3D]              = useState(false)
+  const [measureActive,       setMeasureActive]       = useState(false)
   const [worldLandmarks,      setWorldLandmarks]      = useState<Landmark[]>([])
   const [pose3dDetected,      setPose3dDetected]      = useState(false)
   const [latestROMItems,      setLatestROMItems]      = useState<ROMItem[]>([])
@@ -224,6 +226,8 @@ export default function VideoPlayer({
           )}
 
           <VirtualMarkerLayer videoRef={videoRef} active={virtualMarkerActive} />
+
+          <KinoveaToolsOverlay videoRef={videoRef} active={measureActive} />
 
           {videoOverlay}
 
@@ -409,6 +413,14 @@ export default function VideoPlayer({
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${annotationActive ? 'bg-amber-500 text-white' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
           >
             <PenLine className="w-3.5 h-3.5" />描き込み
+          </button>
+
+          <button
+            onClick={() => setMeasureActive((v) => !v)}
+            title="距離・時間・軌跡の計測ツール（Kinovea風）"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${measureActive ? 'bg-cyan-500 text-white' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
+          >
+            <Ruler className="w-3.5 h-3.5" />計測
           </button>
         </div>
       </div>
