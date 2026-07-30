@@ -72,6 +72,34 @@ export default function VideoPlayer({
     }
   }, [onSeekTo])
 
+  // ── キーボードショートカット ──
+  // Space: 再生/停止  ←→: 1コマ送り  Shift+←→: 10コマ送り
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' || target.isContentEditable) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const v = videoRef.current
+      if (!v) return
+
+      if (e.key === ' ') {
+        e.preventDefault()
+        if (v.paused) { v.play(); setPlaying(true) }
+        else          { v.pause(); setPlaying(false) }
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        const dir = e.key === 'ArrowRight' ? 1 : -1
+        const steps = e.shiftKey ? 10 : 1
+        v.pause()
+        setPlaying(false)
+        v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + dir * steps * FRAME))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const handleTimeUpdate = useCallback(() => {
     const t = videoRef.current?.currentTime ?? 0
     setCurrentTime(t)
@@ -333,7 +361,7 @@ export default function VideoPlayer({
 
         {/* ── 1行目: 再生コントロール ── */}
         <div className="flex items-center gap-2">
-          <button onClick={() => frame(-1)} className="text-gray-400 hover:text-white p-1" title="1フレーム戻る">
+          <button onClick={() => frame(-1)} className="text-gray-400 hover:text-white p-1" title="1フレーム戻る（←キー / Shift+←で10コマ）">
             <SkipBack className="w-4 h-4" />
           </button>
           <button
@@ -342,7 +370,7 @@ export default function VideoPlayer({
           >
             {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
           </button>
-          <button onClick={() => frame(1)} className="text-gray-400 hover:text-white p-1" title="1フレーム進む">
+          <button onClick={() => frame(1)} className="text-gray-400 hover:text-white p-1" title="1フレーム進む（→キー / Shift+→で10コマ）">
             <SkipForward className="w-4 h-4" />
           </button>
           <span className="text-gray-300 text-xs font-mono ml-1 flex-shrink-0">

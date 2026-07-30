@@ -4,16 +4,19 @@
  * Kinovea 風 計測ツールオーバーレイ
  *
  * 動画の上に重ねる計測レイヤー:
+ *  - 選択: 既存の計測（線の端点・ストップウォッチ・追跡点）をドラッグで修正
  *  - キャリブレーション: 既知の長さの線を引き実寸 (cm) を入力 → px→cm 変換
  *  - 距離計測: ドラッグで線を引き px / cm 表示
  *  - ストップウォッチ: 1回目クリック=開始時刻、2回目=停止時刻。動画時間に連動
- *  - ポイント追跡: クリックした点をテンプレートマッチングで自動追従し軌跡＋速度を表示
+ *  - ポイント追跡: クリックした点を ZNCC テンプレートマッチングで自動追従し軌跡＋速度を表示
  *  - グリッド: 10分割グリッド＋中心線
+ *  - 拡大鏡: 端点ドラッグ中は 3.5 倍ルーペ＋十字線で正確な点指定を支援
+ *  - Esc でツール解除
  */
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import {
-  Ruler, MoveHorizontal, Timer, LocateFixed, Grid3x3, Trash2, X,
+  MousePointer2, Ruler, MoveHorizontal, Timer, LocateFixed, Grid3x3, Undo2, Trash2, X,
 } from 'lucide-react'
 import {
   getContentRect, elementToContent, contentToElement,
@@ -21,10 +24,19 @@ import {
   PointTracker,
 } from '@/lib/kinovea-tools'
 import type {
-  NormPoint, Calibration, DistanceMeasure, StopwatchState, TrajPoint,
+  NormPoint, Calibration, DistanceMeasure, StopwatchState, TrajPoint, ContentRect,
 } from '@/lib/kinovea-tools'
 
-type Tool = 'none' | 'calibrate' | 'distance' | 'stopwatch' | 'track'
+type Tool = 'none' | 'select' | 'calibrate' | 'distance' | 'stopwatch' | 'track'
+
+/** 選択ツールでドラッグ中の編集対象 */
+type EditTarget =
+  | { kind: 'calib-a' } | { kind: 'calib-b' }
+  | { kind: 'dist-a'; id: string } | { kind: 'dist-b'; id: string }
+  | { kind: 'stopwatch' }
+  | { kind: 'track' }
+
+const HIT_RADIUS = 14  // 端点ヒット判定半径 (表示px)
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>
@@ -51,12 +63,16 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
   const [pendingCalib, setPendingCalib] = useState<{ a: NormPoint; b: NormPoint } | null>(null)
   const [calibInput,   setCalibInput]   = useState('')
 
-  // ドラッグ中の線（距離・キャリブレーション共用）
+  // ドラッグ中の新規線（距離・キャリブレーション共用）
   const dragRef = useRef<{ a: NormPoint; b: NormPoint } | null>(null)
+  // 選択ツールでの編集ドラッグ対象
+  const editRef = useRef<EditTarget | null>(null)
+  // ルーペ・十字線用の現在カーソル位置（コンテンツ正規化座標）
+  const cursorRef = useRef<NormPoint | null>(null)
 
   // ── 座標変換ヘルパー ──────────────────────────────────────────────────────
 
-  const getRect = useCallback(() => {
+  const getRect = useCallback((): ContentRect | null => {
     const el = containerRef.current
     const v  = videoRef.current
     if (!el || !v) return null
@@ -71,6 +87,36 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
     const box = el.getBoundingClientRect()
     return elementToContent(e.clientX - box.left, e.clientY - box.top, rect)
   }, [getRect])
+
+  // ── 選択ツール: ヒットテスト ──────────────────────────────────────────────
+
+  const hitTest = useCallback((e: React.PointerEvent): EditTarget | null => {
+    const el = containerRef.current
+    const rect = getRect()
+    if (!el || !rect) return null
+    const box = el.getBoundingClientRect()
+    const ex = e.clientX - box.left
+    const ey = e.clientY - box.top
+    const near = (p: NormPoint) => {
+      const q = contentToElement(p, rect)
+      return Math.hypot(q.x - ex, q.y - ey) <= HIT_RADIUS
+    }
+    // 手前に描画されるものから優先的に判定
+    if (trackPoint) {
+      const last = trajRef.current.length > 0 ? trajRef.current[trajRef.current.length - 1].p : trackPoint
+      if (near(last)) return { kind: 'track' }
+    }
+    if (stopwatch && near(stopwatch.pos)) return { kind: 'stopwatch' }
+    for (let i = distances.length - 1; i >= 0; i--) {
+      if (near(distances[i].a)) return { kind: 'dist-a', id: distances[i].id }
+      if (near(distances[i].b)) return { kind: 'dist-b', id: distances[i].id }
+    }
+    if (calibration) {
+      if (near(calibration.a)) return { kind: 'calib-a' }
+      if (near(calibration.b)) return { kind: 'calib-b' }
+    }
+    return null
+  }, [getRect, trackPoint, stopwatch, distances, calibration])
 
   // ── 描画 ─────────────────────────────────────────────────────────────────
 
@@ -125,7 +171,6 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
       ctx.shadowColor = 'rgba(0,0,0,0.6)'
       ctx.shadowBlur = 3
       ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke()
-      // 端点
       for (const p of [pa, pb]) {
         ctx.fillStyle = color
         ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill()
@@ -141,6 +186,18 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
         ctx.fillText(label, mx + 11, my - 6)
       }
       ctx.shadowBlur = 0
+    }
+
+    // 端点編集ハンドル（選択ツール時のみ）
+    const drawHandle = (p: NormPoint, color: string) => {
+      const q = contentToElement(p, rect)
+      ctx.save()
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2
+      ctx.fillRect(q.x - 5, q.y - 5, 10, 10)
+      ctx.strokeRect(q.x - 5, q.y - 5, 10, 10)
+      ctx.restore()
     }
 
     // ── キャリブレーション線 ──
@@ -160,40 +217,50 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
       drawLine(d.a, d.b, '#f59e0b', label)
     }
 
-    // ── ドラッグ中プレビュー ──
+    // ── ドラッグ中プレビュー（新規線） ──
     if (dragRef.current) {
       const { a, b } = dragRef.current
       const color = tool === 'calibrate' ? '#22c55e' : '#f59e0b'
       const cm = distanceCm(a, b, calibration, vw, vh)
+      const px = Math.round(pixelDistance(a, b, vw, vh))
       const label = tool === 'calibrate'
-        ? undefined
-        : cm !== null ? `${cm.toFixed(1)} cm` : `${Math.round(pixelDistance(a, b, vw, vh))} px`
+        ? `${px} px`
+        : cm !== null ? `${cm.toFixed(1)} cm` : `${px} px`
       drawLine(a, b, color, label)
     }
 
-    // ── 軌跡 ──
+    // ── 選択ツールのハンドル ──
+    if (tool === 'select') {
+      if (calibration) { drawHandle(calibration.a, '#22c55e'); drawHandle(calibration.b, '#22c55e') }
+      for (const d of distances) { drawHandle(d.a, '#f59e0b'); drawHandle(d.b, '#f59e0b') }
+      if (stopwatch) drawHandle(stopwatch.pos, '#ffffff')
+      if (trackPoint) {
+        const last = trajRef.current.length > 0 ? trajRef.current[trajRef.current.length - 1].p : trackPoint
+        drawHandle(last, '#22d3ee')
+      }
+    }
+
+    // ── 軌跡（低信頼区間はオレンジで区別） ──
     const traj = trajRef.current
     if (traj.length > 0) {
       const visible = traj.filter((pt) => pt.t <= t + 0.05)
       if (visible.length > 1) {
-        ctx.strokeStyle = '#22d3ee'
         ctx.lineWidth = 2
         ctx.shadowColor = 'rgba(0,0,0,0.5)'
         ctx.shadowBlur = 2
-        ctx.beginPath()
-        const p0 = contentToElement(visible[0].p, rect)
-        ctx.moveTo(p0.x, p0.y)
         for (let i = 1; i < visible.length; i++) {
-          const p = contentToElement(visible[i].p, rect)
-          ctx.lineTo(p.x, p.y)
+          const a = contentToElement(visible[i - 1].p, rect)
+          const b = contentToElement(visible[i].p, rect)
+          const lowConf = (visible[i].conf ?? 1) < 0.4
+          ctx.strokeStyle = lowConf ? '#fb923c' : '#22d3ee'
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
         }
-        ctx.stroke()
         ctx.shadowBlur = 0
       }
       if (visible.length > 0) {
         const last = visible[visible.length - 1]
         const p = contentToElement(last.p, rect)
-        ctx.fillStyle = '#22d3ee'
+        ctx.fillStyle = (last.conf ?? 1) < 0.4 ? '#fb923c' : '#22d3ee'
         ctx.strokeStyle = '#fff'
         ctx.lineWidth = 1.5
         ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
@@ -235,8 +302,43 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
       ctx.fillText(label, bx + 9, by + 18)
     }
 
+    // ── 拡大鏡ルーペ（端点ドラッグ中） ──
+    const cur = cursorRef.current
+    if (cur && (dragRef.current || editRef.current) && v.videoWidth > 0) {
+      const ZOOM = 3.5
+      const SRC = 36                    // 取り込み元サイズ (動画px)
+      const R = (SRC * ZOOM) / 2        // ルーペ半径 (表示px)
+      const cp = contentToElement(cur, rect)
+      // カーソルの右上に表示、はみ出すなら反転
+      let lx = cp.x + R + 24
+      let ly = cp.y - R - 24
+      if (lx + R > canvas.width)  lx = cp.x - R - 24
+      if (ly - R < 0)             ly = cp.y + R + 24
+      const sx = Math.min(Math.max(cur.x * vw - SRC / 2, 0), vw - SRC)
+      const sy = Math.min(Math.max(cur.y * vh - SRC / 2, 0), vh - SRC)
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(lx, ly, R, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.imageSmoothingEnabled = false  // ピクセル単位の確認をしやすく
+      ctx.drawImage(v, sx, sy, SRC, SRC, lx - R, ly - R, R * 2, R * 2)
+      // ルーペ内十字線（カーソル位置 = ルーペ中心とは限らないので実位置に描く）
+      const cxIn = lx - R + (cur.x * vw - sx) * ZOOM
+      const cyIn = ly - R + (cur.y * vh - sy) * ZOOM
+      ctx.strokeStyle = 'rgba(34,211,238,0.9)'
+      ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(cxIn - R, cyIn); ctx.lineTo(cxIn + R, cyIn); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(cxIn, cyIn - R); ctx.lineTo(cxIn, cyIn + R); ctx.stroke()
+      ctx.restore()
+      // 枠
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+      ctx.lineWidth = 2
+      ctx.beginPath(); ctx.arc(lx, ly, R, 0, Math.PI * 2); ctx.stroke()
+    }
+
     ctx.restore()
-  }, [videoRef, getRect, grid, calibration, pendingCalib, distances, stopwatch, tool])
+  }, [videoRef, getRect, grid, calibration, pendingCalib, distances, stopwatch, tool, trackPoint])
 
   // ── rAF ループ: 追跡＋再描画 ──────────────────────────────────────────────
 
@@ -255,8 +357,8 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
           if (t > lastTrackT.current) {
             const traj = trajRef.current
             const prev = traj.length > 0 ? traj[traj.length - 1].p : trackPoint
-            const next = trackerRef.current.track(v, prev)
-            traj.push({ t, p: next })
+            const next = trackerRef.current.track(v, prev, t)
+            traj.push({ t, p: next, conf: trackerRef.current.lastConfidence })
             // メモリ上限（約10分@30fps相当）
             if (traj.length > 18000) traj.splice(0, traj.length - 18000)
           }
@@ -272,7 +374,9 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
     return () => {
       stopped = true
       cancelAnimationFrame(rafRef.current)
-      dragRef.current = null  // 非アクティブ化時にドラッグ状態を解除
+      dragRef.current = null   // 非アクティブ化時にドラッグ状態を解除
+      editRef.current = null
+      cursorRef.current = null
     }
   }, [active, draw, trackPoint, videoRef])
 
@@ -283,6 +387,36 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
     if (!active && pendingCalib) setPendingCalib(null)
   }
 
+  // ── Esc キーでツール解除 ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!active) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dragRef.current = null
+        editRef.current = null
+        setPendingCalib(null)
+        setTool('none')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [active])
+
+  // ── 追跡の再初期化（追跡点の設置・移動で共用） ────────────────────────────
+
+  const restartTracking = useCallback((p: NormPoint) => {
+    const v = videoRef.current
+    if (!v || v.videoWidth === 0) return
+    if (!trackerRef.current) trackerRef.current = new PointTracker()
+    trackerRef.current.reset()
+    if (trackerRef.current.init(v, p)) {
+      trajRef.current = [{ t: v.currentTime, p, conf: 1 }]
+      lastTrackT.current = v.currentTime
+      setTrackPoint(p)
+    }
+  }, [videoRef])
+
   // ── ポインタ操作 ─────────────────────────────────────────────────────────
 
   function handlePointerDown(e: React.PointerEvent) {
@@ -291,6 +425,12 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
     if (!p) return
     e.preventDefault()
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    cursorRef.current = p
+
+    if (tool === 'select') {
+      editRef.current = hitTest(e)
+      return
+    }
 
     if (tool === 'calibrate' || tool === 'distance') {
       dragRef.current = { a: p, b: p }
@@ -301,50 +441,84 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
       const v = videoRef.current
       if (!v) return
       if (!stopwatch || stopwatch.endT !== null) {
-        // 新規開始
-        setStopwatch({ startT: v.currentTime, endT: null, pos: p })
+        setStopwatch({ startT: v.currentTime, endT: null, pos: p })   // 新規開始
       } else {
-        // 停止
-        setStopwatch({ ...stopwatch, endT: Math.max(v.currentTime, stopwatch.startT) })
+        setStopwatch({ ...stopwatch, endT: Math.max(v.currentTime, stopwatch.startT) })  // 停止
       }
       return
     }
 
     if (tool === 'track') {
-      const v = videoRef.current
-      if (!v || v.videoWidth === 0) return
-      if (!trackerRef.current) trackerRef.current = new PointTracker()
-      trackerRef.current.reset()
-      const ok = trackerRef.current.init(v, p)
-      if (ok) {
-        trajRef.current = [{ t: v.currentTime, p }]
-        lastTrackT.current = v.currentTime
-        setTrackPoint(p)
-      }
+      restartTracking(p)
       return
     }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (!dragRef.current) return
     const p = eventToContent(e)
     if (!p) return
-    dragRef.current = { ...dragRef.current, b: p }
+    cursorRef.current = p
+
+    if (dragRef.current) {
+      dragRef.current = { ...dragRef.current, b: p }
+      return
+    }
+
+    const edit = editRef.current
+    if (edit) {
+      switch (edit.kind) {
+        case 'calib-a':
+          setCalibration((c) => c ? { ...c, a: p } : c); break
+        case 'calib-b':
+          setCalibration((c) => c ? { ...c, b: p } : c); break
+        case 'dist-a':
+          setDistances((ds) => ds.map((d) => d.id === edit.id ? { ...d, a: p } : d)); break
+        case 'dist-b':
+          setDistances((ds) => ds.map((d) => d.id === edit.id ? { ...d, b: p } : d)); break
+        case 'stopwatch':
+          setStopwatch((s) => s ? { ...s, pos: p } : s); break
+        case 'track':
+          break  // 追跡点は pointerup で再初期化（ドラッグ中の再学習を避ける）
+      }
+    }
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent) {
+    const p = eventToContent(e)
+
+    const edit = editRef.current
+    if (edit) {
+      editRef.current = null
+      // 離した位置を最終位置として確定する
+      // （move イベントが release 座標まで届かない環境があるため）
+      if (p) {
+        switch (edit.kind) {
+          case 'calib-a':  setCalibration((c) => c ? { ...c, a: p } : c); break
+          case 'calib-b':  setCalibration((c) => c ? { ...c, b: p } : c); break
+          case 'dist-a':   setDistances((ds) => ds.map((d) => d.id === edit.id ? { ...d, a: p } : d)); break
+          case 'dist-b':   setDistances((ds) => ds.map((d) => d.id === edit.id ? { ...d, b: p } : d)); break
+          case 'stopwatch': setStopwatch((s) => s ? { ...s, pos: p } : s); break
+          case 'track':    restartTracking(p); break
+        }
+      }
+      cursorRef.current = null
+      return
+    }
+
     const drag = dragRef.current
-    if (!drag) return
+    if (!drag) { cursorRef.current = null; return }
     dragRef.current = null
+    cursorRef.current = null
+    const end = p ?? drag.b  // 離した位置を終点として採用
     const vw = videoRef.current?.videoWidth ?? 0
     const vh = videoRef.current?.videoHeight ?? 0
-    if (pixelDistance(drag.a, drag.b, vw, vh) < 5) return  // 短すぎる線は無視
+    if (pixelDistance(drag.a, end, vw, vh) < 5) return  // 短すぎる線は無視
 
     if (tool === 'calibrate') {
-      setPendingCalib({ a: drag.a, b: drag.b })
+      setPendingCalib({ a: drag.a, b: end })
       setCalibInput('')
     } else if (tool === 'distance') {
-      setDistances((prev) => [...prev, { id: `dist-${Date.now()}`, a: drag.a, b: drag.b }])
+      setDistances((prev) => [...prev, { id: `dist-${Date.now()}`, a: drag.a, b: end }])
     }
   }
 
@@ -356,6 +530,14 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
     setTool('distance')  // 校正後はそのまま距離計測へ
   }
 
+  /** 直前の操作を取り消す（距離→追跡→ストップウォッチの順に消す） */
+  function undoLast() {
+    if (distances.length > 0) { setDistances((prev) => prev.slice(0, -1)); return }
+    if (trackPoint) { setTrackPoint(null); trajRef.current = []; trackerRef.current?.reset(); return }
+    if (stopwatch) { setStopwatch(null); return }
+    if (calibration) setCalibration(null)
+  }
+
   function clearAll() {
     setCalibration(null)
     setDistances([])
@@ -365,15 +547,17 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
     trackerRef.current?.reset()
     setPendingCalib(null)
     dragRef.current = null
+    editRef.current = null
   }
 
   if (!active) return null
 
-  const TOOLS: Array<{ key: Tool; icon: React.ElementType; label: string }> = [
-    { key: 'calibrate', icon: Ruler,          label: '校正' },
-    { key: 'distance',  icon: MoveHorizontal, label: '距離' },
-    { key: 'stopwatch', icon: Timer,          label: '計時' },
-    { key: 'track',     icon: LocateFixed,    label: '追跡' },
+  const TOOLS: Array<{ key: Tool; icon: React.ElementType; label: string; title: string }> = [
+    { key: 'select',    icon: MousePointer2,  label: '選択', title: '既存の計測点をドラッグで修正' },
+    { key: 'calibrate', icon: Ruler,          label: '校正', title: '既知の長さで実寸校正' },
+    { key: 'distance',  icon: MoveHorizontal, label: '距離', title: '距離を計測' },
+    { key: 'stopwatch', icon: Timer,          label: '計時', title: '区間タイムを計測' },
+    { key: 'track',     icon: LocateFixed,    label: '追跡', title: '点を自動追跡し軌跡・速度を表示' },
   ]
 
   return (
@@ -381,7 +565,10 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full touch-none"
-        style={{ cursor: tool === 'none' ? 'default' : 'crosshair', pointerEvents: 'auto' }}
+        style={{
+          cursor: tool === 'none' ? 'default' : tool === 'select' ? 'grab' : 'crosshair',
+          pointerEvents: 'auto',
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -389,11 +576,11 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
 
       {/* ── ツールバー（左上） ── */}
       <div className="absolute top-2 left-2 flex flex-col gap-1 z-40">
-        {TOOLS.map(({ key, icon: Icon, label }) => (
+        {TOOLS.map(({ key, icon: Icon, label, title }) => (
           <button
             key={key}
             onClick={() => setTool(tool === key ? 'none' : key)}
-            title={label}
+            title={`${title}（Escで解除）`}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm transition-all ${
               tool === key
                 ? 'bg-cyan-500 text-white'
@@ -419,6 +606,15 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
         </button>
 
         <button
+          onClick={undoLast}
+          title="直前の計測を取り消す"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm bg-black/75 text-gray-200 hover:bg-gray-600 hover:text-white border border-white/20 transition-all"
+        >
+          <Undo2 className="w-3.5 h-3.5" />
+          戻す
+        </button>
+
+        <button
           onClick={clearAll}
           title="計測をすべて消去"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm bg-black/75 text-red-300 hover:bg-red-700 hover:text-white border border-white/20 transition-all"
@@ -437,6 +633,7 @@ export default function KinoveaToolsOverlay({ videoRef, active }: Props) {
         )}
         {tool !== 'none' && (
           <div className="bg-black/70 text-white text-[11px] px-2 py-1 rounded-lg">
+            {tool === 'select'    && '計測点・追跡点・タイマーをドラッグで移動'}
             {tool === 'calibrate' && '既知の長さ（例: 身長・マット幅）に沿ってドラッグ → 実寸を入力'}
             {tool === 'distance'  && `ドラッグで距離を計測${calibration ? '（cm 表示）' : '（px 表示・校正で cm 化）'}`}
             {tool === 'stopwatch' && (!stopwatch || stopwatch.endT !== null
