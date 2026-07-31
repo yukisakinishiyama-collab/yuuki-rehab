@@ -141,6 +141,8 @@ export interface Protocol {
   aiChat?: ProtocolChatMessage[]
   /** がんばりレポートに印刷するスタッフからのメッセージ */
   reportComment?: string
+  /** がんばりレポートの「がんばりポイント」上書き（AI生成→スタッフ編集後の確定版） */
+  reportPraise?: string[]
   createdAt: string
   updatedAt: string
 }

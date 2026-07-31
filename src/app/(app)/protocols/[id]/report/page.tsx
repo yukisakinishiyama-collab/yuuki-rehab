@@ -24,8 +24,9 @@ import {
 import ProgressChart from '@/components/protocol/ProgressChart'
 import {
   ArrowLeft, Printer, TrendingUp, TrendingDown, Minus, Star,
-  Target, CalendarDays, ClipboardCheck, MessageCircleHeart,
+  CalendarDays, ClipboardCheck, MessageCircleHeart, Sparkles, Loader2,
 } from 'lucide-react'
+import { generateReportDraft } from '@/lib/report-ai'
 
 // 変化の方向アイコンと色
 function ChangeArrow({ change }: { change: MetricChange }) {
@@ -63,6 +64,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [comment, setComment] = useState('')
   const [savedFlash, setSavedFlash] = useState(false)
+  const [praiseDraft, setPraiseDraft] = useState<string[] | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [genNotice, setGenNotice] = useState<string | null>(null)
 
   useEffect(() => {
     const p = getProtocolById(id)
@@ -73,6 +77,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
     setAssessments(getAssessmentsByProtocol(id).sort((a, b) => a.date.localeCompare(b.date)))
     setMilestones(initMilestones(p.patientId))
     setComment(p.reportComment ?? '')
+    setPraiseDraft(p.reportPraise ?? null)
   }, [id, router])
 
   function saveComment() {
@@ -82,6 +87,36 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
     setTimeout(() => setSavedFlash(false), 1500)
   }
 
+  function savePraise(points: string[] | null) {
+    if (!protocol) return
+    const cleaned = points?.map(s => s.trim()).filter(Boolean) ?? undefined
+    updateProtocol(protocol.id, { reportPraise: cleaned && cleaned.length > 0 ? cleaned : undefined })
+  }
+
+  /** カルテメモ・評価・プロトコル現在地を読み取り、AIでメッセージ＋ポイントを下書き生成 */
+  async function handleGenerate() {
+    if (!protocol || !patient || generating) return
+    setGenerating(true)
+    setGenNotice(null)
+    try {
+      const draft = await generateReportDraft(
+        protocol, patient, assessments, milestones,
+        computeMetricChanges(assessments),
+      )
+      setComment(draft.message)
+      setPraiseDraft(draft.praisePoints)
+      updateProtocol(protocol.id, {
+        reportComment: draft.message,
+        reportPraise: draft.praisePoints,
+      })
+      setGenNotice(draft.source === 'ai'
+        ? 'AIが下書きを作成しました。内容をご確認のうえ、必要に応じて編集してください。'
+        : 'AIに接続できなかったため、記録データから自動作成しました。文面をご確認ください。')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (!protocol || !patient) return null
 
   const changes = computeMetricChanges(assessments)
@@ -89,6 +124,8 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const days = daysSinceStart(patient.eventDate, protocol.createdAt)
   const achievedMs = milestones.filter(m => m.achieved)
   const praise = generatePraise(changes, milestones, assessments.length)
+  // AI生成→スタッフ編集済みのポイントがあればそちらを優先表示
+  const displayPraisePoints = praiseDraft && praiseDraft.length > 0 ? praiseDraft : praise.points
   const currentPhase = protocol.phases[protocol.currentPhaseIndex]
   const criteriaPct = currentPhase && currentPhase.advanceCriteria.length > 0
     ? currentPhase.advanceCriteria.filter(c => c.met).length / currentPhase.advanceCriteria.length
@@ -386,7 +423,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
                   今回のがんばりポイント
                 </h2>
                 <ul className="space-y-2">
-                  {praise.points.map((pt, i) => (
+                  {displayPraisePoints.map((pt, i) => (
                     <li key={i} className="flex items-start gap-2 text-[13px] text-slate-700 leading-snug">
                       <Star className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" />
                       {pt}
@@ -438,6 +475,63 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           {/* 06 スタッフより（吹き出し風） */}
           <div className="report-section mb-5">
             <SectionHeader no="06" title="担当スタッフより" accent="#fb7185" />
+            {/* 画面: AI下書き生成 */}
+            <div className="no-print mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold font-display
+                    bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-sm
+                    hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-60 transition-all"
+                >
+                  {generating
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Sparkles className="w-3.5 h-3.5" />}
+                  {generating ? 'カルテ・記録を読み取り中…' : 'AIで下書きを作成'}
+                </button>
+                <span className="text-[10px] text-slate-400 leading-snug">
+                  カルテのメモ・評価データ・回復プログラムの現在地を読み取り、
+                  メッセージとがんばりポイントを下書きします（印刷前に必ずご確認ください）
+                </span>
+              </div>
+              {genNotice && (
+                <p className="text-[11px] text-violet-600 bg-violet-50 border border-violet-100
+                  rounded-lg px-3 py-1.5 mt-2">
+                  ✦ {genNotice}
+                </p>
+              )}
+              {/* がんばりポイントの編集（AI生成後に表示） */}
+              {praiseDraft && praiseDraft.length > 0 && (
+                <div className="mt-2 space-y-1.5 rounded-xl border border-amber-100 bg-amber-50/50 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-amber-800">
+                      がんばりポイント（編集できます・印刷の「がんばりポイント」欄に反映）
+                    </span>
+                    <button
+                      onClick={() => { setPraiseDraft(null); savePraise(null) }}
+                      className="text-[10px] text-slate-400 hover:text-slate-600 underline"
+                    >
+                      自動生成に戻す
+                    </button>
+                  </div>
+                  {praiseDraft.map((pt, i) => (
+                    <input
+                      key={i}
+                      value={pt}
+                      onChange={e => {
+                        const next = [...praiseDraft]
+                        next[i] = e.target.value
+                        setPraiseDraft(next)
+                      }}
+                      onBlur={() => savePraise(praiseDraft)}
+                      className="w-full text-xs border border-amber-200 rounded-lg px-3 py-1.5 bg-white
+                        focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
             {/* 画面: 編集可能テキストエリア */}
             <div className="no-print">
               <textarea
