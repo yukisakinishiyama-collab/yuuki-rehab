@@ -18,6 +18,7 @@ import {
   BookMarked,
   CloudUpload,
   Dumbbell,
+  CalendarClock,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
 import { logout } from '@/lib/rehab-store'
@@ -39,6 +40,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/patients/dashboard', label: 'リハビリ状況',   icon: LayoutDashboard },
       { href: '/patients',           label: '患者管理',       icon: Users },
+      { href: '/yoyaku',             label: '予約管理',       icon: CalendarClock },
     ],
   },
   {
