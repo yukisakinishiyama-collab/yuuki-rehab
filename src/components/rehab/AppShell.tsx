@@ -21,6 +21,7 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
+import YoyakuFrame from './YoyakuFrame'
 import { logout } from '@/lib/rehab-store'
 import { ROLE_LABELS } from '@/types/rehab'
 import type { User as UserType } from '@/types/rehab'
@@ -288,7 +289,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </header>
 
-            <main className="flex-1 p-4 md:p-6">{children}</main>
+            <main className="flex-1 p-4 md:p-6">
+              {children}
+              {/* 予約管理（常駐iframe）：タブ切替で再読み込みせず一瞬で戻れる */}
+              <YoyakuFrame visible={pathname === '/yoyaku'} />
+            </main>
           </div>
 
           {/* QR Login Modal */}
