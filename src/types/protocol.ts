@@ -181,6 +181,9 @@ export const PRESET_DIAGNOSES: Array<{ label: string; joint: Joint; key: string 
   { label: 'FAI / 股関節鏡術後', joint: 'hip', key: 'fai_arthroscopy' },
   { label: '人工股関節（THA）術後', joint: 'hip', key: 'tha' },
   { label: '腰椎椎間板ヘルニア（保存療法）', joint: 'spine', key: 'lumbar_disc_conservative' },
+  { label: '骨折（保存療法・固定管理）', joint: 'other', key: 'fracture_conservative' },
+  { label: '脱臼（整復後・保存療法）', joint: 'shoulder', key: 'dislocation' },
+  { label: '捻挫・靭帯損傷（保存療法）', joint: 'other', key: 'sprain_ligament' },
 ]
 
 export const DEFAULT_MILESTONES: Array<Omit<Milestone, 'id' | 'patientId'>> = [
