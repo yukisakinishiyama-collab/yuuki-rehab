@@ -148,7 +148,7 @@ export default function IllustrationsPage() {
       </div>
 
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        対応形式: PNG / JPEG / WebP（8MBまで）。アップロードした画像はクラウド（Vercel Blob）に保存され、
+        対応形式: PNG / JPEG / WebP（4MBまで）。アップロードした画像はクラウドに保存され、
         全端末で共有されます。同じスロットに再アップロードすると差し替わります。
       </p>
     </div>
