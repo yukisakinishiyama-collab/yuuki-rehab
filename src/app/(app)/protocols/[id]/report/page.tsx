@@ -8,7 +8,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
+import AppIllustration from '@/components/AppIllustration'
 import type { Protocol, ProtocolPatient, Assessment, Milestone } from '@/types/protocol'
 import {
   getProtocolById, getPatientById, getAssessmentsByProtocol,
@@ -224,14 +224,12 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
               </div>
             </div>
 
-            {/* Canva生成イラストを白カードに載せて少し傾ける */}
+            {/* 表紙イラスト（イラスト管理でアップロードした画像を優先、無ければ既存イラスト） */}
             <div className="flex-shrink-0 bg-white rounded-2xl p-2 shadow-lg rotate-2">
-              <Image
-                src="/illustrations/rehab-cheer.png"
+              <AppIllustration
+                slot="report-cover"
                 alt="スタッフが患者のリハビリを応援するイラスト"
-                width={1200}
-                height={851}
-                priority
+                fallbackSrc="/illustrations/rehab-cheer.png"
                 className="h-[104px] w-auto rounded-xl"
               />
             </div>
@@ -440,8 +438,13 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           {/* 05 つぎの目標（チケット風） */}
           <div className="report-section mb-6">
             <SectionHeader no="05" title="つぎの目標" accent="#f97316" />
-            <div className="rounded-2xl px-5 py-4 space-y-2.5"
+            <div className="relative rounded-2xl px-5 py-4 space-y-2.5"
               style={{ background: '#fff7ed', border: '2px dashed #fdba74' }}>
+              <AppIllustration
+                slot="cheer-goal"
+                alt="目標に向かって進むイラスト"
+                className="absolute right-4 top-1/2 -translate-y-1/2 h-16 w-auto rounded-lg"
+              />
               {nextMilestone && (
                 <div className="flex items-center gap-3">
                   <span className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center

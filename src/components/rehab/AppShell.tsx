@@ -19,6 +19,7 @@ import {
   CloudUpload,
   Dumbbell,
   CalendarClock,
+  Images,
 } from 'lucide-react'
 import AuthGuard from './AuthGuard'
 import YoyakuFrame from './YoyakuFrame'
@@ -52,6 +53,7 @@ const NAV_SECTIONS = [
       { href: '/literature', label: '文献ライブラリ', icon: BookOpen },
       { href: '/rom',        label: '可動域ノート',   icon: Activity },
       { href: '/drills',     label: '競技復帰ドリル', icon: Dumbbell },
+      { href: '/illustrations', label: 'イラスト管理', icon: Images },
     ],
   },
   {

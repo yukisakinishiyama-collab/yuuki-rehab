@@ -8,6 +8,8 @@ import {
   getProtocolById, getPatientById, getAssessmentsByProtocol
 } from '@/lib/protocol-store'
 import PatientView from '@/components/protocol/PatientView'
+import AppIllustration from '@/components/AppIllustration'
+import { slotForProtocolTitle } from '@/lib/illustrations'
 import { ArrowLeft, MonitorPlay } from 'lucide-react'
 
 export default function PatientViewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,6 +67,16 @@ export default function PatientViewPage({ params }: { params: Promise<{ id: stri
 
       {/* コンテンツ */}
       <div className="p-4 max-w-2xl mx-auto">
+        {/* 疾患に応じたイラスト（イラスト管理でアップロードした場合のみ表示） */}
+        {slotForProtocolTitle(protocol.title) && (
+          <div className="flex justify-center mb-3">
+            <AppIllustration
+              slot={slotForProtocolTitle(protocol.title)!}
+              alt="治療の様子のイラスト"
+              className="h-28 w-auto rounded-2xl shadow-sm"
+            />
+          </div>
+        )}
         <PatientView patient={patient} protocol={protocol} assessments={assessments} />
       </div>
     </div>
