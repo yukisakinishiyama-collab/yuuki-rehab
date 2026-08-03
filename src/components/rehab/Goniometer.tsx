@@ -15,7 +15,11 @@ import {
   TrendingDown,
   Minus,
   Crosshair,
+  UserRound,
 } from 'lucide-react'
+import { nanoid } from 'nanoid'
+import { getPatients, saveROMRecord } from '@/lib/patient-store'
+import type { Patient, BodyRegion, Side } from '@/types/patient'
 
 // ─── 型定義 ───────────────────────────────────────────────────
 type Lang = 'ja' | 'en'
@@ -37,6 +41,17 @@ interface JointMotion {
   axis: 'beta' | 'gamma'
   /** センサー値をそのまま使うか反転するか */
   invert: boolean
+}
+
+/** 患者カルテ(ROM記録)反映時の関節名→部位カテゴリ対応 */
+const REGION_MAP: Record<string, BodyRegion> = {
+  '膝関節': 'knee',
+  '股関節': 'hip',
+  '足関節': 'ankle',
+  '肩関節': 'shoulder',
+  '肘関節': 'elbow',
+  '頸椎': 'cervical',
+  '腰椎': 'lumbar',
 }
 
 interface Measurement {
@@ -215,6 +230,11 @@ const T = {
     zeroHint: 'スマホを開始肢位（測り始めの位置）に当てて押すと、その位置が0°になります',
     zeroActive: '開始肢位を0°として計測中',
     zeroClear: '解除',
+    linkTitle: '患者カルテに反映',
+    linkNone: '反映しない（単独計測）',
+    sideRight: '右',
+    sideLeft: '左',
+    reflected: 'カルテのROM記録に反映しました',
   },
   en: {
     title: 'Goniometer',
@@ -245,6 +265,11 @@ const T = {
     zeroHint: 'Hold the phone at the starting position and tap to zero the scale',
     zeroActive: 'Measuring relative to zeroed start position',
     zeroClear: 'Clear',
+    linkTitle: 'Link to patient chart',
+    linkNone: 'No link (standalone)',
+    sideRight: 'R',
+    sideLeft: 'L',
+    reflected: 'Saved to patient ROM records',
   },
 }
 
@@ -345,6 +370,16 @@ export default function Goniometer() {
     )
   })
   const [selectOpen, setSelectOpen] = useState(false)
+  // 患者カルテ連携: 選択した患者のROM記録に計測値を直接反映する
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [linkedPatientId, setLinkedPatientId] = useState('')
+  const [side, setSide] = useState<Side>('right')
+  const [reflectedFlash, setReflectedFlash] = useState(false)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPatients(getPatients().filter(p => p.status === 'active'))
+  }, [])
 
   // スムージング用バッファ
   const bufferRef = useRef<number[]>([])
@@ -434,6 +469,33 @@ export default function Goniometer() {
     const updated = [m, ...measurements]
     setMeasurements(updated)
     saveMeasurements(updated)
+
+    // 患者連携中はカルテのROM記録にもそのまま反映
+    if (linkedPatientId) {
+      const now = new Date()
+      saveROMRecord({
+        id: nanoid(),
+        patientId: linkedPatientId,
+        measuredDate: now.toISOString().slice(0, 10),
+        bodyRegion: REGION_MAP[motion.joint_ja] ?? 'other',
+        joint: motion.joint_ja,
+        movement: motion.motion_ja,
+        side,
+        activeRom: angle,
+        passiveRom: null,
+        normalValue: motion.rom.normal,
+        unit: 'deg',
+        pain: false,
+        painLocation: '',
+        endFeel: '',
+        limitationFactor: '',
+        memo: note ? `${note}（関節角度計で計測）` : '関節角度計で計測',
+        createdAt: now.toISOString(),
+      })
+      setReflectedFlash(true)
+      setTimeout(() => setReflectedFlash(false), 2500)
+    }
+
     setNote('')
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 1800)
@@ -581,6 +643,50 @@ export default function Goniometer() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 患者カルテ連携（任意）: 選択すると保存時にROM記録へそのまま反映 */}
+      <div className="mb-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+          <UserRound className="w-3.5 h-3.5 text-teal-500" />
+          {t.linkTitle}
+        </label>
+        <div className="flex items-center gap-2">
+          <select
+            value={linkedPatientId}
+            onChange={(e) => setLinkedPatientId(e.target.value)}
+            className="flex-1 min-w-0 text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700
+              focus:outline-none focus:ring-2 focus:ring-teal-400"
+          >
+            <option value="">{t.linkNone}</option>
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}（{p.diagnosisLabel || p.mainComplaint || '—'}）
+              </option>
+            ))}
+          </select>
+          {linkedPatientId && (
+            <div className="flex rounded-xl border border-slate-200 overflow-hidden flex-shrink-0">
+              {([['right', t.sideRight], ['left', t.sideLeft]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSide(key)}
+                  className={`text-sm px-3.5 py-2.5 font-bold transition-colors ${
+                    side === key ? 'bg-teal-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {reflectedFlash && (
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 mt-2">
+            <Check className="w-3.5 h-3.5" />
+            {t.reflected}
+          </p>
+        )}
       </div>
 
       {/* メイン計測カード */}
