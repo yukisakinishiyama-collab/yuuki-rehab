@@ -20,6 +20,7 @@ import { getDiseasePage, getReview, type DiseaseReview } from '@/lib/disease-sto
 import { buildExternalRefs } from '@/data/diseases/external-refs'
 import AnatomyDiagram from '@/components/disease/AnatomyDiagram'
 import AppIllustration from '@/components/AppIllustration'
+import PatientIllustrationGuide, { getDiseasePatientIllustrations } from '@/components/disease/PatientIllustrationGuide'
 import { slotForDisease } from '@/lib/illustrations'
 
 // ── 確実性・確認状態のラベルチップ ──
@@ -254,14 +255,18 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
             <h2 className="text-sm font-bold text-[--color-text-primary] font-display mb-2">このけがについて</h2>
             <div className="sm:flex sm:items-start sm:gap-4">
               <p className="text-sm text-slate-700 leading-relaxed flex-1">{page.patientExplanation.whatIs}</p>
-              {/* 症例に応じたイラスト（イラスト管理でアップロードした場合のみ表示） */}
-              <AppIllustration
-                slot={slotForDisease(page.names.ja, page.category)}
-                alt={`${page.names.ja}の説明イラスト`}
-                className="h-32 w-auto rounded-xl mx-auto mt-3 sm:mt-0 sm:mx-0 flex-shrink-0"
-              />
+              {/* 症例に応じたイラスト。「回復の流れ」ガイドがある疾患では重複を避けて非表示 */}
+              {getDiseasePatientIllustrations(page.id).length === 0 && (
+                <AppIllustration
+                  slot={slotForDisease(page.names.ja, page.category)}
+                  alt={`${page.names.ja}の説明イラスト`}
+                  className="h-32 w-auto rounded-xl mx-auto mt-3 sm:mt-0 sm:mx-0 flex-shrink-0"
+                />
+              )}
             </div>
           </div>
+          {/* 疾患ID別の「イラストで見る回復の流れ」（対応疾患のみ表示） */}
+          <PatientIllustrationGuide diseaseId={page.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-teal-50/50 rounded-2xl border border-teal-100 p-5">
               <h3 className="text-xs font-bold text-teal-800 font-display mb-2">してよいこと</h3>
