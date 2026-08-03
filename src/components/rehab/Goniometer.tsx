@@ -14,6 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Crosshair,
 } from 'lucide-react'
 
 // ─── 型定義 ───────────────────────────────────────────────────
@@ -210,6 +211,10 @@ const T = {
     excellent: '正常範囲内',
     limited: '可動域制限あり',
     severely: '高度制限',
+    zeroBtn: '開始肢位を0°にセット',
+    zeroHint: 'スマホを開始肢位（測り始めの位置）に当てて押すと、その位置が0°になります',
+    zeroActive: '開始肢位を0°として計測中',
+    zeroClear: '解除',
   },
   en: {
     title: 'Goniometer',
@@ -236,6 +241,10 @@ const T = {
     excellent: 'Within normal range',
     limited: 'Limited ROM',
     severely: 'Severely limited',
+    zeroBtn: 'Set start position to 0°',
+    zeroHint: 'Hold the phone at the starting position and tap to zero the scale',
+    zeroActive: 'Measuring relative to zeroed start position',
+    zeroClear: 'Clear',
   },
 }
 
@@ -340,6 +349,11 @@ export default function Goniometer() {
   // スムージング用バッファ
   const bufferRef = useRef<number[]>([])
   const BUFFER_SIZE = 12
+  // ゼロセット（開始肢位を0°とする基準値）: 表示用stateとセンサーコールバック用ref
+  const [zeroSet, setZeroSet] = useState(false)
+  const zeroRef = useRef(0)
+  // 直近の平滑化済み生角度（ゼロセット時の基準取得に使用）
+  const rawRef = useRef(0)
 
   const motion = JOINTS.find((j) => j.id === selectedId)!
 
@@ -357,10 +371,24 @@ export default function Goniometer() {
       const avg =
         bufferRef.current.reduce((a, b) => a + b, 0) /
         bufferRef.current.length
-      setAngle(Math.round(Math.abs(avg)))
+      rawRef.current = avg
+      // ゼロセット済みなら基準値からの相対角度で表示する
+      setAngle(Math.round(Math.abs(avg - zeroRef.current)))
     },
     [measuring, motion]
   )
+
+  // ─ ゼロセット: 現在の肢位を0°の基準にする ─
+  function handleZeroSet() {
+    zeroRef.current = rawRef.current
+    setZeroSet(true)
+    setAngle(0)
+  }
+
+  function clearZero() {
+    zeroRef.current = 0
+    setZeroSet(false)
+  }
 
   useEffect(() => {
     window.addEventListener('deviceorientation', handleOrientation, true)
@@ -387,6 +415,9 @@ export default function Goniometer() {
   // ─ リセット ─
   function handleReset() {
     bufferRef.current = []
+    zeroRef.current = 0
+    rawRef.current = 0
+    setZeroSet(false)
     setAngle(0)
     setMeasuring(false)
   }
@@ -616,6 +647,40 @@ export default function Goniometer() {
           <p className="text-center text-xs text-slate-500 mb-3 animate-pulse">
             {t.tiltInstruction}
           </p>
+        )}
+
+        {/* ゼロセット（開始肢位を0°基準にするアタッチメント機能） */}
+        {measuring && (
+          zeroSet ? (
+            <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-xl
+              bg-indigo-50 border border-indigo-200">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700">
+                <Crosshair className="w-3.5 h-3.5" />
+                {t.zeroActive}
+              </span>
+              <button
+                onClick={clearZero}
+                className="text-[11px] font-semibold text-indigo-500 hover:text-indigo-700 underline"
+              >
+                {t.zeroClear}
+              </button>
+            </div>
+          ) : (
+            <div className="mb-3">
+              <button
+                onClick={handleZeroSet}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                  bg-white border-2 border-dashed border-indigo-300 text-indigo-600
+                  font-bold text-sm active:scale-95 transition-transform hover:bg-indigo-50"
+              >
+                <Crosshair className="w-4 h-4" />
+                {t.zeroBtn}
+              </button>
+              <p className="text-[10px] text-slate-400 text-center mt-1 leading-relaxed">
+                {t.zeroHint}
+              </p>
+            </div>
+          )
         )}
 
         {/* ボタン群 */}
