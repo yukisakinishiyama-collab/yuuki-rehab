@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
   ArrowLeft, ShieldAlert, BookMarked, ClipboardCopy, ClipboardCheck,
-  FileText, Users, AlertTriangle, ChevronDown, Route, ExternalLink,
+  FileText, Users, AlertTriangle, ChevronDown, Route, ExternalLink, Printer,
 } from 'lucide-react'
 import type {
   ContentBlock, DisplayLevel, DifferentialGroup,
@@ -138,13 +138,31 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="max-w-3xl mx-auto font-body space-y-4 pb-10">
+      {/* 患者説明資料の印刷スタイル（患者説明モードの内容だけをA4ハンドアウトとして印刷） */}
+      <style>{`
+        .print-only { display: none; }
+        @media print {
+          @page { size: A4; margin: 10mm 12mm; }
+          aside, header { display: none !important; }
+          [class*="ml-56"] { margin-left: 0 !important; }
+          main { padding: 0 !important; }
+          body { background: white !important; }
+          .print-only { display: block !important; }
+          #patient-handout > *, #patient-handout li { break-inside: avoid; }
+          #patient-handout, #patient-handout * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+
       {/* パンくず・戻る */}
-      <Link href="/diseases" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-[--color-text-primary] transition-colors">
+      <Link href="/diseases" className="no-print inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-[--color-text-primary] transition-colors">
         <ArrowLeft className="w-4 h-4" />疾患ライブラリ
       </Link>
 
       {/* 医療安全表示（常時） */}
-      <div className="flex items-start gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 leading-relaxed">
+      <div className="no-print flex items-start gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 leading-relaxed">
         <ShieldAlert className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
         <span>
           本ページは臨床判断を補助する参考情報です。すべての患者に適用できるものではなく、
@@ -153,7 +171,7 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* ヘッダー */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+      <div className="no-print bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -250,7 +268,39 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
 
       {/* ═══ 患者説明モード ═══ */}
       {patientMode ? (
-        <div className="space-y-4">
+        <div id="patient-handout" className="space-y-4">
+          {/* 画面用: 印刷ツールバー */}
+          <div className="no-print flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-xs text-slate-400">
+              A4で印刷して患者様にお渡しできます（この画面の内容がそのまま資料になります）
+            </span>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-[--color-primary]
+                px-4 py-2 rounded-lg hover:bg-[--color-primary-hover] transition-colors font-display"
+            >
+              <Printer className="w-3.5 h-3.5" />説明資料を印刷
+            </button>
+          </div>
+
+          {/* 印刷用: 資料ヘッダー */}
+          <div className="print-only border-b-2 border-teal-600 pb-3 mb-2">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] font-bold tracking-widest text-teal-700">
+                  ゆうき整骨院 ─ 患者様説明資料
+                </p>
+                <h1 className="text-2xl font-bold text-slate-900 leading-tight mt-1">
+                  {page.names.ja}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">{page.names.en}</p>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                発行日 {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <h2 className="text-sm font-bold text-[--color-text-primary] font-display mb-2">このけがについて</h2>
             <div className="sm:flex sm:items-start sm:gap-4">
@@ -296,6 +346,19 @@ export default function DiseaseDetailPage({ params }: { params: Promise<{ id: st
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <h3 className="text-xs font-bold text-[--color-text-primary] font-display mb-2">回復にむけて</h3>
             <p className="text-sm text-slate-700 leading-relaxed">{page.patientExplanation.goal}</p>
+          </div>
+
+          {/* 印刷用: 資料フッター（連絡先・注意書き） */}
+          <div className="print-only border-t border-slate-200 pt-3 mt-2">
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              本資料は一般的な説明を目的としたもので、診断や治療の指示を代替するものではありません。
+              症状や回復の経過には個人差があります。固定具の扱い・運動の開始時期などは、
+              担当医とスタッフからの個別の説明を優先してください。気になる症状があるときは、
+              我慢せずにご相談ください。
+            </p>
+            <p className="text-[11px] font-bold text-slate-700 mt-2">
+              ゆうき整骨院　TEL 083-265-4545
+            </p>
           </div>
         </div>
       ) : (
