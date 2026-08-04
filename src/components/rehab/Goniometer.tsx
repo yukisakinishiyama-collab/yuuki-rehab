@@ -229,6 +229,8 @@ const T = {
     excellent: '正常範囲内',
     limited: '可動域制限あり',
     severely: '高度制限',
+    sensorNoData: 'センサーの値を受信できていません。スマートフォン（iPhone/Android）で開いているか、モーションセンサーの許可を確認してください。パソコンでは角度は 0° のまま動きません。',
+    iosDenied: 'モーションセンサーへのアクセスが許可されませんでした。iPhone の「設定 → Safari → モーションと画面の向きのアクセス」をオンにしてから、ページを再読み込みしてください。',
     zeroBtn: '開始肢位を0°にセット',
     zeroHint: 'スマホを開始肢位（測り始めの位置）に当てて押すと、その瞬間の位置が0°になります。押した後そのまま静止していると基準値の精度が上がります',
     zeroActive: '開始肢位を0°として計測中',
@@ -277,6 +279,8 @@ const T = {
     excellent: 'Within normal range',
     limited: 'Limited ROM',
     severely: 'Severely limited',
+    sensorNoData: 'No sensor data received. Open this page on a phone and allow motion access. On a desktop the angle stays at 0°.',
+    iosDenied: 'Motion access was not granted. Enable Settings → Safari → Motion & Orientation Access on your iPhone, then reload the page.',
     zeroBtn: 'Set start position to 0°',
     zeroHint: 'Hold the phone at the starting position and tap to zero the scale. Keep it still afterwards to refine the baseline',
     zeroActive: 'Measuring relative to zeroed start position',
@@ -399,6 +403,11 @@ export default function Goniometer() {
     )
   })
   const [selectOpen, setSelectOpen] = useState(false)
+  // センサー値を実際に1件でも受信したか（PC・iOS権限未許可では届かない）
+  const [sensorLive, setSensorLive] = useState(false)
+  const sensorLiveRef = useRef(false)
+  const [sensorTimeout, setSensorTimeout] = useState(false)
+  const [iosDenied, setIosDenied] = useState(false)
   // 患者カルテ連携: 選択した患者のROM記録に計測値を直接反映する
   const [patients, setPatients] = useState<Patient[]>([])
   const [linkedPatientId, setLinkedPatientId] = useState('')
@@ -449,7 +458,17 @@ export default function Goniometer() {
   // ─ センサーイベント（高精度計測） ─
   const handleOrientation = useCallback((e: DeviceOrientationEvent) => {
     const m = motionRef.current
-    const raw = m.axis === 'beta' ? (e.beta ?? 0) : (e.gamma ?? 0)
+    const raw = m.axis === 'beta' ? e.beta : e.gamma
+
+    // 値の入っていないイベントは受信として扱わない。
+    // ここで 0 とみなすと、センサーが動いていないのに「0°」が正常表示され、
+    // ゼロセットが効いていないのと区別が付かなくなる。
+    if (raw == null || Number.isNaN(raw)) return
+    if (!sensorLiveRef.current) {
+      sensorLiveRef.current = true
+      setSensorLive(true)
+    }
+
     let val = m.invert ? -raw : raw
 
     // 外れ値除去: 前の値から急激に変わった値を除外する。
@@ -535,6 +554,15 @@ export default function Goniometer() {
     }
   }, [handleOrientation])
 
+  // 計測開始後1.5秒たってもセンサー値が1件も届かない場合は原因を明示する。
+  // ('DeviceOrientationEvent' in window は PC の Chrome でも true になるため、
+  //  従来の sensorAvailable 判定だけでは PC での無反応を検出できない)
+  useEffect(() => {
+    if (!measuring || sensorLive) return
+    const id = setTimeout(() => setSensorTimeout(true), 1500)
+    return () => clearTimeout(id)
+  }, [measuring, sensorLive])
+
   // 計測軸（beta/gamma）が変わると基準値の意味が失われるため、
   // 関節・運動方向を切り替えたらゼロセットも解除する
   function selectJoint(id: string) {
@@ -553,8 +581,14 @@ export default function Goniometer() {
       const result = await fn()
       if (result === 'granted') {
         setIosPermission(false)
+        setIosDenied(false)
+      } else {
+        // 拒否を握り潰すと「許可を押しても何も起きない」状態になる
+        setIosDenied(true)
       }
-    } catch {}
+    } catch {
+      setIosDenied(true)
+    }
   }
 
   // ─ リセット ─
@@ -567,6 +601,7 @@ export default function Goniometer() {
     zeroPendingRef.current = false
     zeroSamplesRef.current = []
     setZeroSet(false)
+    setSensorTimeout(false)
     setAngle(0)
     setMeasuring(false)
   }
@@ -772,10 +807,24 @@ export default function Goniometer() {
         </div>
       )}
 
+      {/* iOS でモーションアクセスが拒否された場合 */}
+      {iosDenied && (
+        <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 leading-relaxed">
+          {t.iosDenied}
+        </div>
+      )}
+
       {/* センサー非対応 */}
       {sensorAvailable === false && (
         <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
           {t.sensorError}
+        </div>
+      )}
+
+      {/* センサー値が届いていない（PC・権限未許可など）*/}
+      {measuring && sensorTimeout && !sensorLive && (
+        <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 leading-relaxed">
+          {t.sensorNoData}
         </div>
       )}
 
@@ -1044,9 +1093,11 @@ export default function Goniometer() {
             <div className="mb-3">
               <button
                 onClick={handleZeroSet}
+                disabled={!sensorLive}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl
                   bg-white border-2 border-dashed border-indigo-300 text-indigo-600
-                  font-bold text-sm active:scale-95 transition-transform hover:bg-indigo-50"
+                  font-bold text-sm active:scale-95 transition-transform hover:bg-indigo-50
+                  disabled:opacity-40 disabled:active:scale-100 disabled:hover:bg-white"
               >
                 <Crosshair className="w-4 h-4" />
                 {t.zeroBtn}
@@ -1067,6 +1118,7 @@ export default function Goniometer() {
                 rejectCountRef.current = 0
                 emaRef.current = 0
                 hasEmaRef.current = false
+                setSensorTimeout(false)
                 setMeasuring(true)
               }}
               disabled={sensorAvailable === false}
