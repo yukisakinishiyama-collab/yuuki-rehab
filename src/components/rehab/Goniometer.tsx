@@ -16,6 +16,9 @@ import {
   Minus,
   Crosshair,
   UserRound,
+  ListChecks,
+  Lock,
+  LockOpen,
 } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { getPatients, saveROMRecord } from '@/lib/patient-store'
@@ -235,6 +238,19 @@ const T = {
     sideRight: '右',
     sideLeft: '左',
     reflected: 'カルテのROM記録に反映しました',
+    batchBtn: 'まとめて計測（複数項目を連続で）',
+    batchSelectTitle: '計測する項目を選択',
+    batchStart: '計測開始',
+    batchCancel: 'やめる',
+    batchConfirm: 'この値で決定 → 次へ',
+    batchSkip: 'スキップ',
+    batchReviewTitle: '計測結果の確認',
+    batchRedo: '再計測',
+    batchMeasureOne: '計測する',
+    batchUnmeasured: '未計測',
+    batchSaveAll: 'まとめて保存',
+    batchNoteHolder: '共通メモ（任意）例: 術後4週評価',
+    batchSavedCount: (n: number) => `${n}件を保存しました`,
   },
   en: {
     title: 'Goniometer',
@@ -270,6 +286,19 @@ const T = {
     sideRight: 'R',
     sideLeft: 'L',
     reflected: 'Saved to patient ROM records',
+    batchBtn: 'Batch measure (multiple motions)',
+    batchSelectTitle: 'Select motions to measure',
+    batchStart: 'Start',
+    batchCancel: 'Cancel',
+    batchConfirm: 'Confirm → Next',
+    batchSkip: 'Skip',
+    batchReviewTitle: 'Review results',
+    batchRedo: 'Redo',
+    batchMeasureOne: 'Measure',
+    batchUnmeasured: 'Not measured',
+    batchSaveAll: 'Save all',
+    batchNoteHolder: 'Shared note (optional)',
+    batchSavedCount: (n: number) => `Saved ${n} records`,
   },
 }
 
@@ -375,6 +404,14 @@ export default function Goniometer() {
   const [linkedPatientId, setLinkedPatientId] = useState('')
   const [side, setSide] = useState<Side>('right')
   const [reflectedFlash, setReflectedFlash] = useState(false)
+  // まとめて計測: 複数項目を連続で計測し、最後に一括保存
+  const [batchMode, setBatchMode] = useState(false)
+  const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([])
+  const [batchResults, setBatchResults] = useState<Record<string, number>>({})
+  const [batchIdx, setBatchIdx] = useState(0)
+  const [batchCommonNote, setBatchCommonNote] = useState('')
+  // 計測ロック: 計測中の誤操作防止
+  const [locked, setLocked] = useState(false)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -407,8 +444,9 @@ export default function Goniometer() {
         bufferRef.current.reduce((a, b) => a + b, 0) /
         bufferRef.current.length
       rawRef.current = avg
-      // ゼロセット済みなら基準値からの相対角度で表示する
-      setAngle(Math.round(Math.abs(avg - zeroRef.current)))
+      // ゼロセット済みなら基準値からの相対角度で表示（90度超対応）
+      const relativeAngle = Math.abs(avg - zeroRef.current)
+      setAngle(Math.round(relativeAngle >= 180 ? 360 - relativeAngle : relativeAngle))
     },
     [measuring, motion]
   )
@@ -455,6 +493,75 @@ export default function Goniometer() {
     setZeroSet(false)
     setAngle(0)
     setMeasuring(false)
+  }
+
+  // ─ まとめて計測: 開始 ─
+  function startBatchMeasure(selectedIds: string[]) {
+    setBatchSelectedIds(selectedIds)
+    setBatchResults({})
+    setBatchIdx(0)
+    setBatchMode(true)
+    if (selectedIds.length > 0) {
+      setSelectedId(selectedIds[0])
+      setMeasuring(true)
+    }
+  }
+
+  // ─ まとめて計測: 次の項目へ ─
+  function nextBatchItem() {
+    if (batchIdx >= batchSelectedIds.length) return
+    setBatchResults(prev => ({
+      ...prev,
+      [batchSelectedIds[batchIdx]]: angle
+    }))
+    const nextIdx = batchIdx + 1
+    if (nextIdx < batchSelectedIds.length) {
+      setBatchIdx(nextIdx)
+      setSelectedId(batchSelectedIds[nextIdx])
+      handleReset()
+      setTimeout(() => setMeasuring(true), 100)
+    }
+  }
+
+  // ─ まとめて計測: 保存（全項目） ─
+  function saveBatchResults() {
+    if (!linkedPatientId) {
+      setBatchMode(false)
+      setBatchSelectedIds([])
+      return
+    }
+    const now = new Date()
+    batchSelectedIds.forEach(motionId => {
+      const motion = JOINTS.find(j => j.id === motionId)
+      if (motion && batchResults[motionId]) {
+        saveROMRecord({
+          id: nanoid(),
+          patientId: linkedPatientId,
+          measuredDate: now.toISOString().slice(0, 10),
+          bodyRegion: REGION_MAP[motion.joint_ja] ?? 'other',
+          joint: motion.joint_ja,
+          movement: motion.motion_ja,
+          side,
+          activeRom: batchResults[motionId],
+          passiveRom: null,
+          normalValue: motion.rom.normal,
+          unit: 'deg',
+          pain: false,
+          painLocation: '',
+          endFeel: '',
+          limitationFactor: '',
+          memo: batchCommonNote ? `${batchCommonNote}（関節角度計で計測）` : '関節角度計で計測',
+          createdAt: now.toISOString(),
+        })
+      }
+    })
+    setReflectedFlash(true)
+    setTimeout(() => setReflectedFlash(false), 2500)
+    setBatchMode(false)
+    setBatchSelectedIds([])
+    setBatchResults({})
+    setBatchIdx(0)
+    setBatchCommonNote('')
   }
 
   // ─ 保存 ─
@@ -597,13 +704,14 @@ export default function Goniometer() {
       )}
 
       {/* 関節選択 */}
-      <div className="mb-4">
+      <div className="mb-4" style={{ opacity: measuring && locked ? 0.5 : 1, pointerEvents: measuring && locked ? 'none' : 'auto' }}>
         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           {t.select}
         </label>
         <div className="relative">
           <button
             onClick={() => setSelectOpen(!selectOpen)}
+            disabled={measuring && locked}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-slate-200 shadow-sm text-slate-800 font-medium text-sm"
           >
             <span>
@@ -645,8 +753,66 @@ export default function Goniometer() {
         </div>
       </div>
 
+      {/* まとめて計測モード: 複数項目の連続計測と一括保存 */}
+      {!batchMode && !measuring ? (
+        <button
+          onClick={() => startBatchMeasure(JOINTS.map(j => j.id))}
+          disabled={!linkedPatientId}
+          className="w-full mb-4 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-sm shadow-md active:scale-95 transition-transform disabled:opacity-40 disabled:from-slate-300 disabled:to-slate-300"
+        >
+          <ListChecks className="w-4 h-4" />
+          {t.batchBtn}
+        </button>
+      ) : batchMode && (
+        <div className="mb-4 bg-white rounded-2xl shadow-sm border-2 border-indigo-200 p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="font-bold text-sm text-indigo-900">
+              {lang === 'ja' ? '計測中' : 'Measuring'}: {batchIdx + 1}/{batchSelectedIds.length}
+            </h3>
+            <button
+              onClick={() => {
+                setBatchMode(false)
+                setBatchSelectedIds([])
+                setBatchResults({})
+                setBatchIdx(0)
+                handleReset()
+              }}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+            >
+              {t.batchCancel}
+            </button>
+          </div>
+          {batchIdx < batchSelectedIds.length && (
+            <p className="text-xs text-slate-500 mb-3">
+              {lang === 'ja' ? `${batchIdx + 1}番目: ` : `${batchIdx + 1}/${batchSelectedIds.length}: `}
+              {JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.joint_ja}
+              {' '}
+              {JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.motion_ja}
+            </p>
+          )}
+          <div className="flex gap-2">
+            {batchIdx < batchSelectedIds.length && measuring && (
+              <button
+                onClick={nextBatchItem}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform"
+              >
+                {batchIdx + 1 === batchSelectedIds.length ? t.batchSaveAll : t.batchConfirm}
+              </button>
+            )}
+            {batchIdx === batchSelectedIds.length && (
+              <button
+                onClick={saveBatchResults}
+                className="flex-1 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-sm active:scale-95 transition-transform"
+              >
+                {t.batchSaveAll} ({Object.keys(batchResults).length})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 患者カルテ連携（任意）: 選択すると保存時にROM記録へそのまま反映 */}
-      <div className="mb-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div className="mb-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-4" style={{ opacity: measuring && locked ? 0.5 : 1, pointerEvents: measuring && locked ? 'none' : 'auto' }}>
         <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
           <UserRound className="w-3.5 h-3.5 text-teal-500" />
           {t.linkTitle}
@@ -690,7 +856,34 @@ export default function Goniometer() {
       </div>
 
       {/* メイン計測カード */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4">
+      <div className={`bg-white rounded-2xl shadow-sm border-2 p-5 mb-4 transition-colors ${
+        locked ? 'border-red-300 bg-red-50' : 'border-slate-200'
+      }`}>
+        {/* ロック表示 */}
+        {measuring && (
+          <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-200">
+            <div className="flex items-center gap-2">
+              {locked ? (
+                <><Lock className="w-4 h-4 text-red-600" />
+                <span className="text-xs font-bold text-red-700">ロック中（計測保護）</span></>
+              ) : (
+                <><LockOpen className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-bold text-amber-700">アンロック（編集可）</span></>
+              )}
+            </div>
+            <button
+              onClick={() => setLocked(!locked)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                locked
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-amber-500 text-white hover:bg-amber-600'
+              }`}
+            >
+              {locked ? <><Lock className="w-3.5 h-3.5" />解除</> : <><LockOpen className="w-3.5 h-3.5" />保護</>}
+            </button>
+          </div>
+        )}
+
         {/* 角度表示 */}
         <div className="text-center mb-4">
           <div
