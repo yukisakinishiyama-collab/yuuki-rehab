@@ -231,6 +231,12 @@ const T = {
     excellent: '正常範囲内',
     limited: '可動域制限あり',
     severely: '高度制限',
+    stableReady: '静止（読み取り可）',
+    stableMoving: '追従中…',
+    diagShow: 'センサー値を表示',
+    diagHide: 'センサー値を隠す',
+    diagIncl: '傾斜',
+    diagZero: '基準',
     lockOn: 'ロック中（表示値を固定）',
     lockOff: 'アンロック（追従中）',
     lockRelease: '解除',
@@ -298,6 +304,12 @@ const T = {
     excellent: 'Within normal range',
     limited: 'Limited ROM',
     severely: 'Severely limited',
+    stableReady: 'Steady (ready to read)',
+    stableMoving: 'Tracking…',
+    diagShow: 'Show sensor values',
+    diagHide: 'Hide sensor values',
+    diagIncl: 'incl',
+    diagZero: 'zero',
     lockOn: 'Locked (reading held)',
     lockOff: 'Unlocked (live)',
     lockRelease: 'Unlock',
@@ -341,6 +353,8 @@ const T = {
     batchNoResult: 'No measurements recorded',
   },
 }
+
+const DEG = Math.PI / 180
 
 // ─── ローカルストレージ ────────────────────────────────────────
 const STORAGE_KEY = 'yuuki_goniometer_v1'
@@ -507,15 +521,31 @@ export default function Goniometer() {
     setPatients(getPatients().filter(p => p.status === 'active'))
   }, [])
 
-  // 高精度フィルタリング: EMA（指数移動平均）+ 外れ値除去
+  // 高精度フィルタリング: 適応EMA + 外れ値除去
   const emaRef = useRef(0)
   const hasEmaRef = useRef(false)   // EMA 初期化済みか（実測0°を未初期化と誤判定しないため）
-  const EMA_ALPHA = 0.15  // 新値のウェイト（低いほど平滑、高いほど反応的）
+  // 固定αだと「静止時の安定」と「動作時の追従」がトレードオフになる。
+  // 変化量に応じてαを上げることで、静止時は強く平滑化しつつ
+  // 動かしている間は遅れずに追従する（読み取り時の遅れが誤差になるのを防ぐ）。
+  const EMA_ALPHA_MIN = 0.12
+  const EMA_ALPHA_MAX = 0.60
+  const EMA_SPEED_GAIN = 0.25
   const OUTLIER_THRESHOLD = 8  // 前の値から8度以上の変化は外れ値と判定
   const OUTLIER_MAX_REJECT = 3  // 連続棄却の上限（速い動きで値が固まるのを防ぐ）
   const RAW_BUFFER_SIZE = 5  // 外れ値除去用の小バッファ
   const rawBufferRef = useRef<number[]>([])
   const rejectCountRef = useRef(0)
+
+  // 静止判定（読み取ってよいタイミングを示す）
+  const [stable, setStable] = useState(false)
+  const stableRef = useRef(false)
+  const stableWindowRef = useRef<number[]>([])
+  const STABLE_WINDOW = 15
+  const STABLE_RANGE = 0.8
+
+  // センサー診断表示（実測との乖離を切り分けるため生値も出す）
+  const [diag, setDiag] = useState<{ beta: number; gamma: number; incl: number; zero: number } | null>(null)
+  const [showDiag, setShowDiag] = useState(false)
 
   // ゼロセット（開始肢位を0°とする基準値）
   const [zeroSet, setZeroSet] = useState(false)
@@ -538,18 +568,56 @@ export default function Goniometer() {
   // ─ センサーイベント（高精度計測） ─
   const handleOrientation = useCallback((e: DeviceOrientationEvent) => {
     const m = motionRef.current
-    const raw = m.axis === 'beta' ? e.beta : e.gamma
 
     // 値の入っていないイベントは受信として扱わない。
     // ここで 0 とみなすと、センサーが動いていないのに「0°」が正常表示され、
     // ゼロセットが効いていないのと区別が付かなくなる。
-    if (raw == null || Number.isNaN(raw)) return
+    if (e.beta == null && e.gamma == null) return
+    if (Number.isNaN(e.beta) || Number.isNaN(e.gamma)) return
     if (!sensorLiveRef.current) {
       sensorLiveRef.current = true
       setSensorLive(true)
     }
 
-    let val = m.invert ? -raw : raw
+    const bRad = (e.beta ?? 0) * DEG
+    const gRad = (e.gamma ?? 0) * DEG
+
+    // ── 傾斜角の算出 ──
+    // beta は端末長軸まわりの回転角そのもので、端末をひねって当てても値が
+    // 変わらない（ロール不変）ため、そのまま使ってよい。
+    //
+    // 一方 gamma は仕様上 ±90° に制限されており、それを超えると折り返す。
+    //   真のロール 120° → gamma は -60° を返す（180° の誤差）
+    // 肩関節外転（正常180°）や股関節外転など短軸まわりの計測が
+    // 90° を境に減り始めるのはこれが原因。
+    // 端末座標系での重力（＝「上」）ベクトルを復元して atan2 で求め直すと
+    // ±180° まで連続な真の回転角が得られる。
+    const gx = -Math.cos(bRad) * Math.sin(gRad)
+    const gz = Math.cos(bRad) * Math.cos(gRad)
+
+    const incl =
+      m.axis === 'beta'
+        ? (e.beta ?? 0)
+        : Math.atan2(-gx, gz) / DEG
+
+    let val = m.invert ? -incl : incl
+
+    if (measuringRef.current) {
+      setDiag({
+        beta: Math.round((e.beta ?? 0) * 10) / 10,
+        gamma: Math.round((e.gamma ?? 0) * 10) / 10,
+        incl: Math.round(incl * 10) / 10,
+        zero: Math.round(zeroRef.current * 10) / 10,
+      })
+    }
+
+    // ±180°の折り返しを連続値に展開してからフィルタに通す。
+    // 折り返しをそのまま平滑化すると中間の無意味な値を掃引してしまう。
+    const prevRaw = rawBufferRef.current[rawBufferRef.current.length - 1]
+    if (prevRaw !== undefined) {
+      while (val - prevRaw > 180) val -= 360
+      while (val - prevRaw < -180) val += 360
+    }
 
     // 外れ値除去: 前の値から急激に変わった値を除外する。
     // ただし連続で棄却が続く場合は実際の素早い動きとみなして追従を再開する
@@ -572,13 +640,29 @@ export default function Goniometer() {
       rawBufferRef.current.shift()
     }
 
-    // EMA（指数移動平均）で平滑化
+    // 適応EMA: 変化量に応じて追従の速さを変える。
+    // 静止時は強く平滑化して 0.1° 単位の安定を出し、
+    // 動かしている間は素早く追従して読み取り遅れによる誤差を避ける。
     const bufferAvg = rawBufferRef.current.reduce((a, b) => a + b, 0) / rawBufferRef.current.length
     if (hasEmaRef.current) {
-      emaRef.current = emaRef.current * (1 - EMA_ALPHA) + bufferAvg * EMA_ALPHA
+      const gap = bufferAvg - emaRef.current
+      const alpha = Math.min(EMA_ALPHA_MAX, EMA_ALPHA_MIN + Math.abs(gap) * EMA_SPEED_GAIN)
+      emaRef.current += gap * alpha
     } else {
       emaRef.current = bufferAvg
       hasEmaRef.current = true
+    }
+
+    // 静止判定: 値が落ち着いた時点を示し、動作中の値をそのまま読むのを防ぐ
+    stableWindowRef.current.push(emaRef.current)
+    if (stableWindowRef.current.length > STABLE_WINDOW) stableWindowRef.current.shift()
+    if (stableWindowRef.current.length === STABLE_WINDOW) {
+      const w = stableWindowRef.current
+      const isStable = Math.max(...w) - Math.min(...w) <= STABLE_RANGE
+      if (isStable !== stableRef.current) {
+        stableRef.current = isStable
+        setStable(isStable)
+      }
     }
 
     // ゼロセットの精密化: 押した瞬間の値を暫定基準にしてあるので、
@@ -681,6 +765,9 @@ export default function Goniometer() {
     rejectCountRef.current = 0
     emaRef.current = 0
     hasEmaRef.current = false
+    stableWindowRef.current = []
+    stableRef.current = false
+    setStable(false)
     zeroRef.current = 0
     zeroPendingRef.current = false
     zeroSamplesRef.current = []
@@ -1379,11 +1466,43 @@ export default function Goniometer() {
           </p>
         )}
 
+        {/* 静止インジケータ: 値が落ち着いてから読む／保存するための目印 */}
+        {measuring && sensorLive && (
+          <div className="flex items-center justify-center mb-3">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${
+              stable
+                ? 'bg-teal-50 border-teal-200 text-teal-700'
+                : 'bg-slate-50 border-slate-200 text-slate-500'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${stable ? 'bg-teal-500' : 'bg-slate-400 animate-pulse'}`} />
+              {stable ? t.stableReady : t.stableMoving}
+            </span>
+          </div>
+        )}
+
         {/* 操作指示 */}
-        {measuring && (
-          <p className="text-center text-xs text-slate-500 mb-3 animate-pulse">
+        {measuring && !stable && (
+          <p className="text-center text-xs text-slate-500 mb-3">
             {t.tiltInstruction}
           </p>
+        )}
+
+        {/* センサー診断: 実測との乖離を切り分けるための生値表示 */}
+        {measuring && (
+          <div className="mb-3 text-center">
+            <button
+              onClick={() => setShowDiag(!showDiag)}
+              className="text-[10px] text-slate-400 underline hover:text-slate-600"
+            >
+              {showDiag ? t.diagHide : t.diagShow}
+            </button>
+            {showDiag && diag && (
+              <p className="mt-1 text-[10px] text-slate-400 font-mono leading-relaxed">
+                β {diag.beta}° / γ {diag.gamma}° → {t.diagIncl} {diag.incl}°
+                {zeroSet && ` / ${t.diagZero} ${diag.zero}°`}
+              </p>
+            )}
+          </div>
         )}
 
         {/* ゼロセット（開始肢位を0°基準にするアタッチメント機能） */}
@@ -1431,6 +1550,9 @@ export default function Goniometer() {
                 rejectCountRef.current = 0
                 emaRef.current = 0
                 hasEmaRef.current = false
+                stableWindowRef.current = []
+                stableRef.current = false
+                setStable(false)
                 setSensorTimeout(false)
                 setMeasuring(true)
               }}
