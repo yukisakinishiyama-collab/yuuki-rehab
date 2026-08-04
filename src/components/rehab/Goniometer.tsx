@@ -63,6 +63,8 @@ interface Measurement {
   angle: number
   date: string   // ISO string
   note: string
+  /** 開始肢位を0°にセットして計測したか（未記録の旧データは undefined） */
+  zeroed?: boolean
 }
 
 // ─── 関節・動作データ ─────────────────────────────────────────
@@ -229,6 +231,15 @@ const T = {
     excellent: '正常範囲内',
     limited: '可動域制限あり',
     severely: '高度制限',
+    lockOn: 'ロック中（表示値を固定）',
+    lockOff: 'アンロック（追従中）',
+    lockRelease: '解除',
+    lockApply: '固定',
+    gaugeIdeal: '0°（理想）',
+    gaugeTolerance: '許容',
+    gaugeRestricted: '制限大',
+    extensionHint: 'この項目は 0° が理想です。数値が大きいほど伸展制限（屈曲拘縮）が強いことを示します',
+    diffMethodMismatch: '前回と計測方式（絶対角／開始肢位0°基準）が異なるため、差分は表示していません',
     sensorNoData: 'センサーの値を受信できていません。スマートフォン（iPhone/Android）で開いているか、モーションセンサーの許可を確認してください。パソコンでは角度は 0° のまま動きません。',
     iosDenied: 'モーションセンサーへのアクセスが許可されませんでした。iPhone の「設定 → Safari → モーションと画面の向きのアクセス」をオンにしてから、ページを再読み込みしてください。',
     zeroBtn: '開始肢位を0°にセット',
@@ -253,6 +264,14 @@ const T = {
     batchSaveAll: 'まとめて保存',
     batchNoteHolder: '共通メモ（任意）例: 術後4週評価',
     batchSavedCount: (n: number) => `${n}件を保存しました`,
+    batchToReview: '確認へ',
+    batchSelectAll: '全項目',
+    batchClearAll: '選択解除',
+    batchNoneSelected: '計測する項目を1つ以上選んでください',
+    batchSelectedCount: (n: number) => `${n}項目を選択中`,
+    batchPresetHint: 'よく使う部位から選べます',
+    batchMeasuredCount: (done: number, total: number) => `${done}/${total} 項目を計測済み`,
+    batchNoResult: '計測済みの項目がありません',
   },
   en: {
     title: 'Goniometer',
@@ -279,6 +298,15 @@ const T = {
     excellent: 'Within normal range',
     limited: 'Limited ROM',
     severely: 'Severely limited',
+    lockOn: 'Locked (reading held)',
+    lockOff: 'Unlocked (live)',
+    lockRelease: 'Unlock',
+    lockApply: 'Hold',
+    gaugeIdeal: '0° (ideal)',
+    gaugeTolerance: 'tolerance',
+    gaugeRestricted: 'restricted',
+    extensionHint: 'For this motion 0° is ideal. A larger value means a greater extension lag (flexion contracture).',
+    diffMethodMismatch: 'The previous record used a different method (absolute vs. zeroed), so no difference is shown.',
     sensorNoData: 'No sensor data received. Open this page on a phone and allow motion access. On a desktop the angle stays at 0°.',
     iosDenied: 'Motion access was not granted. Enable Settings → Safari → Motion & Orientation Access on your iPhone, then reload the page.',
     zeroBtn: 'Set start position to 0°',
@@ -303,6 +331,14 @@ const T = {
     batchSaveAll: 'Save all',
     batchNoteHolder: 'Shared note (optional)',
     batchSavedCount: (n: number) => `Saved ${n} records`,
+    batchToReview: 'Review',
+    batchSelectAll: 'All',
+    batchClearAll: 'Clear',
+    batchNoneSelected: 'Select at least one motion',
+    batchSelectedCount: (n: number) => `${n} selected`,
+    batchPresetHint: 'Pick a region to preselect',
+    batchMeasuredCount: (done: number, total: number) => `${done}/${total} measured`,
+    batchNoResult: 'No measurements recorded',
   },
 }
 
@@ -334,6 +370,37 @@ function AngleGauge({
   normal: number
   min: number
 }) {
+  // 伸展系（正常値0以下）は「0°が理想、大きいほど制限が強い」という逆向きの尺度。
+  // 屈曲系と同じ式だと normal=0 で分母が1に丸められ、5°以上が常に満タン＋teal になる。
+  if (normal <= 0) {
+    const tolerance = Math.abs(min) || 10       // 例: 膝伸展 min:-10 → 10°まで許容
+    const scale = tolerance * 3                 // ゲージ全体の幅
+    const a = Math.abs(angle)
+    const pct = Math.min(a / scale, 1)
+    const color = a <= tolerance / 2 ? '#0d9488' : a <= tolerance * 1.5 ? '#f59e0b' : '#ef4444'
+
+    return (
+      <div className="relative w-full h-3 bg-slate-200 rounded-full overflow-visible mt-1">
+        {/* 正常上限マーカー */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal-500 z-10"
+          style={{ left: `${(tolerance / 2 / scale) * 100}%` }}
+          title="normal limit"
+        />
+        {/* 許容上限マーカー */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 bg-amber-400 z-10"
+          style={{ left: `${(tolerance * 1.5 / scale) * 100}%` }}
+          title="tolerance"
+        />
+        <div
+          className="h-full rounded-full transition-all duration-100"
+          style={{ width: `${pct * 100}%`, backgroundColor: color }}
+        />
+      </div>
+    )
+  }
+
   const pct = Math.min(Math.abs(angle) / Math.max(normal, 1), 1.3)
   const normalPct = 1
   const minPct = min / Math.max(normal, 1)
@@ -416,11 +483,24 @@ export default function Goniometer() {
   // まとめて計測: 複数項目を連続で計測し、最後に一括保存
   const [batchMode, setBatchMode] = useState(false)
   const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([])
-  const [batchResults, setBatchResults] = useState<Record<string, number>>({})
+  // 角度だけでなく計測方式（ゼロセット基準か絶対角か）も持つ。
+  // 方式が混ざったまま記録すると、経過比較で方式差が「改善／悪化」に見えてしまう。
+  const [batchResults, setBatchResults] = useState<Record<string, { angle: number; zeroed: boolean }>>({})
   const [batchIdx, setBatchIdx] = useState(0)
   const [batchCommonNote, setBatchCommonNote] = useState('')
-  // 計測ロック: 計測中の誤操作防止
+  // 項目選択 → 連続計測 → 確認・保存 の3段階
+  const [batchStage, setBatchStage] = useState<'select' | 'measure' | 'review'>('select')
+  // 計測ロック: 計測中の誤操作防止＋表示値の固定
   const [locked, setLocked] = useState(false)
+  const lockedRef = useRef(false)
+
+  // ロックはイベントハンドラ内で ref も同期的に書く。
+  // useEffect 同期だと、切り替えた直後の1フレームが素通りしてしまう。
+  function toggleLock() {
+    const next = !locked
+    lockedRef.current = next
+    setLocked(next)
+  }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -519,6 +599,10 @@ export default function Goniometer() {
 
     if (!measuringRef.current) return
 
+    // 計測ロック中は表示値を固定する。
+    // これが無いと、ロックしたまま端末を患部から外した瞬間の値が保存されてしまう。
+    if (lockedRef.current) return
+
     // 基準値からの相対角度。-180〜180 に正規化してから絶対値を取る
     // （90°を超えた領域で数値が減少する現象を防ぐ）
     let delta = emaRef.current - zeroRef.current
@@ -604,47 +688,113 @@ export default function Goniometer() {
     setSensorTimeout(false)
     setAngle(0)
     setMeasuring(false)
+    lockedRef.current = false
+    setLocked(false)
   }
 
-  // ─ まとめて計測: 開始 ─
-  function startBatchMeasure(selectedIds: string[]) {
-    setBatchSelectedIds(selectedIds)
+  // ─ まとめて計測: 項目選択を開く ─
+  function openBatchSelect() {
+    setBatchMode(true)
+    setBatchStage('select')
+    setBatchSelectedIds([])
     setBatchResults({})
     setBatchIdx(0)
+    setBatchCommonNote('')
+  }
+
+  // ─ まとめて計測: 選択中の項目を1つトグル ─
+  function toggleBatchJoint(id: string) {
+    setBatchSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  // ─ まとめて計測: 連続計測を開始 ─
+  function startBatchMeasure(selectedIds: string[]) {
+    if (selectedIds.length === 0) return
+    // JOINTS の並び順に揃えると、部位ごとに肢位を変える回数が最小になる
+    const ordered = JOINTS.filter(j => selectedIds.includes(j.id)).map(j => j.id)
+    setBatchSelectedIds(ordered)
+    setBatchResults({})
+    setBatchIdx(0)
+    setBatchStage('measure')
     setBatchMode(true)
-    if (selectedIds.length > 0) {
-      selectJoint(selectedIds[0])
-      setMeasuring(true)
+    selectJoint(ordered[0])
+    setMeasuring(true)
+  }
+
+  // ─ まとめて計測: 中止 ─
+  function cancelBatch() {
+    setBatchMode(false)
+    setBatchStage('select')
+    setBatchSelectedIds([])
+    setBatchResults({})
+    setBatchIdx(0)
+    setBatchCommonNote('')
+    handleReset()
+  }
+
+  // ─ ROM記録の memo 文言 ─
+  // 絶対角とゼロセット相対角は同じ関節でも十数度ずれる。方式を残さないと
+  // 方式を変えただけの差が「改善／悪化」として経過記録に残ってしまう。
+  function buildRomMemo(userNote: string, zeroed: boolean) {
+    const method = zeroed ? '関節角度計で計測（開始肢位0°基準）' : '関節角度計で計測（絶対角）'
+    return userNote ? `${userNote}（${method}）` : method
+  }
+
+  // ─ まとめて計測: 指定インデックスへ進む ─
+  // setBatchIdx は必ず呼ぶ。最終項目の次（nextIdx === length）は確認画面になる。
+  // ここを条件分岐の内側に置くと確認画面に到達できず、計測結果が全て失われる。
+  function advanceBatch(nextIdx: number) {
+    setBatchIdx(nextIdx)
+    handleReset()
+    if (nextIdx < batchSelectedIds.length) {
+      setBatchStage('measure')
+      selectJoint(batchSelectedIds[nextIdx])
+      setTimeout(() => setMeasuring(true), 100)
+    } else {
+      setBatchStage('review')
     }
   }
 
-  // ─ まとめて計測: 次の項目へ ─
+  // ─ まとめて計測: この値で確定して次へ ─
   function nextBatchItem() {
     if (batchIdx >= batchSelectedIds.length) return
     setBatchResults(prev => ({
       ...prev,
-      [batchSelectedIds[batchIdx]]: angle
+      [batchSelectedIds[batchIdx]]: { angle, zeroed: zeroSet }
     }))
-    const nextIdx = batchIdx + 1
-    if (nextIdx < batchSelectedIds.length) {
-      setBatchIdx(nextIdx)
-      selectJoint(batchSelectedIds[nextIdx])
-      handleReset()
-      setTimeout(() => setMeasuring(true), 100)
-    }
+    advanceBatch(batchIdx + 1)
+  }
+
+  // ─ まとめて計測: 記録せずに次へ ─
+  function skipBatchItem() {
+    if (batchIdx >= batchSelectedIds.length) return
+    advanceBatch(batchIdx + 1)
+  }
+
+  // ─ まとめて計測: 確認画面から特定項目を測り直す ─
+  function redoBatchItem(idx: number) {
+    setBatchResults(prev => {
+      const next = { ...prev }
+      delete next[batchSelectedIds[idx]]
+      return next
+    })
+    advanceBatch(idx)
   }
 
   // ─ まとめて計測: 保存（全項目） ─
   function saveBatchResults() {
     if (!linkedPatientId) {
-      setBatchMode(false)
-      setBatchSelectedIds([])
+      cancelBatch()
       return
     }
     const now = new Date()
     batchSelectedIds.forEach(motionId => {
       const motion = JOINTS.find(j => j.id === motionId)
-      if (motion && batchResults[motionId]) {
+      const result = batchResults[motionId]
+      // 0° は正当な計測値（膝伸展・肘伸展の正常所見）なので falsy 判定で弾かない
+      if (motion && result != null) {
         saveROMRecord({
           id: nanoid(),
           patientId: linkedPatientId,
@@ -653,7 +803,7 @@ export default function Goniometer() {
           joint: motion.joint_ja,
           movement: motion.motion_ja,
           side,
-          activeRom: batchResults[motionId],
+          activeRom: result.angle,
           passiveRom: null,
           normalValue: motion.rom.normal,
           unit: 'deg',
@@ -661,7 +811,7 @@ export default function Goniometer() {
           painLocation: '',
           endFeel: '',
           limitationFactor: '',
-          memo: batchCommonNote ? `${batchCommonNote}（関節角度計で計測）` : '関節角度計で計測',
+          memo: buildRomMemo(batchCommonNote, result.zeroed),
           createdAt: now.toISOString(),
         })
       }
@@ -669,6 +819,7 @@ export default function Goniometer() {
     setReflectedFlash(true)
     setTimeout(() => setReflectedFlash(false), 2500)
     setBatchMode(false)
+    setBatchStage('select')
     setBatchSelectedIds([])
     setBatchResults({})
     setBatchIdx(0)
@@ -678,11 +829,12 @@ export default function Goniometer() {
   // ─ 保存 ─
   function handleSave() {
     const m: Measurement = {
-      id: Date.now().toString(),
+      id: nanoid(),
       motionId: motion.id,
       angle,
       date: new Date().toISOString(),
       note,
+      zeroed: zeroSet,
     }
     const updated = [m, ...measurements]
     setMeasurements(updated)
@@ -707,7 +859,7 @@ export default function Goniometer() {
         painLocation: '',
         endFeel: '',
         limitationFactor: '',
-        memo: note ? `${note}（関節角度計で計測）` : '関節角度計で計測',
+        memo: buildRomMemo(note, zeroSet),
         createdAt: now.toISOString(),
       })
       setReflectedFlash(true)
@@ -718,6 +870,10 @@ export default function Goniometer() {
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 1800)
     setMeasuring(false)
+    // 基準を持ち越すと、次の計測が「見えない古い基準」で始まる
+    clearZero()
+    lockedRef.current = false
+    setLocked(false)
   }
 
   // ─ 共有 ─
@@ -752,16 +908,33 @@ export default function Goniometer() {
 
   // ─ 前回値 ─
   const prevMeasurement = measurements.find((m) => m.motionId === motion.id)
-  const diff =
-    prevMeasurement !== undefined ? angle - prevMeasurement.angle : null
+  // 絶対角とゼロセット相対角は別物なので、方式が一致するときだけ差分を出す。
+  // (旧データは zeroed 未記録 = undefined。絶対角として扱う)
+  const prevSameMethod =
+    prevMeasurement !== undefined && (prevMeasurement.zeroed ?? false) === zeroSet
+  const diff = prevSameMethod ? angle - prevMeasurement!.angle : null
+  const diffMethodMismatch = prevMeasurement !== undefined && !prevSameMethod
 
   // ─ 評価 ─
-  const evaluation =
-    angle >= motion.rom.normal * 0.9
+  // 伸展系（正常値が0以下）は「0°が理想で、大きいほど伸展制限が強い」という
+  // 逆向きの尺度。屈曲系と同じ式（angle >= normal * 0.9）だと閾値が0になり
+  // 何度出ていても『正常範囲内』になってしまうため、別扱いにする。
+  const isExtensionType = motion.rom.normal <= 0
+  const extLimitTolerance = Math.abs(motion.rom.min)   // 例: 膝伸展 min:-10 → 10°まで許容
+  const evaluation = isExtensionType
+    ? angle <= extLimitTolerance / 2
+      ? { label: t.excellent, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' }
+      : angle <= extLimitTolerance * 1.5
+      ? { label: t.limited, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' }
+      : { label: t.severely, color: 'text-red-600', bg: 'bg-red-50 border-red-200' }
+    : angle >= motion.rom.normal * 0.9
       ? { label: t.excellent, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' }
       : angle >= motion.rom.min
       ? { label: t.limited, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' }
       : { label: t.severely, color: 'text-red-600', bg: 'bg-red-50 border-red-200' }
+
+  // 伸展系は数値が小さいほど良いので、改善の向きが屈曲系と逆になる
+  const diffImproved = diff !== null && (isExtensionType ? diff < 0 : diff > 0)
 
   // ─ 関節グループ ─
   const jointGroups = JOINTS.reduce<Record<string, JointMotion[]>>((acc, j) => {
@@ -878,61 +1051,183 @@ export default function Goniometer() {
         </div>
       </div>
 
-      {/* まとめて計測モード: 複数項目の連続計測と一括保存 */}
-      {!batchMode && !measuring ? (
+      {/* まとめて計測モード: 項目選択 → 連続計測 → 確認・一括保存 */}
+      {!batchMode && !measuring && (
         <button
-          onClick={() => startBatchMeasure(JOINTS.map(j => j.id))}
+          onClick={openBatchSelect}
           disabled={!linkedPatientId}
           className="w-full mb-4 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-sm shadow-md active:scale-95 transition-transform disabled:opacity-40 disabled:from-slate-300 disabled:to-slate-300"
         >
           <ListChecks className="w-4 h-4" />
           {t.batchBtn}
         </button>
-      ) : batchMode && (
+      )}
+
+      {batchMode && (
         <div className="mb-4 bg-white rounded-2xl shadow-sm border-2 border-indigo-200 p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h3 className="font-bold text-sm text-indigo-900">
-              {lang === 'ja' ? '計測中' : 'Measuring'}: {batchIdx + 1}/{batchSelectedIds.length}
+              {batchStage === 'select'
+                ? t.batchSelectTitle
+                : batchStage === 'review'
+                ? t.batchReviewTitle
+                : `${lang === 'ja' ? '計測中' : 'Measuring'}: ${batchIdx + 1}/${batchSelectedIds.length}`}
             </h3>
             <button
-              onClick={() => {
-                setBatchMode(false)
-                setBatchSelectedIds([])
-                setBatchResults({})
-                setBatchIdx(0)
-                handleReset()
-              }}
+              onClick={cancelBatch}
               className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
             >
               {t.batchCancel}
             </button>
           </div>
-          {batchIdx < batchSelectedIds.length && (
-            <p className="text-xs text-slate-500 mb-3">
-              {lang === 'ja' ? `${batchIdx + 1}番目: ` : `${batchIdx + 1}/${batchSelectedIds.length}: `}
-              {JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.joint_ja}
-              {' '}
-              {JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.motion_ja}
-            </p>
-          )}
-          <div className="flex gap-2">
-            {batchIdx < batchSelectedIds.length && measuring && (
+
+          {/* ── 項目選択 ── */}
+          {batchStage === 'select' && (
+            <>
+              <p className="text-[11px] text-slate-500 mb-2">{t.batchPresetHint}</p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {Object.entries(jointGroups).map(([groupName, items]) => (
+                  <button
+                    key={groupName}
+                    onClick={() => setBatchSelectedIds(items.map(j => j.id))}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-semibold hover:bg-indigo-100 transition-colors"
+                  >
+                    {groupName}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setBatchSelectedIds(JOINTS.map(j => j.id))}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
+                >
+                  {t.batchSelectAll}
+                </button>
+                <button
+                  onClick={() => setBatchSelectedIds([])}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
+                >
+                  {t.batchClearAll}
+                </button>
+              </div>
+
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 mb-3">
+                {Object.entries(jointGroups).map(([groupName, items]) => (
+                  <div key={groupName}>
+                    <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50">
+                      {groupName}
+                    </div>
+                    {items.map(j => {
+                      const checked = batchSelectedIds.includes(j.id)
+                      return (
+                        <button
+                          key={j.id}
+                          onClick={() => toggleBatchJoint(j.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                            checked ? 'bg-indigo-50 text-indigo-800 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
+                            checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'
+                          }`}>
+                            {checked && <Check className="w-3 h-3 text-white" />}
+                          </span>
+                          {lang === 'ja' ? j.motion_ja : j.motion_en}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-slate-500 mb-2">
+                {batchSelectedIds.length === 0
+                  ? t.batchNoneSelected
+                  : t.batchSelectedCount(batchSelectedIds.length)}
+              </p>
               <button
-                onClick={nextBatchItem}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform"
+                onClick={() => startBatchMeasure(batchSelectedIds)}
+                disabled={batchSelectedIds.length === 0}
+                className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100"
               >
-                {batchIdx + 1 === batchSelectedIds.length ? t.batchSaveAll : t.batchConfirm}
+                {t.batchStart}
               </button>
-            )}
-            {batchIdx === batchSelectedIds.length && (
+            </>
+          )}
+
+          {/* ── 連続計測 ── */}
+          {batchStage === 'measure' && batchIdx < batchSelectedIds.length && (
+            <>
+              <p className="text-xs text-slate-500 mb-3">
+                {lang === 'ja' ? `${batchIdx + 1}番目: ` : `${batchIdx + 1}/${batchSelectedIds.length}: `}
+                {lang === 'ja'
+                  ? `${JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.joint_ja} ${JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.motion_ja}`
+                  : `${JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.joint_en} ${JOINTS.find(j => j.id === batchSelectedIds[batchIdx])?.motion_en}`}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={skipBatchItem}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-semibold text-sm active:scale-95 transition-transform"
+                >
+                  {t.batchSkip}
+                </button>
+                <button
+                  onClick={nextBatchItem}
+                  disabled={!measuring}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-40"
+                >
+                  {batchIdx + 1 === batchSelectedIds.length ? t.batchToReview : t.batchConfirm}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── 確認・一括保存 ── */}
+          {batchStage === 'review' && (
+            <>
+              <p className="text-[11px] text-slate-500 mb-2">
+                {t.batchMeasuredCount(Object.keys(batchResults).length, batchSelectedIds.length)}
+              </p>
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 mb-3">
+                {batchSelectedIds.map((id, idx) => {
+                  const j = JOINTS.find(x => x.id === id)
+                  const r = batchResults[id]
+                  return (
+                    <div key={id} className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-700 truncate">
+                          {lang === 'ja' ? `${j?.joint_ja} ${j?.motion_ja}` : `${j?.joint_en} ${j?.motion_en}`}
+                        </p>
+                        <p className={`text-sm font-bold ${r != null ? 'text-teal-600' : 'text-slate-300'}`}>
+                          {r != null ? `${r.angle}°${r.zeroed ? ' (0°基準)' : ''}` : t.batchUnmeasured}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => redoBatchItem(idx)}
+                        className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
+                      >
+                        {r != null ? t.batchRedo : t.batchMeasureOne}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              <input
+                value={batchCommonNote}
+                onChange={(e) => setBatchCommonNote(e.target.value)}
+                placeholder={t.batchNoteHolder}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-slate-200 mb-2
+                  focus:outline-none focus:ring-2 focus:ring-teal-400"
+              />
               <button
                 onClick={saveBatchResults}
-                className="flex-1 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-sm active:scale-95 transition-transform"
+                disabled={Object.keys(batchResults).length === 0}
+                className="w-full py-2.5 rounded-xl bg-teal-600 text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100"
               >
-                {t.batchSaveAll} ({Object.keys(batchResults).length})
+                {Object.keys(batchResults).length === 0
+                  ? t.batchNoResult
+                  : `${t.batchSaveAll}（${Object.keys(batchResults).length}）`}
               </button>
-            )}
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -990,21 +1285,21 @@ export default function Goniometer() {
             <div className="flex items-center gap-2">
               {locked ? (
                 <><Lock className="w-4 h-4 text-red-600" />
-                <span className="text-xs font-bold text-red-700">ロック中（計測保護）</span></>
+                <span className="text-xs font-bold text-red-700">{t.lockOn}</span></>
               ) : (
                 <><LockOpen className="w-4 h-4 text-amber-600" />
-                <span className="text-xs font-bold text-amber-700">アンロック（編集可）</span></>
+                <span className="text-xs font-bold text-amber-700">{t.lockOff}</span></>
               )}
             </div>
             <button
-              onClick={() => setLocked(!locked)}
+              onClick={toggleLock}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 locked
                   ? 'bg-red-600 text-white hover:bg-red-700'
                   : 'bg-amber-500 text-white hover:bg-amber-600'
               }`}
             >
-              {locked ? <><Lock className="w-3.5 h-3.5" />解除</> : <><LockOpen className="w-3.5 h-3.5" />保護</>}
+              {locked ? <><Lock className="w-3.5 h-3.5" />{t.lockRelease}</> : <><LockOpen className="w-3.5 h-3.5" />{t.lockApply}</>}
             </button>
           </div>
         )}
@@ -1022,8 +1317,8 @@ export default function Goniometer() {
           </div>
           <p className="text-xs text-slate-400 mt-1">{t.current}</p>
 
-          {/* 評価バッジ */}
-          {measuring && angle > 0 && (
+          {/* 評価バッジ（伸展系は 0° が最良なので angle > 0 を条件にしない） */}
+          {measuring && sensorLive && (
             <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold border ${evaluation.bg} ${evaluation.color}`}>
               {evaluation.label}
             </span>
@@ -1036,34 +1331,52 @@ export default function Goniometer() {
           normal={motion.rom.normal}
           min={motion.rom.min}
         />
-        <div className="flex justify-between text-[10px] text-slate-400 mt-1 mb-4">
-          <span>0°</span>
-          <span className="text-amber-500">min {motion.rom.min}°</span>
-          <span className="text-teal-500">norm {motion.rom.normal}°</span>
-        </div>
+        {isExtensionType ? (
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1 mb-4">
+            <span className="text-teal-500">{t.gaugeIdeal}</span>
+            <span className="text-amber-500">{t.gaugeTolerance} {extLimitTolerance}°</span>
+            <span className="text-red-400">{t.gaugeRestricted}</span>
+          </div>
+        ) : (
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1 mb-4">
+            <span>0°</span>
+            <span className="text-amber-500">min {motion.rom.min}°</span>
+            <span className="text-teal-500">norm {motion.rom.normal}°</span>
+          </div>
+        )}
 
-        {/* 前回差分 */}
+        {/* 伸展系は数値の意味が屈曲系と逆なので明示する */}
+        {isExtensionType && measuring && (
+          <p className="text-center text-[10px] text-slate-500 -mt-2 mb-3 leading-relaxed">
+            {t.extensionHint}
+          </p>
+        )}
+
+        {/* 前回差分（伸展系は数値が減るほど改善なので向きを反転する） */}
         {diff !== null && measuring && (
           <div className="flex items-center justify-center gap-1.5 mb-4 text-sm font-semibold">
-            {diff > 0 ? (
-              <TrendingUp className="w-4 h-4 text-teal-500" />
-            ) : diff < 0 ? (
-              <TrendingDown className="w-4 h-4 text-red-500" />
-            ) : (
+            {diff === 0 ? (
               <Minus className="w-4 h-4 text-slate-400" />
+            ) : diffImproved ? (
+              <TrendingUp className="w-4 h-4 text-teal-500" />
+            ) : (
+              <TrendingDown className="w-4 h-4 text-red-500" />
             )}
             <span
               className={
-                diff > 0
-                  ? 'text-teal-600'
-                  : diff < 0
-                  ? 'text-red-600'
-                  : 'text-slate-500'
+                diff === 0 ? 'text-slate-500' : diffImproved ? 'text-teal-600' : 'text-red-600'
               }
             >
-              {t.prevDiff}: {diff > 0 ? '+' : ''}{diff}°
+              {t.prevDiff}: {diff > 0 ? '+' : ''}{Math.round(diff * 10) / 10}°
             </span>
           </div>
+        )}
+
+        {/* 計測方式が前回と異なる場合は差分を出さず、理由を示す */}
+        {diffMethodMismatch && measuring && (
+          <p className="text-center text-[11px] text-slate-400 mb-4 leading-relaxed">
+            {t.diffMethodMismatch}
+          </p>
         )}
 
         {/* 操作指示 */}
