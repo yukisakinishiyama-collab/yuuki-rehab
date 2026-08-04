@@ -230,7 +230,7 @@ const T = {
     limited: '可動域制限あり',
     severely: '高度制限',
     zeroBtn: '開始肢位を0°にセット',
-    zeroHint: 'スマホを開始肢位（測り始めの位置）に当てて押すと、その位置が0°になります',
+    zeroHint: 'スマホを開始肢位（測り始めの位置）に当てて押すと、その瞬間の位置が0°になります。押した後そのまま静止していると基準値の精度が上がります',
     zeroActive: '開始肢位を0°として計測中',
     zeroClear: '解除',
     linkTitle: '患者カルテに反映',
@@ -278,7 +278,7 @@ const T = {
     limited: 'Limited ROM',
     severely: 'Severely limited',
     zeroBtn: 'Set start position to 0°',
-    zeroHint: 'Hold the phone at the starting position and tap to zero the scale',
+    zeroHint: 'Hold the phone at the starting position and tap to zero the scale. Keep it still afterwards to refine the baseline',
     zeroActive: 'Measuring relative to zeroed start position',
     zeroClear: 'Clear',
     linkTitle: 'Link to patient chart',
@@ -420,77 +420,111 @@ export default function Goniometer() {
 
   // 高精度フィルタリング: EMA（指数移動平均）+ 外れ値除去
   const emaRef = useRef(0)
+  const hasEmaRef = useRef(false)   // EMA 初期化済みか（実測0°を未初期化と誤判定しないため）
   const EMA_ALPHA = 0.15  // 新値のウェイト（低いほど平滑、高いほど反応的）
   const OUTLIER_THRESHOLD = 8  // 前の値から8度以上の変化は外れ値と判定
+  const OUTLIER_MAX_REJECT = 3  // 連続棄却の上限（速い動きで値が固まるのを防ぐ）
   const RAW_BUFFER_SIZE = 5  // 外れ値除去用の小バッファ
   const rawBufferRef = useRef<number[]>([])
+  const rejectCountRef = useRef(0)
 
   // ゼロセット（開始肢位を0°とする基準値）
   const [zeroSet, setZeroSet] = useState(false)
   const zeroRef = useRef(0)
-  const zeroReadyRef = useRef(false)
-  const zeroCountRef = useRef(0)  // ゼロセット時の安定フレームカウント
+  const zeroPendingRef = useRef(false)      // 基準値の精密化サンプルを収集中か
+  const zeroSamplesRef = useRef<number[]>([])
+  const ZERO_SAMPLES = 12        // 約0.4秒ぶんのサンプルで基準を精密化
+  const ZERO_STABLE_RANGE = 2.5  // サンプルの振れ幅がこの範囲なら「静止」と判定
 
   const motion = JOINTS.find((j) => j.id === selectedId)!
 
+  // センサーハンドラから参照する可変値は ref に写す。
+  // useCallback の依存配列に入れ忘れると値が更新されず（stale closure）、
+  // ゼロセットが効かなくなるため、依存を持たない形に統一する。
+  const measuringRef = useRef(measuring)
+  const motionRef = useRef(motion)
+  useEffect(() => { measuringRef.current = measuring }, [measuring])
+  useEffect(() => { motionRef.current = motion }, [motion])
+
   // ─ センサーイベント（高精度計測） ─
-  const handleOrientation = useCallback(
-    (e: DeviceOrientationEvent) => {
-      if (!measuring) return
-      const raw = motion.axis === 'beta' ? (e.beta ?? 0) : (e.gamma ?? 0)
-      let val = motion.invert ? -raw : raw
+  const handleOrientation = useCallback((e: DeviceOrientationEvent) => {
+    const m = motionRef.current
+    const raw = m.axis === 'beta' ? (e.beta ?? 0) : (e.gamma ?? 0)
+    let val = m.invert ? -raw : raw
 
-      // 外れ値除去: 前の値から急激に変わった値を除外
-      if (rawBufferRef.current.length > 0) {
-        const lastVal = rawBufferRef.current[rawBufferRef.current.length - 1]
-        if (Math.abs(val - lastVal) > OUTLIER_THRESHOLD) {
-          val = lastVal  // 外れ値と判定して前の値を使用
-        }
+    // 外れ値除去: 前の値から急激に変わった値を除外する。
+    // ただし連続で棄却が続く場合は実際の素早い動きとみなして追従を再開する
+    // （無条件に棄却すると速く動かした瞬間に値が固まったままになる）。
+    if (rawBufferRef.current.length > 0) {
+      const lastVal = rawBufferRef.current[rawBufferRef.current.length - 1]
+      if (
+        Math.abs(val - lastVal) > OUTLIER_THRESHOLD &&
+        rejectCountRef.current < OUTLIER_MAX_REJECT
+      ) {
+        rejectCountRef.current++
+        val = lastVal
+      } else {
+        rejectCountRef.current = 0
       }
-
-      rawBufferRef.current.push(val)
-      if (rawBufferRef.current.length > RAW_BUFFER_SIZE) {
-        rawBufferRef.current.shift()
-      }
-
-      // EMA（指数移動平均）で平滑化
-      const bufferAvg = rawBufferRef.current.reduce((a, b) => a + b, 0) / rawBufferRef.current.length
-      emaRef.current = emaRef.current === 0 ? bufferAvg : emaRef.current * (1 - EMA_ALPHA) + bufferAvg * EMA_ALPHA
-
-      // ゼロセット準備: 1秒安定したら基準値を確定
-      if (zeroSet && !zeroReadyRef.current) {
-        zeroCountRef.current++
-        if (zeroCountRef.current >= 30) {  // 30フレーム（約1秒）で確定
-          zeroRef.current = emaRef.current
-          zeroReadyRef.current = true
-          zeroCountRef.current = 0
-        }
-      }
-
-      // 相対角度を計測（90度超対応）
-      const relativeAngle = Math.abs(emaRef.current - zeroRef.current)
-      const displayAngle = relativeAngle >= 180 ? 360 - relativeAngle : relativeAngle
-
-      // 0.1度単位で表示（精度向上）
-      setAngle(Math.round(displayAngle * 10) / 10)
-    },
-    [measuring, motion]
-  )
-
-  // ─ ゼロセット: 現在の肢位を0°の基準にする（1秒安定後に確定） ─
-  function handleZeroSet() {
-    if (!zeroSet) {
-      setZeroSet(true)
-      zeroReadyRef.current = false
-      zeroCountRef.current = 0
     }
+
+    rawBufferRef.current.push(val)
+    if (rawBufferRef.current.length > RAW_BUFFER_SIZE) {
+      rawBufferRef.current.shift()
+    }
+
+    // EMA（指数移動平均）で平滑化
+    const bufferAvg = rawBufferRef.current.reduce((a, b) => a + b, 0) / rawBufferRef.current.length
+    if (hasEmaRef.current) {
+      emaRef.current = emaRef.current * (1 - EMA_ALPHA) + bufferAvg * EMA_ALPHA
+    } else {
+      emaRef.current = bufferAvg
+      hasEmaRef.current = true
+    }
+
+    // ゼロセットの精密化: 押した瞬間の値を暫定基準にしてあるので、
+    // 続く数フレームが静止していれば、その平均で基準値を置き換える。
+    if (zeroPendingRef.current) {
+      zeroSamplesRef.current.push(emaRef.current)
+      if (zeroSamplesRef.current.length >= ZERO_SAMPLES) {
+        const s = zeroSamplesRef.current
+        const spread = Math.max(...s) - Math.min(...s)
+        // 静止していた場合のみ精密化。動いていたら押下時の暫定基準を維持する
+        if (spread <= ZERO_STABLE_RANGE) {
+          zeroRef.current = s.reduce((a, b) => a + b, 0) / s.length
+        }
+        zeroPendingRef.current = false
+        zeroSamplesRef.current = []
+      }
+    }
+
+    if (!measuringRef.current) return
+
+    // 基準値からの相対角度。-180〜180 に正規化してから絶対値を取る
+    // （90°を超えた領域で数値が減少する現象を防ぐ）
+    let delta = emaRef.current - zeroRef.current
+    while (delta > 180) delta -= 360
+    while (delta < -180) delta += 360
+
+    // 0.1度単位で表示（精度向上）
+    setAngle(Math.round(Math.abs(delta) * 10) / 10)
+  }, [])
+
+  // ─ ゼロセット: 現在の肢位を0°の基準にする ─
+  // 押した瞬間に暫定基準を確定させて即座に0°を表示し、
+  // 続く約0.4秒が静止していればその平均値で基準を精密化する。
+  function handleZeroSet() {
+    zeroRef.current = hasEmaRef.current ? emaRef.current : 0
+    zeroPendingRef.current = true
+    zeroSamplesRef.current = []
+    setZeroSet(true)
     setAngle(0)
   }
 
   function clearZero() {
     zeroRef.current = 0
-    zeroReadyRef.current = false
-    zeroCountRef.current = 0
+    zeroPendingRef.current = false
+    zeroSamplesRef.current = []
     setZeroSet(false)
   }
 
@@ -500,6 +534,13 @@ export default function Goniometer() {
       window.removeEventListener('deviceorientation', handleOrientation, true)
     }
   }, [handleOrientation])
+
+  // 計測軸（beta/gamma）が変わると基準値の意味が失われるため、
+  // 関節・運動方向を切り替えたらゼロセットも解除する
+  function selectJoint(id: string) {
+    setSelectedId(id)
+    clearZero()
+  }
 
   // ─ センサー許可（iOS）─
   async function requestIOS() {
@@ -519,10 +560,12 @@ export default function Goniometer() {
   // ─ リセット ─
   function handleReset() {
     rawBufferRef.current = []
+    rejectCountRef.current = 0
     emaRef.current = 0
+    hasEmaRef.current = false
     zeroRef.current = 0
-    zeroReadyRef.current = false
-    zeroCountRef.current = 0
+    zeroPendingRef.current = false
+    zeroSamplesRef.current = []
     setZeroSet(false)
     setAngle(0)
     setMeasuring(false)
@@ -535,7 +578,7 @@ export default function Goniometer() {
     setBatchIdx(0)
     setBatchMode(true)
     if (selectedIds.length > 0) {
-      setSelectedId(selectedIds[0])
+      selectJoint(selectedIds[0])
       setMeasuring(true)
     }
   }
@@ -550,7 +593,7 @@ export default function Goniometer() {
     const nextIdx = batchIdx + 1
     if (nextIdx < batchSelectedIds.length) {
       setBatchIdx(nextIdx)
-      setSelectedId(batchSelectedIds[nextIdx])
+      selectJoint(batchSelectedIds[nextIdx])
       handleReset()
       setTimeout(() => setMeasuring(true), 100)
     }
@@ -766,7 +809,7 @@ export default function Goniometer() {
                     <button
                       key={j.id}
                       onClick={() => {
-                        setSelectedId(j.id)
+                        selectJoint(j.id)
                         setSelectOpen(false)
                         handleReset()
                       }}
@@ -1021,7 +1064,9 @@ export default function Goniometer() {
             <button
               onClick={() => {
                 rawBufferRef.current = []
+                rejectCountRef.current = 0
                 emaRef.current = 0
+                hasEmaRef.current = false
                 setMeasuring(true)
               }}
               disabled={sensorAvailable === false}
