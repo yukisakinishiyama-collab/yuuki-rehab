@@ -418,48 +418,79 @@ export default function Goniometer() {
     setPatients(getPatients().filter(p => p.status === 'active'))
   }, [])
 
-  // スムージング用バッファ
-  const bufferRef = useRef<number[]>([])
-  const BUFFER_SIZE = 12
-  // ゼロセット（開始肢位を0°とする基準値）: 表示用stateとセンサーコールバック用ref
+  // 高精度フィルタリング: EMA（指数移動平均）+ 外れ値除去
+  const emaRef = useRef(0)
+  const EMA_ALPHA = 0.15  // 新値のウェイト（低いほど平滑、高いほど反応的）
+  const OUTLIER_THRESHOLD = 8  // 前の値から8度以上の変化は外れ値と判定
+  const RAW_BUFFER_SIZE = 5  // 外れ値除去用の小バッファ
+  const rawBufferRef = useRef<number[]>([])
+
+  // ゼロセット（開始肢位を0°とする基準値）
   const [zeroSet, setZeroSet] = useState(false)
   const zeroRef = useRef(0)
-  // 直近の平滑化済み生角度（ゼロセット時の基準取得に使用）
-  const rawRef = useRef(0)
+  const zeroReadyRef = useRef(false)
+  const zeroCountRef = useRef(0)  // ゼロセット時の安定フレームカウント
 
   const motion = JOINTS.find((j) => j.id === selectedId)!
 
-  // ─ センサーイベント ─
+  // ─ センサーイベント（高精度計測） ─
   const handleOrientation = useCallback(
     (e: DeviceOrientationEvent) => {
       if (!measuring) return
       const raw = motion.axis === 'beta' ? (e.beta ?? 0) : (e.gamma ?? 0)
-      const val = motion.invert ? -raw : raw
+      let val = motion.invert ? -raw : raw
 
-      bufferRef.current.push(val)
-      if (bufferRef.current.length > BUFFER_SIZE) {
-        bufferRef.current.shift()
+      // 外れ値除去: 前の値から急激に変わった値を除外
+      if (rawBufferRef.current.length > 0) {
+        const lastVal = rawBufferRef.current[rawBufferRef.current.length - 1]
+        if (Math.abs(val - lastVal) > OUTLIER_THRESHOLD) {
+          val = lastVal  // 外れ値と判定して前の値を使用
+        }
       }
-      const avg =
-        bufferRef.current.reduce((a, b) => a + b, 0) /
-        bufferRef.current.length
-      rawRef.current = avg
-      // ゼロセット済みなら基準値からの相対角度で表示（90度超対応）
-      const relativeAngle = Math.abs(avg - zeroRef.current)
-      setAngle(Math.round(relativeAngle >= 180 ? 360 - relativeAngle : relativeAngle))
+
+      rawBufferRef.current.push(val)
+      if (rawBufferRef.current.length > RAW_BUFFER_SIZE) {
+        rawBufferRef.current.shift()
+      }
+
+      // EMA（指数移動平均）で平滑化
+      const bufferAvg = rawBufferRef.current.reduce((a, b) => a + b, 0) / rawBufferRef.current.length
+      emaRef.current = emaRef.current === 0 ? bufferAvg : emaRef.current * (1 - EMA_ALPHA) + bufferAvg * EMA_ALPHA
+
+      // ゼロセット準備: 1秒安定したら基準値を確定
+      if (zeroSet && !zeroReadyRef.current) {
+        zeroCountRef.current++
+        if (zeroCountRef.current >= 30) {  // 30フレーム（約1秒）で確定
+          zeroRef.current = emaRef.current
+          zeroReadyRef.current = true
+          zeroCountRef.current = 0
+        }
+      }
+
+      // 相対角度を計測（90度超対応）
+      const relativeAngle = Math.abs(emaRef.current - zeroRef.current)
+      const displayAngle = relativeAngle >= 180 ? 360 - relativeAngle : relativeAngle
+
+      // 0.1度単位で表示（精度向上）
+      setAngle(Math.round(displayAngle * 10) / 10)
     },
     [measuring, motion]
   )
 
-  // ─ ゼロセット: 現在の肢位を0°の基準にする ─
+  // ─ ゼロセット: 現在の肢位を0°の基準にする（1秒安定後に確定） ─
   function handleZeroSet() {
-    zeroRef.current = rawRef.current
-    setZeroSet(true)
+    if (!zeroSet) {
+      setZeroSet(true)
+      zeroReadyRef.current = false
+      zeroCountRef.current = 0
+    }
     setAngle(0)
   }
 
   function clearZero() {
     zeroRef.current = 0
+    zeroReadyRef.current = false
+    zeroCountRef.current = 0
     setZeroSet(false)
   }
 
@@ -487,9 +518,11 @@ export default function Goniometer() {
 
   // ─ リセット ─
   function handleReset() {
-    bufferRef.current = []
+    rawBufferRef.current = []
+    emaRef.current = 0
     zeroRef.current = 0
-    rawRef.current = 0
+    zeroReadyRef.current = false
+    zeroCountRef.current = 0
     setZeroSet(false)
     setAngle(0)
     setMeasuring(false)
@@ -987,7 +1020,8 @@ export default function Goniometer() {
           {!measuring ? (
             <button
               onClick={() => {
-                bufferRef.current = []
+                rawBufferRef.current = []
+                emaRef.current = 0
                 setMeasuring(true)
               }}
               disabled={sensorAvailable === false}
