@@ -237,6 +237,8 @@ const T = {
     diagHide: 'センサー値を隠す',
     diagIncl: '傾斜',
     diagZero: '基準',
+    diagSpatial: '方式: 空間角（運動面に依存しない）',
+    diagPlanar: '方式: 単軸傾斜（ゼロセットで空間角に切替）',
     lockOn: 'ロック中（表示値を固定）',
     lockOff: 'アンロック（追従中）',
     lockRelease: '解除',
@@ -310,6 +312,8 @@ const T = {
     diagHide: 'Hide sensor values',
     diagIncl: 'incl',
     diagZero: 'zero',
+    diagSpatial: 'mode: spatial angle (plane-independent)',
+    diagPlanar: 'mode: single-axis tilt (zeroing switches to spatial)',
     lockOn: 'Locked (reading held)',
     lockOff: 'Unlocked (live)',
     lockRelease: 'Unlock',
@@ -544,7 +548,7 @@ export default function Goniometer() {
   const STABLE_RANGE = 0.8
 
   // センサー診断表示（実測との乖離を切り分けるため生値も出す）
-  const [diag, setDiag] = useState<{ beta: number; gamma: number; incl: number; zero: number } | null>(null)
+  const [diag, setDiag] = useState<{ beta: number; gamma: number; incl: number; zero: number; spatial: boolean } | null>(null)
   const [showDiag, setShowDiag] = useState(false)
 
   // ゼロセット（開始肢位を0°とする基準値）
@@ -554,6 +558,13 @@ export default function Goniometer() {
   const zeroSamplesRef = useRef<number[]>([])
   const ZERO_SAMPLES = 12        // 約0.4秒ぶんのサンプルで基準を精密化
   const ZERO_STABLE_RANGE = 2.5  // サンプルの振れ幅がこの範囲なら「静止」と判定
+
+  // 空間角（3D）方式で使う、端末長軸の世界座標での向き
+  type Vec3 = { x: number; y: number; z: number }
+  const axisVecRef = useRef<Vec3 | null>(null)      // 現在の向き
+  const zeroAxisRef = useRef<Vec3 | null>(null)     // ゼロセット時の向き
+  const zeroAxisSamplesRef = useRef<Vec3[]>([])
+  const zeroAxisPendingRef = useRef(false)
 
   const motion = JOINTS.find((j) => j.id === selectedId)!
 
@@ -619,7 +630,53 @@ export default function Goniometer() {
       incl = Math.atan2(-gx, gz) / DEG
     }
 
-    let val = m.invert ? -incl : incl
+    // ── 端末長軸の「世界座標での向き」──
+    // ねじれ(gamma)に依存しない。ゼロセット時の向きとの角度を直接求めれば、
+    // 運動が鉛直面から外れていても正しい関節角が得られる。
+    const aRad = (e.alpha ?? 0) * DEG
+    const sinA = Math.sin(aRad), cosA = Math.cos(aRad)
+    const cosB = Math.cos(bRad), sinB = Math.sin(bRad)
+    const axisVec = { x: -sinA * cosB, y: cosA * cosB, z: sinB }
+    // alpha が取れない端末では空間角方式は使えない。
+    // ここを残したままにするとゼロセットが空間角側を選び、
+    // 計測時には単軸側へ落ちて基準がずれる。
+    axisVecRef.current = e.alpha != null ? axisVec : null
+
+    // 空間角の基準を取った後に alpha が失われた場合は、方式を切り替えず
+    // 直前の値を保持する（基準の意味が変わって数値が飛ぶのを防ぐ）
+    if (zeroAxisRef.current && e.alpha == null) return
+
+    // 基準ベクトルの精密化: 押した瞬間の1サンプルは手ぶれを含むため、
+    // 続く数フレームの平均で置き換える
+    if (zeroAxisPendingRef.current && e.alpha != null) {
+      zeroAxisSamplesRef.current.push(axisVec)
+      if (zeroAxisSamplesRef.current.length >= ZERO_SAMPLES) {
+        const s = zeroAxisSamplesRef.current
+        const sum = s.reduce((a, v) => ({ x: a.x + v.x, y: a.y + v.y, z: a.z + v.z }), { x: 0, y: 0, z: 0 })
+        const n = Math.hypot(sum.x, sum.y, sum.z) || 1
+        zeroAxisRef.current = { x: sum.x / n, y: sum.y / n, z: sum.z / n }
+        zeroAxisPendingRef.current = false
+        zeroAxisSamplesRef.current = []
+      }
+    }
+
+    let val: number
+    let spatial = false
+    const z0 = zeroAxisRef.current
+
+    if (z0 && e.alpha != null) {
+      // ── 空間角（3D）方式 ──
+      // 単軸の傾斜差は、運動軸が水平から外れた分だけ必ず「浅く」出る。
+      //   真の関節角90° でも、運動軸が10°傾いていれば 80°、20°なら 70° にしかならない。
+      // ゼロセット時の長軸ベクトルと現在の長軸ベクトルのなす角を取れば、
+      // 運動面に関係なく真の角度が得られる。
+      const dot = Math.min(1, Math.max(-1,
+        axisVec.x * z0.x + axisVec.y * z0.y + axisVec.z * z0.z))
+      val = Math.acos(dot) / DEG
+      spatial = true
+    } else {
+      val = m.invert ? -incl : incl
+    }
 
     if (measuringRef.current) {
       setDiag({
@@ -627,6 +684,7 @@ export default function Goniometer() {
         gamma: Math.round((e.gamma ?? 0) * 10) / 10,
         incl: Math.round(incl * 10) / 10,
         zero: Math.round(zeroRef.current * 10) / 10,
+        spatial,
       })
     }
 
@@ -684,9 +742,9 @@ export default function Goniometer() {
       }
     }
 
-    // ゼロセットの精密化: 押した瞬間の値を暫定基準にしてあるので、
-    // 続く数フレームが静止していれば、その平均で基準値を置き換える。
-    if (zeroPendingRef.current) {
+    // ゼロセットの精密化（単軸フォールバック時のみ）。
+    // 空間角方式では基準ベクトル側で精密化しているため不要。
+    if (zeroPendingRef.current && !spatial) {
       zeroSamplesRef.current.push(emaRef.current)
       if (zeroSamplesRef.current.length >= ZERO_SAMPLES) {
         const s = zeroSamplesRef.current
@@ -720,9 +778,31 @@ export default function Goniometer() {
   // 押した瞬間に暫定基準を確定させて即座に0°を表示し、
   // 続く約0.4秒が静止していればその平均値で基準を精密化する。
   function handleZeroSet() {
-    zeroRef.current = hasEmaRef.current ? emaRef.current : 0
-    zeroPendingRef.current = true
+    const v = axisVecRef.current
+    if (v) {
+      // 空間角方式: 基準は「そのときの長軸ベクトル」。
+      // 以後の値は基準からの相対角そのものなので、数値の基準は0にする。
+      zeroAxisRef.current = { ...v }
+      zeroAxisSamplesRef.current = []
+      zeroAxisPendingRef.current = true
+      zeroRef.current = 0
+      zeroPendingRef.current = false
+    } else {
+      // alpha が取得できない端末向けのフォールバック（単軸の傾斜差）
+      zeroAxisRef.current = null
+      zeroAxisPendingRef.current = false
+      zeroRef.current = hasEmaRef.current ? emaRef.current : 0
+      zeroPendingRef.current = true
+    }
     zeroSamplesRef.current = []
+    // 計測する量が切り替わるためフィルタを初期化する
+    rawBufferRef.current = []
+    rejectCountRef.current = 0
+    emaRef.current = 0
+    hasEmaRef.current = false
+    stableWindowRef.current = []
+    stableRef.current = false
+    setStable(false)
     setZeroSet(true)
     setAngle(0)
   }
@@ -731,6 +811,12 @@ export default function Goniometer() {
     zeroRef.current = 0
     zeroPendingRef.current = false
     zeroSamplesRef.current = []
+    zeroAxisRef.current = null
+    zeroAxisPendingRef.current = false
+    zeroAxisSamplesRef.current = []
+    rawBufferRef.current = []
+    emaRef.current = 0
+    hasEmaRef.current = false
     setZeroSet(false)
   }
 
@@ -790,6 +876,10 @@ export default function Goniometer() {
     zeroRef.current = 0
     zeroPendingRef.current = false
     zeroSamplesRef.current = []
+    zeroAxisRef.current = null
+    zeroAxisPendingRef.current = false
+    zeroAxisSamplesRef.current = []
+    axisVecRef.current = null
     setZeroSet(false)
     setSensorTimeout(false)
     setAngle(0)
@@ -1518,7 +1608,9 @@ export default function Goniometer() {
             {showDiag && diag && (
               <p className="mt-1 text-[10px] text-slate-400 font-mono leading-relaxed">
                 β {diag.beta}° / γ {diag.gamma}° → {t.diagIncl} {diag.incl}°
-                {zeroSet && ` / ${t.diagZero} ${diag.zero}°`}
+                {!diag.spatial && zeroSet && ` / ${t.diagZero} ${diag.zero}°`}
+                <br />
+                {diag.spatial ? t.diagSpatial : t.diagPlanar}
               </p>
             )}
           </div>
