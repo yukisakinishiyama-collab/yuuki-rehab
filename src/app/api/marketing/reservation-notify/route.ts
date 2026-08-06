@@ -3,23 +3,30 @@
  *
  * 用途は2系統:
  * 1) 院長宛（従来）: 新規予約/キャンセル/前日リマインド一覧を院長のLINEへ
- *    - kind: 'new' | 'cancel' | 'reminder'（to指定なし → RESERVATION_NOTIFY_LINE_USER_ID宛）
+ *    - kind: 'new' | 'cancel' | 'reminder' → RESERVATION_NOTIFY_LINE_USER_ID宛
  * 2) 患者宛（LIFF連携）: 予約完了・キャンセル確認を患者本人のLINEへ
- *    - kind: 'patient-confirm' | 'patient-cancel' ＋ to=患者のLINE userId
+ *    - kind: 'patient-confirm' … ticket（LIFF IDトークン検証済みの短命チケット）
+ *      成功時、シート保存用の sealed（長期の署名付き参照）を返す
+ *    - kind: 'patient-cancel'  … sealed（予約行に保存済みの参照）
  *
  * セキュリティ:
- * - RESERVATION_NOTIFY_SECRET（共有シークレット）で保護。未設定時は503（誤って開放しない）
- * - 患者宛の to は U+32桁hex の形式検証を通った場合のみ送信
+ * - RESERVATION_NOTIFY_SECRET（共有シークレット）で保護。未設定時は503
+ * - 患者宛の宛先は【必ず】署名付きticket/sealedから復元する。生のuserIdは受け付けない
+ *   （生受付だと他人のIDを指定して公式アカウント名義で通知を送れてしまうため）
+ * - 本文に載せる氏名は改行・制御文字を除去し長さを制限（メッセージ偽装の防止）
  * - LINEプッシュには既存の LINE_CHANNEL_ACCESS_TOKEN を使う（トークンはVercelに集約）
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { readTicket, sealUserId, unsealUserId } from '@/lib/liff-ticket'
 
 export const dynamic = 'force-dynamic'
 
 type NotifyBody = {
   kind?: 'new' | 'cancel' | 'reminder' | 'patient-confirm' | 'patient-cancel'
-  /** 患者宛push用のLINE userId（U+32桁hex）。未指定なら院長宛 */
-  to?: string
+  /** patient-confirm用：LIFF検証済みの短命チケット */
+  ticket?: string
+  /** patient-cancel用：予約行に保存された長期参照 */
+  sealed?: string
   reservationNo?: string
   name?: string
   kana?: string
@@ -37,6 +44,16 @@ function authorized(request: NextRequest): boolean {
   if (!secret) return false
   const header = request.headers.get('x-reservation-secret') ?? ''
   return header === secret
+}
+
+/** 患者名など、外部入力を本文へ埋める前の無害化（改行・制御文字除去＋長さ制限） */
+function safeName(value?: string): string {
+  return String(value ?? '')
+    // 改行・制御文字・行区切りを除去（メッセージ本文の偽装を防ぐ）
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40)
 }
 
 /** 'yyyy-MM-dd' を「M月D日（曜）」へ。形式外はそのまま返す */
@@ -67,15 +84,20 @@ function buildMessage(b: NotifyBody): string {
 
 /** 患者宛の通知本文（予約完了・キャンセル確認） */
 function buildPatientMessage(b: NotifyBody): string {
-  const when = `${formatDateJa(b.date)} ${b.time ?? ''}`.trim()
+  const name = safeName(b.name)
+  const reservationNo = /^[A-Za-z0-9]{1,12}$/.test(String(b.reservationNo ?? ''))
+    ? String(b.reservationNo)
+    : ''
+  const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
+
   if (b.kind === 'patient-cancel') {
     return [
-      `${b.name ?? ''} 様`,
+      `${name} 様`,
       '',
       'ゆうき整骨院です。以下のご予約のキャンセルを承りました。',
       '',
       `📅 日時：${when}`,
-      b.reservationNo ? `予約番号：${b.reservationNo}` : undefined,
+      reservationNo ? `予約番号：${reservationNo}` : undefined,
       '',
       'またのご利用をお待ちしております。',
       'ご予約はメニューの「ネット予約」からいつでもどうぞ😊',
@@ -84,13 +106,13 @@ function buildPatientMessage(b: NotifyBody): string {
       .join('\n')
   }
   return [
-    `${b.name ?? ''} 様`,
+    `${name} 様`,
     '',
     'ゆうき整骨院です。ご予約ありがとうございます。',
     '以下の内容で確定しました。',
     '',
     `📅 日時：${when}〜`,
-    b.reservationNo ? `🎫 予約番号：${b.reservationNo}` : undefined,
+    reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
     '',
     '変更・キャンセルは、このトークまたは',
     'お電話（083-265-4545）へお気軽にどうぞ。',
@@ -101,7 +123,8 @@ function buildPatientMessage(b: NotifyBody): string {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.RESERVATION_NOTIFY_SECRET) {
+  const secret = process.env.RESERVATION_NOTIFY_SECRET
+  if (!secret) {
     return NextResponse.json({ error: 'not configured' }, { status: 503 })
   }
   if (!authorized(request)) {
@@ -120,14 +143,26 @@ export async function POST(request: NextRequest) {
 
   let to: string | undefined
   let text: string
+  let sealed: string | undefined
+
   if (isPatientPush) {
-    // 患者宛：toの形式検証を通った場合のみ送る
-    const patientTo = String(body.to ?? '')
-    if (!/^U[0-9a-f]{32}$/.test(patientTo)) {
-      return NextResponse.json({ ok: false, delivered: false, error: 'invalid to' }, { status: 400 })
+    // 患者宛：宛先は必ず署名付きticket/sealedから復元する（生のuserIdは受け付けない）
+    const userId =
+      body.kind === 'patient-confirm'
+        ? readTicket(String(body.ticket ?? ''), secret)
+        : unsealUserId(String(body.sealed ?? ''), secret)
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, delivered: false, error: 'invalid or expired ticket' },
+        { status: 400 },
+      )
     }
-    to = patientTo
+    to = userId
     text = buildPatientMessage(body)
+    // 予約確定時は、以後のキャンセル通知に使う長期参照をGASへ返す
+    if (body.kind === 'patient-confirm') {
+      sealed = sealUserId(userId, secret)
+    }
   } else {
     // 院長宛（従来動作）
     to = process.env.RESERVATION_NOTIFY_LINE_USER_ID
@@ -152,7 +187,7 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       )
     }
-    return NextResponse.json({ ok: true, delivered: true })
+    return NextResponse.json({ ok: true, delivered: true, sealed })
   } catch (error) {
     return NextResponse.json(
       { ok: false, delivered: false, error: error instanceof Error ? error.message : '不明' },
