@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import type { Milestone } from '@/types/protocol'
-import { achieveMilestone, getMilestones, initMilestones, getAssessments } from '@/lib/protocol-store'
+import {
+  achieveMilestone, getMilestones, initMilestones, getAssessments,
+  resolvePatientMilestoneSet, resetMilestonesToDisease, updateMilestone,
+  consumeMilestoneSwapNotice,
+} from '@/lib/protocol-store'
 import Confetti from './Confetti'
-import { ClipboardCheck, Trophy, CheckCircle, Target, Sparkles } from 'lucide-react'
+import { ClipboardCheck, Trophy, CheckCircle, Target, Sparkles, RefreshCw, Undo2 } from 'lucide-react'
 
 interface Props {
   patientId: string
@@ -23,17 +27,18 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
   const [celebrating, setCelebrating] = useState<string | null>(null)
   const [recordCount, setRecordCount] = useState(0)
 
+  const [swapNotice, setSwapNotice] = useState(false)
+
   useEffect(() => {
-    const ms = getMilestones(patientId)
-    if (ms.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMilestones(initMilestones(patientId))
-    } else {
-      setMilestones(ms)
-    }
+    // initMilestones は疾患別セットの選択と、旧共通セット（未達成）の自動差し替えも行う
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMilestones(initMilestones(patientId))
+    // 差し替えはページ側の呼び出しなど別経路で先に起きていることがあるため、
+    // ストアに残る「未告知」印で判定する（フル表示のときだけ告知して印を消す）
+    if (!simpleMode && consumeMilestoneSwapNotice(patientId)) setSwapNotice(true)
     // 実データ: この患者の評価記録の回数
     setRecordCount(getAssessments(patientId).length)
-  }, [patientId])
+  }, [patientId, simpleMode])
 
   function handleAchieve(id: string) {
     achieveMilestone(id)
@@ -41,6 +46,24 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
     setCelebrating(id)
     setTimeout(() => setCelebrating(null), 3500)
   }
+
+  /** 達成の取り消し（押し間違いの復旧） */
+  function handleUndo(id: string) {
+    updateMilestone(id, { achieved: false, date: undefined })
+    setMilestones(getMilestones(patientId))
+  }
+
+  /** 疾患別セットへ作り直す（同名マイルストーンの達成記録は引き継がれる） */
+  function handleReset() {
+    if (!confirm('マイルストーンを疾患に合わせて作り直しますか？\n（同じ名前の達成記録は引き継がれます）')) return
+    setMilestones(resetMilestonesToDisease(patientId))
+  }
+
+  // 現在のセットが疾患別セットと違う場合だけ「合わせ直す」導線を出す
+  const diseaseSet = resolvePatientMilestoneSet(patientId)
+  const setMismatch =
+    milestones.length > 0 &&
+    milestones.map(m => m.label).join('|') !== diseaseSet.defs.map(d => d.label).join('|')
 
   const achieved = milestones.filter(m => m.achieved).length
   const total = milestones.length
@@ -73,6 +96,22 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
   return (
     <div className="space-y-5">
       {celebrating && <Confetti />}
+
+      {/* 疾患別セットへの自動更新のお知らせ（1回だけ） */}
+      {swapNotice && (
+        <div className="flex items-start justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3">
+          <p className="text-xs text-teal-800 leading-relaxed font-body">
+            マイルストーンを診断内容に合わせて更新しました（達成記録の無い共通セットからの切り替えです）。
+          </p>
+          <button
+            onClick={() => setSwapNotice(false)}
+            className="text-teal-400 hover:text-teal-700 text-xs flex-shrink-0"
+            aria-label="お知らせを閉じる"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* サマリーバナー */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[--color-navy] to-[--color-navy-800] p-5 text-white">
@@ -143,9 +182,21 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
 
       {/* マイルストーンタイムライン */}
       <div>
-        <h3 className="text-xs font-bold text-[--color-text-secondary] font-display uppercase tracking-widest mb-3">
-          マイルストーン
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-bold text-[--color-text-secondary] font-display uppercase tracking-widest">
+            マイルストーン
+          </h3>
+          {setMismatch && (
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1 text-[11px] text-[--color-primary] hover:opacity-80 transition-opacity font-body"
+              title="診断名・関節に合ったマイルストーンへ作り直します"
+            >
+              <RefreshCw className="w-3 h-3" />
+              疾患に合わせ直す
+            </button>
+          )}
+        </div>
         <div className="relative space-y-2">
           {/* タイムラインライン */}
           <div className="absolute left-[19px] top-5 bottom-5 w-0.5 bg-slate-100" />
@@ -199,6 +250,12 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
                 }`}>
                   {m.label}
                 </div>
+                {/* スタッフ向けの達成目安（達成済みは非表示にして情報量を抑える） */}
+                {!m.achieved && m.hint && (
+                  <div className="text-[11px] text-[--color-text-muted] mt-0.5 font-body">
+                    目安：{m.hint}
+                  </div>
+                )}
                 {m.achieved && m.date && (
                   <div className="metric text-xs text-white/75 mt-0.5">
                     {new Date(m.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })} 達成
@@ -207,7 +264,17 @@ export default function MilestonePanel({ patientId, simpleMode }: Props) {
               </div>
 
               {m.achieved ? (
-                <Trophy className="w-4 h-4 text-white/70 flex-shrink-0" />
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Trophy className="w-4 h-4 text-white/70" />
+                  <button
+                    onClick={() => handleUndo(m.id)}
+                    className="p-1 rounded text-white/40 hover:text-white/90 transition-colors"
+                    title="達成を取り消す（押し間違いの修正）"
+                    aria-label={`${m.label} の達成を取り消す`}
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={() => handleAchieve(m.id)}

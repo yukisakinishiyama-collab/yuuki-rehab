@@ -164,6 +164,10 @@ export interface Milestone {
   achieved: boolean
   date?: string
   icon?: string
+  /** スタッフ向けの達成目安（疾患別セットで設定される） */
+  hint?: string
+  /** どのマイルストーンセットから作られたか（疾患キー or joint_◯◯ / legacy_default） */
+  setKey?: string
 }
 
 export const PRESET_DIAGNOSES: Array<{ label: string; joint: Joint; key: string }> = [
@@ -186,13 +190,5 @@ export const PRESET_DIAGNOSES: Array<{ label: string; joint: Joint; key: string 
   { label: '捻挫・靭帯損傷（保存療法）', joint: 'other', key: 'sprain_ligament' },
 ]
 
-export const DEFAULT_MILESTONES: Array<Omit<Milestone, 'id' | 'patientId'>> = [
-  { label: '初回荷重', achieved: false, icon: '🦶' },
-  { label: 'フルウェイトベアリング', achieved: false, icon: '🏋️' },
-  { label: '平地歩行自立', achieved: false, icon: '🚶' },
-  { label: '階段昇降', achieved: false, icon: '🪜' },
-  { label: 'ジョグ開始', achieved: false, icon: '🏃' },
-  { label: 'ランニング', achieved: false, icon: '⚡' },
-  { label: 'ジャンプ解禁', achieved: false, icon: '🦘' },
-  { label: '競技復帰', achieved: false, icon: '🏆' },
-]
+// 旧・全疾患共通のマイルストーンは src/data/milestones.ts の LEGACY_DEFAULT_SET へ移動。
+// 現在は疾患別セット（MILESTONE_SETS）を resolveMilestoneSet() で選んで使う。

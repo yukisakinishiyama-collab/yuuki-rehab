@@ -1,6 +1,6 @@
 import type { ProtocolPatient, Protocol, Phase, Assessment, Milestone, ProtocolAttachment, ProtocolChatMessage } from '@/types/protocol'
-import { DEFAULT_MILESTONES } from '@/types/protocol'
 import { getTemplate, findBestTemplate } from '@/data/protocols/templates'
+import { resolveMilestoneSet, LEGACY_DEFAULT_SET } from '@/data/milestones'
 import { nanoid } from 'nanoid'
 
 const KEYS = {
@@ -208,18 +208,95 @@ export function getMilestones(patientId: string): Milestone[] {
   return get<Milestone>(KEYS.milestones).filter(m => m.patientId === patientId)
 }
 
-export function initMilestones(patientId: string): Milestone[] {
-  const existing = getMilestones(patientId)
-  if (existing.length > 0) return existing
+/** 患者の診断名・関節に合ったマイルストーンセットを返す */
+export function resolvePatientMilestoneSet(patientId: string) {
+  const patient = getPatientById(patientId)
+  return resolveMilestoneSet(patient?.diagnosis, patient?.joint)
+}
 
-  const milestones: Milestone[] = DEFAULT_MILESTONES.map(m => ({
-    ...m,
+/** セット定義から患者のマイルストーン実体を作る（保存はしない） */
+function buildMilestones(patientId: string, setKey: string, defs: { label: string; icon: string; hint?: string }[]): Milestone[] {
+  return defs.map(def => ({
     id: nanoid(),
     patientId,
+    label: def.label,
+    icon: def.icon,
+    hint: def.hint,
+    setKey,
+    achieved: false,
   }))
+}
 
+const LEGACY_LABELS = LEGACY_DEFAULT_SET.map(m => m.label).join('|')
+
+// 旧セット→疾患別セットへ自動差し替えした患者の「未告知」印。
+// initMilestones はページ側・レポート側・簡易表示など複数経路から呼ばれるため、
+// どの経路で差し替えが起きても、次にマイルストーンパネルを開いたときに1回だけ告知できるよう
+// localStorage に永続化しておく。
+const SWAP_NOTICE_KEY = 'protocolMilestoneSwapNotices'
+
+function markMilestoneSwapNotice(patientId: string): void {
+  if (typeof window === 'undefined') return
+  const list = get<string>(SWAP_NOTICE_KEY)
+  if (!list.includes(patientId)) set(SWAP_NOTICE_KEY, [...list, patientId])
+}
+
+/** 未告知の差し替えがあれば true を返し、印を消す（告知は1回だけ） */
+export function consumeMilestoneSwapNotice(patientId: string): boolean {
+  const list = get<string>(SWAP_NOTICE_KEY)
+  if (!list.includes(patientId)) return false
+  set(SWAP_NOTICE_KEY, list.filter(id => id !== patientId))
+  return true
+}
+
+/**
+ * マイルストーンを初期化して返す。
+ * - 未作成なら、診断名・関節に合った疾患別セットで作成する
+ * - 旧・全疾患共通セットのまま【1つも達成していない】患者は、疾患別セットへ自動で差し替える
+ *   （達成記録がある場合は、記録を守るため触らない）
+ */
+export function initMilestones(patientId: string): Milestone[] {
+  const existing = getMilestones(patientId)
+  const { key, defs } = resolvePatientMilestoneSet(patientId)
+
+  if (existing.length > 0) {
+    const isLegacyUntouched =
+      existing.every(m => !m.achieved) &&
+      existing.map(m => m.label).join('|') === LEGACY_LABELS
+    const targetLabels = defs.map(d => d.label).join('|')
+    if (!isLegacyUntouched || targetLabels === LEGACY_LABELS) return existing
+    // 旧共通セット（未達成）→ 疾患別セットへ差し替え
+    const others = get<Milestone>(KEYS.milestones).filter(m => m.patientId !== patientId)
+    const milestones = buildMilestones(patientId, key, defs)
+    set(KEYS.milestones, [...others, ...milestones])
+    // どの呼び出し経路で差し替わっても、次回パネル表示時に告知できるよう印を残す
+    markMilestoneSwapNotice(patientId)
+    return milestones
+  }
+
+  const milestones = buildMilestones(patientId, key, defs)
   const all = get<Milestone>(KEYS.milestones)
   set(KEYS.milestones, [...all, ...milestones])
+  return milestones
+}
+
+/**
+ * マイルストーンを疾患別セットで作り直す（達成記録は消える）。
+ * 診断名を後から変えた場合や、旧セットで達成済みの患者を切り替えたい場合に使う。
+ * 同名のマイルストーンの達成記録は引き継ぐ。
+ */
+export function resetMilestonesToDisease(patientId: string): Milestone[] {
+  const previous = getMilestones(patientId)
+  const achievedByLabel = new Map(
+    previous.filter(m => m.achieved).map(m => [m.label, m] as const),
+  )
+  const { key, defs } = resolvePatientMilestoneSet(patientId)
+  const milestones = buildMilestones(patientId, key, defs).map(m => {
+    const prev = achievedByLabel.get(m.label)
+    return prev ? { ...m, achieved: true, date: prev.date } : m
+  })
+  const others = get<Milestone>(KEYS.milestones).filter(m => m.patientId !== patientId)
+  set(KEYS.milestones, [...others, ...milestones])
   return milestones
 }
 

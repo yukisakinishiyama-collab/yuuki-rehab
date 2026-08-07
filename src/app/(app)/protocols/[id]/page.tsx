@@ -19,7 +19,7 @@ import {
   ArrowRight, ChevronRight, Printer, Trash2, User, MonitorPlay,
   BarChart2, Cpu, FileText, AlertCircle, CheckCircle,
   BookOpen, Edit2, Plus, Paperclip, Eye, X, Upload, HelpCircle, Search, Bot, Users,
-  Link2, Link2Off,
+  Link2, Link2Off, Zap,
 } from 'lucide-react'
 import type { Phase } from '@/types/protocol'
 import { nanoid } from 'nanoid'
@@ -326,6 +326,15 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           >
             <MonitorPlay className="w-3.5 h-3.5 text-[--color-primary]" />
             <span className="hidden sm:inline">患者提示</span>
+          </Link>
+          <Link
+            href={`/protocols/${id}/oneday`}
+            title="その日の症状を緩和させる単回メニューをAIが作成"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-amber-200
+              bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-700 font-semibold font-display"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">1dayリハ</span>
           </Link>
           <Link
             href={`/protocols/${id}/progress`}
