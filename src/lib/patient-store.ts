@@ -5,7 +5,7 @@ import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
   PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake,
-  ExplanationOverride
+  ExplanationOverride, CancellationRecord
 } from '@/types/patient'
 import { SAMPLE_PATIENTS, SAMPLE_EVALUATIONS, SAMPLE_EXERCISES, SAMPLE_SOAP_NOTES } from './patient-data'
 
@@ -23,6 +23,7 @@ const KEYS = {
   patientExercises: 'pt_patient_exercises',
   progressRecords: 'pt_progress_records',
   attendanceRecords: 'pt_attendance_records',
+  cancellations: 'pt_cancellations',
   retentionRisks: 'pt_retention_risks',
   quickMemos: 'pt_quick_memos',
   intakes: 'pt_intakes',
@@ -288,6 +289,27 @@ export function saveAttendanceRecord(record: AttendanceRecord): void {
   if (idx >= 0) list[idx] = record
   else list.push(record)
   set(KEYS.attendanceRecords, list)
+}
+
+// ── キャンセル記録 ──
+export function getCancellations(patientId?: string): CancellationRecord[] {
+  const all = get<CancellationRecord>(KEYS.cancellations)
+  const list = patientId ? all.filter(r => r.patientId === patientId) : all
+  // 予約日の新しい順（同日は登録の新しい順）
+  return list.sort((a, b) =>
+    b.appointmentDate.localeCompare(a.appointmentDate) || b.createdAt.localeCompare(a.createdAt))
+}
+
+export function saveCancellation(record: CancellationRecord): void {
+  const list = get<CancellationRecord>(KEYS.cancellations)
+  const idx = list.findIndex(r => r.id === record.id)
+  if (idx >= 0) list[idx] = record
+  else list.push(record)
+  set(KEYS.cancellations, list)
+}
+
+export function deleteCancellation(id: string): void {
+  set(KEYS.cancellations, get<CancellationRecord>(KEYS.cancellations).filter(r => r.id !== id))
 }
 
 // ── 離脱リスク ──

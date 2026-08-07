@@ -8,7 +8,8 @@ import { useRouter } from 'next/navigation'
 import { Users, AlertTriangle, Activity, TrendingUp, Clock, Award, ChevronRight, Route } from 'lucide-react'
 import type { Patient, SOAPNote } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
-import { getPatients, getSOAPNotes, initPatientStore } from '@/lib/patient-store'
+import { getPatients, getSOAPNotes, initPatientStore, getCancellations } from '@/lib/patient-store'
+import { groupByPatient } from '@/lib/cancellation-utils'
 import {
   getProtocols, getPatients as getProtocolPatients,
 } from '@/lib/protocol-store'
@@ -71,14 +72,18 @@ export default function RehabDashboard() {
       })
     }
 
+    // キャンセル記録は一度だけ読み込み、患者ごとにまとめる
+    const cancelsByPatient = groupByPatient(getCancellations())
+
     const allStats: PatientStat[] = patients.map(p => {
       const notes = getSOAPNotes(p.id).sort((a, b) => b.visitDate.localeCompare(a.visitDate))
       const latestNote = notes[0]
       const days = getDaysSinceLastVisit(p.updatedAt)
+      const cancelCount = cancelsByPatient.get(p.id)?.length ?? 0
       const risk = calculateRetentionRisk({
         daysSinceLastVisit: days,
         recommendedIntervalDays: 7,
-        cancelCount: 0,
+        cancelCount,
         totalVisits: notes.length,
         painChange: latestNote ? latestNote.painToday - 8 : -3,
         romImprovementRate: 10,

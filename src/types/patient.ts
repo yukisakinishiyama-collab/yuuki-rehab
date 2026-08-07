@@ -343,6 +343,56 @@ export interface AttendanceRecord {
 }
 
 // ──────────────────────────────────────────────
+// キャンセル記録
+// 「予約日前」「当日」「無断」の3区分で記録し、患者ごとの累計を出す。
+// ──────────────────────────────────────────────
+export type CancellationKind = 'advance' | 'same_day' | 'no_show'
+
+export const CANCELLATION_KINDS: CancellationKind[] = ['advance', 'same_day', 'no_show']
+
+export const CANCELLATION_LABELS: Record<CancellationKind, string> = {
+  advance: '予約日前キャンセル',
+  same_day: '当日キャンセル',
+  no_show: '無断キャンセル',
+}
+
+export const CANCELLATION_SHORT_LABELS: Record<CancellationKind, string> = {
+  advance: '予約日前',
+  same_day: '当日',
+  no_show: '無断',
+}
+
+export const CANCELLATION_DESCRIPTIONS: Record<CancellationKind, string> = {
+  advance: '予約日より前に連絡があった',
+  same_day: '予約当日に連絡があった',
+  no_show: '連絡なく来院されなかった',
+}
+
+export interface CancellationRecord {
+  id: string
+  patientId: string
+  kind: CancellationKind
+  /** 予約されていた日（yyyy-MM-dd） */
+  appointmentDate: string
+  /** 連絡を受けた日（無断キャンセルは空欄） */
+  contactedDate: string
+  reason: string
+  memo: string
+  createdAt: string
+}
+
+export interface CancellationSummary {
+  total: number
+  advance: number
+  same_day: number
+  no_show: number
+  /** 直近90日の件数（傾向を見るため） */
+  recent90: number
+  /** 最終キャンセル日（yyyy-MM-dd／無ければ空） */
+  lastDate: string
+}
+
+// ──────────────────────────────────────────────
 // 患者説明書 上書き設定
 // ──────────────────────────────────────────────
 export interface ExplanationOverride {

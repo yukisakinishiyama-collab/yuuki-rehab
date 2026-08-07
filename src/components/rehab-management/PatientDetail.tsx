@@ -8,7 +8,7 @@ import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
-  SpecialTestResult, QuickMemo, Intake,
+  SpecialTestResult, QuickMemo, Intake, CancellationRecord,
 } from '@/types/patient'
 import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
@@ -18,8 +18,9 @@ import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getExercises, getPatientExercises, savePatientExercise,
   deletePatientExercise, getProgressRecords, getRehabPlans,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations,
 } from '@/lib/patient-store'
+import { summarizeCancellations } from '@/lib/cancellation-utils'
 import {
   calculateImprovementScore, calculateROMImprovement,
   calculateRetentionRisk, getDaysSinceLastVisit, generatePatientFriendlyMessage,
@@ -34,6 +35,7 @@ import SOAPForm from './SOAPForm'
 import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
+import CancellationTab from './CancellationTab'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
@@ -694,7 +696,7 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'drills' | 'explanation'
+type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'cancel' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'drills' | 'explanation'
 
 interface Props {
   patient: Patient
@@ -714,6 +716,7 @@ export default function PatientDetail({ patient }: Props) {
   const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
+  const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
   const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
@@ -735,6 +738,7 @@ export default function PatientDetail({ patient }: Props) {
     setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
+    setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
   }
 
@@ -793,10 +797,13 @@ export default function PatientDetail({ patient }: Props) {
       })
     : null
 
+  // キャンセル累計（ヘッダー表示・離脱リスク算出に使用）
+  const cancelSummary = summarizeCancellations(cancellations)
+
   const retentionRisk = calculateRetentionRisk({
     daysSinceLastVisit: getDaysSinceLastVisit(patient.updatedAt),
     recommendedIntervalDays: 7,
-    cancelCount: 0,
+    cancelCount: cancelSummary.total,
     totalVisits: soapNotes.length,
     painChange: firstEval ? (latestSoap?.painToday ?? 5) - firstEval.painNrs : 0,
     romImprovementRate: 15,
@@ -860,6 +867,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'evaluation', label: '初回評価', icon: '🩺' },
     { key: 'soap', label: 'SOAPカルテ', icon: '📝' },
     { key: 'memo', label: '簡易メモ', icon: '🗒️', badge: quickMemos.length || undefined },
+    { key: 'cancel', label: 'キャンセル', icon: '🚫', badge: cancelSummary.total || undefined },
     { key: 'rom', label: 'ROM', icon: '📐' },
     { key: 'strength', label: '筋力', icon: '💪' },
     { key: 'special', label: 'スペシャルテスト', icon: '🔍' },
@@ -890,6 +898,24 @@ export default function PatientDetail({ patient }: Props) {
                 <Badge color="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
                 {patient.diagnosisLabel && <Badge color="gray">{patient.diagnosisLabel}</Badge>}
                 <RetentionRiskBadge level={retentionRisk.level} />
+                {/* キャンセル累計（0件のときは表示しない）。押すとキャンセルタブへ */}
+                {cancelSummary.total > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('cancel')}
+                    title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      cancelSummary.no_show > 0
+                        ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                    }`}
+                  >
+                    🚫 キャンセル {cancelSummary.total}回
+                    <span className="opacity-70 tabular-nums">
+                      （前{cancelSummary.advance}・当{cancelSummary.same_day}・無{cancelSummary.no_show}）
+                    </span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowReferralModal(true)}
@@ -1236,6 +1262,16 @@ export default function PatientDetail({ patient }: Props) {
             patient={patient}
             memos={quickMemos}
             specialTests={specialTests}
+            onUpdate={reload}
+          />
+        )}
+
+        {/* ── キャンセルタブ ── */}
+        {activeTab === 'cancel' && (
+          <CancellationTab
+            patientId={patient.id}
+            records={cancellations}
+            visitCount={soapNotes.length}
             onUpdate={reload}
           />
         )}

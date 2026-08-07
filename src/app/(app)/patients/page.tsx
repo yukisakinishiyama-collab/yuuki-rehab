@@ -10,11 +10,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   User, Plus, Search, AlertTriangle, ChevronRight, Activity,
-  Pin, PinOff, History, ArrowUpDown,
+  Pin, PinOff, History, ArrowUpDown, CalendarX,
 } from 'lucide-react'
-import type { Patient, SOAPNote } from '@/types/patient'
+import type { Patient, SOAPNote, CancellationSummary } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
-import { getPatients, initPatientStore, getSOAPNotes } from '@/lib/patient-store'
+import { getPatients, initPatientStore, getSOAPNotes, getCancellations } from '@/lib/patient-store'
+import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils'
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
 import { buttonVariants } from '@/components/ui/button'
@@ -76,6 +77,16 @@ export default function PatientsPage() {
     return map
   }, [patients])
 
+  // キャンセル記録も一度だけ読み込み、患者ごとに集計する
+  const cancelByPatient = useMemo(() => {
+    const map = new Map<string, CancellationSummary>()
+    if (patients.length === 0) return map
+    for (const [patientId, records] of groupByPatient(getCancellations())) {
+      map.set(patientId, summarizeCancellations(records))
+    }
+    return map
+  }, [patients])
+
   // 離脱リスクを患者ごとに一度だけ算出（既存アルゴリズム・パラメータを維持）
   const riskByPatient = useMemo(() => {
     const map = new Map<string, RiskInfo>()
@@ -85,7 +96,7 @@ export default function PatientsPage() {
       const risk = calculateRetentionRisk({
         daysSinceLastVisit: getDaysSinceLastVisit(p.updatedAt),
         recommendedIntervalDays: 7,
-        cancelCount: 0,
+        cancelCount: cancelByPatient.get(p.id)?.total ?? 0,
         totalVisits: notes.length,
         painChange: latestNote ? latestNote.painToday - 8 : -3,
         romImprovementRate: 10,
@@ -98,7 +109,7 @@ export default function PatientsPage() {
       map.set(p.id, { level: risk.level })
     }
     return map
-  }, [patients, notesByPatient])
+  }, [patients, notesByPatient, cancelByPatient])
 
   const highRiskCount = useMemo(
     () => patients.filter(p => riskByPatient.get(p.id)?.level === 'high').length,
@@ -270,6 +281,7 @@ export default function PatientsPage() {
                     patient={patient}
                     notes={notesByPatient.get(patient.id) ?? []}
                     riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
+                    cancelSummary={cancelByPatient.get(patient.id)}
                     pinned
                     onTogglePin={() => handleTogglePin(patient.id)}
                     onClick={() => router.push(`/patients/${patient.id}`)}
@@ -285,6 +297,7 @@ export default function PatientsPage() {
                 patient={patient}
                 notes={notesByPatient.get(patient.id) ?? []}
                 riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
+                cancelSummary={cancelByPatient.get(patient.id)}
                 pinned={false}
                 onTogglePin={() => handleTogglePin(patient.id)}
                 onClick={() => router.push(`/patients/${patient.id}`)}
@@ -297,10 +310,11 @@ export default function PatientsPage() {
   )
 }
 
-function PatientCard({ patient, notes, riskLevel, pinned, onTogglePin, onClick }: {
+function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onTogglePin, onClick }: {
   patient: Patient
   notes: SOAPNote[]
   riskLevel: 'low' | 'medium' | 'high'
+  cancelSummary?: CancellationSummary
   pinned: boolean
   onTogglePin: () => void
   onClick: () => void
@@ -346,6 +360,21 @@ function PatientCard({ patient, notes, riskLevel, pinned, onTogglePin, onClick }
               離脱リスク{RISK_LABELS[riskLevel]}
             </Badge>
             {riskLevel === 'high' && <AlertTriangle className="w-4 h-4 text-red-500" />}
+            {/* キャンセル累計（0件の患者には出さない。無断ありは赤で強調） */}
+            {cancelSummary && cancelSummary.total > 0 && (
+              <span
+                title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+                  cancelSummary.no_show > 0
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-orange-50 text-orange-700 border-orange-200',
+                )}
+              >
+                <CalendarX className="w-3 h-3" />
+                キャンセル {cancelSummary.total}
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-500 mt-1 truncate">{patient.mainComplaint}</p>
           <p className="text-xs text-gray-400">{patient.diagnosisLabel}</p>
