@@ -6,6 +6,8 @@
  *    - kind: 'new' | 'cancel' | 'reminder' → RESERVATION_NOTIFY_LINE_USER_ID宛
  * 2) 患者宛（LIFF連携）: 予約完了・キャンセル確認を患者本人のLINEへ
  *    - kind: 'patient-confirm' … ticket（LIFF IDトークン検証済みの短命チケット）
+ *      または sealed（過去の予約行に保存済みの長期参照。管理画面からの手動登録で、
+ *      LINE連携済みの患者へ完了通知を送るときに使う）
  *      成功時、シート保存用の sealed（長期の署名付き参照）を返す
  *    - kind: 'patient-cancel'  … sealed（予約行に保存済みの参照）
  *
@@ -147,9 +149,11 @@ export async function POST(request: NextRequest) {
 
   if (isPatientPush) {
     // 患者宛：宛先は必ず署名付きticket/sealedから復元する（生のuserIdは受け付けない）
+    // patient-confirm は ticket（LIFF予約）優先。無ければ sealed（管理画面からの手動登録）
     const userId =
       body.kind === 'patient-confirm'
-        ? readTicket(String(body.ticket ?? ''), secret)
+        ? (readTicket(String(body.ticket ?? ''), secret) ??
+           unsealUserId(String(body.sealed ?? ''), secret))
         : unsealUserId(String(body.sealed ?? ''), secret)
     if (!userId) {
       return NextResponse.json(
