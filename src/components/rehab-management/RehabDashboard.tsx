@@ -16,6 +16,7 @@ import {
 import { calculateRetentionRisk, getDaysSinceLastVisit } from '@/lib/rehab-algorithms'
 import { RetentionRiskBadge } from './shared'
 import YoyakuTodayCard from '@/components/rehab/YoyakuTodayCard'
+import YoyakuCancelSyncCard from './YoyakuCancelSyncCard'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -162,6 +163,9 @@ export default function RehabDashboard() {
 
       {/* 今日の予約（GAS予約システムと連携・患者カルテへ直接ジャンプ） */}
       <YoyakuTodayCard />
+
+      {/* 予約システムのキャンセルをカルテへ自動反映（要確認のみ手動で1タップ） */}
+      <YoyakuCancelSyncCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 離脱リスク高 */}

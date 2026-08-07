@@ -51,15 +51,6 @@ export function summarizeCancellations(
   return summary
 }
 
-/**
- * キャンセル率（キャンセル ÷（来院 + キャンセル））。
- * 離脱リスク算出と同じ考え方で、来院実績が無いときは 0 とする。
- */
-export function cancellationRate(cancelCount: number, visitCount: number): number {
-  const denom = cancelCount + visitCount
-  return denom > 0 ? cancelCount / denom : 0
-}
-
 /** 記録を患者IDごとにまとめる（一覧・ダッシュボードでの一括集計用） */
 export function groupByPatient(records: CancellationRecord[]): Map<string, CancellationRecord[]> {
   const map = new Map<string, CancellationRecord[]>()

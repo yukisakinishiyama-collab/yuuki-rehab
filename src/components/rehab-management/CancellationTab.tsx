@@ -11,9 +11,10 @@ import {
   CANCELLATION_KINDS, CANCELLATION_LABELS, CANCELLATION_SHORT_LABELS,
   CANCELLATION_DESCRIPTIONS,
 } from '@/types/patient'
-import { saveCancellation, deleteCancellation } from '@/lib/patient-store'
+import { saveCancellation } from '@/lib/patient-store'
+import { deleteCancellationRecord } from '@/lib/yoyaku-cancel-sync'
 import {
-  summarizeCancellations, inferCancellationKind, cancellationRate, todayString,
+  summarizeCancellations, inferCancellationKind, todayString,
 } from '@/lib/cancellation-utils'
 import { Card, CardContent, CardHeader, SectionTitle, FormLabel, Input, SaveButton } from './shared'
 
@@ -57,7 +58,8 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
   const [memo, setMemo] = useState('')
 
   const summary = useMemo(() => summarizeCancellations(records), [records])
-  const rate = Math.round(cancellationRate(summary.total, visitCount) * 100)
+  // 区分を直している行（誤って記録した区分を後から直せるようにする）
+  const [editingKindId, setEditingKindId] = useState<string | null>(null)
 
   // 予約日を変えたときは区分を推定し直す（施術者が自分で選び直した後は上書きしない）
   function handleDateChange(value: string) {
@@ -77,6 +79,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
       reason,
       memo,
       createdAt: new Date().toISOString(),
+      source: 'manual',
     })
     setReason('')
     setMemo('')
@@ -84,9 +87,24 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
     onUpdate()
   }
 
-  function handleDelete(id: string) {
-    if (!confirm('このキャンセル記録を削除しますか？')) return
-    deleteCancellation(id)
+  /** 記録済みの区分を直す（当日と予約日前を取り違えた場合など） */
+  function handleChangeKind(record: CancellationRecord, kind: CancellationKind) {
+    setEditingKindId(null)
+    if (record.kind === kind) return
+    // 院長が手で直した記録は、以後の同期で自動的に取り下げない
+    saveCancellation({ ...record, kind, origin: record.source === 'yoyaku' ? 'confirmed' : record.origin })
+    onUpdate()
+  }
+
+  // 誤って記録した分の取り消し。予約システムから取り込んだ記録は、
+  // 削除しただけだと次の同期で戻ってきてしまうため、取り込み対象からも外す。
+  function handleDelete(record: CancellationRecord) {
+    const fromYoyaku = Boolean(record.sourceReservationNo)
+    const message = fromYoyaku
+      ? `${record.appointmentDate} のキャンセル記録を削除しますか？\nこの予約は今後カルテに取り込まれなくなります。`
+      : `${record.appointmentDate} のキャンセル記録を削除しますか？`
+    if (!confirm(message)) return
+    deleteCancellationRecord(record)
     onUpdate()
   }
 
@@ -103,10 +121,11 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
         <CardHeader>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <SectionTitle>キャンセル累計</SectionTitle>
+            {/* 分母はSOAPカルテの件数。来院実績そのものではないため、率ではなく実数で示す */}
             <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span>来院 {visitCount}回</span>
+              <span>SOAPカルテ <strong className="text-gray-700 tabular-nums">{visitCount}</strong>件</span>
               <span className="text-gray-300">|</span>
-              <span>キャンセル率 <strong className="text-gray-700 tabular-nums">{rate}%</strong></span>
+              <span>キャンセル <strong className="text-gray-700 tabular-nums">{summary.total}</strong>件</span>
             </div>
           </div>
         </CardHeader>
@@ -208,7 +227,12 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
 
       {/* ── 履歴 ── */}
       <Card>
-        <CardHeader><SectionTitle>キャンセル履歴</SectionTitle></CardHeader>
+        <CardHeader>
+          <SectionTitle>キャンセル履歴</SectionTitle>
+          <p className="text-xs text-gray-400 mt-1">
+            区分を間違えたときは左の区分ラベルを押すと直せます。記録そのものが誤りなら「削除」で取り消せます。
+          </p>
+        </CardHeader>
         <CardContent>
           {records.length === 0 ? (
             <p className="text-sm text-gray-400 py-6 text-center">キャンセル記録はありません</p>
@@ -216,11 +240,30 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             <ul className="divide-y divide-gray-100">
               {records.map(r => (
                 <li key={r.id} className="flex items-start gap-3 py-3">
-                  <span className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${KIND_STYLES[r.kind].chip}`}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingKindId(editingKindId === r.id ? null : r.id)}
+                    title="区分を直す"
+                    className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                      hover:ring-2 hover:ring-teal-300 transition-shadow ${KIND_STYLES[r.kind].chip}`}
+                  >
                     {CANCELLATION_SHORT_LABELS[r.kind]}
-                  </span>
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 tabular-nums">{r.appointmentDate}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-800 tabular-nums">
+                        {r.appointmentDate}
+                        {r.appointmentTime && <span className="ml-1.5 text-gray-500">{r.appointmentTime}</span>}
+                      </span>
+                      {r.sourceReservationNo && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-200"
+                          title={`予約番号 ${r.sourceReservationNo}`}
+                        >
+                          予約システムから
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-gray-500 mt-0.5">
                       {r.reason || '理由の記録なし'}
                       {r.contactedDate && r.contactedDate !== r.appointmentDate && (
@@ -228,12 +271,32 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                       )}
                     </div>
                     {r.memo && <div className="text-xs text-gray-400 mt-0.5">{r.memo}</div>}
+                    {editingKindId === r.id && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                        <span className="text-[11px] text-gray-500">区分を直す</span>
+                        {CANCELLATION_KINDS.map(k => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => handleChangeKind(r, k)}
+                            className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
+                              r.kind === k
+                                ? 'bg-teal-600 text-white border-teal-600'
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
+                            }`}
+                          >
+                            {CANCELLATION_SHORT_LABELS[k]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleDelete(r.id)}
-                    className="flex-shrink-0 text-xs text-gray-300 hover:text-red-600 transition-colors px-2 py-1"
-                    aria-label="この記録を削除"
+                    onClick={() => handleDelete(r)}
+                    className="flex-shrink-0 text-xs text-gray-400 hover:text-red-600 hover:border-red-200
+                      border border-transparent rounded-md transition-colors px-2 py-1"
+                    aria-label={`${r.appointmentDate} のキャンセル記録を削除`}
                   >
                     削除
                   </button>

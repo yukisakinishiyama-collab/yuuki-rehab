@@ -379,6 +379,18 @@ export interface CancellationRecord {
   reason: string
   memo: string
   createdAt: string
+  /** 記録の由来。'yoyaku' は予約システム連携（省略時は手動入力） */
+  source?: 'manual' | 'yoyaku'
+  /**
+   * 予約システム由来の記録の作られ方。
+   * 'auto' … 自動取り込み（予約側でキャンセルが取り消されたら自動で取り下げる）
+   * 'confirmed' … 院長が確認して記録した（同期で勝手に消さない）
+   */
+  origin?: 'auto' | 'confirmed'
+  /** 自動取り込み元の予約番号。二重取り込みの防止と、予約側の変更への追従に使う */
+  sourceReservationNo?: string
+  /** 予約時間（自動取り込み時に記録。表示の手がかり用） */
+  appointmentTime?: string
 }
 
 export interface CancellationSummary {
