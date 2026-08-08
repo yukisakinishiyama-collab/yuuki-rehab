@@ -23,6 +23,7 @@ import {
   type OneDaySession,
 } from '@/lib/oneday-store'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
+import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import {
   ArrowLeft, Zap, Sparkles, AlertTriangle, Printer, Trash2,
   Clock, Bot, Wrench, History, Check,
@@ -366,11 +367,14 @@ export default function OneDayRehabPage({ params }: { params: Promise<{ id: stri
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="text-xs font-bold text-slate-500 font-display mb-1.5">きっかけ・状況（任意）</div>
-            <input
-              type="text" value={trigger} onChange={e => setTrigger(e.target.value)}
-              placeholder="例: 昨日の練習後から / 朝起きたら"
-              className="w-full h-9 px-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text" value={trigger} onChange={e => setTrigger(e.target.value)}
+                placeholder="例: 昨日の練習後から / 朝起きたら"
+                className="flex-1 h-9 px-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              />
+              <VoiceInputButton size="sm" onText={t => setTrigger(prev => (prev ? `${prev} ${t}` : t))} />
+            </div>
           </div>
           <div>
             <div className="text-xs font-bold text-slate-500 font-display mb-1.5">セッション時間</div>
@@ -541,6 +545,10 @@ export default function OneDayRehabPage({ params }: { params: Promise<{ id: stri
                 placeholder="実施後の様子（例: 挙上が楽になった）"
                 className="flex-1 min-w-[12rem] h-8 px-3 text-xs rounded-lg border border-slate-200
                   focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              />
+              <VoiceInputButton
+                size="sm"
+                onText={t => handleAfterUpdate({ afterNote: session.afterNote ? `${session.afterNote} ${t}` : t })}
               />
             </div>
           </div>

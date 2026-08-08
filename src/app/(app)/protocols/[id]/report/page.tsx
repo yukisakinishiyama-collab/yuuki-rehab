@@ -27,6 +27,7 @@ import {
   CalendarDays, ClipboardCheck, MessageCircleHeart, Sparkles, Loader2,
 } from 'lucide-react'
 import { generateReportDraft } from '@/lib/report-ai'
+import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 
 // 変化の方向アイコンと色
 function ChangeArrow({ change }: { change: MetricChange }) {
@@ -67,6 +68,16 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const [praiseDraft, setPraiseDraft] = useState<string[] | null>(null)
   const [generating, setGenerating] = useState(false)
   const [genNotice, setGenNotice] = useState<string | null>(null)
+  const [voiceInterim, setVoiceInterim] = useState('')
+
+  /** 音声入力の確定文をメッセージへ追記し、その場で保存する（印刷に確実に反映させる） */
+  function appendVoiceText(text: string) {
+    setComment(prev => {
+      const next = prev ? `${prev}${text}` : text
+      if (protocol) updateProtocol(protocol.id, { reportComment: next })
+      return next
+    })
+  }
 
   useEffect(() => {
     const p = getProtocolById(id)
@@ -535,7 +546,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
             </div>
-            {/* 画面: 編集可能テキストエリア */}
+            {/* 画面: 編集可能テキストエリア（音声入力対応） */}
             <div className="no-print">
               <textarea
                 value={comment}
@@ -547,8 +558,14 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
                   focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400
                   placeholder:text-slate-300"
               />
-              <div className="text-right text-[10px] text-teal-600 h-4">
-                {savedFlash && '✓ 保存しました'}
+              {voiceInterim && (
+                <p className="text-xs text-slate-400 italic px-1">🎤 {voiceInterim}…</p>
+              )}
+              <div className="flex items-center justify-between mt-1">
+                <VoiceInputButton size="sm" onText={appendVoiceText} onInterim={setVoiceInterim} />
+                <div className="text-right text-[10px] text-teal-600 h-4">
+                  {savedFlash && '✓ 保存しました'}
+                </div>
               </div>
             </div>
             {/* 印刷: メッセージ吹き出し or 手書き用罫線 */}

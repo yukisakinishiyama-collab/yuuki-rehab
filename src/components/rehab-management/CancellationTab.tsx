@@ -13,6 +13,7 @@ import {
 } from '@/types/patient'
 import { saveCancellation } from '@/lib/patient-store'
 import { deleteCancellationRecord } from '@/lib/yoyaku-cancel-sync'
+import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import {
   summarizeCancellations, inferCancellationKind, todayString,
 } from '@/lib/cancellation-utils'
@@ -218,7 +219,12 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
 
           <div>
             <FormLabel>メモ（任意）</FormLabel>
-            <Input value={memo} onChange={setMemo} placeholder="次回の予約を◯日に取り直し、など" />
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1">
+                <Input value={memo} onChange={setMemo} placeholder="次回の予約を◯日に取り直し、など" />
+              </div>
+              <VoiceInputButton size="sm" onText={t => setMemo(prev => (prev ? `${prev} ${t}` : t))} />
+            </div>
           </div>
 
           <SaveButton onClick={handleSave} label="キャンセルを記録" />

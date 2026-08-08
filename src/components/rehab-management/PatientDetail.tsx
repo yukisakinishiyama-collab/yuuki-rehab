@@ -36,6 +36,7 @@ import ExerciseCard from './ExerciseCard'
 import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
+import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
@@ -158,6 +159,8 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
   const [content, setContent] = useState('')
   const [saved, setSaved] = useState(false)
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  // 音声入力の認識途中テキスト（確定前のプレビュー表示用）
+  const [voiceInterim, setVoiceInterim] = useState('')
 
   // メモとテストを月別に統合
   type Entry =
@@ -215,7 +218,13 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
     <div className="space-y-4">
       {/* 入力エリア */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-        <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
+          <VoiceInputButton
+            onText={text => setContent(prev => (prev ? `${prev}${prev.endsWith('\n') ? '' : '\n'}${text}` : text))}
+            onInterim={setVoiceInterim}
+          />
+        </div>
         <div className="flex items-center gap-3">
           <label className="text-xs text-gray-500 whitespace-nowrap">日付</label>
           <input
@@ -233,6 +242,9 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
         />
+        {voiceInterim && (
+          <p className="text-xs text-gray-400 italic px-1">🎤 {voiceInterim}…</p>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400">Ctrl+Enter で保存</span>
           <div className="flex items-center gap-3">
