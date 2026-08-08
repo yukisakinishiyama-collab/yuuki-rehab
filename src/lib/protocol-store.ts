@@ -1,6 +1,7 @@
 import type { ProtocolPatient, Protocol, Phase, Assessment, Milestone, ProtocolAttachment, ProtocolChatMessage } from '@/types/protocol'
 import { getTemplate, findBestTemplate } from '@/data/protocols/templates'
 import { resolveMilestoneSet, LEGACY_DEFAULT_SET } from '@/data/milestones'
+import { notifyCloudSync } from './store-sync'
 import { nanoid } from 'nanoid'
 
 const KEYS = {
@@ -22,6 +23,9 @@ function get<T>(key: string): T[] {
 function set<T>(key: string, data: T[]): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(key, JSON.stringify(data))
+  // クラウドへ自動送信。これが無いと、AI文章やマイルストーン達成などの
+  // プロトコル系データが次回起動時のプル（全上書き）で巻き戻ってしまう
+  notifyCloudSync()
 }
 
 // ─── 患者 ────────────────────────────────────────────────────────────────────

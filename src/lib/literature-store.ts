@@ -1,5 +1,6 @@
 import type { LiteraturePaper } from '@/types/literature'
 import { nanoid } from 'nanoid'
+import { notifyCloudSync } from './store-sync'
 
 const KEY = 'literatureLibrary'
 
@@ -19,6 +20,7 @@ export function savePaperToLibrary(
   const now = new Date().toISOString()
   const newPaper: LiteraturePaper = { ...paper, id: nanoid(), addedAt: now, updatedAt: now }
   localStorage.setItem(KEY, JSON.stringify([...papers, newPaper]))
+  notifyCloudSync()
   return newPaper
 }
 
@@ -28,11 +30,13 @@ export function updateLibraryPaper(id: string, patch: Partial<LiteraturePaper>):
     p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p,
   )
   localStorage.setItem(KEY, JSON.stringify(updated))
+  notifyCloudSync()
 }
 
 export function deleteLibraryPaper(id: string): void {
   const papers = getLiteratureLibrary()
   localStorage.setItem(KEY, JSON.stringify(papers.filter(p => p.id !== id)))
+  notifyCloudSync()
 }
 
 export function isPmidSaved(pmid: string): boolean {

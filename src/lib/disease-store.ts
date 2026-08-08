@@ -5,6 +5,7 @@
 
 import type { DiseasePage, DiseaseCategory, PlannedDisease } from '@/types/disease'
 import { DISEASE_PAGES, PLANNED_CATALOG } from '@/data/diseases'
+import { notifyCloudSync } from './store-sync'
 
 // ─── 監修記録オーバーレイ ───────────────────────────────────────
 
@@ -38,10 +39,12 @@ export function saveReview(review: Omit<DiseaseReview, 'updatedAt'>): void {
   const reviews = readReviews().filter(r => r.pageId !== review.pageId)
   reviews.push({ ...review, updatedAt: new Date().toISOString() })
   localStorage.setItem(REVIEW_KEY, JSON.stringify(reviews))
+  notifyCloudSync()
 }
 
 export function clearReview(pageId: string): void {
   localStorage.setItem(REVIEW_KEY, JSON.stringify(readReviews().filter(r => r.pageId !== pageId)))
+  notifyCloudSync()
 }
 
 export function getDiseasePages(): DiseasePage[] {

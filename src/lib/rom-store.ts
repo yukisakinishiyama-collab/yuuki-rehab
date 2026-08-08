@@ -1,4 +1,5 @@
 import type { ROMPatient, ROMSession } from '@/types/rom'
+import { notifyCloudSync } from './store-sync'
 
 const KEYS = {
   patients: 'romPatients',
@@ -17,6 +18,7 @@ function get<T>(key: string): T[] {
 function set<T>(key: string, data: T[]): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(key, JSON.stringify(data))
+  notifyCloudSync()
 }
 
 export function getPatients(): ROMPatient[] {

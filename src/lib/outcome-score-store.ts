@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────
 import type { OutcomeScoreRecord, ScoreId } from '@/types/outcome-scores'
 import { nanoid } from 'nanoid'
+import { notifyCloudSync } from './store-sync'
 
 const KEY = 'outcomeScores_v1'
 
@@ -12,6 +13,7 @@ function load(): OutcomeScoreRecord[] {
 }
 function persist(list: OutcomeScoreRecord[]) {
   localStorage.setItem(KEY, JSON.stringify(list))
+  notifyCloudSync()
 }
 
 export function getScores(patientId: string): OutcomeScoreRecord[] {

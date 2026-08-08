@@ -16,6 +16,7 @@ import type {
   AssessmentRegion,
 } from '@/types/return-criteria'
 import { nanoid } from 'nanoid'
+import { notifyCloudSync } from './store-sync'
 
 const KEY = 'returnCriteria'
 
@@ -30,6 +31,7 @@ function load(): ReturnCriteriaAssessment[] {
 
 function save(list: ReturnCriteriaAssessment[]) {
   localStorage.setItem(KEY, JSON.stringify(list))
+  notifyCloudSync()
 }
 
 // ── スコア計算 ────────────────────────────────────────────────────

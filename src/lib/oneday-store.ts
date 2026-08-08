@@ -4,6 +4,7 @@
 // ──────────────────────────────────────────────
 import { nanoid } from 'nanoid'
 import type { OneDayInput, OneDayMenu } from './oneday-rehab'
+import { notifyCloudSync } from './store-sync'
 
 const KEY = 'onedaySessions'
 
@@ -34,6 +35,7 @@ function getAll(): OneDaySession[] {
 function setAll(list: OneDaySession[]): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(KEY, JSON.stringify(list))
+  notifyCloudSync()
 }
 
 export function getOneDaySessions(patientId: string): OneDaySession[] {

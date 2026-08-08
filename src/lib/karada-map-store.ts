@@ -1,3 +1,4 @@
+import { notifyCloudSync } from './store-sync';
 /**
  * カラダの地図 — データモデルとLocalStorageストア
  *
@@ -187,6 +188,7 @@ function loadData(): StoreData {
 function saveData(data: StoreData): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  notifyCloudSync();
 }
 
 function generateId(): string {

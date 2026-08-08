@@ -1,6 +1,7 @@
 import type { User, RehabCase, VideoComment, EvaluationResult, SavedAnnotation, ChatMessage, PersonMarker, AISummary, ExerciseProgram, ROMSession, DiscussionSession } from '@/types/rehab'
 import { MOCK_CASES, MOCK_COMMENTS, MOCK_EVALUATIONS, MOCK_USERS } from './rehab-data'
 import { deleteVideoBlob } from './video-db'
+import { notifyCloudSync } from './store-sync'
 
 const MOCK_CREDENTIALS: Record<string, string> = {
   'user-001': 'rehab2026',
@@ -36,6 +37,7 @@ function get<T>(key: string): T[] {
 function set<T>(key: string, data: T[]): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(key, JSON.stringify(data))
+  notifyCloudSync()
 }
 
 export function initStore(): void {
