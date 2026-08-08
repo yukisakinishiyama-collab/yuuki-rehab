@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Phase } from '@/types/protocol'
 import { findVideoUrl } from '@/lib/exercise-video-map'
 import {
@@ -20,13 +20,23 @@ interface Props {
   onUpdate?: (updates: Partial<Phase>) => void
   onDelete?: () => void
   readOnly?: boolean
+  /** 編集モードの開始/終了を親へ通知（編集中は他UIからの基準チェックをロックするため） */
+  onEditingChange?: (editing: boolean) => void
 }
 
-export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDelete, readOnly }: Props) {
+export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDelete, readOnly, onEditingChange }: Props) {
   const [expanded, setExpanded] = useState(isActive)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(phase)
   const [prevPhaseForDraft, setPrevPhaseForDraft] = useState(phase)
+
+  // 編集状態を親へ通知する。編集中のままアンマウントされた場合（タブ切替など）も
+  // クリーンアップで必ず解除し、親側のロックが残らないようにする
+  useEffect(() => {
+    onEditingChange?.(editing)
+    return () => { if (editing) onEditingChange?.(false) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
 
   // 編集中でない間は、保存済みの最新phaseにdraftを同期し続ける（レンダー中に調整）。
   // これを怠ると、以前保存した内容から更新されない古いdraftを基準に

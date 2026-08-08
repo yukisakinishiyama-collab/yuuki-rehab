@@ -11,6 +11,7 @@ import {
 import { getPatients as getPtPatients, saveRehabPlan } from '@/lib/patient-store'
 import type { Patient as PtPatient } from '@/types/patient'
 import PhaseCard from '@/components/protocol/PhaseCard'
+import PhaseReadinessPanel from '@/components/protocol/PhaseReadinessPanel'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import ProtocolChat from '@/components/protocol/ProtocolChat'
@@ -42,7 +43,18 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const [reflectDone, setReflectDone] = useState(false)
   const [pendingQuestion, setPendingQuestion] = useState('')
   const [selectionPopup, setSelectionPopup] = useState<{ text: string; x: number; y: number } | null>(null)
+  // 編集モード中のフェーズID（編集中は準備状況パネルからのチェック操作をロックする。
+  // PhaseCard の編集保存は draft 全体を書き戻すため、並行変更が無言で巻き戻るのを防ぐ）
+  const [editingPhaseIds, setEditingPhaseIds] = useState<string[]>([])
   const protocolContentRef = useRef<HTMLDivElement>(null)
+
+  function setPhaseEditing(phaseId: string, editing: boolean) {
+    setEditingPhaseIds(prev => {
+      const has = prev.includes(phaseId)
+      if (editing === has) return prev // 変化なしのときは同じ参照を返して再レンダーを防ぐ
+      return editing ? [...prev, phaseId] : prev.filter(x => x !== phaseId)
+    })
+  }
 
   const filteredPtPatients = ptSearch
     ? ptPatients.filter(p => p.name.includes(ptSearch) || (p.kana && p.kana.includes(ptSearch)))
@@ -411,6 +423,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         )}
       </div>
 
+      {/* フェーズ進行の準備状況（v2.1: 進行基準×実測値の自動照合） */}
+      {patient && (
+        <PhaseReadinessPanel
+          protocol={protocol}
+          patient={patient}
+          editLocked={editingPhaseIds.includes(protocol.phases[protocol.currentPhaseIndex]?.id ?? '')}
+          onUpdated={() => setProtocol(getProtocolById(protocol.id))}
+        />
+      )}
+
       {/* タブ */}
       <div className="flex border-b border-slate-200 mb-5 no-print animate-slide-up delay-150">
         {([
@@ -473,6 +495,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 isCompleted={i < protocol.currentPhaseIndex}
                 onUpdate={(updates) => handlePhaseUpdate(phase.id, updates)}
                 onDelete={protocol.phases.length > 1 ? () => handlePhaseDelete(phase.id) : undefined}
+                onEditingChange={editing => setPhaseEditing(phase.id, editing)}
               />
             </div>
           ))}

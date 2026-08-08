@@ -18,6 +18,9 @@ import {
   getPatients as getProtocolPatients, getProtocolsByPatient, getMilestones,
 } from '@/lib/protocol-store'
 import type { Milestone, Protocol } from '@/types/protocol'
+import { recommendConditionImage, getConditionImage, type ConditionImage } from '@/lib/condition-images'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import ConditionPhoto from './ConditionPhoto'
 import { X, Target, Flag, Sprout, Award, CalendarCheck } from 'lucide-react'
 
 interface Derived {
@@ -25,6 +28,27 @@ interface Derived {
   problems: ClinicalProblem[]
   protocol: Protocol | null
   milestones: Milestone[]
+  conditionImage: ConditionImage | null
+}
+
+/**
+ * 説明モードに表示する実写画像を決める（画像統合指示書§9）。
+ * 施術者の明示選択が最優先。'none' なら表示しない。未設定のときだけ推奨を使う。
+ */
+function resolveConditionImage(
+  patient: Patient, goals: PatientGoals | undefined, protocol: Protocol | null,
+): ConditionImage | null {
+  if (!isFeatureEnabled('conditionImages')) return null
+  const chosen = goals?.explanationImageId
+  if (chosen === 'none') return null
+  if (chosen) return getConditionImage(chosen)
+  return recommendConditionImage({
+    diagnosis: patient.diagnosisLabel,
+    protocolTitle: protocol?.title,
+    phaseTitle: protocol?.phases[protocol.currentPhaseIndex]?.title,
+    bodyRegion: patient.bodyRegion,
+    mainComplaint: patient.mainComplaint,
+  })
 }
 
 /**
@@ -47,7 +71,10 @@ function derive(patient: Patient): Derived {
     : null
   const milestones = protocolPatient ? getMilestones(protocolPatient.id) : []
 
-  return { goals, problems, protocol, milestones }
+  return {
+    goals, problems, protocol, milestones,
+    conditionImage: resolveConditionImage(patient, goals, protocol),
+  }
 }
 
 interface Props {
@@ -58,7 +85,7 @@ interface Props {
 export default function ExplanationMode({ patient, onClose }: Props) {
   // 開いた時点のデータで固定（説明中に裏で変わって表示が揺れないように）
   const [data] = useState<Derived>(() => derive(patient))
-  const { goals, problems, protocol, milestones } = data
+  const { goals, problems, protocol, milestones, conditionImage } = data
 
   const improving = problems.filter(p => p.status === 'improving' || p.status === 'resolved')
   const working = problems.filter(p => p.status === 'active' || p.status === 'monitor')
@@ -154,6 +181,24 @@ export default function ExplanationMode({ patient, onClose }: Props) {
               第{protocol.currentPhaseIndex + 1}段階
               <span className="text-slate-400 text-base font-medium">（全{protocol.phases.length}段階）</span>
               ：{currentPhase.title}
+            </p>
+          </section>
+        )}
+
+        {/* 取り組んでいる内容の実写イメージ（画像が未登録なら自動的に非表示） */}
+        {conditionImage && (
+          <section className="rounded-3xl bg-white border border-slate-200 shadow-sm px-7 py-6">
+            <div className="flex items-center gap-2 text-slate-600 font-bold text-sm mb-3">
+              <Sprout className="w-5 h-5 text-teal-500" />いま取り組んでいる練習のイメージ
+            </div>
+            <ConditionPhoto
+              slot={conditionImage.slot}
+              alt={conditionImage.alt}
+              caption={conditionImage.patientCaption}
+              className="max-w-xl"
+            />
+            <p className="text-xs text-slate-400 mt-3">
+              ※ 写真は練習内容のイメージです。実際の内容は、お一人ずつの状態に合わせて調整します。
             </p>
           </section>
         )}

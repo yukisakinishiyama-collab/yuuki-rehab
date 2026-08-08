@@ -23,6 +23,14 @@ export const ILLUSTRATION_SLOTS: IllustrationSlot[] = [
   { slot: 'sprain-icing',           label: '捻挫・アイシング',       usage: '足関節外側靱帯損傷の急性期（症状緩和の一例）' },
   { slot: 'sprain-taping',          label: '捻挫・テーピング',       usage: '足関節外側靱帯損傷の保護／プロトコル患者提示画面' },
   { slot: 'sprain-balance',         label: '捻挫・バランス訓練',     usage: '足関節捻挫・慢性足関節不安定症の再発予防' },
+  // 疾患・場面別の実写写真（患者説明モード用。4:3・実写ベース／画像統合指示書 §10）
+  // 未アップロードのスロットは自動的に非表示になるため、順次追加してよい
+  { slot: 'condition-acl-knee',          label: '実写・ACL/膝',        usage: '患者説明モード: 膝の症例（4:3・実写）' },
+  { slot: 'condition-ankle-instability', label: '実写・足関節',        usage: '患者説明モード: 足関節捻挫・不安定症（4:3・実写）' },
+  { slot: 'condition-hip',               label: '実写・股関節',        usage: '患者説明モード: 股関節・FAI・関節唇（4:3・実写）' },
+  { slot: 'condition-shoulder-cuff',     label: '実写・肩/腱板',       usage: '患者説明モード: 肩・腱板（4:3・実写）' },
+  { slot: 'condition-lumbar',            label: '実写・腰部',          usage: '患者説明モード: 腰部・体幹（4:3・実写）' },
+  { slot: 'condition-return-to-sport',   label: '実写・スポーツ復帰',  usage: '患者説明モード: 復帰期の動作確認（4:3・実写）' },
   // 疾患ライブラリ（患者説明モード）用の部位別イラスト
   { slot: 'category-knee',          label: '部位別・膝',             usage: '疾患ライブラリ: 膝の症例の患者説明' },
   { slot: 'category-shoulder',      label: '部位別・肩',             usage: '疾患ライブラリ: 肩の症例の患者説明' },

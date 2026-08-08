@@ -9,11 +9,15 @@
 export type FeatureKey =
   | 'explanationMode'   // 患者説明モード（カルテの全画面提示）
   | 'goalsProblems'     // 目標二層（本人の目標／臨床目標）と問題リスト
+  | 'smartProtocol'     // 進行基準×実測値の自動照合＋条件ベース再評価リマインド
+  | 'conditionImages'   // 患者説明モードの疾患別実写画像
 
 /** 既定値。問題発生時はここを false にしてデプロイすれば全端末で止まる */
 const DEFAULTS: Record<FeatureKey, boolean> = {
   explanationMode: true,
   goalsProblems: true,
+  smartProtocol: true,
+  conditionImages: true,
 }
 
 const STORAGE_KEY = 'featureFlags'

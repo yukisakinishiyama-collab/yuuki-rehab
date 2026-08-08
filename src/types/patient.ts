@@ -429,6 +429,12 @@ export interface PatientGoals {
    * SOAPカルテの自由記述はスタッフ向けのため患者画面には出さず、必ずこの欄を使う。
    */
   nextVisitNote?: string
+  /**
+   * 患者説明モードに表示する実写画像の選択（画像統合指示書§9「最終選択は施術者」）。
+   * 未設定=診断・部位からの推奨を表示 / 'none'=画像を表示しない /
+   * それ以外= condition-images.ts の conditionId
+   */
+  explanationImageId?: string
   updatedAt: string
 }
 
