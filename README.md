@@ -58,3 +58,9 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_xxxxxxxxxxxx   # 動画アップロード用�
 - **動画解析**: MediaPipe Tasks Vision（`serverExternalPackages` でバンドル除外）
 - **スタイリング**: Tailwind CSS 4
 - 詳細は [CLAUDE.md](CLAUDE.md) / [DECISIONS.md](DECISIONS.md) 参照
+
+## 復旧地点（次世代化プロジェクト）
+
+タグ **`YUUKI_REHAB_STABLE_BASELINE_V1`**（= 2026-08-08 本番）まで戻せば、
+現行の YUUKI REHAB へ完全に復元できます。手順・データバックアップの場所は
+[ROLLBACK.md](ROLLBACK.md) を参照。次世代化の計画は [docs/NEXTGEN-PLAN.md](docs/NEXTGEN-PLAN.md)。
