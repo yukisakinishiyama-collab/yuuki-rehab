@@ -22,7 +22,7 @@ export type ComparisonOp = 'gte' | 'lte'
 export type CriterionKind = 'rom' | 'lsi' | 'pain' | 'mmt'
 
 /** 照合先の記録を特定できなかった理由 */
-export type Ambiguity = 'sides' | 'muscles'
+export type Ambiguity = 'sides' | 'muscles' | 'variants'
 
 export interface ParsedCriterion {
   kind: CriterionKind
@@ -30,6 +30,8 @@ export interface ParsedCriterion {
   movement?: string
   op: ComparisonOp
   threshold: number
+  /** 表示用のしきい値（MMTの「4+」など、数値化前の原文） */
+  thresholdLabel?: string
   unit: string
 }
 
@@ -104,62 +106,102 @@ export function movementMatches(recordMovement: string, keyword: string): boolea
   return matcher.include.test(recordMovement)
 }
 
-// 筋名の同義語グループ（基準文言 ⇔ 記録の muscleGroup を日英対応で突き合わせる）。
-// 「下腿三頭筋」は「三頭筋」グループより先に置く（部分文字列の誤マッチ防止）
-const MUSCLE_SYNONYMS: RegExp[] = [
-  /quadriceps|quads?\b|大腿四頭筋|四頭筋/i,
-  /hamstrings?|ハムスト/i,
-  /gluteus|glutes?\b|殿筋|臀筋/i,
-  /calf|gastrocnemius|soleus|下腿三頭筋|腓腹筋|ヒラメ筋/i,
-  /deltoid|三角筋/i,
-  /rotator|cuff|腱板|棘上筋|棘下筋|肩甲下筋|小円筋/i,
-  /biceps|上腕二頭筋|二頭筋/i,
-  /triceps|上腕三頭筋|三頭筋/i,
-  /tibialis|前脛骨筋/i,
-  /iliopsoas|腸腰筋/i,
+// 個々の筋（日英・表記ゆれのみを同義とする）。
+// 大殿筋と中殿筋、棘上筋と棘下筋のような「別の筋」は決して同一視しない。
+// 総称（殿筋群・腱板）で書かれた基準だけが family 経由で下位の筋に当たる。
+interface MuscleDef { key: string; re: RegExp; family?: string }
+
+const MUSCLES: MuscleDef[] = [
+  { key: 'quadriceps',   re: /quadriceps|quads?\b|大腿四頭筋|四頭筋/i },
+  { key: 'hamstrings',   re: /hamstrings?|biceps femoris|ハムスト|大腿二頭筋/i },
+  { key: 'glut_max',     re: /gluteus\s*maximus|大殿筋|大臀筋/i, family: 'glutes' },
+  { key: 'glut_med',     re: /gluteus\s*medius|中殿筋|中臀筋/i,  family: 'glutes' },
+  { key: 'glut_min',     re: /gluteus\s*minimus|小殿筋|小臀筋/i, family: 'glutes' },
+  { key: 'supraspinatus',re: /supraspinatus|棘上筋/i,            family: 'cuff' },
+  { key: 'infraspinatus',re: /infraspinatus|棘下筋/i,            family: 'cuff' },
+  { key: 'teres_minor',  re: /teres\s*minor|小円筋/i,            family: 'cuff' },
+  { key: 'subscapularis',re: /subscapularis|肩甲下筋/i,          family: 'cuff' },
+  { key: 'deltoid',      re: /deltoid|三角筋/i },
+  { key: 'calf',         re: /gastrocnemius|soleus|calf|下腿三頭筋|腓腹筋|ヒラメ筋/i },
+  { key: 'tibialis_ant', re: /tibialis\s*anterior|前脛骨筋/i },
+  { key: 'iliopsoas',    re: /iliopsoas|腸腰筋/i },
+  { key: 'biceps_br',    re: /biceps\s*brachii|上腕二頭筋/i },
+  { key: 'triceps_br',   re: /triceps\s*brachii|上腕三頭筋/i },
+  { key: 'grip',         re: /握力|grip/i },
 ]
 
-function muscleGroupIndex(text: string): number {
-  return MUSCLE_SYNONYMS.findIndex(re => re.test(text))
+// 総称。基準が総称で書かれている場合のみ、その系統の筋の記録と照合してよい
+const MUSCLE_FAMILIES: Record<string, RegExp> = {
+  glutes: /(殿筋群|臀筋群|glute)/i,
+  cuff: /(腱板|rotator|cuff)/i,
+}
+
+/** 未知の筋名が書かれているかの判定（推測での照合を避けるため） */
+const NAMES_SOME_MUSCLE = /[一-龥ァ-ヴー]{1,6}筋/
+
+function musclesIn(text: string): string[] {
+  return MUSCLES.filter(m => m.re.test(text)).map(m => m.key)
+}
+
+function familiesIn(text: string): string[] {
+  return Object.entries(MUSCLE_FAMILIES).filter(([, re]) => re.test(text)).map(([k]) => k)
 }
 
 /**
  * 筋力系の照合候補から、基準文言に対応する1件を保守的に選ぶ。
- * - 基準に筋名がある → 同じ筋の記録だけに絞る（対応記録なし=null、複数筋に該当=曖昧）
- * - 基準に筋名がない → 記録が1筋だけなら採用、複数筋あれば曖昧
- * - 絞った後も左右の記録が混在していたら曖昧（患側を特定できないため）
+ * - 基準が特定の筋を指名 → その筋の記録だけ（無ければ null＝データなし扱い）
+ * - 基準が総称（腱板・殿筋群）→ その系統の記録だけ
+ * - 基準が知らない筋名を含む → 推測しない（null）
+ * - 基準が筋を指名していない → 記録が1筋だけなら採用、複数筋あれば曖昧
+ * - 絞った後に左右が混在していたら曖昧（患側を特定できないため）
  */
 export function pickStrengthCandidate(
   criterionText: string,
   candidates: StrengthCandidate[],
 ): { candidate: StrengthCandidate } | { ambiguity: Ambiguity } | null {
   if (candidates.length === 0) return null
-  const critIdx = muscleGroupIndex(criterionText)
-  const muscles = [...new Set(candidates.map(c => c.muscle))]
-  const critNamesMuscle =
-    critIdx >= 0 || muscles.some(m => m.length >= 2 && criterionText.includes(m))
+
+  const critMuscles = musclesIn(criterionText)
+  // 記録の筋名がそのまま基準文に書かれている場合も「指名」とみなす
+  const namedByText = (c: StrengthCandidate) =>
+    c.muscle.length >= 2 && criterionText.includes(c.muscle)
 
   let pool: StrengthCandidate[]
-  if (critNamesMuscle) {
-    const matched = muscles.filter(m => {
-      if (!m) return false
-      if (m.length >= 2 && criterionText.includes(m)) return true
-      const mi = muscleGroupIndex(m)
-      return mi >= 0 && mi === critIdx
-    })
-    if (matched.length === 0) return null // 基準の筋に対応する記録がない → データなし扱い
-    if (matched.length > 1) return { ambiguity: 'muscles' }
-    pool = candidates.filter(c => c.muscle === matched[0])
+  if (critMuscles.length > 0 || candidates.some(namedByText)) {
+    pool = candidates.filter(c =>
+      namedByText(c) || musclesIn(c.muscle).some(k => critMuscles.includes(k)))
+    if (pool.length === 0) return null
   } else {
-    if (muscles.length > 1) return { ambiguity: 'muscles' }
-    pool = candidates
+    const critFamilies = familiesIn(criterionText)
+    if (critFamilies.length > 0) {
+      pool = candidates.filter(c =>
+        musclesIn(c.muscle).some(k => {
+          const family = MUSCLES.find(m => m.key === k)?.family
+          return family != null && critFamilies.includes(family)
+        }))
+      if (pool.length === 0) return null
+    } else if (NAMES_SOME_MUSCLE.test(criterionText)) {
+      return null // 未知の筋名が書かれている → どの記録が対応するか判断できない
+    } else {
+      pool = candidates
+    }
   }
 
+  const muscles = [...new Set(pool.map(c => c.muscle))]
+  if (muscles.length > 1) return { ambiguity: 'muscles' }
   const sides = new Set(pool.map(c => c.side).filter(s => s === 'left' || s === 'right'))
   if (sides.size >= 2) return { ambiguity: 'sides' }
   const latest = [...pool].sort((a, b) => b.date.localeCompare(a.date))[0]
   return { candidate: latest }
 }
+
+// 筋力ではない指標。これらの「健側比」を筋力LSIの記録で判定してはいけない
+const NON_STRENGTH_METRIC =
+  /(rom|可動域|関節可動域|ホップ|hop\b|バランス|balance|リーチ|reach|片脚立位|歩行|走行|ジャンプ|jump|着地|周径)/i
+
+// 条件付きの痛み。カルテの全般NRS（評価記録）とは比較できない
+const PAIN_CONTEXT =
+  /(歩行|走行|動作|荷重|運動|安静|夜間|早朝|起床|日常生活|階段|しゃがみ|ジャンプ|着地|投球|時痛)/
 
 function detectOp(text: string, fallback: ComparisonOp): ComparisonOp {
   if (/(以上|≥|≧|>=)/.test(text)) return 'gte'
@@ -178,8 +220,13 @@ export function parseCriterion(label: string, target?: string): ParsedCriterion 
 
   // LSI / 健側比（%必須。「左右差5°以内」のような角度の左右差は対象外）
   if (/(lsi|健側比|健患比|患健比|左右比)/.test(lower)) {
-    // 「屈曲 健側比90%」のようなROM対称性の基準は筋力LSIと別物 → 筋力の文脈が無ければ対象外
+    // 「肩ROM 健側比80%」「ホップテスト等 健側比85%」のような筋力以外の左右比は、
+    // 筋力の健側比とは別次元の指標なので照合しない（誤った達成提案の防止）
+    if (NON_STRENGTH_METRIC.test(text)) return null
+    // 「屈曲 健側比90%」のようなROM対称性の基準も同様に対象外
     if (ROM_MOVEMENTS.some(k => text.includes(k)) && !/筋|力|strength/i.test(text)) return null
+    // 筋力の文脈（「筋力」「握力」等）か、既知の筋名が書かれている場合のみ筋力LSIとみなす
+    if (!/筋|力|strength|mmt|hhd/i.test(text) && musclesIn(text).length === 0) return null
     const m = text.match(/(\d{1,3})\s*[%％]/)
     if (!m) return null
     const threshold = Number(m[1])
@@ -188,10 +235,12 @@ export function parseCriterion(label: string, target?: string): ParsedCriterion 
   }
 
   // 痛み（NRS）。誤解析を避けるため:
-  // - 動作特異的な痛み（例: 屈曲時痛）は全身のNRS記録と同一視できない → 対象外
+  // - 条件付きの痛み（歩行時・動作時・安静時など）はカルテの全般NRSと別物 → 対象外
+  // - 動作特異的な痛み（例: 屈曲時痛）も同様に対象外
   // - 機能課題との複合（例: 疼痛なく片脚スクワット10回）の回数・時間を拾わない → 対象外
   // - 数値は「◯以下」等の比較語が直接付くものだけを採用（既定方向へのフォールバックはしない）
   if (/(疼痛|痛み|nrs|pain)/.test(lower)) {
+    if (PAIN_CONTEXT.test(text)) return null
     if (ROM_MOVEMENTS.some(k => text.includes(k))) return null
     if (/\d\s*(回|セット|分|秒|時間|km|㎞|kg|㎏|cm|㎝)/.test(text)) return null
     const m =
@@ -207,9 +256,18 @@ export function parseCriterion(label: string, target?: string): ParsedCriterion 
 
   // MMT（数値はMMTの直後にあるものだけ。「MMT改善（屈曲120°）」の角度の桁を拾わない）
   if (/mmt/.test(lower)) {
-    const m = text.match(/mmt\s*[:：]?\s*(?:grade\s*)?([0-5])(?![0-9])/i)
+    const m = text.match(/mmt\s*[:：]?\s*(?:grade\s*)?([0-5])\s*([+＋\-－])?(?![0-9])/i)
     if (!m) return null
-    return { kind: 'mmt', op: detectOp(text, 'gte'), threshold: Number(m[1]), unit: '' }
+    const base = Number(m[1])
+    // 「4+」「4-」はカルテ側の数値化（4.3 / 3.7）に合わせる
+    const modifier = m[2] === '+' || m[2] === '＋' ? 0.3 : m[2] === '-' || m[2] === '－' ? -0.3 : 0
+    return {
+      kind: 'mmt',
+      op: detectOp(text, 'gte'),
+      threshold: Number((base + modifier).toFixed(1)),
+      thresholdLabel: `${base}${m[2] ?? ''}`,
+      unit: '',
+    }
   }
 
   // ROM（動きのキーワード＋角度）。以下は比較先が複雑なため対象外:
@@ -266,9 +324,14 @@ export function evaluateCriteria(
     if (parsed.kind === 'rom') {
       const matches = evidence.roms.filter(r => movementMatches(r.movement, parsed.movement!))
       if (matches.length > 0) {
-        // 左右の記録が混在 → 患側を特定できないので判定しない
+        // 同じ動きでも測定条件が複数ある場合（外旋1st/2nd、背屈の膝伸展位/屈曲位など）は
+        // どれと比べるべきか決められないので判定しない
+        const variants = new Set(matches.map(r => r.movement))
         const sides = new Set(matches.map(r => r.side).filter(s => s === 'left' || s === 'right'))
-        if (sides.size >= 2) {
+        if (variants.size >= 2) {
+          ambiguity = 'variants'
+        } else if (sides.size >= 2) {
+          // 左右の記録が混在 → 患側を特定できないので判定しない
           ambiguity = 'sides'
         } else {
           const latest = [...matches].sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -349,9 +412,11 @@ export function buildReassessmentSuggestions(
 export const AMBIGUITY_LABELS: Record<Ambiguity, string> = {
   sides: '左右の記録が混在するため自動照合の対象外（患側を特定できません）',
   muscles: '複数の筋の記録があり基準の筋を特定できないため自動照合の対象外',
+  variants: '同じ動きで測定条件の異なる記録が複数あるため自動照合の対象外',
 }
 
-/** 表示用: 基準値の文字列（例: 「≥80%」「≤2/10」） */
+/** 表示用: 基準値の文字列（例: 「≥80%」「≤2/10」「≥4+」） */
 export function formatThreshold(parsed: ParsedCriterion): string {
-  return `${parsed.op === 'gte' ? '≥' : '≤'}${parsed.threshold}${parsed.unit}`
+  const value = parsed.thresholdLabel ?? String(parsed.threshold)
+  return `${parsed.op === 'gte' ? '≥' : '≤'}${value}${parsed.unit}`
 }
