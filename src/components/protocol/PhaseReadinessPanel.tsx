@@ -250,6 +250,10 @@ export default function PhaseReadinessPanel({ protocol, patient, editLocked, onU
               {!ev.measured && !ev.ambiguity && ev.parsed && link.patient && (
                 <span className="ml-2 text-[10px] text-slate-400">実測データなし</span>
               )}
+              {/* 何も判定していない行を「確認済み」と誤読されないよう明示する */}
+              {!ev.parsed && (
+                <span className="ml-2 text-[10px] text-slate-400">自動照合の対象外（目視で判断してください）</span>
+              )}
             </div>
 
             {/* 実測OKの承認提案（自動では達成にしない） */}
