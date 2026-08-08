@@ -405,6 +405,66 @@ export interface CancellationSummary {
 }
 
 // ──────────────────────────────────────────────
+// 目標二層（本人の目標／臨床目標）— NextGen v2.0
+// 患者説明モードでは「本人の目標」を最上部に置き、
+// 臨床目標はその達成につながる道筋として表示する。
+// ──────────────────────────────────────────────
+export interface ClinicalGoal {
+  id: string
+  /** 例: 膝の曲がり140°、太もも筋力 反対側の90% */
+  label: string
+  achieved: boolean
+  achievedDate?: string
+}
+
+export interface PatientGoals {
+  patientId: string
+  /** 本人の言葉のままの目標。例: 「サッカーの試合に出たい」「孫と旅行に行きたい」 */
+  patientGoal: string
+  /** 目標時期（任意・断定的な予後予測には使わない） */
+  targetNote: string
+  clinicalGoals: ClinicalGoal[]
+  /**
+   * 次回来院時に一緒に確認すること（患者説明モードに表示される・患者向けの文で書く）。
+   * SOAPカルテの自由記述はスタッフ向けのため患者画面には出さず、必ずこの欄を使う。
+   */
+  nextVisitNote?: string
+  updatedAt: string
+}
+
+// ──────────────────────────────────────────────
+// 問題リスト（Clinical Problem List）— NextGen v2.0
+// 診断名ではなく「今、何が問題か」で患者を管理する。
+// ──────────────────────────────────────────────
+export type ProblemStatus = 'active' | 'improving' | 'resolved' | 'monitor'
+
+export const PROBLEM_STATUS_LABELS: Record<ProblemStatus, string> = {
+  active: '要対応',
+  improving: '改善中',
+  resolved: '解決',
+  monitor: '経過観察',
+}
+
+/** 患者説明モードで使う、患者向けのやさしい呼び方 */
+export const PROBLEM_STATUS_PATIENT_LABELS: Record<ProblemStatus, string> = {
+  active: 'これから取り組むところ',
+  improving: '良くなってきているところ',
+  resolved: '良くなったところ',
+  monitor: '様子を見ているところ',
+}
+
+export interface ClinicalProblem {
+  id: string
+  patientId: string
+  /** 例: 大腿四頭筋の筋力低下、着地動作の不安定さ、再受傷への不安 */
+  label: string
+  status: ProblemStatus
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
+// ──────────────────────────────────────────────
 // 患者説明書 上書き設定
 // ──────────────────────────────────────────────
 export interface ExplanationOverride {

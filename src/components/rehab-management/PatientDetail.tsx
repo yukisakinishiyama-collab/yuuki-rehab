@@ -37,6 +37,9 @@ import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
+import ExplanationMode from './ExplanationMode'
+import GoalsProblemsCard from './GoalsProblemsCard'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
@@ -730,6 +733,7 @@ export default function PatientDetail({ patient }: Props) {
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
+  const [showExplanation, setShowExplanation] = useState(false)
   const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
   const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
@@ -928,6 +932,16 @@ export default function PatientDetail({ patient }: Props) {
                     </span>
                   </button>
                 )}
+                {/* 患者説明モード（NextGen v2.0・フラグでOFF可能） */}
+                {isFeatureEnabled('explanationMode') && (
+                  <button
+                    type="button"
+                    onClick={() => setShowExplanation(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+                  >
+                    🖥️ 患者さんへ説明
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowReferralModal(true)}
@@ -1012,6 +1026,11 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── 概要タブ ── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* 目標と課題（NextGen v2.0・説明モードの表示元）
+                key=patient.id で患者切替時に必ず読み直す（別患者のデータ混入防止） */}
+            {isFeatureEnabled('goalsProblems') && (
+              <GoalsProblemsCard key={patient.id} patient={patient} />
+            )}
             {/* 患者メッセージ（施術者向け参考）*/}
             {patientMessage && (
               <Card>
@@ -1692,15 +1711,18 @@ export default function PatientDetail({ patient }: Props) {
         )}
       </div>
 
-      {/* 紹介状・報告書 フローティングボタン（常時表示） */}
-      <button
-        type="button"
-        onClick={() => setShowReferralModal(true)}
-        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}
-        className="flex items-center gap-2 px-4 py-3 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl hover:bg-teal-700 transition-colors"
-      >
-        📄 紹介状・報告書
-      </button>
+      {/* 紹介状・報告書 フローティングボタン
+          （患者説明モード中は非表示＝患者向け全画面の上にスタッフUIを出さない） */}
+      {!showExplanation && (
+        <button
+          type="button"
+          onClick={() => setShowReferralModal(true)}
+          style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 40 }}
+          className="flex items-center gap-2 px-4 py-3 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl hover:bg-teal-700 transition-colors"
+        >
+          📄 紹介状・報告書
+        </button>
+      )}
 
       {/* 紹介状・報告書モーダル */}
       {showReferralModal && (
@@ -1715,6 +1737,16 @@ export default function PatientDetail({ patient }: Props) {
             setSelectedIntake(null)
             setSelectedSoap(null)
           }}
+        />
+      )}
+
+      {/* 患者説明モード（全画面・専門情報は表示しない）
+          必ず最後に描画し、最前面（z-index最大）でスタッフ向けUIをすべて覆う */}
+      {showExplanation && (
+        <ExplanationMode
+          key={patient.id}
+          patient={patient}
+          onClose={() => setShowExplanation(false)}
         />
       )}
     </div>

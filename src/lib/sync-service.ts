@@ -8,7 +8,9 @@ const SYNC_SECRET = process.env.NEXT_PUBLIC_SYNC_SECRET ?? ''
 const SYNC_ENDPOINT = '/api/sync'
 
 // 同期から除外するキー（一時データ・認証情報）
-const EXCLUDE_KEYS = ['rehabStore_session', 'pt_initialized']
+// featureFlags は「この端末だけ機能を止める」ための避難ハッチなので同期しない
+// （同期すると起動時プルでOFFが巻き戻る／1端末のOFFが全端末へ波及してしまう）
+const EXCLUDE_KEYS = ['rehabStore_session', 'pt_initialized', 'featureFlags']
 
 // デバウンス用タイマー
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
