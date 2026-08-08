@@ -20,7 +20,7 @@ import {
 import type { Milestone, Protocol } from '@/types/protocol'
 import { recommendConditionImage, getConditionImage, type ConditionImage } from '@/lib/condition-images'
 import { isFeatureEnabled } from '@/lib/feature-flags'
-import ConditionPhoto from './ConditionPhoto'
+import ConditionPhoto, { useResolvedIllustration } from './ConditionPhoto'
 import { X, Target, Flag, Sprout, Award, CalendarCheck } from 'lucide-react'
 
 interface Derived {
@@ -86,6 +86,8 @@ export default function ExplanationMode({ patient, onClose }: Props) {
   // 開いた時点のデータで固定（説明中に裏で変わって表示が揺れないように）
   const [data] = useState<Derived>(() => derive(patient))
   const { goals, problems, protocol, milestones, conditionImage } = data
+  // 実際に読み込めた画像だけを表示する（未登録なら写真セクションごと出さない）
+  const photoSrc = useResolvedIllustration(conditionImage?.slot)
 
   const improving = problems.filter(p => p.status === 'improving' || p.status === 'resolved')
   const working = problems.filter(p => p.status === 'active' || p.status === 'monitor')
@@ -186,13 +188,13 @@ export default function ExplanationMode({ patient, onClose }: Props) {
         )}
 
         {/* 取り組んでいる内容の実写イメージ（画像が未登録なら自動的に非表示） */}
-        {conditionImage && (
+        {conditionImage && photoSrc && (
           <section className="rounded-3xl bg-white border border-slate-200 shadow-sm px-7 py-6">
             <div className="flex items-center gap-2 text-slate-600 font-bold text-sm mb-3">
               <Sprout className="w-5 h-5 text-teal-500" />いま取り組んでいる練習のイメージ
             </div>
             <ConditionPhoto
-              slot={conditionImage.slot}
+              src={photoSrc}
               alt={conditionImage.alt}
               caption={conditionImage.patientCaption}
               className="max-w-xl"
