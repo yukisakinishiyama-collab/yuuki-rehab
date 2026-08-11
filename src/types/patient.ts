@@ -368,6 +368,26 @@ export const CANCELLATION_DESCRIPTIONS: Record<CancellationKind, string> = {
   no_show: '連絡なく来院されなかった',
 }
 
+/**
+ * 患者さんのキャンセル回数に数えない理由。
+ * こちら側の都合で「キャンセル扱い」になってしまった記録を、
+ * 患者さんの実際のキャンセルと区別するために使う。
+ */
+export type CancellationExclusion = 'input_error' | 'clinic'
+
+/** 表示順を固定するための一覧（理由を増やすときはここにも追加する） */
+export const CANCELLATION_EXCLUSIONS: CancellationExclusion[] = ['input_error', 'clinic']
+
+export const CANCELLATION_EXCLUSION_LABELS: Record<CancellationExclusion, string> = {
+  input_error: '入力ミス',
+  clinic: '院側の都合',
+}
+
+export const CANCELLATION_EXCLUSION_DESCRIPTIONS: Record<CancellationExclusion, string> = {
+  input_error: '予約の入力間違い・重複登録など',
+  clinic: '休診・時間変更など、院側の都合による取り消し',
+}
+
 export interface CancellationRecord {
   id: string
   patientId: string
@@ -391,6 +411,11 @@ export interface CancellationRecord {
   sourceReservationNo?: string
   /** 予約時間（自動取り込み時に記録。表示の手がかり用） */
   appointmentTime?: string
+  /**
+   * 設定するとキャンセル回数に数えない（患者さんの責任ではない記録）。
+   * 未設定＝患者さんの実際のキャンセルとして数える。
+   */
+  excludedAs?: CancellationExclusion
 }
 
 export interface CancellationSummary {
@@ -402,6 +427,8 @@ export interface CancellationSummary {
   recent90: number
   /** 最終キャンセル日（yyyy-MM-dd／無ければ空） */
   lastDate: string
+  /** カウント対象外にした記録の件数（入力ミス・院側都合。totalには含めない） */
+  excluded: number
 }
 
 // ──────────────────────────────────────────────

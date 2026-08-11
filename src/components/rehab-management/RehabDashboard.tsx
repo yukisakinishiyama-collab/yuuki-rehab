@@ -9,7 +9,7 @@ import { Users, AlertTriangle, Activity, TrendingUp, Clock, Award, ChevronRight,
 import type { Patient, SOAPNote } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
 import { getPatients, getSOAPNotes, initPatientStore, getCancellations } from '@/lib/patient-store'
-import { groupByPatient } from '@/lib/cancellation-utils'
+import { groupByPatient, isCountedCancellation } from '@/lib/cancellation-utils'
 import {
   getProtocols, getPatients as getProtocolPatients,
 } from '@/lib/protocol-store'
@@ -80,7 +80,8 @@ export default function RehabDashboard() {
       const notes = getSOAPNotes(p.id).sort((a, b) => b.visitDate.localeCompare(a.visitDate))
       const latestNote = notes[0]
       const days = getDaysSinceLastVisit(p.updatedAt)
-      const cancelCount = cancelsByPatient.get(p.id)?.length ?? 0
+      // 入力ミス・院側都合として除外した記録は、離脱リスクの材料にしない
+      const cancelCount = (cancelsByPatient.get(p.id) ?? []).filter(isCountedCancellation).length
       const risk = calculateRetentionRisk({
         daysSinceLastVisit: days,
         recommendedIntervalDays: 7,

@@ -6,16 +6,17 @@
 // ──────────────────────────────────────────────
 import { useMemo, useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { CancellationKind, CancellationRecord } from '@/types/patient'
+import type { CancellationExclusion, CancellationKind, CancellationRecord } from '@/types/patient'
 import {
   CANCELLATION_KINDS, CANCELLATION_LABELS, CANCELLATION_SHORT_LABELS,
-  CANCELLATION_DESCRIPTIONS,
+  CANCELLATION_DESCRIPTIONS, CANCELLATION_EXCLUSIONS,
+  CANCELLATION_EXCLUSION_LABELS, CANCELLATION_EXCLUSION_DESCRIPTIONS,
 } from '@/types/patient'
 import { saveCancellation } from '@/lib/patient-store'
 import { deleteCancellationRecord } from '@/lib/yoyaku-cancel-sync'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import {
-  summarizeCancellations, inferCancellationKind, todayString,
+  summarizeCancellations, inferCancellationKind, todayString, splitCancellations,
 } from '@/lib/cancellation-utils'
 import { Card, CardContent, CardHeader, SectionTitle, FormLabel, Input, SaveButton } from './shared'
 
@@ -59,8 +60,12 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
   const [memo, setMemo] = useState('')
 
   const summary = useMemo(() => summarizeCancellations(records), [records])
+  const { counted, excluded } = useMemo(() => splitCancellations(records), [records])
   // 区分を直している行（誤って記録した区分を後から直せるようにする）
   const [editingKindId, setEditingKindId] = useState<string | null>(null)
+  // カウント対象外にする理由を選んでいる行
+  const [excludingId, setExcludingId] = useState<string | null>(null)
+  const [showExcluded, setShowExcluded] = useState(false)
 
   // 予約日を変えたときは区分を推定し直す（施術者が自分で選び直した後は上書きしない）
   function handleDateChange(value: string) {
@@ -97,14 +102,34 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
     onUpdate()
   }
 
+  /**
+   * カウント対象外にする／戻す。
+   * 記録そのものは残したまま、患者さんのキャンセル回数から外す
+   * （こちらの入力ミスで患者さんの回数が増えないようにするため）。
+   */
+  function handleSetExclusion(record: CancellationRecord, excludedAs: CancellationExclusion | null) {
+    setExcludingId(null)
+    // origin は書き換えない。書き換えると「戻す」で元に戻せず、
+    // 予約側でキャンセルが取り消されても自動で取り下げられなくなる。
+    // 対象外の記録は予約番号で重複判定されるため、再取り込みは起きない。
+    saveCancellation({ ...record, excludedAs: excludedAs ?? undefined })
+    onUpdate()
+  }
+
   // 誤って記録した分の取り消し。予約システムから取り込んだ記録は、
   // 削除しただけだと次の同期で戻ってきてしまうため、取り込み対象からも外す。
   function handleDelete(record: CancellationRecord) {
     const fromYoyaku = Boolean(record.sourceReservationNo)
-    const message = fromYoyaku
-      ? `${record.appointmentDate} のキャンセル記録を削除しますか？\nこの予約は今後カルテに取り込まれなくなります。`
-      : `${record.appointmentDate} のキャンセル記録を削除しますか？`
-    if (!confirm(message)) return
+    const lines = [
+      `${record.appointmentDate} のキャンセル記録を削除しますか？`,
+      '',
+      '記録ごと消えます。元には戻せません。',
+    ]
+    if (fromYoyaku) lines.push('この予約は今後カルテに取り込まれなくなります。')
+    if (!record.excludedAs) {
+      lines.push('', '※ 記録を残したまま患者さんの回数から外すだけなら、「対象外にする」をお使いください。')
+    }
+    if (!confirm(lines.join('\n'))) return
     deleteCancellationRecord(record)
     onUpdate()
   }
@@ -151,6 +176,11 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
           <div className="flex items-center gap-4 mt-3 text-xs text-gray-500 flex-wrap">
             <span>直近3ヶ月：<strong className="text-gray-700 tabular-nums">{summary.recent90}</strong>回</span>
             {summary.lastDate && <span>最終キャンセル：{summary.lastDate}</span>}
+            {summary.excluded > 0 && (
+              <span className="text-gray-400">
+                （ほかにカウント対象外 <strong className="tabular-nums">{summary.excluded}</strong>件）
+              </span>
+            )}
           </div>
 
           {alertMessage && (
@@ -231,87 +261,200 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
         </CardContent>
       </Card>
 
-      {/* ── 履歴 ── */}
+      {/* ── 履歴（患者さんのキャンセル） ── */}
       <Card>
         <CardHeader>
-          <SectionTitle>キャンセル履歴</SectionTitle>
-          <p className="text-xs text-gray-400 mt-1">
-            区分を間違えたときは左の区分ラベルを押すと直せます。記録そのものが誤りなら「削除」で取り消せます。
-          </p>
+          <SectionTitle>キャンセル履歴（{counted.length}件）</SectionTitle>
+          <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
+            <li>・区分（予約日前／当日／無断）を間違えたときは、左の区分ラベルを押すと直せます</li>
+            <li>
+              ・<strong className="text-gray-500">対象外にする</strong>
+              …こちらの入力ミスや院側都合のとき。記録は残したまま、患者さんの回数から外します（あとで戻せます）
+            </li>
+            <li>
+              ・<strong className="text-gray-500">削除</strong>
+              …記録ごと消します。予約システムから取り込んだ分は、以後そのまま取り込まれなくなります
+            </li>
+          </ul>
         </CardHeader>
         <CardContent>
-          {records.length === 0 ? (
-            <p className="text-sm text-gray-400 py-6 text-center">キャンセル記録はありません</p>
+          {counted.length === 0 ? (
+            <p className="text-sm text-gray-400 py-6 text-center">
+              {excluded.length > 0
+                ? `数える対象のキャンセルはありません（カウント対象外が${excluded.length}件あります）`
+                : 'キャンセル記録はありません'}
+            </p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {records.map(r => (
-                <li key={r.id} className="flex items-start gap-3 py-3">
-                  <button
-                    type="button"
-                    onClick={() => setEditingKindId(editingKindId === r.id ? null : r.id)}
-                    title="区分を直す"
-                    className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                      hover:ring-2 hover:ring-teal-300 transition-shadow ${KIND_STYLES[r.kind].chip}`}
-                  >
-                    {CANCELLATION_SHORT_LABELS[r.kind]}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-gray-800 tabular-nums">
-                        {r.appointmentDate}
-                        {r.appointmentTime && <span className="ml-1.5 text-gray-500">{r.appointmentTime}</span>}
-                      </span>
-                      {r.sourceReservationNo && (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-200"
-                          title={`予約番号 ${r.sourceReservationNo}`}
-                        >
-                          予約システムから
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {r.reason || '理由の記録なし'}
-                      {r.contactedDate && r.contactedDate !== r.appointmentDate && (
-                        <span className="text-gray-400">（連絡日 {r.contactedDate}）</span>
-                      )}
-                    </div>
-                    {r.memo && <div className="text-xs text-gray-400 mt-0.5">{r.memo}</div>}
-                    {editingKindId === r.id && (
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                        <span className="text-[11px] text-gray-500">区分を直す</span>
-                        {CANCELLATION_KINDS.map(k => (
-                          <button
-                            key={k}
-                            type="button"
-                            onClick={() => handleChangeKind(r, k)}
-                            className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
-                              r.kind === k
-                                ? 'bg-teal-600 text-white border-teal-600'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
-                            }`}
-                          >
-                            {CANCELLATION_SHORT_LABELS[k]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(r)}
-                    className="flex-shrink-0 text-xs text-gray-400 hover:text-red-600 hover:border-red-200
-                      border border-transparent rounded-md transition-colors px-2 py-1"
-                    aria-label={`${r.appointmentDate} のキャンセル記録を削除`}
-                  >
-                    削除
-                  </button>
-                </li>
-              ))}
+              {counted.map(r => renderRow(r))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      {/* ── カウント対象外（入力ミス・院側都合） ── */}
+      {excluded.length > 0 && (
+        <Card>
+          <CardHeader>
+            <SectionTitle>
+              <span>カウント対象外（{excluded.length}件）</span>
+              <button
+                type="button"
+                onClick={() => setShowExcluded(v => !v)}
+                aria-expanded={showExcluded}
+                className="ml-auto text-xs font-normal text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showExcluded ? '閉じる' : '開く'}
+              </button>
+            </SectionTitle>
+            <p className="text-xs text-gray-400 mt-1">
+              患者さんのキャンセル回数には数えていません。「戻す」で数える側へ戻せます。
+            </p>
+          </CardHeader>
+          {showExcluded && (
+            <CardContent>
+              <ul className="divide-y divide-gray-100">
+                {excluded.map(r => renderRow(r))}
+              </ul>
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   )
+
+  /** 履歴1行分。カウント対象かどうかで見た目と操作を変える */
+  function renderRow(r: CancellationRecord) {
+    const isExcluded = Boolean(r.excludedAs)
+    return (
+      <li key={r.id} className={`flex items-start gap-3 py-3 ${isExcluded ? 'opacity-60' : ''}`}>
+        {isExcluded ? (
+          <span className="flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs
+            font-medium bg-slate-100 text-slate-500 line-through">
+            {CANCELLATION_SHORT_LABELS[r.kind]}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingKindId(editingKindId === r.id ? null : r.id)}
+            title="区分を直す"
+            className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+              hover:ring-2 hover:ring-teal-300 transition-shadow ${KIND_STYLES[r.kind].chip}`}
+          >
+            {CANCELLATION_SHORT_LABELS[r.kind]}
+          </button>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-gray-800 tabular-nums">
+              {r.appointmentDate}
+              {r.appointmentTime && <span className="ml-1.5 text-gray-500">{r.appointmentTime}</span>}
+            </span>
+            {r.sourceReservationNo && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-200"
+                title={`予約番号 ${r.sourceReservationNo}`}
+              >
+                予約システムから
+              </span>
+            )}
+            {r.excludedAs && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+                {CANCELLATION_EXCLUSION_LABELS[r.excludedAs]}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {r.reason || '理由の記録なし'}
+            {r.contactedDate && r.contactedDate !== r.appointmentDate && (
+              <span className="text-gray-400">（連絡日 {r.contactedDate}）</span>
+            )}
+          </div>
+          {r.memo && <div className="text-xs text-gray-400 mt-0.5">{r.memo}</div>}
+
+          {editingKindId === r.id && !isExcluded && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              <span className="text-[11px] text-gray-500">区分を直す</span>
+              {CANCELLATION_KINDS.map(k => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => handleChangeKind(r, k)}
+                  className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
+                    r.kind === k
+                      ? 'bg-teal-600 text-white border-teal-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
+                  }`}
+                >
+                  {CANCELLATION_SHORT_LABELS[k]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {excludingId === r.id && (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="text-[11px] text-amber-800 mb-1.5">
+                患者さんの回数から外します。理由を選んでください
+              </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {CANCELLATION_EXCLUSIONS.map(key => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleSetExclusion(r, key)}
+                    title={CANCELLATION_EXCLUSION_DESCRIPTIONS[key]}
+                    className="px-3 py-1.5 text-[11px] rounded-full border font-medium bg-white
+                      text-amber-800 border-amber-300 hover:bg-amber-100 transition-colors"
+                  >
+                    {CANCELLATION_EXCLUSION_LABELS[key]}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setExcludingId(null)}
+                  className="px-3 py-1.5 text-[11px] rounded-full border border-transparent
+                    text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  やめる
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-shrink-0 flex items-center gap-1">
+          {isExcluded ? (
+            <button
+              type="button"
+              onClick={() => handleSetExclusion(r, null)}
+              className="text-xs text-gray-500 hover:text-teal-700 border border-gray-200
+                hover:border-teal-300 rounded-md transition-colors px-2 py-1"
+            >
+              戻す
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExcludingId(excludingId === r.id ? null : r.id)}
+              className="text-xs text-gray-500 hover:text-amber-700 border border-gray-200
+                hover:border-amber-300 rounded-md transition-colors px-2 py-1"
+            >
+              対象外にする
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => handleDelete(r)}
+            className="text-xs text-gray-400 hover:text-red-600 hover:border-red-200
+              border border-transparent rounded-md transition-colors px-2 py-1"
+            aria-label={`${r.appointmentDate} のキャンセル記録を削除`}
+          >
+            削除
+          </button>
+        </div>
+      </li>
+    )
+  }
 }

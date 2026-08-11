@@ -15,6 +15,7 @@
 // ──────────────────────────────────────────────
 import type { CancellationKind, CancellationRecord, Patient } from '@/types/patient'
 import { getCancellations, saveCancellation, deleteCancellation } from './patient-store'
+import { isCountedCancellation } from './cancellation-utils'
 
 const EXCLUDED_KEY = 'pt_yoyaku_excluded'
 const NOSHOW_OK_KEY = 'pt_yoyaku_noshow_ok'
@@ -325,9 +326,15 @@ export function buildSyncPlan({
   const recordedNos = new Set(
     existing.map((r) => r.sourceReservationNo).filter((no): no is string => Boolean(no)),
   )
-  // 同じ患者・同じ予約日の既存記録（手入力との二重計上を防ぐ）
+  // 同じ患者・同じ予約日の既存記録（手入力との二重計上を防ぐ）。
+  // カウント対象外にした記録（入力ミス・院側都合）は「その日は記録済み」とみなさない。
+  // 含めてしまうと、同じ日に起きた本当のキャンセルが対象外の記録に吸収され、
+  // 患者さんのキャンセルが1件も数えられなくなる。
   const byPatientDate = new Map<string, CancellationRecord>()
-  for (const r of existing) byPatientDate.set(`${r.patientId}|${r.appointmentDate}`, r)
+  for (const r of existing) {
+    if (!isCountedCancellation(r)) continue
+    byPatientDate.set(`${r.patientId}|${r.appointmentDate}`, r)
+  }
 
   const allRows: YoyakuFeedRow[] = []
   // その日に「来院済み」を付けた実績がある日付（無断候補を出してよい日）

@@ -30,20 +30,42 @@ export function inferCancellationKind(appointmentDate: string, contactedDate: st
   return d >= 0 ? 'same_day' : 'advance'
 }
 
-/** 患者1人分のキャンセル記録を集計する */
+/**
+ * 患者さんのキャンセルとして数える記録か。
+ * 入力ミス・院側都合として除外した記録は数えない
+ * （こちらの都合で患者さんのキャンセル回数が増えないようにするため）。
+ */
+export function isCountedCancellation(record: CancellationRecord): boolean {
+  return !record.excludedAs
+}
+
+/** 数える記録と、カウント対象外の記録に分ける */
+export function splitCancellations(records: CancellationRecord[]): {
+  counted: CancellationRecord[]
+  excluded: CancellationRecord[]
+} {
+  const counted: CancellationRecord[] = []
+  const excluded: CancellationRecord[] = []
+  for (const r of records) (isCountedCancellation(r) ? counted : excluded).push(r)
+  return { counted, excluded }
+}
+
+/** 患者1人分のキャンセル記録を集計する（カウント対象外は total に含めない） */
 export function summarizeCancellations(
   records: CancellationRecord[],
   today: string = todayString(),
 ): CancellationSummary {
+  const { counted, excluded } = splitCancellations(records)
   const summary: CancellationSummary = {
-    total: records.length,
+    total: counted.length,
     advance: 0,
     same_day: 0,
     no_show: 0,
     recent90: 0,
     lastDate: '',
+    excluded: excluded.length,
   }
-  for (const r of records) {
+  for (const r of counted) {
     summary[r.kind] += 1
     if (diffDays(today, r.appointmentDate) <= 90) summary.recent90 += 1
     if (r.appointmentDate > summary.lastDate) summary.lastDate = r.appointmentDate
