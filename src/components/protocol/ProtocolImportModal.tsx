@@ -268,9 +268,17 @@ export default function ProtocolImportModal({ protocol, attachment, onClose, onA
                 </label>
               </div>
 
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  <strong>原本と見比べていただきたい項目</strong><br />
+                  ・<strong>週数</strong>… 表のマス目から読み取るため、間違いが起きやすい箇所です。
+                  用紙が傾いていたり印が薄いと、行と週がずれることがあります<br />
+                  ・<strong>荷重・装具・可動域制限</strong>… 患者さんの安全に直結します。
+                  読み取れなかった場合は上の「資料と照らし合わせてください」に出ます
+                </p>
+              </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 取り込んだフェーズには「要・臨床医確認」と出典が付きます。
-                荷重・装具・可動域制限は患者さんの安全に関わるため、必ず資料と見比べてください。
               </p>
 
               <div className="flex items-center gap-2">
