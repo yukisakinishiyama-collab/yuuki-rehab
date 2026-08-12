@@ -227,6 +227,9 @@ body {
   .no-print { display: none !important; }
   .print-break { page-break-after: always; }
 
+  /* サイドバーを消したぶんの余白を詰める（md:ml-56 を打ち消す） */
+  .print-full-width { margin-left: 0 !important; }
+
   body {
     background: white !important;
     color: #000 !important;

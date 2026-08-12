@@ -240,8 +240,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <AuthGuard>
       {(user) => (
         <div className="flex min-h-screen bg-[#f0f4f8]">
-          {/* Desktop sidebar */}
-          <aside className="hidden md:flex flex-col w-56 bg-[#080e1a] fixed inset-y-0 left-0 z-30
+          {/* Desktop sidebar（印刷には出さない） */}
+          <aside className="no-print hidden md:flex flex-col w-56 bg-[#080e1a] fixed inset-y-0 left-0 z-30
             border-r border-white/[0.05]">
             <SidebarContent user={user} onLogout={handleLogout} pathname={pathname} onOpenQR={() => setShowQR(true)} onPushSync={handlePushSync} syncing={syncing} />
             {syncing && (
@@ -254,7 +254,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Mobile sidebar overlay */}
           {mobileOpen && (
-            <div className="fixed inset-0 z-40 md:hidden">
+            <div className="no-print fixed inset-0 z-40 md:hidden">
               <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={() => setMobileOpen(false)}
@@ -272,9 +272,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           {/* Main */}
-          <div className="flex-1 md:ml-56 flex flex-col min-h-screen">
-            {/* Mobile header */}
-            <header className="md:hidden bg-[#080e1a] px-4 py-3 flex items-center gap-3 sticky top-0 z-20
+          {/* 印刷時はサイドバー分の余白を詰めて、紙の幅いっぱいに出す */}
+          <div className="flex-1 md:ml-56 print-full-width flex flex-col min-h-screen">
+            {/* Mobile header（印刷には出さない） */}
+            <header className="no-print md:hidden bg-[#080e1a] px-4 py-3 flex items-center gap-3 sticky top-0 z-20
               border-b border-white/[0.06]">
               <button onClick={() => setMobileOpen(true)} className="text-white/80 hover:text-white">
                 <Menu className="w-5 h-5" />
