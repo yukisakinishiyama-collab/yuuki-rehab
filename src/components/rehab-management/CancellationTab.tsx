@@ -296,17 +296,21 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
       {excluded.length > 0 && (
         <Card>
           <CardHeader>
-            <SectionTitle>
-              <span>カウント対象外（{excluded.length}件）</span>
-              <button
-                type="button"
-                onClick={() => setShowExcluded(v => !v)}
-                aria-expanded={showExcluded}
-                className="ml-auto text-xs font-normal text-gray-400 hover:text-gray-600 transition-colors"
-              >
+            {/* 見出し全体を押せるようにする。h3 の中に button を入れず、
+                button の中に見出し風の span を置く（HTMLとして正しい形にするため） */}
+            <button
+              type="button"
+              onClick={() => setShowExcluded(v => !v)}
+              aria-expanded={showExcluded}
+              className="w-full flex items-center gap-2 text-left group"
+            >
+              <span className="text-sm font-semibold text-gray-800">
+                カウント対象外（{excluded.length}件）
+              </span>
+              <span className="ml-auto text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
                 {showExcluded ? '閉じる' : '開く'}
-              </button>
-            </SectionTitle>
+              </span>
+            </button>
             <p className="text-xs text-gray-400 mt-1">
               患者さんのキャンセル回数には数えていません。「戻す」で数える側へ戻せます。
             </p>
