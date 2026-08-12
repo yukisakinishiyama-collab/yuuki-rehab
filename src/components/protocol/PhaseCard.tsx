@@ -6,6 +6,8 @@ import { findVideoUrl } from '@/lib/exercise-video-map'
 import {
   EVIDENCE_LABELS, EVIDENCE_COLORS,
   EVIDENCE_GRADE_LABELS, EVIDENCE_GRADE_COLORS,
+  EXERCISE_STATUSES, EXERCISE_STATUS_LABELS, EXERCISE_STATUS_DESCRIPTIONS,
+  EXERCISE_STATUS_STYLES, EXERCISE_STATUS_CARD_STYLES,
 } from '@/types/protocol'
 import CriteriaGauge from './CriteriaGauge'
 import {
@@ -60,6 +62,21 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
   function saveEdit() {
     onUpdate?.(draft)
     setEditing(false)
+  }
+
+  /**
+   * 運動の実施状況を切り替える（実施中 → できる → 見合わせ → 未設定）。
+   * 保存済みの phase を基点にするため、編集中の draft とは混ざらない。
+   */
+  function cycleExerciseStatus(index: number) {
+    if (!onUpdate) return
+    const current = phase.exercises[index]?.status
+    const at = current ? EXERCISE_STATUSES.indexOf(current) : -1
+    const next = EXERCISE_STATUSES[at + 1] // 最後まで行くと undefined＝未設定に戻る
+    const exercises = phase.exercises.map((ex, i) =>
+      i === index ? { ...ex, status: next } : ex,
+    )
+    onUpdate({ exercises })
   }
 
   function addExercise() {
@@ -380,17 +397,59 @@ export default function PhaseCard({ phase, isActive, isCompleted, onUpdate, onDe
               {phase.exercises.length > 0 && (
                 <div>
                   <h4 className="flex items-center gap-1.5 text-xs font-bold text-[--color-text-secondary]
-                    font-display uppercase tracking-widest mb-2">
+                    font-display uppercase tracking-widest mb-2 flex-wrap">
                     <Dumbbell className="w-3 h-3" />推奨エクササイズ
+                    {/* 色の意味。押して切り替えられることも伝える */}
+                    {onUpdate && (
+                      <span className="no-print ml-auto flex items-center gap-1 normal-case tracking-normal font-medium">
+                        {EXERCISE_STATUSES.map(s => (
+                          <span key={s}
+                            className={`px-1.5 py-0.5 rounded-full border text-[9px] ${EXERCISE_STATUS_STYLES[s]}`}>
+                            {EXERCISE_STATUS_LABELS[s]}
+                          </span>
+                        ))}
+                        <span className="text-[9px] text-slate-400">を押して切替</span>
+                      </span>
+                    )}
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {phase.exercises.map((ex, i) => {
                       // 動画URL未設定でも運動名からマップを自動検索して表示
                       const videoUrl = ex.videoUrl || findVideoUrl(ex.name)
+                      const cardStyle = ex.status
+                        ? EXERCISE_STATUS_CARD_STYLES[ex.status]
+                        : 'bg-[--color-surface-raised] border-slate-100'
                       return (
-                      <div key={i} className="bg-[--color-surface-raised] rounded-lg border border-slate-100 px-3 py-2">
+                      <div key={i} className={`rounded-lg border px-3 py-2 transition-colors ${cardStyle}`}>
                         <div className="flex items-start justify-between gap-2">
-                          <div className="text-sm font-semibold text-[--color-text-primary] font-display">{ex.name}</div>
+                          <div className="flex items-start gap-2 min-w-0">
+                            {/* タップするたび 実施中 → できる → 見合わせ → 未設定 と切り替わる */}
+                            {onUpdate && (
+                              <button
+                                type="button"
+                                onClick={() => cycleExerciseStatus(i)}
+                                title={ex.status
+                                  ? `${EXERCISE_STATUS_LABELS[ex.status]}（${EXERCISE_STATUS_DESCRIPTIONS[ex.status]}）／押すと切り替え`
+                                  : '押して実施状況をつける'}
+                                className={`no-print flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-full border text-[10px]
+                                  font-bold transition-colors ${
+                                  ex.status
+                                    ? EXERCISE_STATUS_STYLES[ex.status]
+                                    : 'bg-white text-slate-300 border-slate-200 hover:border-teal-300 hover:text-teal-500'
+                                }`}
+                              >
+                                {ex.status ? EXERCISE_STATUS_LABELS[ex.status] : '未設定'}
+                              </button>
+                            )}
+                            {/* 印刷にも状態を残す（ボタンは印刷しないため） */}
+                            {ex.status && (
+                              <span className={`hidden print:inline px-1.5 rounded border text-[10px] font-bold
+                                ${EXERCISE_STATUS_STYLES[ex.status]}`}>
+                                {EXERCISE_STATUS_LABELS[ex.status]}
+                              </span>
+                            )}
+                            <div className="text-sm font-semibold text-[--color-text-primary] font-display">{ex.name}</div>
+                          </div>
                           {videoUrl && (
                             <a
                               href={videoUrl}

@@ -80,11 +80,48 @@ export interface Criterion {
   met?: boolean
 }
 
+/**
+ * 運動の実施状況。プロトコル画面でタップして切り替える簡易マーカー。
+ * 未設定（status なし）＝まだ手を付けていない
+ */
+export type ExerciseStatus = 'doing' | 'able' | 'hold'
+
+/** 切り替える順番（タップするたびにこの順で回り、最後は未設定に戻る） */
+export const EXERCISE_STATUSES: ExerciseStatus[] = ['doing', 'able', 'hold']
+
+export const EXERCISE_STATUS_LABELS: Record<ExerciseStatus, string> = {
+  doing: '実施中',
+  able: 'できる',
+  hold: '見合わせ',
+}
+
+export const EXERCISE_STATUS_DESCRIPTIONS: Record<ExerciseStatus, string> = {
+  doing: 'いま取り組んでいる',
+  able: '自分でできるようになった',
+  hold: '今は行わない',
+}
+
+/** 印刷でも色が残るよう、背景は薄い色＋文字は濃い色にする */
+export const EXERCISE_STATUS_STYLES: Record<ExerciseStatus, string> = {
+  doing: 'bg-teal-100 text-teal-800 border-teal-300',
+  able: 'bg-sky-100 text-sky-800 border-sky-300',
+  hold: 'bg-slate-100 text-slate-500 border-slate-300',
+}
+
+/** カード全体の縁取り（一覧の中で状態が一目で分かるように） */
+export const EXERCISE_STATUS_CARD_STYLES: Record<ExerciseStatus, string> = {
+  doing: 'bg-teal-50/60 border-teal-200',
+  able: 'bg-sky-50/60 border-sky-200',
+  hold: 'bg-slate-50 border-slate-200 opacity-70',
+}
+
 export interface Exercise {
   name: string
   dose?: string
   notes?: string
   videoUrl?: string
+  /** 実施状況のマーカー（未設定＝まだ手を付けていない） */
+  status?: ExerciseStatus
 }
 
 export interface Phase {
