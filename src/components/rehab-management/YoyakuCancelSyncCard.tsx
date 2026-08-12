@@ -11,7 +11,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarX, RefreshCw, Check, X, ChevronDown, ChevronUp, Undo2 } from 'lucide-react'
 import type { CancellationKind, Patient } from '@/types/patient'
 import { CANCELLATION_KINDS, CANCELLATION_SHORT_LABELS } from '@/types/patient'
-import { getPatients, initPatientStore } from '@/lib/patient-store'
+import { nanoid } from 'nanoid'
+import { getPatients, initPatientStore, savePatient } from '@/lib/patient-store'
 import {
   syncFromFeed, confirmPending, excludeReservationNo, unexcludeReservationNo,
   getExcludedReservationNos, resolveNoShow, unresolveNoShow, getResolvedNoShows,
@@ -102,13 +103,46 @@ export default function YoyakuCancelSyncCard() {
     return () => clearTimeout(timer)
   }, [run])
 
-  /** 要確認の1件を記録する */
-  function handleConfirm(item: PendingCancellation) {
+  /** 要確認の1件を記録する。patientId を渡すと、その患者へ直接記録する */
+  function handleConfirm(item: PendingCancellation, forcePatientId?: string) {
     const selected = choice[item.reservationNo]
-    const patientId = selected?.patientId || item.patientId || ''
+    const patientId = forcePatientId || selected?.patientId || item.patientId || ''
     const kind = selected?.kind || item.suggestedKind
     if (!patientId || !kind) return
     confirmPending(item, patientId, kind)
+    dropPending(item.reservationNo)
+  }
+
+  /**
+   * カルテが無い方の予約を、予約情報からカルテを作って記録する。
+   * 氏名・ふりがな・電話は予約のものをそのまま使い、あとから編集できる。
+   */
+  function handleCreateAndConfirm(item: PendingCancellation) {
+    const kind = choice[item.reservationNo]?.kind || item.suggestedKind
+    if (!kind) return
+    if (!confirm(`${item.name} 様のカルテを新しく作成して記録しますか？`)) return
+    const now = new Date().toISOString()
+    const patient: Patient = {
+      id: nanoid(),
+      name: item.name,
+      kana: item.kana ?? '',
+      birthDate: '',
+      gender: 'other',
+      phone: item.phone ?? '',
+      emergencyContact: '',
+      mainComplaint: '',
+      bodyRegion: 'other',
+      diagnosisLabel: '',
+      onsetDate: '',
+      firstVisitDate: item.date,
+      status: 'active',
+      therapistNotes: '予約システムのキャンセルから作成',
+      createdAt: now,
+      updatedAt: now,
+    }
+    savePatient(patient)
+    setPatients(getPatients())
+    confirmPending(item, patient.id, kind)
     dropPending(item.reservationNo)
   }
 
@@ -212,7 +246,9 @@ export default function YoyakuCancelSyncCard() {
             </p>
             {visiblePending.map((item) => {
               const selected = choice[item.reservationNo]
-              const patientId = selected?.patientId ?? item.patientId ?? ''
+              const rawPatientId = selected?.patientId ?? item.patientId ?? ''
+              // '__pick__' は「一覧から選ぶ」を開いただけの状態。まだ患者は決まっていない
+              const patientId = rawPatientId === '__pick__' ? '' : rawPatientId
               const kind = selected?.kind ?? item.suggestedKind
               const setChoiceFor = (next: Partial<{ patientId: string; kind: CancellationKind }>) =>
                 setChoice((prev) => ({
@@ -246,13 +282,76 @@ export default function YoyakuCancelSyncCard() {
                     )}
                   </div>
 
-                  {/* 患者の指定。確度の低い推定は初期選択せず、押して選んでもらう */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-[11px] text-gray-500">カルテ</label>
+                  {/* 記録先のカルテ。
+                      予約の氏名と一致するカルテがあれば、その名前のまま1タップで記録できるようにする。
+                      自動では紐づけない（別人の可能性があるため）が、探させることもしない。 */}
+                  {patientId ? (
+                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                      <span className="text-gray-500">カルテ</span>
+                      <span className="font-semibold text-gray-800">
+                        {sortedPatients.find((p) => p.id === patientId)?.name ?? ''} 様
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setChoiceFor({ patientId: '' })}
+                        className="text-gray-400 hover:text-gray-600 underline"
+                      >
+                        別の方を選ぶ
+                      </button>
+                    </div>
+                  ) : item.guessPatientId ? (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] text-gray-500">
+                        同じ氏名のカルテがあります（電話番号は一致していません）
+                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Button
+                          size="sm" className="h-7 text-xs"
+                          onClick={() => handleConfirm(item, item.guessPatientId)}
+                          disabled={!kind}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          {item.guessPatientName} 様のカルテに記録
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setChoiceFor({ patientId: '__pick__' })}
+                          className="text-[11px] text-gray-400 hover:text-gray-600 underline px-1"
+                        >
+                          別の方を選ぶ
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] text-gray-500">
+                        「{item.name}」様のカルテが見つかりません
+                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Button
+                          variant="outline" size="sm" className="h-7 text-xs"
+                          onClick={() => handleCreateAndConfirm(item)}
+                          disabled={!kind}
+                        >
+                          カルテを作成して記録
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setChoiceFor({ patientId: '__pick__' })}
+                          className="text-[11px] text-gray-400 hover:text-gray-600 underline px-1"
+                        >
+                          既存のカルテから選ぶ
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 「別の方を選ぶ」を押したときだけ一覧を出す */}
+                  {choice[item.reservationNo]?.patientId === '__pick__' && (
                     <select
-                      value={patientId}
+                      value=""
                       onChange={(e) => setChoiceFor({ patientId: e.target.value })}
-                      className="flex-1 min-w-[10rem] text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white
+                      className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white
                         focus:outline-none focus:ring-2 focus:ring-teal-500/40"
                       aria-label="記録する患者"
                     >
@@ -263,16 +362,6 @@ export default function YoyakuCancelSyncCard() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                  {item.guessPatientId && patientId !== item.guessPatientId && (
-                    <button
-                      type="button"
-                      onClick={() => setChoiceFor({ patientId: item.guessPatientId })}
-                      className="text-[11px] text-teal-700 bg-teal-50 border border-teal-200 rounded-full
-                        px-2.5 py-1 hover:bg-teal-100 transition-colors"
-                    >
-                      候補：{item.guessPatientName} 様 — 同じ方ならこちら
-                    </button>
                   )}
 
                   {/* 区分の指定 */}
@@ -295,13 +384,17 @@ export default function YoyakuCancelSyncCard() {
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                    <Button
-                      size="sm" className="h-7 text-xs"
-                      onClick={() => handleConfirm(item)}
-                      disabled={!patientId || !kind}
-                    >
-                      <Check className="w-3.5 h-3.5" />カルテに記録
-                    </Button>
+                    {/* 記録先が決まっているときだけ出す。
+                        決まっていないときは上の「◯◯様のカルテに記録」が主役になる */}
+                    {patientId && (
+                      <Button
+                        size="sm" className="h-7 text-xs"
+                        onClick={() => handleConfirm(item)}
+                        disabled={!kind}
+                      >
+                        <Check className="w-3.5 h-3.5" />カルテに記録
+                      </Button>
+                    )}
                     {item.reason === 'no_show_candidate' ? (
                       <Button
                         variant="outline" size="sm" className="h-7 text-xs"
