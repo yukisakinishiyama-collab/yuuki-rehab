@@ -17,6 +17,7 @@ import { calculateRetentionRisk, getDaysSinceLastVisit } from '@/lib/rehab-algor
 import { RetentionRiskBadge } from './shared'
 import YoyakuTodayCard from '@/components/rehab/YoyakuTodayCard'
 import YoyakuCancelSyncCard from './YoyakuCancelSyncCard'
+import MonshinInboxCard from './MonshinInboxCard'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -167,6 +168,9 @@ export default function RehabDashboard() {
 
       {/* 予約システムのキャンセルをカルテへ自動反映（要確認のみ手動で1タップ） */}
       <YoyakuCancelSyncCard />
+
+      {/* 患者さんが来院前に送ったWeb問診（届いているときだけ表示） */}
+      <MonshinInboxCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 離脱リスク高 */}

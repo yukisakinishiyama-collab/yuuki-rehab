@@ -13,7 +13,7 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 const TABLE = 'marketing_line_contacts'
 
 /** LINE顧客一覧などがKV行を誤って拾わないための予約プレフィックス */
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:'] as const
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')
