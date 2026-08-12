@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import type { Protocol, Assessment, ProtocolPatient } from '@/types/protocol'
 import MilestonePanel from './MilestonePanel'
 import ProgressChart from './ProgressChart'
+import ProtocolProgressMap from './ProtocolProgressMap'
 import { findVideoUrl } from '@/lib/exercise-video-map'
 import { Eye, EyeOff, Star, ShieldAlert, Flame, Sprout, Activity, Dumbbell, Trophy, Printer, PlayCircle } from 'lucide-react'
 
@@ -154,6 +155,9 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
           )}
         </div>
       </div>
+
+      {/* 進捗マップ（患者さんと一緒に見る。いまどのステージかを大きく出す） */}
+      <ProtocolProgressMap protocol={protocol} patientFacing />
 
       {/* 励ましメッセージ */}
       <div className="flex items-center gap-3 bg-gradient-to-r from-orange-50 to-amber-50

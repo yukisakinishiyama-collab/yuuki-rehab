@@ -13,6 +13,7 @@ import type { Patient as PtPatient } from '@/types/patient'
 import PhaseCard from '@/components/protocol/PhaseCard'
 import PhaseReadinessPanel from '@/components/protocol/PhaseReadinessPanel'
 import ProtocolImportModal from '@/components/protocol/ProtocolImportModal'
+import ProtocolProgressMap from '@/components/protocol/ProtocolProgressMap'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import ProtocolChat from '@/components/protocol/ProtocolChat'
@@ -422,6 +423,11 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             </span>
           </div>
         )}
+      </div>
+
+      {/* 進捗マップ（患者さんと一緒に見られる形で全体像を出す） */}
+      <div className="mb-4">
+        <ProtocolProgressMap protocol={protocol} />
       </div>
 
       {/* フェーズ進行の準備状況（v2.1: 進行基準×実測値の自動照合） */}
