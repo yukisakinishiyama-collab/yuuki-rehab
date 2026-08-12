@@ -12,6 +12,7 @@ import { getPatients as getPtPatients, saveRehabPlan } from '@/lib/patient-store
 import type { Patient as PtPatient } from '@/types/patient'
 import PhaseCard from '@/components/protocol/PhaseCard'
 import PhaseReadinessPanel from '@/components/protocol/PhaseReadinessPanel'
+import ProtocolImportModal from '@/components/protocol/ProtocolImportModal'
 import ExpertPanel from '@/components/protocol/ExpertPanel'
 import DisclaimerBanner from '@/components/protocol/DisclaimerBanner'
 import ProtocolChat from '@/components/protocol/ProtocolChat'
@@ -745,6 +746,8 @@ function AttachmentsTab({
   const [uploading, setUploading] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
+  // 資料からプロトコルを読み取る対象（病院からもらったPDFなど）
+  const [importing, setImporting] = useState<ProtocolAttachment | null>(null)
   const attachments = protocol.attachments ?? []
 
   function readFileAsBase64(file: File): Promise<string> {
@@ -897,6 +900,17 @@ function AttachmentsTab({
                 </div>
 
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* PDF・画像は、書かれている内容をそのままプロトコルへ写し取れる */}
+                  {(att.fileType.includes('pdf') || att.fileType.startsWith('image/')) && (
+                    <button
+                      onClick={() => setImporting(att)}
+                      className="text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200
+                        rounded-full px-2.5 py-1 hover:bg-teal-100 transition-colors"
+                      title="この資料の内容をプロトコルに取り込む"
+                    >
+                      取り込む
+                    </button>
+                  )}
                   <button
                     onClick={() => viewAttachment(att)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
@@ -922,6 +936,15 @@ function AttachmentsTab({
         ファイルはこのデバイスのローカルストレージに保存されます。
         個人情報を含む書類の取り扱いには注意してください。
       </p>
+
+      {importing && (
+        <ProtocolImportModal
+          protocol={protocol}
+          attachment={importing}
+          onClose={() => setImporting(null)}
+          onApplied={onUpdate}
+        />
+      )}
     </div>
   )
 }
