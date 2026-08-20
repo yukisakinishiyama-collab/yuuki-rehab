@@ -67,13 +67,34 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-4 font-body">
+    <div className="sheet-root max-w-lg mx-auto space-y-4 font-body">
 
-      {/* 印刷用 @page 設定 */}
+      {/* 印刷用の設定。指導シートはA4一枚に収める（患者さんが持ち帰る紙のため） */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { size: A4; margin: 15mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+          /* 画面では読みやすさ優先で余白を広く取っているが、
+             紙では一枚に収めることを優先して詰める。数値は実測して決めた */
+          .sheet-root { max-width: 100% !important; }
+          .sheet-root > * + * { margin-top: 7px !important; }
+          .sheet-root .p-5 { padding: 11px !important; }
+          .sheet-root .p-4 { padding: 9px !important; }
+          .sheet-root .space-y-4 > * + * { margin-top: 7px !important; }
+          .sheet-root .space-y-2 > * + * { margin-top: 4px !important; }
+          .sheet-root .space-y-1\.5 > * + * { margin-top: 2px !important; }
+          .sheet-root .py-2\.5 { padding-top: 3px !important; padding-bottom: 3px !important; }
+          .sheet-root .py-3\.5 { padding-top: 5px !important; padding-bottom: 5px !important; }
+          .sheet-root .py-3 { padding-top: 5px !important; padding-bottom: 5px !important; }
+          .sheet-root .mt-2 { margin-top: 3px !important; }
+          .sheet-root .mb-3 { margin-bottom: 5px !important; }
+          .sheet-root .mb-2 { margin-bottom: 3px !important; }
+          .sheet-root .pb-4 { padding-bottom: 0 !important; }
+
+          /* 運動は紙幅を活かして2列に並べる（縦に伸ばさないため） */
+          .sheet-exercises { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 5px !important; }
+          .sheet-exercises > * + * { margin-top: 0 !important; }
         }
       `}} />
 
@@ -156,8 +177,11 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
         </div>
       </div>
 
-      {/* 進捗マップ（患者さんと一緒に見る。いまどのステージかを大きく出す） */}
-      <ProtocolProgressMap protocol={protocol} patientFacing />
+      {/* 進捗マップ（患者さんと一緒に画面で見る用）。
+          紙では下のフェーズカードと内容が重なるうえ一枚に収まらなくなるため出さない */}
+      <div className="print:hidden">
+        <ProtocolProgressMap protocol={protocol} patientFacing />
+      </div>
 
       {/* 励ましメッセージ */}
       <div className="flex items-center gap-3 bg-gradient-to-r from-orange-50 to-amber-50
@@ -252,7 +276,7 @@ export default function PatientView({ patient, protocol, assessments }: Props) {
           <div className="text-xs font-bold text-[--color-text-secondary] font-display uppercase tracking-widest mb-3">
             今取り組む運動
           </div>
-          <div className="space-y-2">
+          <div className="sheet-exercises space-y-2">
             {currentPhase.exercises.slice(0, 8).map((ex, i) => {
               // 動画URL未設定でも運動名からマップを自動検索
               const videoUrl = ex.videoUrl || findVideoUrl(ex.name)
