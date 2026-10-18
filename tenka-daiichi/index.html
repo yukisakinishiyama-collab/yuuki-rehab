@@ -861,6 +861,64 @@ const BADGES = [
   ['review10', 'ふくしゅう名人', '復習で10問正解'],
 ];
 
+/* ================= みなとの声：文の分け方と録音の見つけ方 =================
+   画面（DOM）を使わない関数だけを置く。声を書き出すスクリプト（tools/voice_lines.js）も同じ関数を使うので、
+   ここを変えたら build_voice.py で声を作り直す。 */
+const TTS_UNIT = { km: 'キロメートル', cm: 'センチメートル', mL: 'ミリリットル', kg: 'キログラム', m: 'メートル', g: 'グラム' };
+function ttsClean(t) {
+  return String(t)
+    .replace(/（聞きとり）/g, '')
+    .replace(/(\d+)\/(\d+)/g, '$2ぶんの$1')
+    .replace(/×/g, 'かける').replace(/÷/g, 'わる').replace(/□/g, 'しかく').replace(/＝/g, 'イコール')
+    .replace(/(\d+|しかく)：(\d+|しかく)/g, '$1たい$2').replace(/(\d)〜(\d)/g, '$1から$2')
+    .replace(/何(km|cm|mL|kg|m|g)(?![a-zA-Z²³])/g, (s, u) => '何' + TTS_UNIT[u])
+    .replace(/cm²/g, '平方センチメートル').replace(/km²/g, '平方キロメートル').replace(/m²/g, '平方メートル').replace(/cm³/g, '立方センチメートル')
+    .replace(/(\d)km/g, '$1キロメートル').replace(/(\d)cm/g, '$1センチメートル').replace(/(\d)mL/g, '$1ミリリットル')
+    .replace(/(\d)kg/g, '$1キログラム').replace(/(\d)m(?![a-zA-Z])/g, '$1メートル').replace(/(\d)g(?![a-zA-Z])/g, '$1グラム')
+    .replace(/%/g, 'パーセント').replace(/°/g, '度').replace(/（　）/g, 'かっこ');
+}
+/* 文字列 → 8けたの番号（録音ファイルの名前） */
+function vhash(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return ('0000000' + h.toString(16)).slice(-8);
+}
+/* 日本語はみなとの声、英語は英語の声で読むように文を分ける → [{t, en?}] */
+function voiceSegs(text, lang) {
+  if (text == null || text === '') return [];
+  if (lang === 'en') return [{ t: String(text), en: 1 }];
+  const s = ttsClean(text), out = [];
+  const re = /[A-Za-z][A-Za-z'’-]*(?:[ ,.!?]+[A-Za-z][A-Za-z'’-]*)*[.!?]?/g;
+  let buf = '', last = 0, m;
+  const flush = () => { const t = buf.trim(); buf = ''; if (t && /[^\s\p{P}\p{S}]/u.test(t)) out.push({ t }); };
+  while ((m = re.exec(s))) {
+    if (!/[a-z]{2,}/.test(m[0])) continue; // A・x・BTB・P.E. のような1文字や略語は日本語の声で読む
+    buf += s.slice(last, m.index); flush();
+    out.push({ t: m[0].trim(), en: 1 });
+    last = m.index + m[0].length;
+  }
+  buf += s.slice(last); flush();
+  return out;
+}
+/* 組み合わせて話すセリフ（アプリと声の書き出しで同じものを使う） */
+const PRAISE = ['せいかい！', 'すごい！', 'その調子！', 'ナイス！', 'さすが！', 'かんぺき！'];
+const ENCOURAGE = ['おしい！', 'ドンマイ、次いこう！', 'だいじょうぶ、覚えればオーケー！'];
+const VL = {
+  ans: a => 'こたえは、' + a,
+  combo: n => n + 'れんぞく！すごい！',
+  nOk: n => n + '問正解！',
+  rank: name => name + 'になったよ！',
+  intro: 'はじめまして！わたしは、関門海峡のそばの資料館で案内人をしている、みなと。肩にいるのは相棒のふくぞう。いっしょに勉強して、天下第一関をめざそう！',
+  remind(xp, goal) {
+    return xp === 0 ? '今日はまだ勉強していないよ！10分だけいっしょにやろう。'
+      : xp >= goal ? '今日の目標は達成しているよ！'
+        : '今日の目標まで、もうすこし！もうひとがんばり！';
+  },
+};
+
+/* 自動生成（tools/build_voice.py）。みなとの声のパック一覧 */
+const VOICE_IDX = {"credit": "VOICEVOX:春日部つむぎ", "packs": {"core": "core.1b605294.bin", "play": "play.30fc5cf8.bin", "q_eigo": "q_eigo.825f5fc1.bin", "q_hoken": "q_hoken.eff0473c.bin", "q_katei": "q_katei.eb76b9c6.bin", "q_kokugo": "q_kokugo.a88ffd0d.bin", "q_ongaku": "q_ongaku.6fa6fa41.bin", "q_rika": "q_rika.7b25af95.bin", "q_sansu": "q_sansu.d4363dd0.bin", "q_shakai": "q_shakai.2cd9b47d.bin", "q_tekisei": "q_tekisei.6bc6fdf6.bin", "q_zuko": "q_zuko.eae4cc90.bin"}};
+
 'use strict';
 /* ================= 基本ユーティリティ ================= */
 const $ = (s, r = document) => r.querySelector(s);
@@ -1150,7 +1208,7 @@ function addXP(n) {
   if (r.i > before) {
     Snd.sfx('up');
     toast('ランクアップ！「' + r.name + '」になった！');
-    setTimeout(() => Voice.say('ランクアップ！' + r.name + 'になったよ！'), 600);
+    setTimeout(() => Voice.say(['ランクアップ！', VL.rank(r.name)]), 600);
   }
   const t = todayRec();
   if (t.xp >= S.settings.goal && t.xp - n < S.settings.goal) {
@@ -1223,20 +1281,10 @@ function qCount(subject, mode) {
   if (mode === 'pair') return PAIR_SETS.filter(o => subject === 'mix' || o.s === subject).length;
   return allQ().filter(q => (subject === 'mix' || q.s === subject) && (mode !== 'shooter' || shootable(q))).length;
 }
-function ttsClean(t) {
-  return String(t)
-    .replace(/（聞きとり）/g, '')
-    .replace(/(\d+)\/(\d+)/g, '$2分の$1')
-    .replace(/×/g, 'かける').replace(/÷/g, 'わる').replace(/□/g, 'しかく').replace(/＝/g, 'イコール')
-    .replace(/cm²/g, '平方センチメートル').replace(/km²/g, '平方キロメートル').replace(/m²/g, '平方メートル').replace(/cm³/g, '立方センチメートル')
-    .replace(/(\d)km/g, '$1キロメートル').replace(/(\d)cm/g, '$1センチメートル').replace(/(\d)mL/g, '$1ミリリットル')
-    .replace(/(\d)kg/g, '$1キログラム').replace(/(\d)m(?![a-zA-Z])/g, '$1メートル').replace(/(\d)g(?![a-zA-Z])/g, '$1グラム')
-    .replace(/%/g, 'パーセント').replace(/°/g, '度').replace(/（　）/g, 'かっこ');
-}
 
 /* ================= サウンド（BGM・効果音）================= */
 const Snd = (() => {
-  let ctx = null, master = null, bgmG = null, sfxG = null, timer = null, cur = null, step = 0, next = 0, noiseBuf = null, ducked = false, unlocked = false;
+  let ctx = null, master = null, bgmG = null, sfxG = null, voiceG = null, timer = null, cur = null, step = 0, next = 0, noiseBuf = null, ducked = false, unlocked = false;
   const NI = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
   const fq = n => { const m = /^([A-G]#?)(\d)$/.exec(n); if (!m) return 0; const midi = (+m[2] + 1) * 12 + NI[m[1]]; return 440 * Math.pow(2, (midi - 69) / 12); };
   const P = s => s.trim().split(/\s+/).map(t => t === '.' ? null : t);
@@ -1263,6 +1311,7 @@ const Snd = (() => {
       master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
       bgmG = ctx.createGain(); bgmG.connect(master);
       sfxG = ctx.createGain(); sfxG.gain.value = 0.9; sfxG.connect(master);
+      voiceG = ctx.createGain(); voiceG.gain.value = 1; voiceG.connect(ctx.destination); // みなとの声（BGMを下げても声は下げない）
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
       const ch = noiseBuf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
       setVol();
@@ -1317,6 +1366,7 @@ const Snd = (() => {
     ensure,
     unlock() { unlocked = true; return ensure(); },
     get ready() { return !!ctx && ctx.state === 'running'; },
+    voiceOut() { return ctx && voiceG && ctx.state === 'running' ? { ctx, node: voiceG } : null; },
     play(name) {
       if (!S.settings.bgm || !TR[name]) { this.stop(); return; }
       if (!ensure()) return;
@@ -1350,43 +1400,180 @@ const Snd = (() => {
   };
 })();
 
-/* ================= 音声読み上げ ================= */
+/* ================= 音声（みなとの声） =================
+   日本語のセリフは、VOICEVOX で前もって作った自然な声（voice/*.bin）を流す。
+   英語や、録音にない文（AIのコメントなど）は端末の読み上げで話す。 */
+const VOICE_SILENT = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//OEwAAAAAAAAAAAAEluZm8AAAAPAAAABgAAAwAAYGBgYGBgYGBgYGBgYGBgYICAgICAgICAgICAgICAgICAoKCgoKCgoKCgoKCgoKCgoMDAwMDAwMDAwMDAwMDAwMDA4ODg4ODg4ODg4ODg4ODg4OD/////////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQDwAAAAAAAAAMArPq/AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//NExAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExFMAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKYAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKwAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
 const Voice = {
-  ok: typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined',
-  ja: null, en: null,
+  tts: typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined',
+  rec: typeof VOICE_IDX !== 'undefined' && typeof Audio !== 'undefined' && typeof fetch === 'function',
+  get ok() { return this.tts || this.rec; },
+  get credit() { return typeof VOICE_IDX !== 'undefined' ? VOICE_IDX.credit : '端末の読み上げ'; },
+  ja: null, en: null, el: null, tok: 0, queue: [], blobs: {}, urls: {}, packs: {}, bufs: {}, _src: null, unlocked: false, _t: null, _guard: null, _cancelAt: -1e9, loading: null, loaded: false,
   init() {
-    if (!this.ok) return;
-    const pick = () => {
-      try {
-        const vs = speechSynthesis.getVoices();
-        this.ja = vs.find(v => /^ja/i.test(v.lang)) || null;
-        this.en = vs.find(v => /^en-US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
-      } catch (e) { /* */ }
-    };
-    pick();
-    try { speechSynthesis.addEventListener('voiceschanged', pick); } catch (e) { /* */ }
+    if (this.tts) {
+      // 録音がないときのために、女の人の声を優先して選ぶ
+      const JA = [/nanami/i, /kyoko/i, /o-?ren/i, /haruka/i, /ayumi/i, /mizuki/i, /sayaka/i, /female|女性/i, /google/i];
+      const JA_NG = /otoya|hattori|ichiro|keita|daichi|male(?!.*female)|男性/i;
+      const EN = [/samantha/i, /ava/i, /allison/i, /susan/i, /aria/i, /jenny/i, /zira/i, /google us english/i, /female/i];
+      const rank = (v, list) => { const i = list.findIndex(r => r.test(v.name)); return (i < 0 ? 50 : i) + (v.localService ? 0 : 0.5); };
+      const pick = () => {
+        try {
+          const vs = speechSynthesis.getVoices();
+          const ja = vs.filter(v => /^ja/i.test(v.lang) && !JA_NG.test(v.name)).sort((a, b) => rank(a, JA) - rank(b, JA));
+          const en = vs.filter(v => /^en-US/i.test(v.lang)).concat(vs.filter(v => /^en/i.test(v.lang) && !/^en-US/i.test(v.lang)));
+          this.ja = ja[0] || vs.find(v => /^ja/i.test(v.lang)) || null;
+          this.en = en.sort((a, b) => rank(a, EN) - rank(b, EN))[0] || null;
+        } catch (e) { /* */ }
+      };
+      pick();
+      try { speechSynthesis.addEventListener('voiceschanged', pick); } catch (e) { /* */ }
+    }
+    if (this.rec) this.loading = this.preload().then(() => { this.loaded = true; });
   },
-  say(text, lang = 'ja', force = false) {
-    if (!this.ok || (!S.settings.voice && !force) || !text) return;
+  /* 声のパックを読みこむ（よく使うものから順に。2回目からは端末に保存したものを使う） */
+  load(name) {
+    if (!this.rec || !VOICE_IDX.packs[name]) return Promise.resolve(false);
+    if (this.packs[name]) return this.packs[name];
+    return (this.packs[name] = fetch('voice/' + VOICE_IDX.packs[name])
+      .then(r => { if (!r.ok) throw new Error('voice ' + r.status); return r.arrayBuffer(); })
+      .then(buf => {
+        const n = new DataView(buf).getUint32(0, true);
+        const head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, n)));
+        for (const h in head) this.blobs[h] = new Blob([new Uint8Array(buf, 4 + n + head[h][0], head[h][1])], { type: 'audio/mpeg' });
+        return true;
+      })
+      .catch(() => { delete this.packs[name]; return false; }));
+  },
+  preload() {
+    const names = Object.keys(VOICE_IDX.packs).filter(n => n !== 'core');
+    // 最初のパックが読めない（ネットなし・ファイルで開いた など）ときは、残りも読みにいかない
+    return this.load('core').then(ok => ok && names.reduce((p, n) => p.then(() => this.load(n)), Promise.resolve()));
+  },
+  has(t) { return !!this.blobs[vhash(t)]; },
+  url(t) {
+    const h = vhash(t), b = this.blobs[h];
+    if (!b) return null;
+    try { return this.urls[h] || (this.urls[h] = URL.createObjectURL(b)); } catch (e) { return null; }
+  },
+  audio() {
+    if (!this.el) { this.el = new Audio(); this.el.preload = 'auto'; this.el.setAttribute('playsinline', ''); }
+    return this.el;
+  },
+  /* 最初のタップで音を出す許可をもらう（iPhone・iPad 用） */
+  unlock() {
+    if (this.unlocked || !this.rec) return;
+    const a = this.audio();
+    if (!a.paused || this.queue.length) return; // 話している最中は何もしない
+    this.unlocked = true;
     try {
-      const busy = speechSynthesis.speaking || speechSynthesis.pending;
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(lang === 'ja' ? ttsClean(text) : text);
+      a.muted = true; a.src = VOICE_SILENT;
+      const p = a.play();
+      const back = () => { a.muted = false; };
+      if (p && p.then) p.then(back, err => { a.muted = false; if (err && err.name === 'NotAllowedError') this.unlocked = false; }); else back();
+    } catch (e) { this.unlocked = false; }
+  },
+  decode(h, ctx) {
+    if (!this.bufs[h]) {
+      this.bufs[h] = this.blobs[h].arrayBuffer()
+        .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
+        .catch(err => { delete this.bufs[h]; throw err; });
+    }
+    return this.bufs[h];
+  },
+  /* parts：文字列か、文字列の配列（順番に話す） */
+  say(parts, lang = 'ja', force = false) {
+    if (!this.ok || (!S.settings.voice && !force) || parts == null) return;
+    const segs = [].concat(parts).reduce((a, p) => a.concat(voiceSegs(p, lang)), []);
+    if (!segs.length) return;
+    this.stop();
+    const tok = this.tok;
+    this.queue = segs;
+    // 開いた直後でまだ声を読みこみ中なら、少しだけ待ってからみなとの声で話す
+    if (this.loading && !this.loaded && segs.some(s => !s.en && !this.has(s.t))) {
+      Promise.race([this.loading, new Promise(r => setTimeout(r, 2500))]).then(() => this._next(tok));
+      return;
+    }
+    this._next(tok);
+  },
+  _next(tok) {
+    if (tok !== this.tok) return;
+    clearTimeout(this._guard);
+    const s = this.queue.shift();
+    if (!s) { Snd.duck(false); return; }
+    Snd.duck(true);
+    const done = () => this._next(tok);
+    if (s.en || !this.has(s.t)) { this._speak(s.t, s.en ? 'en' : 'ja', done, tok); return; }
+    const rate = S.settings.voiceRate || 1, out = Snd.voiceOut();
+    if (out && Math.abs(rate - 1) < 0.05) this._clipWA(s, out, done, tok);
+    else this._clipEl(s, done, tok);
+  },
+  // ふつうの速さ：Web Audio で流す（BGMと同じしくみ。Android でメディアの通知が出ない）
+  _clipWA(s, out, done, tok) {
+    this.decode(vhash(s.t), out.ctx).then(buf => {
+      if (tok !== this.tok) return;
+      const src = out.ctx.createBufferSource();
+      src.buffer = buf; src.connect(out.node);
+      let fin = false;
+      const end = () => { if (fin) return; fin = true; if (this._src === src) this._src = null; if (tok === this.tok) done(); };
+      src.onended = end;
+      this._src = src;
+      src.start();
+      this._guard = setTimeout(end, buf.duration * 1000 + 2500);
+    }).catch(() => { if (tok === this.tok) this._clipEl(s, done, tok); });
+  },
+  // 速さを変えたとき：audio 要素で流す（声の高さを変えずに速さだけ変えられる）
+  _clipEl(s, done, tok) {
+    const url = this.url(s.t);
+    if (!url) { this._speak(s.t, 'ja', done, tok); return; }
+    const a = this.audio(), rate = S.settings.voiceRate || 1;
+    let fin = false;
+    const end = ok => {
+      if (fin || tok !== this.tok) return;
+      fin = true; a.onended = a.onerror = null;
+      if (ok) done(); else this._speak(s.t, 'ja', done, tok); // 流せなかったら端末の声で
+    };
+    a.onended = () => end(true);
+    a.onerror = () => end(false);
+    try {
+      a.muted = false; a.src = url;
+      a.defaultPlaybackRate = rate; a.playbackRate = rate;
+      a.preservesPitch = true; a.webkitPreservesPitch = true; a.mozPreservesPitch = true;
+      const p = a.play();
+      if (p && p.catch) p.catch(err => { if (err && err.name === 'NotAllowedError') { fin = true; this.queue = []; Snd.duck(false); } else end(false); });
+    } catch (e) { end(false); }
+    this._guard = setTimeout(() => end(true), 20000);
+  },
+  _speak(text, lang, done, tok) {
+    if (!this.tts) { done(); return; }
+    try {
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = lang === 'en' ? 'en-US' : 'ja-JP';
       const v = lang === 'en' ? this.en : this.ja;
       if (v) u.voice = v;
-      u.rate = lang === 'en' ? Math.max(0.6, S.settings.voiceRate * 0.85) : S.settings.voiceRate;
-      u.onstart = () => Snd.duck(true);
-      u.onend = u.onerror = () => Snd.duck(false);
-      clearTimeout(this._t);
-      if (busy) this._t = setTimeout(() => { try { speechSynthesis.speak(u); } catch (e) { /* */ } }, 90);
+      const rate = S.settings.voiceRate || 1;
+      u.rate = lang === 'en' ? Math.max(0.6, rate * 0.85) : rate;
+      u.pitch = lang === 'en' ? 1.1 : 1.2; // みなとの声に近づけて少し高めに
+      let fin = false;
+      const end = () => { if (fin) return; fin = true; clearTimeout(this._guard); done(); };
+      u.onend = u.onerror = end;
+      this._guard = setTimeout(end, Math.max(3000, text.length * 320 / u.rate));
+      // 止めた直後にすぐ話すと声が出ないブラウザがあるので、少し待つ
+      if (performance.now() - this._cancelAt < 150) this._t = setTimeout(() => { if (tok === this.tok) try { speechSynthesis.speak(u); } catch (e) { end(); } }, 90);
       else speechSynthesis.speak(u);
-    } catch (e) { /* */ }
+    } catch (e) { done(); }
   },
-  stop() { try { speechSynthesis.cancel(); } catch (e) { /* */ } Snd.duck(false); },
+  stop() {
+    this.tok++; this.queue = [];
+    clearTimeout(this._t); clearTimeout(this._guard);
+    if (this._src) { try { this._src.onended = null; this._src.stop(); } catch (e) { /* */ } this._src = null; }
+    if (this.el) { try { this.el.onended = this.el.onerror = null; this.el.pause(); } catch (e) { /* */ } }
+    if (this.tts) {
+      try { if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); this._cancelAt = performance.now(); } } catch (e) { /* */ }
+    }
+    Snd.duck(false);
+  },
 };
-const PRAISE = ['せいかい！', 'すごい！', 'その調子！', 'ナイス！', 'さすが！', 'かんぺき！'];
-const ENCOURAGE = ['おしい！', 'ドンマイ、次いこう！', 'だいじょうぶ、覚えればOK！'];
 const pickOne = a => a[Math.floor(Math.random() * a.length)];
 
 /* ================= 絵（マスコット・アイコン） ================= */
@@ -1657,7 +1844,7 @@ function recordSubj(k, ok) {
   st.a++; if (ok) st.c++;
   const t = todayRec(); t.a++; if (ok) t.c++;
 }
-function qText(q) { return q.say && (!Voice.ok || !S.settings.voice) ? q.q + '　「' + q.say + '」' : q.q; }
+function qText(q) { return q.say && (!Voice.tts || !S.settings.voice) ? q.q + '　「' + q.say + '」' : q.q; }
 function speakQ(q, force) {
   if (q.say) { Voice.say(q.say, 'en', force); return; }
   if (force || S.settings.readQ) Voice.say(q.q, 'ja', force);
@@ -1778,7 +1965,7 @@ function ShooterGame(root, qs) {
       g.score += pts; g.xp += pts; addXP(pts);
       pops.push({ x: t.x, y: t.y - 40, text: '+' + pts + (g.combo >= 2 ? '  ' + g.combo + 'COMBO' : ''), life: 1.2, c: '#ffd36b' });
       Snd.sfx('ok');
-      Voice.say(g.combo >= 3 ? g.combo + 'れんぞく！すごい！' : pickOne(PRAISE));
+      Voice.say(g.combo >= 3 ? VL.combo(g.combo) : pickOne(PRAISE));
       recordAnswer(q, true);
       if (g.combo >= 5) award('combo5');
       if (g.combo >= 10) award('combo10');
@@ -1790,7 +1977,7 @@ function ShooterGame(root, qs) {
       Snd.sfx('ng');
       const ct = targets.find(o => o.ok); if (ct) ct.glow = 3;
       targets.forEach(o => { if (!o.ok) o.fade = 0.3; });
-      Voice.say(pickOne(ENCOURAGE) + ' こたえは、' + q.a);
+      Voice.say([pickOne(ENCOURAGE), VL.ans(q.a)]);
       recordAnswer(q, false); g.missed.push(q);
       reveal(1.9);
     }
@@ -1803,7 +1990,7 @@ function ShooterGame(root, qs) {
     const ct = targets.find(o => o.ok); if (ct) ct.glow = 3;
     targets.forEach(o => { if (!o.ok) o.fade = 0.3; });
     pops.push({ x: W / 2, y: H * 0.5, text: '時間切れ！', life: 1.3, c: '#ff9a9a' });
-    Voice.say('時間切れ！ こたえは、' + q.a);
+    Voice.say(['時間切れ！', VL.ans(q.a)]);
     recordAnswer(q, false); g.missed.push(q);
     reveal(1.9); hud();
   }
@@ -1824,7 +2011,7 @@ function ShooterGame(root, qs) {
     const best = S.counts.shooterBest || 0;
     S.counts.shooterBest = Math.max(best, g.score);
     commit();
-    Voice.say(clear ? 'クリア！ ' + g.correct + '問正解！' : 'ゲームオーバー。また挑戦しよう！');
+    Voice.say(clear ? ['クリア！', VL.nOk(g.correct)] : 'ゲームオーバー。また挑戦しよう！');
     setTimeout(() => {
       if (!alive) return;
       showResult({
@@ -2093,7 +2280,7 @@ function startQuiz(main, subject, review) {
       g.score += pts; addXP(pts);
       Snd.sfx('ok'); Voice.say(pickOne(PRAISE));
     } else {
-      g.missed.push(q); Snd.sfx('ng'); Voice.say(pickOne(ENCOURAGE) + ' こたえは、' + q.a);
+      g.missed.push(q); Snd.sfx('ng'); Voice.say([pickOne(ENCOURAGE), VL.ans(q.a)]);
     }
     checkBadges();
     commit();
@@ -2108,7 +2295,7 @@ function startQuiz(main, subject, review) {
     const bonus = g.correct === qs.length ? 20 : 0;
     if (bonus) addXP(bonus);
     commit();
-    Voice.say(g.correct + '問正解！おつかれさま！');
+    Voice.say([VL.nOk(g.correct), 'おつかれさま！']);
     showResult({ title: review ? 'ふくしゅう完了！' : 'クイズ終了！', big: g.correct + ' / ' + qs.length, sub: `正解${g.correct}問${bonus ? '<br>全問正解ボーナス +20pt' : ''}`, xp: g.score + bonus, missed: g.missed, noAgain: review && !Object.keys(S.wrong).length });
   }
   const onKey = e => {
@@ -2170,7 +2357,7 @@ function startOrder(main, subject) {
       S.counts.puzzle++;
       recordSubj(cur.s.s, cur.miss === 0);
       checkBadges(); commit();
-      Snd.sfx('ok'); Voice.say(cur.miss ? 'できた！' : pickOne(PRAISE) + ' 一発正解！');
+      Snd.sfx('ok'); Voice.say(cur.miss ? 'できた！' : [pickOne(PRAISE), '一発正解！']);
       draw();
     } else {
       cur.miss++; Snd.sfx('ng'); Voice.say('おしい！赤いところを直そう');
@@ -2210,7 +2397,7 @@ function startPair(main, subject) {
     <div id="pmAfter" aria-live="polite"></div>
   </div>`;
     $$('.pcard', main).forEach(b => b.addEventListener('click', () => flip(b)));
-    Voice.say(s.t + '。なかまのカードを見つけよう');
+    Voice.say([s.t, 'なかまのカードを見つけよう']);
   }
   function flip(b) {
     const i = +b.dataset.c;
@@ -2629,7 +2816,7 @@ function viewParent(main) {
       <label class="switch"><span>BGMの音量</span><input type="range" id="setVol" min="0" max="1" step="0.05" value="${s.bgmVol}"></label>
       <label class="switch"><span>効果音</span><input type="checkbox" id="setSfx" ${s.sfx ? 'checked' : ''}></label>
     </div>
-    ${Voice.ok ? '' : '<p class="small muted">このブラウザでは音声読み上げが使えません。</p>'}
+    <p class="small muted">みなとの声：${esc(Voice.credit)}${Voice.tts ? '' : '（このブラウザでは英語の読み上げが使えません）'}</p>
   </section>
 
   <section class="card stack">
@@ -2838,12 +3025,12 @@ window.addEventListener('appinstalled', () => { deferredInstall = null; toast('�
 
 /* ---------- はじめてのあいさつ（案内人みなと） ---------- */
 function showIntro() {
-  const msg = 'はじめまして！わたしは、関門海峡のそばの資料館で案内人をしている、みなと。肩にいるのは相棒のふくぞう。いっしょに勉強して、天下第一関をめざそう！';
+  const msg = VL.intro;
   modal(`<div class="intro"><div class="center">${minatoImg('guide', 'intro-guide')}</div>
   <h2 class="center" style="font-family:var(--f-display);font-weight:400;font-size:22px">案内人のみなとです</h2>
   <p>${esc(msg)}</p>
   <ul class="intro-list"><li>ゲームで正解すると <b>ポイント</b> がたまって、ランクが上がるよ</li><li>まちがえた問題は <b>ふくしゅう</b> にとっておくから、あとでとき直そう</li><li>1日の目標は <b>${S.settings.goal}ポイント</b>。毎日つづけると、れんぞく記録がのびるよ</li></ul>
-  <div class="row-btns"><button class="btn accent" data-act="introStart">はじめる</button></div></div>`);
+  <div class="row-btns"><button class="btn ghost" data-act="introVoice">${ICON.speak} みなとの声を聞く</button><button class="btn accent" data-act="introStart">はじめる</button></div></div>`);
   setTimeout(() => Voice.say(msg), 300);
 }
 
@@ -2869,7 +3056,7 @@ function checkReminder(force) {
   document.body.appendChild(b);
   uiSet('remindNext', endOfToday());
   Snd.sfx('chime');
-  setTimeout(() => Voice.say(msg), 700);
+  setTimeout(() => Voice.say(VL.remind(xp, s.goal)), 700); // 名前や数字は画面に出し、声は録音したセリフで
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification('めざせ天下第一関', { body: msg }); } catch (e) { /* 通知が使えない環境 */ }
 }
 
@@ -2897,7 +3084,8 @@ document.addEventListener('click', e => {
     case 'bannerGo': { const b = $('#banner'); if (b) b.remove(); closeModal(); go('play', { mode: 'shooter', subject: weakest() }); break; }
     case 'bannerLater': { const b = $('#banner'); if (b) b.remove(); uiSet('remindNext', Date.now() + 30 * 60000); toast('30分後にまたお知らせするね'); break; }
     case 'close': closeModal(); break;
-    case 'introStart': uiSet('introSeen', 1); closeModal(); Snd.sfx('badge'); break;
+    case 'introStart': uiSet('introSeen', 1); Voice.stop(); closeModal(); Snd.sfx('badge'); break;
+    case 'introVoice': Voice.say(VL.intro, 'ja', true); break;
     case 'install': showInstall(); break;
     case 'installHide': uiSet('installHide', Date.now() + 3 * 864e5); render(); break;
     case 'shareToday': shareToday(); break;
@@ -2909,16 +3097,17 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { Snd.stop(); Voice.stop(); }
   else if (S.settings.bgm && Snd.want && Snd.ready) Snd.play(Snd.want);
 });
-const unlockAudio = () => { Snd.unlock(); if (S.settings.bgm && Snd.want) Snd.play(Snd.want); };
-document.addEventListener('pointerdown', unlockAudio, { capture: true });
-document.addEventListener('keydown', unlockAudio, { capture: true });
+const unlockAudio = () => { Snd.unlock(); Voice.unlock(); if (S.settings.bgm && Snd.want) Snd.play(Snd.want); };
+// iPhone・iPad はタッチを離したとき（touchend / click）でないと音を出す許可が出ないので、いくつかの合図で試す
+['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, { capture: true, passive: true }));
 $('#btnBgm').addEventListener('click', () => {
   S.settings.bgm = !S.settings.bgm; commit(); updateTop();
   if (S.settings.bgm) { if (Snd.want) Snd.play(Snd.want); toast('BGMをオンにしました'); } else { Snd.stop(); toast('BGMをオフにしました'); }
 });
 $('#btnVoice').addEventListener('click', () => {
   S.settings.voice = !S.settings.voice; commit(); updateTop();
-  if (S.settings.voice) Voice.say('読み上げをオンにしたよ'); else { Voice.stop(); toast('音声をオフにしました'); }
+  if (!S.settings.voice) { Voice.stop(); toast('音声をオフにしました'); return; }
+  Voice.say('読み上げをオンにしたよ');
 });
 
 /* ================= 起動 ================= */
@@ -2934,6 +3123,7 @@ function boot() {
   $('#btnVoice').innerHTML = ICON.voice;
   $$('[data-icon]').forEach(x => { x.innerHTML = ICON[x.dataset.icon] || ''; });
   Voice.init();
+  if (/[?&]debug=1\b/.test(location.search)) window.__tenka = { Voice, S }; // テスト用
   if (STANDALONE && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
   initCapabilities();
