@@ -5,3 +5,5 @@
 
 - アプリ: `tenka-daiichi/`
 - 更新するときは `tenka-daiichi/` の中身を新しいファイルで置きかえます。
+
+案内人みなとの声：VOICEVOX:春日部つむぎ
