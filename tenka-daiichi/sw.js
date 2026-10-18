@@ -1,5 +1,5 @@
 /* めざせ天下第一関 — オフラインで動かすためのサービスワーカー */
-const VERSION = 'tenka-20261018-1917';
+const VERSION = 'tenka-20261018-1918';
 const FONT_CACHE = 'tenka-fonts';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-64.png'];
 

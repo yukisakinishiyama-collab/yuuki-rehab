@@ -2853,7 +2853,7 @@ function checkReminder(force) {
   const s = S.settings;
   const t = S.days[dkey()], xp = t ? t.xp : 0;
   if (!force) {
-    if (!s.remindOn || inGame() || $('#banner')) return;
+    if (!s.remindOn || inGame() || $('#banner') || $('#modal')) return;
     const [h, m] = (s.remindTime || '19:00').split(':').map(Number);
     const now = new Date();
     if (now.getHours() * 60 + now.getMinutes() < h * 60 + m) return;
