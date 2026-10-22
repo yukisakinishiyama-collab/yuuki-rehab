@@ -12,7 +12,12 @@ name: marketing-publish-jobs
 on:
   schedule:
     - cron: '*/15 * * * *' # UTC基準・15分ごと
-  workflow_dispatch: {} # 手動実行も可能
+  workflow_dispatch: # 手動実行も可能
+    inputs:
+      generate_now:
+        description: '自動投稿の案を今すぐ作る（今週の残り枠、なければ来週の分）'
+        type: boolean
+        default: false
 
 jobs:
   run-due-jobs:
@@ -28,6 +33,8 @@ jobs:
       - name: 自動投稿パイプライン（下書き作成・期限切れ整理・リマインド）
         if: always()
         run: |
-          curl -fsS --max-time 290 -X POST "https://yuuki-rehab.vercel.app/api/marketing/autopilot/run" \
+          URL="https://yuuki-rehab.vercel.app/api/marketing/autopilot/run"
+          if [ "${{ inputs.generate_now }}" = "true" ]; then URL="$URL?generate=now"; fi
+          curl -sS --max-time 290 -w "\nHTTP %{http_code}\n" -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.MARKETING_CRON_SECRET }}" \
             -H "Content-Type: application/json"
