@@ -53,6 +53,8 @@ export const AUTOPILOT_URL = `${SITE_URL}/marketing/autopilot`
 const GOOGLE_MANAGE_URL = 'https://business.google.com/'
 /** 「生成中」の印がこれより古ければ、途中で止まったとみなして作り直す */
 const STALE_GENERATING_MS = 10 * 60 * 1000
+/** 投稿案を作ってからこの時間が経つまでは前日リマインドを送らない */
+const REMIND_AFTER_MS = 12 * 60 * 60 * 1000
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -350,7 +352,9 @@ export async function runAutopilot(now = new Date()): Promise<RunSummary> {
     const soon = proposal.items.filter(
       (i) => i.status === 'proposed' && i.variants.length > 0 && i.scheduledAt <= addMinutesLocal(jst.local, 24 * 60),
     )
-    if (!proposal.remindedAt && soon.length > 0 && settings.enabled) {
+    // 作った直後（12時間以内）はリマインドしない（「できました」のお知らせと重ならないように）
+    const settled = now.getTime() - new Date(proposal.createdAt).getTime() > REMIND_AFTER_MS
+    if (!proposal.remindedAt && settled && soon.length > 0 && settings.enabled) {
       const result = await notifyOwner([
         ownerCard(
           '投稿案の承認をお待ちしています',

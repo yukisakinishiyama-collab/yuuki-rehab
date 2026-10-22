@@ -4,11 +4,13 @@
  * - GitHub Actions（15分ごと）と Vercel Cron（週1回の保険）から呼ばれる
  * - ほとんどの回は「期限切れの整理・前日リマインド」だけで終わる（数百ミリ秒）
  * - 日曜の夕方（設定の時刻）以降の最初の回だけ、翌週分のAI下書きを作って院長へLINE通知する
+ * - ?generate=now … 承認画面の「今すぐ投稿案を作る」と同じ（GitHub Actionsの手動実行 generate_now から。
+ *                    今週の残り枠、なければ来週の分。その週の案がもうあれば何もしない）
  * - 認証: CRON_SECRET（Bearer）または管理者のBasic認証（proxyの認証対象外のためここで確認）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { cronOrAdmin } from '@/lib/marketing/auth'
-import { runAutopilot } from '@/lib/marketing/autopilot-server'
+import { generateNow, runAutopilot } from '@/lib/marketing/autopilot-server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -16,6 +18,10 @@ export const maxDuration = 300
 async function handle(request: NextRequest) {
   if (!cronOrAdmin(request)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {
+    if (request.nextUrl.searchParams.get('generate') === 'now') {
+      const result = await generateNow()
+      return NextResponse.json(result, { status: result.ok ? 200 : 409 })
+    }
     return NextResponse.json(await runAutopilot())
   } catch (error) {
     return NextResponse.json(
