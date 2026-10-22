@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { CHANNEL_LABELS, type Channel } from '@/lib/marketing/types'
 import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
+import { useMarketingRole } from '@/lib/marketing/use-role'
 
 interface Analytics {
   days: number
@@ -30,6 +31,117 @@ const FUNNEL_STEPS: Array<{ key: keyof Analytics['funnel']; label: string }> = [
   { key: 'guide', label: '来院案内に到達' },
   { key: 'reserveClick', label: '予約リンクをクリック' },
 ]
+
+interface FollowerPoint {
+  date: string
+  followers: number
+  source: 'api' | 'manual'
+}
+interface FollowerData {
+  points: FollowerPoint[]
+  summary: null | { latest: FollowerPoint; change7: number | null; change30: number | null }
+  connected: boolean
+}
+
+const signed = (n: number | null) => (n === null ? '—' : n > 0 ? `+${n}` : `${n}`)
+
+/** Instagramフォロワーの推移（連携後は毎日自動。連携前は手で記録） */
+function InstagramFollowers() {
+  const { isAdmin } = useMarketingRole()
+  const [data, setData] = useState<FollowerData | null>(null)
+  const [value, setValue] = useState('')
+  const [message, setMessage] = useState('')
+
+  const load = useCallback(
+    () =>
+      fetch('/api/marketing/analytics/instagram', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: FollowerData | null) => {
+          if (d) setData(d)
+        })
+        .catch(() => undefined),
+    [],
+  )
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function save() {
+    const followers = Number(value.replace(/[,，\s人]/g, ''))
+    if (!Number.isFinite(followers) || followers < 0) {
+      setMessage('数字で入力してください')
+      return
+    }
+    const res = await fetch('/api/marketing/analytics/instagram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ followers }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      setData((prev) => ({ connected: prev?.connected ?? false, points: d.points, summary: d.summary }))
+      setValue('')
+      setMessage('記録しました')
+    } else {
+      setMessage(d.error ?? '記録できませんでした')
+    }
+  }
+
+  const recent = [...(data?.points ?? [])].reverse().slice(0, 8)
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <h2 className="font-bold">Instagramフォロワー</h2>
+      {data?.summary ? (
+        <div className="mt-2 flex flex-wrap items-end gap-6">
+          <div>
+            <p className="text-xs font-bold text-slate-500">いま（{data.summary.latest.date}）</p>
+            <p className="text-3xl font-black text-teal-900">{data.summary.latest.followers.toLocaleString('ja-JP')}人</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500">7日前から</p>
+            <p className="text-xl font-bold">{signed(data.summary.change7)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500">30日前から</p>
+            <p className="text-xl font-bold">{signed(data.summary.change30)}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-slate-500">まだ記録がありません。</p>
+      )}
+      {recent.length > 1 && (
+        <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+          {recent.map((p) => (
+            <li key={p.date} className="flex justify-between gap-2 border-b border-slate-100 py-1">
+              <span className="text-slate-500">{p.date.slice(5).replace('-', '/')}</span>
+              <span className="font-medium">{p.followers.toLocaleString('ja-JP')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-3 text-xs text-slate-500">
+        {data?.connected
+          ? 'Instagram連携済み：毎日自動で記録しています。'
+          : 'Instagram連携後は毎日自動で記録します。それまでは、週に1回ほどプロフィールのフォロワー数をここに記録してください。'}
+      </p>
+      {isAdmin && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            inputMode="numeric"
+            placeholder="今日のフォロワー数（例: 912）"
+            className="w-48 rounded-lg border border-slate-300 p-2 text-sm"
+          />
+          <button type="button" onClick={save} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white">
+            記録する
+          </button>
+          {message && <span className="text-sm text-slate-600">{message}</span>}
+        </div>
+      )}
+    </section>
+  )
+}
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null)
@@ -82,6 +194,8 @@ export default function AnalyticsPage() {
           </div>
         ))}
       </div>
+
+      <InstagramFollowers />
 
       {/* 予約（流入元別）… どこから来た予約か */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
