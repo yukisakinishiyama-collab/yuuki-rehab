@@ -41,7 +41,7 @@
 | `LINE_CHANNEL_ACCESS_TOKEN` / `RESERVATION_NOTIFY_LINE_USER_ID` | 院長へのLINE | 既存 |
 | `CRON_SECRET`（＝GitHubの `MARKETING_CRON_SECRET`） | 定期実行の保護 | 既存 |
 | `RESERVATION_NOTIFY_SECRET` | 予約システムから集計値を受け取る署名（GASの `PATIENT_NOTIFY_SECRET` と同じ値） | 既存 |
-| `INSTAGRAM_ACCESS_TOKEN` / `INSTAGRAM_USER_ID` | Instagram自動投稿 | 未（`INSTAGRAM-SETUP.md`） |
+| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET`（＋ハブの「Instagramとつなぐ」） | Instagram自動投稿 | 設定中（`INSTAGRAM-SETUP.md`。`INSTAGRAM_USER_ID` は設定済み） |
 | `GBP_CLIENT_ID` / `GBP_CLIENT_SECRET` / `GBP_REFRESH_TOKEN` / `GBP_LOCATION_NAME` | Google投稿の自動化 | API申請の承認後（`GOOGLE-BUSINESS-SETUP.md`） |
 
 定期実行（どちらも無料の範囲）:

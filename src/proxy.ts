@@ -18,6 +18,7 @@
  * - /api/marketing/jobs/run           … Vercel Cron（CRON_SECRETで保護）
  * - /api/marketing/autopilot/run      … 自動下書きの定期実行（CRON_SECRETで保護）
  * - /api/marketing/reservation-notify … GAS予約システムからの通知（RESERVATION_NOTIFY_SECRETで保護）
+ * - /api/marketing/instagram/callback … Instagramの許可画面からの戻り（/connectで発行したstateのCookie一致で保護）
  */
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -29,6 +30,7 @@ const PUBLIC_PATHS = [
   '/api/marketing/jobs/run',
   '/api/marketing/autopilot/run',
   '/api/marketing/reservation-notify',
+  '/api/marketing/instagram/callback',
 ]
 
 /** 認証済みの役割を権威的にヘッダー注入し、UI表示用Cookieを添えて通過させる */

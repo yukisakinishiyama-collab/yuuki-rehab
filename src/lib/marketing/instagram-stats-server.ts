@@ -1,7 +1,7 @@
 /**
  * Instagramのフォロワー数の記録（サーバー専用）
  *
- * - Instagram連携（INSTAGRAM_ACCESS_TOKEN）後は、定期実行が1日1回 followers_count を自動で記録する
+ * - Instagram連携（「Instagramとつなぐ」または INSTAGRAM_ACCESS_TOKEN）後は、定期実行が1日1回 followers_count を自動で記録する
  * - 連携前でも、効果測定画面から院長が数字を手で記録できる（週1回など）
  * 保存先: KV 'ig:followers'（日付ごとに1件・新しい日付で上書き）
  */
@@ -33,7 +33,7 @@ export async function addFollowerPoint(point: FollowerPoint): Promise<FollowerPo
 
 /** 連携済みなら、その日の分を1回だけAPIから記録する */
 export async function recordInstagramFollowers(today: string): Promise<FollowerPoint | null> {
-  if (process.env.MARKETING_MODE === 'mock' || !process.env.INSTAGRAM_ACCESS_TOKEN) return null
+  if (process.env.MARKETING_MODE === 'mock') return null
   const rows = await listFollowerPoints()
   if (rows.some((p) => p.date === today && p.source === 'api')) return null
 
