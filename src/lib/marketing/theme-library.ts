@@ -268,6 +268,43 @@ export const THEME_LIBRARY: ThemeSeed[] = [
     sitePath: '/drills',
   },
 
+  // 保存して見返してもらう「保存版」（フォロワーを増やす中心のテーマ）
+  {
+    id: 'save-ankle-balance',
+    category: 'prevention',
+    objective: 'スポーツ障害予防',
+    theme: '【保存版】足首の捻挫をくり返さないためのバランス練習',
+    keyMessage: '片脚立ちなど自宅でできる練習を、痛みのない範囲で少しずつ。痛みや腫れがあるときは無理をしない',
+    audience: '足首の捻挫をくり返している学生・スポーツ愛好家',
+    sitePath: '/symptoms/ankle-sprain',
+  },
+  {
+    id: 'save-hamstring',
+    category: 'prevention',
+    objective: 'スポーツ障害予防',
+    theme: '【保存版】太もも裏の肉離れを防ぐための準備運動',
+    keyMessage: '練習前は動きながら体を温め、ダッシュは体が温まってから。違和感があるときは早めに相談を',
+    audience: 'サッカー・陸上・野球など走る競技の選手',
+    sitePath: '/symptoms/muscle-strain',
+  },
+  {
+    id: 'save-knee-check',
+    category: 'prevention',
+    objective: 'スポーツ障害予防',
+    theme: '【保存版】成長期のひざの痛み、家でできるセルフチェック',
+    keyMessage: '押すと痛い場所・痛みが出る動きを確認し、続く痛みは早めに医療機関や専門家へ',
+    audience: '小中学生の選手の保護者',
+    sitePath: '/symptoms/osgood',
+  },
+  {
+    id: 'save-desk-stretch',
+    category: 'prevention',
+    objective: '認知拡大',
+    theme: '【保存版】座りっぱなしの腰と首をほぐす1分ストレッチ',
+    keyMessage: '仕事の合間に立ち上がって体を動かす。痛みやしびれがあるときは無理をしない',
+    audience: 'デスクワーク中心の働く世代',
+  },
+
   // ── 院のご案内 ──
   {
     id: 'first-visit',

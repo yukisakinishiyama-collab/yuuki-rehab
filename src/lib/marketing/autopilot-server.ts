@@ -18,6 +18,7 @@ import { checkGenerated, generateVariants } from './generate-server'
 import { createJob, getJob, updateJob, type PublishJob } from './jobs-store-server'
 import { fetchHubStats } from './booking-stats'
 import { notifyOwner, ownerCard, type OwnerMessage } from './owner-notify'
+import { followerSummary, recordInstagramFollowers } from './instagram-stats-server'
 import {
   addDays,
   addMinutesLocal,
@@ -113,11 +114,18 @@ const COMMON_NOTES = [
 
 function channelNotesFor(seed: Seed): Partial<Record<Channel, string>> {
   const site = seed.sitePath ? `${SITE_URL}${seed.sitePath}` : ''
-  const instagram =
-    'キャプション内のURLはタップできないため、URLは書かずに「ご予約・ご相談はプロフィールのリンクから」と案内する。'
+  // フォロワーを増やす型：保存・シェアされる中身 → 「フォローすると続きが届く」理由を示す。
+  // 見返りと引き換えのフォロー依頼（割引・プレゼント）はしない
+  const instagram = [
+    'キャプション内のURLはタップできないため、URLは書かずに「ご予約・ご相談はプロフィールのリンクから」と案内する。',
+    'キャプションの1行目は、対象の人が「自分のことだ」と思う悩みの言葉にする（例: 「部活で足首をよくひねる人へ」）。',
+    '本文の終わり近くに「あとで見返せるように保存しておくと便利です」と、保存をすすめる一言を入れる。',
+    'キャプションの最後に「@yu.ki__seikotsuin では、ケガの予防とリハビリの情報を毎週お届けしています」とフォローの理由を1行で書く。割引やプレゼントと引き換えのフォロー依頼はしない。',
+    'ハッシュタグは10個前後：地域（#下関市 #彦島 #下関整骨院 #山口県）3〜4個＋競技・症状のタグ5〜6個＋#ゆうき整骨院。',
+  ].join(' ')
   return {
     instagram_feed: instagram,
-    instagram_carousel: `${instagram} 最後のスライドは「ご予約はプロフィールのリンクから／ネット予約24時間受付」にする。`,
+    instagram_carousel: `${instagram} スライドの構成：1枚目は悩みの言葉と結論が一目でわかる表紙、2〜6枚目は1枚1ポイント（見出し＋短い説明）、最後から2枚目に「保存して見返してください」、最後のスライドは「フォローで毎週のケガ予防情報／ご予約はプロフィールのリンクから（ネット予約24時間）」にする。`,
     google_business: site
       ? `予約ボタンは別に付くので、本文の最後に「くわしくはこちら：${site}」を1回だけ載せてよい（ほかのURLは書かない）。`
       : '予約ボタンは別に付くので、本文にURLは書かない。',
@@ -282,7 +290,8 @@ export async function generateWeek(week: string, now: Date): Promise<{ proposal:
 
   const usable = proposal.items.filter((i) => i.variants.length > 0)
   if (usable.length > 0) {
-    const result = await notifyOwner(weeklyNotice(proposal))
+    const followers = await followerSummary().catch(() => null)
+    const result = await notifyOwner(weeklyNotice(proposal, followers))
     proposal.notifiedAt = result.delivered ? new Date().toISOString() : undefined
     proposal.notifyResult = result.delivered ? 'LINEで通知しました' : `LINE通知なし（${result.reason ?? '不明'}）`
     await saveProposal(proposal)
@@ -292,7 +301,7 @@ export async function generateWeek(week: string, now: Date): Promise<{ proposal:
 }
 
 /** 下書き完成のお知らせ（本文＋「全部承認」「内容を確認」ボタン） */
-function weeklyNotice(proposal: WeeklyProposal): OwnerMessage[] {
+function weeklyNotice(proposal: WeeklyProposal, followers?: string | null): OwnerMessage[] {
   const items = proposal.items.filter((i) => i.variants.length > 0)
   const lines = items.map((item) => {
     const channels = activeVariants(item)
@@ -313,6 +322,7 @@ function weeklyNotice(proposal: WeeklyProposal): OwnerMessage[] {
     '',
     '内容を確認して承認すると、予定の時刻に投稿されます。',
     '承認しなかった投稿は出ません。',
+    ...(followers ? ['', followers] : []),
   ].join('\n')
   return [
     ownerCard('来週の投稿案ができました', text, [
@@ -336,6 +346,13 @@ export async function runAutopilot(now = new Date()): Promise<RunSummary> {
   const jst = jstParts(now)
   const thisMonday = mondayOf(jst.date)
   const summary: RunSummary = { ok: true, expired: 0, reminded: false }
+
+  // Instagramのフォロワー数を1日1回記録（連携済みのときだけ。失敗しても他の処理は続ける）
+  try {
+    await recordInstagramFollowers(jst.date)
+  } catch {
+    // 記録できない日は飛ばす
+  }
 
   // 1) 承認されないまま時刻が過ぎた案は「期限切れ」に（投稿しない）／前日リマインド
   for (const week of [thisMonday, addDays(thisMonday, 7)]) {
