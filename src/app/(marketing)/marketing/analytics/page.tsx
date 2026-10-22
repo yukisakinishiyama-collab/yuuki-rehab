@@ -15,6 +15,13 @@ interface Analytics {
   conversions: { contacts: number; reserved: number; visited: number; handedOff: number }
   followUps: Array<{ userId: string; displayName: string; intent: string | null; step: string; daysSince: number }>
   postStats: Record<string, { published: number; pending: number; failed: number }>
+  bookings: null | {
+    total: number
+    firstVisit: number
+    sources: Array<{ source: string; label: string; bookings: number; firstVisit: number; cancelled: number; clicks: number }>
+    posts: Array<{ campaign: string; theme: string; scheduledAt: string; bookings: number }>
+    generatedAt: string
+  }
 }
 
 const FUNNEL_STEPS: Array<{ key: keyof Analytics['funnel']; label: string }> = [
@@ -75,6 +82,62 @@ export default function AnalyticsPage() {
           </div>
         ))}
       </div>
+
+      {/* 予約（流入元別）… どこから来た予約か */}
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="font-bold">予約の流入元（どこから来た予約か）</h2>
+        {!data.bookings ? (
+          <p className="mt-2 text-sm text-slate-500">
+            予約システム側の更新（流入元の記録）が終わると、ここに「Instagram・Google・LINEなど、どこから何件の予約が入ったか」が表示されます。
+          </p>
+        ) : data.bookings.total === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">この期間のネット予約はまだありません。</p>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-slate-500">
+              期間中の予約 {data.bookings.total}件（うち初めての方 {data.bookings.firstVisit}件）。計測リンク経由のクリック数と並べて表示します。
+            </p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full min-w-[28rem] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="py-1.5 pr-2">流入元</th>
+                    <th className="py-1.5 pr-2 text-right">予約</th>
+                    <th className="py-1.5 pr-2 text-right">うち初めて</th>
+                    <th className="py-1.5 pr-2 text-right">キャンセル</th>
+                    <th className="py-1.5 text-right">予約リンクのクリック</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.bookings.sources.map((s) => (
+                    <tr key={s.source} className="border-b border-slate-100">
+                      <td className="py-1.5 pr-2 font-medium">{s.label}</td>
+                      <td className="py-1.5 pr-2 text-right font-bold text-teal-900">{s.bookings}</td>
+                      <td className="py-1.5 pr-2 text-right">{s.firstVisit}</td>
+                      <td className="py-1.5 pr-2 text-right text-slate-500">{s.cancelled}</td>
+                      <td className="py-1.5 text-right text-slate-500">{s.clicks || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {data.bookings.posts.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs font-bold text-slate-600">予約につながった自動投稿</p>
+                <ul className="mt-1 divide-y divide-slate-100 text-sm">
+                  {data.bookings.posts.map((p) => (
+                    <li key={p.campaign} className="flex items-center gap-2 py-1.5">
+                      <span className="font-mono text-xs text-slate-400">{p.scheduledAt ? p.scheduledAt.slice(5, 10).replace('-', '/') : p.campaign}</span>
+                      <span className="flex-1 truncate">{p.theme}</span>
+                      <span className="font-bold text-teal-900">{p.bookings}件</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       {/* LINEファネル */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">

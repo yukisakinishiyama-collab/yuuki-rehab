@@ -27,7 +27,7 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
     case 'instagram_reel':
       return publishInstagram(channel, content)
     case 'google_business':
-      return publishGoogleBusiness()
+      return publishGoogleBusiness(content)
     case 'line_broadcast':
       return publishLineBroadcast(content)
     case 'note':
@@ -42,10 +42,15 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
 }
 
 /** テンプレート画像を生成してVercel Blobに公開し、Instagram APIに渡せる公開URLを返す */
-async function uploadTemplateImage(title: string, subtitle: string, name: string): Promise<string> {
+async function uploadTemplateImage(
+  title: string,
+  subtitle: string,
+  name: string,
+  size: 'instagram' | 'google' = 'instagram',
+): Promise<string> {
   const { renderTemplateImage } = await import('./image-template')
   const { put } = await import('@vercel/blob')
-  const png = await renderTemplateImage(title, subtitle, 'instagram')
+  const png = await renderTemplateImage(title, subtitle, size)
   const blob = await put(name, png, { access: 'public', contentType: 'image/png' })
   return blob.url
 }
@@ -147,12 +152,75 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
   }
 }
 
-/** Google Business Profile。API承認制のため、承認されるまでは常に手動投稿モード（指示書15章） */
-async function publishGoogleBusiness(): Promise<PublishOutcome> {
-  return {
-    kind: 'action_required',
-    reason: 'Google Business Profile APIは利用申請の承認待ちです。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
-    manualUrl: 'https://business.google.com/',
+/**
+ * Google Business Profile（投稿 = localPosts）。
+ * APIは利用申請の承認制。承認後に次の環境変数を設定すると自動投稿になる（未設定の間は手動投稿モード）:
+ *   GBP_CLIENT_ID / GBP_CLIENT_SECRET … Google CloudのOAuthクライアント
+ *   GBP_REFRESH_TOKEN                … ビジネスプロフィールのオーナーで同意して得たリフレッシュトークン
+ *   GBP_LOCATION_NAME                … 'accounts/{accountId}/locations/{locationId}'
+ */
+async function publishGoogleBusiness(content: GeneratedContent): Promise<PublishOutcome> {
+  const manualUrl = 'https://business.google.com/'
+  const clientId = process.env.GBP_CLIENT_ID
+  const clientSecret = process.env.GBP_CLIENT_SECRET
+  const refreshToken = process.env.GBP_REFRESH_TOKEN
+  const location = process.env.GBP_LOCATION_NAME
+  if (!clientId || !clientSecret || !refreshToken || !location || !/^accounts\/\d+\/locations\/\d+$/.test(location)) {
+    return {
+      kind: 'action_required',
+      reason: 'Google Business Profile APIは利用申請の承認待ちです。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
+      manualUrl,
+    }
+  }
+
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    })
+    const tokenData = (await tokenRes.json()) as { access_token?: string; error_description?: string; error?: string }
+    if (!tokenRes.ok || !tokenData.access_token) {
+      // 権限の取り消し・期限切れはリトライしても直らないため手動投稿へ
+      return {
+        kind: 'action_required',
+        reason: `Googleの接続が切れています（${tokenData.error_description ?? tokenData.error ?? tokenRes.status}）。今回は手動で投稿し、接続をやり直してください。`,
+        manualUrl,
+      }
+    }
+
+    // 投稿画像（テンプレート・4:3）。画像が作れなくても文章だけで投稿する
+    let media: Array<{ mediaFormat: 'PHOTO'; sourceUrl: string }> | undefined
+    try {
+      const url = await uploadTemplateImage(content.imageText || content.title || content.hook, content.hook.slice(0, 40), `marketing/gbp-${Date.now()}.png`, 'google')
+      media = [{ mediaFormat: 'PHOTO', sourceUrl: url }]
+    } catch {
+      media = undefined
+    }
+
+    const summary = content.body.length > 1500 ? `${content.body.slice(0, 1499)}…` : content.body
+    const ctaUrl = /^https:\/\//.test(content.cta?.url ?? '') ? content.cta.url : undefined
+    const res = await fetch(`https://mybusiness.googleapis.com/v4/${location}/localPosts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenData.access_token}` },
+      body: JSON.stringify({
+        languageCode: 'ja',
+        topicType: 'STANDARD',
+        summary,
+        ...(ctaUrl ? { callToAction: { actionType: 'BOOK', url: ctaUrl } } : {}),
+        ...(media ? { media } : {}),
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { searchUrl?: string; name?: string; error?: { message?: string } }
+    if (!res.ok) return { kind: 'error', message: `Google投稿APIエラー: ${data.error?.message ?? `HTTP ${res.status}`}` }
+    return { kind: 'published', url: data.searchUrl, message: 'Googleビジネスプロフィールへ投稿しました' }
+  } catch (error) {
+    return { kind: 'error', message: `Google投稿APIエラー: ${error instanceof Error ? error.message : '不明'}` }
   }
 }
 

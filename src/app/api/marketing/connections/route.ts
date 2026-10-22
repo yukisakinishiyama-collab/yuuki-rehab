@@ -59,7 +59,10 @@ export async function GET() {
       openaiImage: Boolean(process.env.OPENAI_API_KEY),
       lineChannel: Boolean(process.env.LINE_CHANNEL_SECRET && process.env.LINE_CHANNEL_ACCESS_TOKEN),
       instagram: Boolean(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID),
-      googleBusiness: false, // API利用申請の承認待ち（承認後に実装を有効化）
+      // API利用申請が承認され、OAuthの値（GBP_*）を設定すると自動投稿になる
+      googleBusiness: Boolean(
+        process.env.GBP_CLIENT_ID && process.env.GBP_CLIENT_SECRET && process.env.GBP_REFRESH_TOKEN && process.env.GBP_LOCATION_NAME,
+      ),
       cronSecret: Boolean(process.env.CRON_SECRET),
     },
     details,
