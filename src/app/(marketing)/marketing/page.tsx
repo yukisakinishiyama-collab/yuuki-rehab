@@ -5,6 +5,32 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { loadProjects } from '@/lib/marketing/store'
 import { CHANNEL_LABELS, STATUS_LABELS, type ContentProject, type PostStatus } from '@/lib/marketing/types'
+import type { WeeklyProposal } from '@/lib/marketing/autopilot-types'
+
+/** 自動投稿の承認待ちのお知らせ（サーバーの投稿案を見る。失敗したら何も出さない） */
+function AutopilotBanner() {
+  const [pending, setPending] = useState<{ count: number; week: string } | null>(null)
+  useEffect(() => {
+    fetch('/api/marketing/autopilot', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { proposals?: WeeklyProposal[] } | null) => {
+        const proposals = data?.proposals ?? []
+        const target = [...proposals].reverse().find((p) => p.items.some((i) => i.status === 'proposed'))
+        if (target) setPending({ count: target.items.filter((i) => i.status === 'proposed').length, week: target.weekStart })
+      })
+      .catch(() => undefined)
+  }, [])
+  if (!pending) return null
+  return (
+    <Link
+      href={`/marketing/autopilot?week=${pending.week}`}
+      className="block rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 hover:bg-amber-100"
+    >
+      <p className="font-bold">📝 自動投稿の案が {pending.count} 本、承認を待っています</p>
+      <p className="mt-1 text-sm">内容を確認して承認すると、予定の時刻に投稿されます →</p>
+    </Link>
+  )
+}
 
 export default function MarketingDashboard() {
   const [projects, setProjects] = useState<ContentProject[]>([])
@@ -38,6 +64,8 @@ export default function MarketingDashboard() {
           ＋ 投稿を作る
         </Link>
       </div>
+
+      <AutopilotBanner />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {cards.map(({ status, tone }) => (

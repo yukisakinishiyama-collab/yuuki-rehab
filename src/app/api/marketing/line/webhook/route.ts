@@ -13,6 +13,8 @@ import { advanceScenario, type EngineInput } from '@/lib/marketing/line-scenario
 import { getContact, saveContact } from '@/lib/marketing/line-store-server'
 import { recordEvent } from '@/lib/marketing/analytics-store-server'
 import type { BotReply, LineChatMessage } from '@/lib/marketing/line-types'
+import { isOwnerLineUser, replyOwner } from '@/lib/marketing/owner-notify'
+import { handleOwnerPostback } from '@/lib/marketing/autopilot-server'
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET ?? ''
 const ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
@@ -165,7 +167,23 @@ export async function POST(request: NextRequest) {
     }
     if (event.type === 'postback') {
       const postback = event.postback as { data?: string }
-      input = { kind: 'postback', data: postback.data ?? '' }
+      const data = postback.data ?? ''
+      // 自動投稿パイプラインのボタン（全部承認・投稿した）。院長本人からのときだけ処理し、
+      // それ以外の人から届いても何もしない（会話シナリオにも流さない）
+      if (data.startsWith('ap:')) {
+        if (isOwnerLineUser(userId)) {
+          const replyToken = event.replyToken as string | undefined
+          try {
+            const replies = await handleOwnerPostback(data)
+            if (replyToken) await replyOwner(replyToken, replies)
+          } catch (error) {
+            console.error('自動投稿ボタンの処理に失敗:', error instanceof Error ? error.message : error)
+            if (replyToken) await replyOwner(replyToken, ['処理に失敗しました。承認画面から操作してください。'])
+          }
+        }
+        continue
+      }
+      input = { kind: 'postback', data }
     }
     if (!input) continue
 

@@ -35,6 +35,32 @@ export function authEnabled(): boolean {
 }
 
 /**
+ * 定期実行用ルート（proxy の認証対象外）のガード。次のどれかなら許可する:
+ * - Authorization: Bearer <CRON_SECRET>（Vercel Cron・GitHub Actions）
+ * - Authorization: Basic …（管理者パスワード）… 管理画面の「今すぐ実行」ボタン。
+ *   認証対象外のルートでは役割ヘッダーが注入されない（偽装もありうる）ため、
+ *   ヘッダーではなく Basic 認証のパスワードそのものをここで確かめる
+ * - CRON_SECRET 未設定（従来どおり開放。本番では設定する。
+ *   定期実行は「期限が来たものだけ処理する」ため、何度呼ばれても余計な投稿・生成はしない）
+ */
+export function cronOrAdmin(request: NextRequest): boolean {
+  const header = request.headers.get('authorization') ?? ''
+  const secret = process.env.CRON_SECRET
+  if (!secret) return true
+  if (header === `Bearer ${secret}`) return true
+  if (header.startsWith('Basic ')) {
+    try {
+      const decoded = atob(header.slice(6))
+      const pass = decoded.slice(decoded.indexOf(':') + 1)
+      if (roleFromPassword(pass) === 'admin') return true
+    } catch {
+      // 不正なヘッダーは不許可
+    }
+  }
+  return false
+}
+
+/**
  * ルートハンドラ用の管理者ガード。
  * - 認証無効（ローカル開発）なら常に許可（null を返す）
  * - 有効なら proxy が注入した役割ヘッダーが 'admin' の時だけ許可

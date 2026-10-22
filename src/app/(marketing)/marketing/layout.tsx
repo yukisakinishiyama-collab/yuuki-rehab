@@ -22,6 +22,7 @@ export const viewport: Viewport = {
 
 const NAV = [
   { href: '/marketing', label: 'ダッシュボード' },
+  { href: '/marketing/autopilot', label: '自動投稿' },
   { href: '/marketing/compose', label: '投稿を作る' },
   { href: '/marketing/videos', label: '動画ストック' },
   { href: '/marketing/calendar', label: '投稿カレンダー' },

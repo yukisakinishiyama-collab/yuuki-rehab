@@ -16,6 +16,7 @@
  * - /api/marketing/line/webhook       … LINEサーバーからの通知（署名検証で保護）
  * - /api/marketing/go                 … 患者がタップする計測リンク
  * - /api/marketing/jobs/run           … Vercel Cron（CRON_SECRETで保護）
+ * - /api/marketing/autopilot/run      … 自動下書きの定期実行（CRON_SECRETで保護）
  * - /api/marketing/reservation-notify … GAS予約システムからの通知（RESERVATION_NOTIFY_SECRETで保護）
  */
 import { NextResponse } from 'next/server'
@@ -26,6 +27,7 @@ const PUBLIC_PATHS = [
   '/api/marketing/line/webhook',
   '/api/marketing/go',
   '/api/marketing/jobs/run',
+  '/api/marketing/autopilot/run',
   '/api/marketing/reservation-notify',
 ]
 
