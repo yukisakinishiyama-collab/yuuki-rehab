@@ -44,8 +44,11 @@
 | `INSTAGRAM_ACCESS_TOKEN` / `INSTAGRAM_USER_ID` | Instagram自動投稿 | 未（`INSTAGRAM-SETUP.md`） |
 | `GBP_CLIENT_ID` / `GBP_CLIENT_SECRET` / `GBP_REFRESH_TOKEN` / `GBP_LOCATION_NAME` | Google投稿の自動化 | API申請の承認後（`GOOGLE-BUSINESS-SETUP.md`） |
 
-定期実行: GitHub Actions（15分ごと・`.github/workflows/marketing-jobs.yml`）が `jobs/run` と `autopilot/run` を呼ぶ。
-Vercel Cron は保険（`jobs/run` 毎日・`autopilot/run` 毎週日曜）。
+定期実行（どちらも無料の範囲）:
+
+- Vercel Cron（`vercel.json`）… `jobs/run` を日本時間 6〜21時に1時間ごと（Hobbyは1本のcronが1日1回までなので、時刻ごとに1本ずつ並べている。各回は±59分の幅で動く）。`autopilot/run` は日曜18時半・毎日12時・月曜8時
+- GitHub Actions（`.github/workflows/marketing-jobs.yml`）… 15分ごとの指定だが、実際は混雑で数時間おきになることがある（補助）
+- 投稿は予定時刻からおおむね1時間以内に出る
 
 ## LINEの通数の目安（無料プラン 月200通）
 
