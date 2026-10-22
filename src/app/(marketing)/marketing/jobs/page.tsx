@@ -11,6 +11,8 @@ interface Connections {
   connections: Record<string, boolean>
   /** 実疎通チェックの結果（envがある項目のみ）。okでも定期確認を推奨 */
   details?: Record<string, { ok: boolean; note: string }>
+  /** 「Instagramとつなぐ」ボタン用 */
+  instagramOAuth?: { ready: boolean; last: { ok: boolean; message: string; at: string } | null }
 }
 
 const JOB_STATUS_LABEL: Record<PublishJob['status'], { label: string; tone: string }> = {
@@ -26,7 +28,7 @@ const CONNECTION_ITEMS: Array<{ key: string; label: string; hint: string }> = [
   { key: 'anthropic', label: 'AI文章生成（Anthropic）', hint: 'ANTHROPIC_API_KEY' },
   { key: 'openaiImage', label: '画像生成（OpenAI）', hint: 'OPENAI_API_KEY（Phase 5で使用）' },
   { key: 'lineChannel', label: 'LINE Messaging API', hint: 'LINE_CHANNEL_SECRET / ACCESS_TOKEN' },
-  { key: 'instagram', label: 'Instagram Graph API', hint: 'INSTAGRAM_ACCESS_TOKEN / USER_ID' },
+  { key: 'instagram', label: 'Instagram Graph API', hint: '下の「Instagramとつなぐ」から接続' },
   { key: 'googleBusiness', label: 'Google Business Profile API', hint: '利用申請の承認待ち（手動投稿モードで運用）' },
   { key: 'cronSecret', label: 'ジョブ実行の保護（CRON_SECRET）', hint: '本番デプロイ時に設定推奨' },
 ]
@@ -59,7 +61,14 @@ export default function JobsPage() {
   }, [])
 
   useEffect(() => {
-    refresh()
+    // 読み込みは非同期で開始（effect本体で同期的にsetStateしない）
+    let alive = true
+    Promise.resolve().then(() => {
+      if (alive) void refresh()
+    })
+    return () => {
+      alive = false
+    }
   }, [refresh])
 
   async function runNow() {
@@ -126,6 +135,29 @@ export default function JobsPage() {
             )
           })}
         </ul>
+        {/* Instagramとつなぐ（OAuth）: 院長が許可するだけで接続。トークンのコピーは不要 */}
+        <div className="mt-3 rounded-lg border border-pink-100 bg-pink-50/50 p-3 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold">Instagramの自動投稿</span>
+            {isAdmin && conn?.instagramOAuth?.ready ? (
+              <a href="/api/marketing/instagram/connect" className="rounded-lg bg-pink-700 px-4 py-2 text-sm font-bold text-white">
+                {conn?.connections?.instagram ? 'Instagramとつなぎ直す' : 'Instagramとつなぐ'}
+              </a>
+            ) : null}
+            {isAdmin && conn && !conn.instagramOAuth?.ready ? (
+              <span className="text-xs text-slate-500">VercelにINSTAGRAM_APP_IDとINSTAGRAM_APP_SECRETを設定すると「Instagramとつなぐ」ボタンが使えます。</span>
+            ) : null}
+            {!isAdmin ? <span className="text-xs text-slate-500">接続は院長が行います。</span> : null}
+          </div>
+          {conn?.instagramOAuth?.last ? (
+            <p className={`mt-2 text-xs ${conn.instagramOAuth.last.ok ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {conn.instagramOAuth.last.ok ? '✓ ' : '! '}
+              {conn.instagramOAuth.last.message}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">ボタンを押すとInstagramの画面に移ります。yu.ki__seikotsuin で「許可」を押すと、この画面に戻って接続済みになります。</p>
+          )}
+        </div>
         <p className="mt-2 text-xs text-slate-500">
           未接続の媒体も投稿は止まりません。予定時刻になると「手動対応待ち」になり、本文コピー＋完了記録で運用できます。
         </p>

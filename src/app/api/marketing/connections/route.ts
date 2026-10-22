@@ -1,6 +1,8 @@
 /** API接続確認（指示書30章の納品物「API接続確認画面」用）。秘密情報は返さず有無のみ */
 import { NextResponse } from 'next/server'
-import { getInstagramToken, INSTAGRAM_GRAPH_HOST } from '@/lib/marketing/instagram-token'
+import { getInstagramToken, INSTAGRAM_GRAPH_HOST, isInstagramConnected } from '@/lib/marketing/instagram-token'
+import { instagramOAuthConfig } from '@/lib/marketing/instagram-oauth-server'
+import { lastOAuthResult } from '@/lib/marketing/instagram-oauth-result'
 
 // 実疎通チェックを行うため常に動的実行
 export const dynamic = 'force-dynamic'
@@ -9,7 +11,7 @@ type Detail = { ok: boolean; note: string }
 
 /** Instagramトークンの実疎通確認（/meでユーザー名が取れれば有効） */
 async function checkInstagram(): Promise<Detail | undefined> {
-  if (!process.env.INSTAGRAM_ACCESS_TOKEN || !process.env.INSTAGRAM_USER_ID) return undefined
+  if (!(await isInstagramConnected())) return undefined
   try {
     const token = await getInstagramToken()
     const res = await fetch(
@@ -42,7 +44,7 @@ async function checkLine(): Promise<Detail | undefined> {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const mock = process.env.MARKETING_MODE === 'mock'
   // モックモードでは外部APIを呼ばない（ローカル開発・デモ用）
   const [instagram, line] = mock ? [undefined, undefined] : await Promise.all([checkInstagram(), checkLine()])
@@ -58,7 +60,7 @@ export async function GET() {
       anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
       openaiImage: Boolean(process.env.OPENAI_API_KEY),
       lineChannel: Boolean(process.env.LINE_CHANNEL_SECRET && process.env.LINE_CHANNEL_ACCESS_TOKEN),
-      instagram: Boolean(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID),
+      instagram: await isInstagramConnected(),
       // API利用申請が承認され、OAuthの値（GBP_*）を設定すると自動投稿になる
       googleBusiness: Boolean(
         process.env.GBP_CLIENT_ID && process.env.GBP_CLIENT_SECRET && process.env.GBP_REFRESH_TOKEN && process.env.GBP_LOCATION_NAME,
@@ -66,5 +68,10 @@ export async function GET() {
       cronSecret: Boolean(process.env.CRON_SECRET),
     },
     details,
+    // 「Instagramとつなぐ」ボタン用（アプリID/シークレットの有無と直近の結果。秘密の値は返さない）
+    instagramOAuth: {
+      ready: instagramOAuthConfig(new URL(request.url).origin).ready,
+      last: await lastOAuthResult(),
+    },
   })
 }

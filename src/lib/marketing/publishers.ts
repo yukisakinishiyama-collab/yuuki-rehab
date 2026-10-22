@@ -95,9 +95,9 @@ async function igPublishContainer(host: string, igUserId: string, token: string,
 
 /** Instagram API（コンテンツ公開）。トークン設定時は画像も自動生成して完全自動投稿 */
 async function publishInstagram(channel: Channel, content: GeneratedContent): Promise<PublishOutcome> {
-  const { getInstagramToken, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
+  const { getInstagramToken, getInstagramUserId, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
   const token = await getInstagramToken()
-  const igUserId = process.env.INSTAGRAM_USER_ID
+  const igUserId = await getInstagramUserId()
   const manualUrl = 'https://www.instagram.com/'
 
   if (!token || !igUserId) {

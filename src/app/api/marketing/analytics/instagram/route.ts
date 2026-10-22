@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { addFollowerPoint, listFollowerPoints, summarize } from '@/lib/marketing/instagram-stats-server'
 import { jstParts } from '@/lib/marketing/autopilot-planner'
+import { isInstagramConnected } from '@/lib/marketing/instagram-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ const Schema = z.object({
 
 export async function GET() {
   const points = await listFollowerPoints()
-  return NextResponse.json({ ok: true, points: points.slice(-120), summary: summarize(points), connected: Boolean(process.env.INSTAGRAM_ACCESS_TOKEN) })
+  return NextResponse.json({ ok: true, points: points.slice(-120), summary: summarize(points), connected: await isInstagramConnected() })
 }
 
 export async function POST(request: NextRequest) {

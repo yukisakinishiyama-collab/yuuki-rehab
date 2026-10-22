@@ -24,12 +24,22 @@
 2. 「**Instagram APIのセットアップ（Instagramログイン）**」を選択
 3. 「Instagramアカウントを追加」→ yu.ki__seikotsuin でログインして連携
 
-### Step 3: アクセストークンとユーザーIDの取得
+### Step 3: 「Instagramとつなぐ」ボタンで接続（推奨・トークンのコピー不要）
 
-1. 同じ画面の「アクセストークン生成」セクションで、連携したアカウントの「トークンを生成」
-2. 表示された**長期アクセストークン**をコピー → Vercelの `INSTAGRAM_ACCESS_TOKEN` に設定
-3. 同じ画面に表示される**InstagramユーザーID**（数字）をコピー → `INSTAGRAM_USER_ID` に設定
-4. 再デプロイ（コード変更をpush、またはVercelのRedeploy）
+Metaの画面の「トークンを生成」は別ウィンドウでログインする方式で、ブラウザによっては
+ログイン後にInstagramのホームへ飛ばされて先へ進めないことがある（2026-10-22 実際に発生）。
+そのため、ハブ側に自前の接続ボタンを用意している。
+
+1. Metaのアプリ →「InstagramログインによるAPI設定」→「4. Instagramビジネスログインを設定する」→「設定する」で、
+   OAuthリダイレクトURIに `https://yuuki-rehab.vercel.app/api/marketing/instagram/callback` を登録して保存
+2. 同じ画面の「InstagramアプリID」を Vercel の `INSTAGRAM_APP_ID`（Config）に、
+   「Instagram app secret」（表示 → コピー）を `INSTAGRAM_APP_SECRET`（Secret）に設定 → 再デプロイ
+3. マーケティングハブ →「投稿ジョブ・接続状況」→「Instagramとつなぐ」→ yu.ki__seikotsuin で「許可」
+4. 画面に戻って「Instagramとつながりました」と出れば完了。長期トークンはサーバーが保存し、7日ごとに自動延長する
+
+（従来の方法）Metaの画面で「トークンを生成」できた場合は、そのトークンを `INSTAGRAM_ACCESS_TOKEN` に、
+InstagramユーザーIDを `INSTAGRAM_USER_ID` に設定して再デプロイしてもよい。環境変数のトークンが新しく
+設定されると、そちらが優先される。
 
 ### Step 4: 動作確認
 
@@ -43,8 +53,7 @@
 - 生成される長期トークンは約60日有効だが、**アプリが7日ごとに自動延長する**ため、
   通常は手動更新は不要（15分間隔のジョブ実行時に延長。延長後のトークンはSupabaseに保持）
 - 自動延長が効かなくなるのは、Instagramのパスワード変更などでトークン自体が無効化された場合。
-  その時は投稿が「公開失敗」になるので、Step 3で再生成→Vercelの INSTAGRAM_ACCESS_TOKEN を
-  差し替え→再デプロイ（新しい値が自動で優先される）
+  その時は投稿が「公開失敗」になるので、「投稿ジョブ・接続状況」の「Instagramとつなぎ直す」を押す
 
 ## 補足
 

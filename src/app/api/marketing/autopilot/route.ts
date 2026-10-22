@@ -6,6 +6,7 @@
  * POST … { action: 'generate_now' } 今週の残り枠（なければ来週）の下書きを今すぐ作る（院長のみ）
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { isInstagramConnected } from '@/lib/marketing/instagram-token'
 import { z } from 'zod'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { generateNow } from '@/lib/marketing/autopilot-server'
@@ -39,7 +40,7 @@ export async function GET() {
       proposals: proposals.slice(0, 6),
       connections: {
         ai: Boolean(process.env.ANTHROPIC_API_KEY) && process.env.MARKETING_MODE !== 'mock',
-        instagram: Boolean(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID),
+        instagram: await isInstagramConnected(),
         googleApi: Boolean(process.env.GBP_REFRESH_TOKEN && process.env.GBP_LOCATION_NAME),
         ownerLine: Boolean(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.RESERVATION_NOTIFY_LINE_USER_ID),
         bookingStats: Boolean(process.env.RESERVATION_NOTIFY_SECRET),
