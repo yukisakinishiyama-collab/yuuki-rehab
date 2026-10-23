@@ -91,8 +91,8 @@ export default function FirstVisitPage() {
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
             <span className="text-blue-700 text-sm font-bold tracking-widest uppercase">Flow</span>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">初診の<span className="text-blue-700">流れ</span></h2>
-            <p className="text-slate-500 mt-3 text-sm">初診時は約70分ほどお時間をいただいています</p>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">初回の<span className="text-blue-700">流れ</span></h2>
+            <p className="text-slate-500 mt-3 text-sm">初回は約70分ほどお時間をいただいています</p>
           </div>
           <div className="relative">
             <div className="absolute left-7 top-0 bottom-0 w-0.5 bg-blue-100 hidden md:block" />

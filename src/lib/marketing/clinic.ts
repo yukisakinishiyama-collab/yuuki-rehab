@@ -40,7 +40,7 @@ export function clinicProfileToPrompt(profile: ClinicProfile): string {
     `院名: ${profile.name}`,
     `所在地: ${profile.address}（${profile.parking}）`,
     `電話: ${profile.phone}`,
-    `診療時間: ${profile.hours}／休診: ${profile.closedDays}`,
+    `施術時間: ${profile.hours}／定休日: ${profile.closedDays}`,
     `ネット予約（24時間・即時確定）: ${profile.reserveUrl}`,
     `公式LINE: ${profile.lineUrl}`,
     `Google店舗ページ: ${profile.googleMapUrl}`,

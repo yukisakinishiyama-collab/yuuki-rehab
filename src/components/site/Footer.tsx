@@ -32,7 +32,7 @@ export default function Footer() {
 
           {/* Hours */}
           <div>
-            <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wider mb-4">診療時間</h3>
+            <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wider mb-4">施術時間</h3>
             <div className="space-y-2 text-sm text-blue-100">
               <div className="flex gap-3">
                 <span className="flex items-center gap-1 text-blue-300 min-w-20">
@@ -48,7 +48,7 @@ export default function Footer() {
               </div>
               <div className="flex gap-3">
                 <span className="flex items-center gap-1 text-blue-300 min-w-20">
-                  <Clock size={14} /> 休診日
+                  <Clock size={14} /> 定休日
                 </span>
                 <span>日曜・祝日</span>
               </div>
