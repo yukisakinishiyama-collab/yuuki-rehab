@@ -5,7 +5,7 @@
  * - シミュレーター: 管理画面から x-marketing-simulator ヘッダー付きで呼び出し、
  *   返信を実際に送らずレスポンスで返す（チャネル未接続でもE2E検証できる）
  *
- * 既存の /api/karada-line/webhook には手を加えない（共存）。
+ * （以前あった /api/karada-line/webhook は削除済み。LINE の Webhook URL はこのルート）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'

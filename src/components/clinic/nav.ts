@@ -86,7 +86,10 @@ export function activeSection(pathname: string): { section: NavSection | null; l
   let best: { section: NavSection; link: NavLink | null; length: number } | null = null
   const consider = (section: NavSection, href: string, link: NavLink | null) => {
     const hit = pathname === href || pathname.startsWith(`${href}/`)
-    if (hit && (!best || href.length > best.length)) best = { section, link, length: href.length }
+    // 同じ長さなら中の画面（子）を優先する（例: /marketing/sales は「経営」の中の「売上・来院」）
+    if (hit && (!best || href.length > best.length || (link && href.length === best.length))) {
+      best = { section, link, length: href.length }
+    }
   }
   for (const section of NAV) {
     consider(section, section.href, null)
