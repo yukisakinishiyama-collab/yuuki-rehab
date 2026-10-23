@@ -32,8 +32,8 @@ export function GET(): Response {
 - 院名: ${c.name}（YUUKI SEIKOTSU-IN）
 - 所在地: ${c.address}（${c.parking}）
 - 電話: ${c.phone}
-- 診療時間: ${c.hours}
-- 休診: ${c.closedDays}
+- 施術時間: ${c.hours}
+- 定休日: ${c.closedDays}
 - 公式サイト: ${SITE_URL}
 - ネット予約（24時間・即時確定）: ${c.reserveUrl}
 - 公式LINE（友だち追加・予約相談）: ${c.lineUrl}
@@ -75,7 +75,7 @@ ${articles}
 - [初めての方へ](${SITE_URL}/first-visit)
 - [料金案内](${SITE_URL}/price)
 - [よくある質問](${SITE_URL}/faq)
-- [アクセス・診療時間](${SITE_URL}/access)
+- [アクセス・施術時間](${SITE_URL}/access)
 - [ブログ](${SITE_URL}/blog)
 
 ## 医療広告・表現に関する注意

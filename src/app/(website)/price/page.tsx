@@ -8,7 +8,7 @@ import { CheckCircle2, ChevronRight, ChevronDown, ShieldCheck, Star, Send } from
 
 const plans = [
   {
-    tag: '健康保険診療',
+    tag: '健康保険を使う施術',
     title: '急性外傷の施術',
     price: '保険適応',
     priceNote: '健康保険・自賠責・労災',
@@ -24,10 +24,10 @@ const plans = [
     note: '※ 慢性的な症状・運動療法は保険適応外。衛生材料（テーピング・包帯等）を使用した際は材料費が別途発生します',
   },
   {
-    tag: '自由診療（自費）',
+    tag: '自費の施術',
     title: '初回評価',
     price: '¥2,000',
-    priceNote: '税込 / 自由診療 / 施術費別途',
+    priceNote: '税込 / 自費 / 施術費別途',
     color: 'from-blue-600 to-blue-800',
     badge: 'まずここから',
     includes: [
@@ -38,7 +38,7 @@ const plans = [
       '今後の施術方針の説明',
       '自宅でできるセルフケア指導',
     ],
-    note: '※ 保険診療の対象外です（自費・¥2,000）。まず現状把握だけでもOKです',
+    note: '※ 健康保険の対象外です（自費・¥2,000）。まず現状把握だけでもOKです',
   },
   {
     tag: '自費・施術',
@@ -65,8 +65,8 @@ const faqs = [
     a: '現時点では現金払いのみ対応しています。カード・QRコード払いの導入については検討中です。詳しくはLINEでお問い合わせください。',
   },
   {
-    q: '保険診療と自費メニューを同日に受けられますか？',
-    a: '基本的には可能です。ただし保険適応の対象（急性外傷）と自費メニュー（運動療法・リハビリ）は明確に区分してご案内します。詳しくは初回ヒアリング時にご説明します。',
+    q: '健康保険を使う施術と自費メニューを同日に受けられますか？',
+    a: '基本的には可能です。ただし健康保険の対象（急性外傷）と自費メニュー（運動療法・リハビリ）は明確に区分してご案内します。詳しくは初回ヒアリング時にご説明します。',
   },
   {
     q: '追加費用は発生しますか？',
@@ -176,7 +176,7 @@ export default function PricePage() {
           <div className="bg-blue-50 rounded-2xl p-5 text-center">
             <p className="text-slate-600 text-sm">
               リハビリ・運動療法は <strong className="text-blue-700">1回あたり¥3,850〜</strong>（1部位の場合）。
-              スポーツの継続・再発防止を目的とした<strong>自由診療メニュー</strong>です。
+              スポーツの継続・再発防止を目的とした<strong>自費メニュー</strong>です。
               施術ごとに内容と費用をご説明してから開始しますので、ご安心ください。
             </p>
           </div>
@@ -281,12 +281,12 @@ export default function PricePage() {
         </div>
       </section>
 
-      {/* 保険診療について */}
+      {/* 保険を使う施術について */}
       <section className="py-16 bg-white">
         <div className="max-w-4xl mx-auto px-4">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
             <ShieldCheck size={22} className="text-blue-700" />
-            保険診療について
+            保険を使う施術について
           </h2>
           <div className="bg-slate-50 rounded-2xl p-6 md:p-8 space-y-4">
             <div className="grid sm:grid-cols-3 gap-4">
@@ -302,7 +302,7 @@ export default function PricePage() {
               ))}
             </div>
             <p className="text-slate-500 text-xs leading-relaxed border-t border-slate-200 pt-4">
-              ※ 保険診療の適否は症状・経緯によって異なります。「使えるか不明」な場合はLINEでお気軽にご相談ください。不必要な保険請求は行いません。
+              ※ 保険が使えるかどうかは、症状やけがの経緯によって異なります。「使えるか不明」な場合はLINEでお気軽にご相談ください。不必要な保険請求は行いません。
             </p>
           </div>
         </div>

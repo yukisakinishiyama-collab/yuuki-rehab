@@ -88,8 +88,8 @@ const URGENT_REPLY: BotReply = {
 }
 
 function handoffReply(): BotReply {
-  // 診療時間外・急ぎの場合の直通連絡先を1行添える（設定時のみ）
-  const urgentLine = P.emergencyPhone ? `\nお急ぎ・診療時間外は直通（${P.emergencyPhone}）へお電話ください。` : ''
+  // 施術時間外・急ぎの場合の直通連絡先を1行添える（設定時のみ）
+  const urgentLine = P.emergencyPhone ? `\nお急ぎ・施術時間外は直通（${P.emergencyPhone}）へお電話ください。` : ''
   return {
     type: 'text',
     text: `スタッフが直接確認して、こちらのLINEでお返事いたします。少しお時間をください。\nお急ぎの場合はお電話（${P.phone}）へお願いします。診療時間: ${P.hours}${urgentLine}`,
