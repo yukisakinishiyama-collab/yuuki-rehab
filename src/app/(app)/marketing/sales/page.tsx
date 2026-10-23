@@ -848,7 +848,7 @@ export default function SalesPage() {
             {showTable && <DailyTable month={month} />}
           </Card>
 
-          <Card title="日別の金額" sub="NOAHの金額分析の値（窓口で受け取った額。保険者への請求分は含まない見込み）">
+          <Card title="日別の金額" sub="NOAHの金額分析の値（保険の請求分も含めた総額）">
             <DailyChart month={month} measure="s" />
           </Card>
 
