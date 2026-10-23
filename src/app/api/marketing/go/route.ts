@@ -8,7 +8,7 @@
  * ホワイトリスト（d=キー名）のみ。任意URLは受け付けない。
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
+import { DEFAULT_CLINIC_PROFILE, HOMEPAGE_URL } from '@/lib/marketing/clinic'
 import { recordEvent } from '@/lib/marketing/analytics-store-server'
 
 const DESTINATIONS: Record<string, string> = {
@@ -16,6 +16,7 @@ const DESTINATIONS: Record<string, string> = {
   map: DEFAULT_CLINIC_PROFILE.googleMapUrl,
   instagram: DEFAULT_CLINIC_PROFILE.instagramUrl,
   line: DEFAULT_CLINIC_PROFILE.lineUrl,
+  home: HOMEPAGE_URL,
 }
 
 export async function GET(request: NextRequest) {

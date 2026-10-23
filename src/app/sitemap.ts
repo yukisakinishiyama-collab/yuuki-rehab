@@ -1,89 +1,21 @@
 import type { MetadataRoute } from 'next'
-import { BLOG_POSTS } from '@/lib/site/blog'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://yuuki-rehab.vercel.app'
 
+/**
+ * 検索に出すページの一覧
+ *
+ * 院のホームページは https://shimonoseki-yuuki.com/ （Netlify）。このアプリの公開ページのうち、
+ * ホームページと同じ内容のもの（症状・料金・アクセス・FAQ・ブログなど）は、ホームページへ移動させている
+ * （next.config.ts の TO_HOMEPAGE）。ここには、ホームページに同じページが無い「競技復帰ドリル」だけを載せる。
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date()
-
-  const symptomPages = [
-    'acl',
-    'meniscus',
-    'ankle-sprain',
-    'muscle-strain',
-    'baseball-shoulder',
-    'baseball-elbow',
-    'shin-splints',
-    'knee-pain',
-    'hip-pain',
-    'osgood',
-    'severs',
-    'spondylolysis',
-    'lower-back',
-    'wrist',
-  ]
-
   return [
     {
-      url: BASE_URL,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 1,
-    },
-    {
-      url: `${BASE_URL}/first-visit`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.9,
-    },
-    {
-      url: `${BASE_URL}/price`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${BASE_URL}/symptoms`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.9,
-    },
-    ...symptomPages.map((slug) => ({
-      url: `${BASE_URL}/symptoms/${slug}`,
-      lastModified: now,
-      changeFrequency: 'monthly' as const,
-      priority: 0.8,
-    })),
-    {
       url: `${BASE_URL}/drills`,
-      lastModified: now,
+      lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.7,
-    },
-    {
-      url: `${BASE_URL}/blog`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-    // ブログ記事（本文ページ）
-    ...BLOG_POSTS.map((post) => ({
-      url: `${BASE_URL}/blog/${post.slug}`,
-      lastModified: new Date(post.isoDate),
-      changeFrequency: 'yearly' as const,
-      priority: 0.6,
-    })),
-    {
-      url: `${BASE_URL}/faq`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      url: `${BASE_URL}/access`,
-      lastModified: now,
-      changeFrequency: 'yearly',
-      priority: 0.8,
     },
   ]
 }
