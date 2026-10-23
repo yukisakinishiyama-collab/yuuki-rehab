@@ -75,6 +75,14 @@
     {
       "path": "/api/marketing/autopilot/run",
       "schedule": "0 23 * * 0"
+    },
+    {
+      "path": "/api/marketing/noah/nightly",
+      "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/marketing/noah/nightly",
+      "schedule": "15 14 * * *"
     }
   ]
 }
