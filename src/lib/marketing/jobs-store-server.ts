@@ -34,6 +34,8 @@ export interface PublishJob {
   publishedUrl?: string
   /** 手動投稿が必要な場合の理由（API未承認・画像未設定など） */
   actionReason?: string
+  /** 手動投稿に使うもの（ストーリーの画像のURLなど） */
+  manualUrl?: string
   createdAt: string
   updatedAt: string
 }

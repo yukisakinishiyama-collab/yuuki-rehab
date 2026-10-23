@@ -35,6 +35,11 @@ export interface AutopilotSettings {
   google: boolean
   /** 週のはじめにGoogle投稿で「今週の予約の空き状況」を出す（予約システムから自動集計） */
   availabilityPost: boolean
+  /**
+   * 空き状況を Instagram のストーリーにも出す（週のはじめ＝今週の空き・空きが多い日の朝＝本日の空き）。
+   * 画像は投稿する時刻の空きで作り直し、空きが無くなっていたら出さない。承認されるまで出さない
+   */
+  availabilityStory: boolean
   /** 下書きを作る時刻（日曜・日本時間の時。既定18時） */
   generateHour: number
   /** 来週の投稿で触れてほしいこと（院長メモ）。次の下書きで1本目のテーマになり、使ったら空に戻る */
@@ -59,6 +64,7 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   instagram: 'instagram_carousel',
   google: true,
   availabilityPost: true,
+  availabilityStory: true,
   generateHour: 18,
   ownerNote: '',
 }

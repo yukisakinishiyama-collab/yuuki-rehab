@@ -19,6 +19,7 @@ import { baseline } from './goal-plan'
 import {
   DECISION_LABELS,
   METRICS,
+  PDCA_KV_KEY,
   TEMPLATES,
   addDays,
   check,
@@ -35,7 +36,7 @@ import {
   type TemplateBase,
 } from './pdca'
 
-const KEY = 'keiei:pdca'
+const KEY = PDCA_KV_KEY
 const MAX_ITEMS = 100
 
 interface Store {

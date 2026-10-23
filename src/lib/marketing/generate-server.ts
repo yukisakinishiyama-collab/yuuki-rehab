@@ -50,6 +50,8 @@ export const CHANNEL_GUIDES: Record<Channel, string> = {
     'slides配列で表紙(order:1)＋内容2〜7枚＋最終CTAページを構成。各スライドはheading（短い見出し）とbody（2〜3文）。imagePromptに画像生成指示。captionとしてbodyに投稿本文、ハッシュタグも。',
   instagram_reel:
     'bodyに台本を書く。構成: 【冒頭3秒】フック→【シーン1..n】ナレーションと画面テキスト→【CTA】。撮影指示とBロール案も本文内に含める。hookにサムネイル文言。',
+  instagram_story:
+    'ストーリーは予約の空き状況だけを定型の画像で出す（AIでは作らない）。本文は院内の確認用の短い説明。',
   google_business:
     '地域性（下関市・彦島）を自然に含めた1500字以内の本文。冒頭に短い見出し。CTAは予約URL。ハッシュタグは使わない（hashtagsは空配列）。',
   line_broadcast:

@@ -39,10 +39,19 @@ async function run() {
         const updated = await updateJob(job.id, (j) => {
           j.status = 'action_required'
           j.actionReason = outcome.reason
+          j.manualUrl = outcome.manualUrl
           j.attempts.push({ at: new Date().toISOString(), ok: false, message: `手動対応が必要: ${outcome.reason}` })
         })
         if (updated) manual.push(updated)
         results.push({ id: job.id, channel: job.channel, outcome: 'action_required' })
+      } else if (outcome.kind === 'skipped') {
+        // 出す必要がなくなった（ストーリーの時刻に空きが無いなど）。やり直さない
+        await updateJob(job.id, (j) => {
+          j.status = 'cancelled'
+          j.actionReason = outcome.message
+          j.attempts.push({ at: new Date().toISOString(), ok: true, message: outcome.message })
+        })
+        results.push({ id: job.id, channel: job.channel, outcome: 'skipped' })
       } else {
         await recordAttempt(job.id, false, outcome.message)
         results.push({ id: job.id, channel: job.channel, outcome: 'retry_scheduled' })

@@ -18,6 +18,9 @@
 import type { NoahMonth } from './noah-types'
 import type { BookingStatRow } from './booking-stats'
 
+/** 保存先（KV）。院長のみのAPIと、毎晩の院長へのLINEのまとめから読む */
+export const PDCA_KV_KEY = 'keiei:pdca'
+
 // ── 指標 ─────────────────────────────────────────────
 
 export type MetricKey =
@@ -489,3 +492,34 @@ export function ruleReview(item: PdcaItem, c: CheckResult): ConsultReviewResult 
   return { decision, learned, next, nextConcern: `${item.title}の次の一手`, ai: false }
 }
 
+
+// ── 毎晩の院長へのLINEに足すお知らせ ─────────────────────────
+
+/**
+ * PDCAで「いま手をつけたいこと」を短い行にする（無ければ空）。
+ * - 振り返りの時期：期間が終わったのに、まだ振り返っていない
+ * - まもなく終わる：あと3日以内
+ * - 記録が止まっている：始めて7日以上たつのに、この7日「やったこと」の記録も、やることのチェックも無い
+ */
+export function pdcaReminder(items: PdcaItem[], today: string, max = 4): string[] {
+  const lines: string[] = []
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
+  const open = items.filter((i) => i.status !== 'done')
+  for (const it of open) {
+    if (effectiveStatus(it, today) === 'review' && !it.review) lines.push(`振り返りの時期：「${it.title}」（${md(it.end)}で終了）`)
+  }
+  for (const it of open) {
+    if (it.status !== 'doing' || today > it.end || today < it.start) continue
+    const left = daysBetween(today, it.end) - 1
+    if (left <= 3) lines.push(`まもなく終わる：「${it.title}」（${left === 0 ? '今日まで' : `あと${left}日`}）`)
+  }
+  const weekAgo = addDays(today, -7)
+  for (const it of open) {
+    if (it.status !== 'doing' || today > it.end || it.start > weekAgo) continue
+    const lastLog = it.logs.reduce((m, l) => (l.at > m ? l.at : m), '')
+    const lastCheck = it.actions.reduce((m, a) => (a.doneAt && a.doneAt > m ? a.doneAt : m), '')
+    const last = lastLog > lastCheck ? lastLog : lastCheck
+    if (!last || last < weekAgo) lines.push(`記録が止まっています：「${it.title}」（この7日「やったこと」がありません）`)
+  }
+  return lines.slice(0, max)
+}

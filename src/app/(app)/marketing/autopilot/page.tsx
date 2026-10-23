@@ -52,6 +52,7 @@ function weekLabel(weekStart: string): string {
 }
 
 function channelShort(channel: Channel): string {
+  if (channel === 'instagram_story') return 'ストーリー'
   return channel === 'google_business' ? 'Google' : channel.startsWith('instagram') ? 'Instagram' : CHANNEL_LABELS[channel]
 }
 
@@ -139,6 +140,20 @@ function VariantPreview({
             </li>
           ))}
         </ol>
+      )}
+      {variant.channel === 'instagram_story' && c.story && (
+        <figure className="flex items-start gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- 院内だけで使うその場の見本（最適化は不要） */}
+          <img
+            src={`/api/marketing/image?${new URLSearchParams({ kind: 'story', scope: c.story.scope, dates: c.story.dates.join(',') }).toString()}`}
+            alt="ストーリー画像の見本"
+            loading="lazy"
+            className="w-32 shrink-0 rounded-xl border border-slate-200 sm:w-40"
+          />
+          <figcaption className="text-xs leading-relaxed text-slate-500">
+            いまの空きで作った見本です。投稿の時刻に、その時の空きで作り直します（空きが無くなっていたら出しません）。
+          </figcaption>
+        </figure>
       )}
       <p className="whitespace-pre-wrap leading-relaxed text-slate-700">{c.body}</p>
       {c.hashtags.length > 0 && <p className="text-xs text-sky-700">{c.hashtags.join(' ')}</p>}
@@ -420,6 +435,16 @@ function SettingsPanel({
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={s.availabilityPost} disabled={disabled || !s.google} onChange={(e) => setS({ ...s, availabilityPost: e.target.checked })} className="h-5 w-5" />
           週のはじめに「今週の予約の空き状況」をGoogleに投稿する（予約システムの空き枠から自動作成）
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={s.availabilityStory}
+            disabled={disabled}
+            onChange={(e) => setS({ ...s, availabilityStory: e.target.checked })}
+            className="h-5 w-5"
+          />
+          空き状況をInstagramのストーリーにも出す（週のはじめ・空きが多い日の朝。投稿の時刻の空きで画像を作り、空きが無ければ出しません）
         </label>
       </div>
 

@@ -197,3 +197,83 @@ export function availabilityText(
   ].join('\n')
   return { title: '今週のご予約の空き状況', body }
 }
+
+// ── Instagramストーリーの空き状況（定型の画像。AIは使わない） ─────────────────
+
+/** 半日の空きの見せ方（くわしい枠数は出さない） */
+export type StoryLevel = 'many' | 'few' | 'full' | 'closed'
+
+export const STORY_LEVEL_LABELS: Record<StoryLevel, string> = {
+  many: '空きあり',
+  few: '少しあり',
+  full: 'ご予約いっぱい',
+  closed: '休診',
+}
+
+export function storyLevel(count: number): StoryLevel {
+  if (count >= 3) return 'many'
+  if (count >= 1) return 'few'
+  return 'full'
+}
+
+export interface StoryRow {
+  date: string
+  /** '10/26（月）' */
+  label: string
+  closed: boolean
+  am: StoryLevel
+  pm: StoryLevel
+}
+
+const STORY_WEEK = ['日', '月', '火', '水', '木', '金', '土']
+export const storyDayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（${STORY_WEEK[weekdayOf(date)]}）`
+
+/** 載せる日の空きを、見せ方に直す（予約システムに無い日は載せない） */
+export function storyRows(openings: OpeningDay[], dates: string[]): StoryRow[] {
+  const rows: StoryRow[] = []
+  for (const date of dates) {
+    const d = openings.find((o) => o.date === date)
+    if (!d) continue
+    rows.push({
+      date,
+      label: storyDayLabel(date),
+      closed: d.closed,
+      am: d.closed ? 'closed' : storyLevel(d.am),
+      pm: d.closed ? 'closed' : storyLevel(d.pm),
+    })
+  }
+  return rows
+}
+
+/** 案内できる空きがあるか（無ければストーリーは出さない） */
+export function storyHasOpening(rows: StoryRow[]): boolean {
+  return rows.some((r) => !r.closed && (r.am !== 'full' || r.pm !== 'full'))
+}
+
+/** 今週のストーリーに載せる日（from〜その週の土曜の診療日。最大6日） */
+export function storyWeekDates(openings: OpeningDay[], weekStart: string, fromDate: string): string[] {
+  const start = fromDate > weekStart ? fromDate : weekStart
+  const end = addDays(weekStart, 5)
+  return openings
+    .filter((o) => !o.closed && o.date >= start && o.date <= end)
+    .map((o) => o.date)
+    .sort()
+    .slice(0, 6)
+}
+
+/** ストーリーの見出しと、承認画面・手動投稿用の説明文 */
+export function storyText(rows: StoryRow[], scope: 'day' | 'week', asOfLocal: string): { title: string; body: string } {
+  const title = scope === 'day' ? '本日のご予約の空き' : '今週のご予約の空き状況'
+  const asOf = `${Number(asOfLocal.slice(5, 7))}/${Number(asOfLocal.slice(8, 10))} ${asOfLocal.slice(11, 16)}`
+  const lines = rows.map((r) =>
+    r.closed ? `・${r.label} 休診` : `・${r.label} 午前 ${STORY_LEVEL_LABELS[r.am]}／午後 ${STORY_LEVEL_LABELS[r.pm]}`,
+  )
+  const body = [
+    `【Instagramストーリー】${title}`,
+    ...lines,
+    '',
+    `（${asOf}時点の空き。投稿する時刻に予約システムから取り直して画像を作ります。空きが無くなっていたら出しません）`,
+    '画像には「ネット予約は24時間受付・プロフィールのリンクから」と電話番号を載せます。',
+  ].join('\n')
+  return { title, body }
+}

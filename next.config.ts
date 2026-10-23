@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
   },
   serverExternalPackages: ['@anthropic-ai/sdk'],
+  // 投稿画像（Instagramストーリーの空き状況・テンプレート画像）を作るサーバーの処理に、日本語フォントを同梱する
+  outputFileTracingIncludes: {
+    '/api/marketing/**': ['./assets/fonts/**/*'],
+  },
   async redirects() {
     return [
       ...REMOVED_TO_HOME.flatMap((source) => [

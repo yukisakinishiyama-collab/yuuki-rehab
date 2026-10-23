@@ -10,6 +10,7 @@ export type Channel =
   | 'instagram_feed'
   | 'instagram_carousel'
   | 'instagram_reel'
+  | 'instagram_story'
   | 'google_business'
   | 'line_broadcast'
   | 'note'
@@ -18,6 +19,7 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
   instagram_feed: 'Instagramフィード',
   instagram_carousel: 'Instagramカルーセル',
   instagram_reel: 'Instagramリール',
+  instagram_story: 'Instagramストーリー',
   google_business: 'Google投稿',
   line_broadcast: '公式LINE配信',
   note: 'note記事',
@@ -98,6 +100,20 @@ export interface GeneratedContent {
   imageText?: string
   altText?: string
   warnings: string[]
+  /**
+   * Instagramストーリーの空き状況（instagram_story のときだけ）。
+   * 投稿する時刻に予約システムから空きを取り直して画像を作る（下書きのときの空きは snapshot）
+   */
+  story?: StoryContent
+}
+
+export interface StoryContent {
+  /** day＝その日（本日）の空き / week＝今週の空き */
+  scope: 'day' | 'week'
+  /** 載せる日 'YYYY-MM-DD' */
+  dates: string[]
+  /** 下書きを作ったときの空き（取り直せなかったときに使う） */
+  snapshot: Array<{ date: string; closed: boolean; am: number; pm: number }>
 }
 
 /** 媒体別バリアント（1プロジェクトから媒体ごとに生成） */

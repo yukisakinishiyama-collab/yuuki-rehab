@@ -11,6 +11,11 @@ import {
   mondayOf,
   pickThemes,
   planSlots,
+  storyHasOpening,
+  storyLevel,
+  storyRows,
+  storyText,
+  storyWeekDates,
   trackingUrl,
   weekdayOf,
 } from '../../src/lib/marketing/autopilot-planner.ts'
@@ -165,6 +170,49 @@ test('週の途中なら過ぎた日は入れない', () => {
 })
 test('空きがほぼ無い週は投稿しない', () => {
   assert.equal(availabilityText([{ date: '2026-10-27', closed: false, am: 1, pm: 1 }], '2026-10-26', '2026-10-25T18:00', '083'), null)
+})
+
+
+console.log('Instagramストーリーの空き状況')
+test('空きの見せ方：3枠以上＝空きあり・1〜2枠＝少しあり・0＝いっぱい', () => {
+  assert.equal(storyLevel(5), 'many')
+  assert.equal(storyLevel(3), 'many')
+  assert.equal(storyLevel(2), 'few')
+  assert.equal(storyLevel(1), 'few')
+  assert.equal(storyLevel(0), 'full')
+})
+
+test('載せる日の行・休診・予約システムに無い日は載せない', () => {
+  const openings = [
+    { date: '2026-10-26', closed: false, am: 4, pm: 1 },
+    { date: '2026-10-27', closed: false, am: 0, pm: 0 },
+    { date: '2026-11-03', closed: true, am: 0, pm: 0 },
+  ]
+  const rows = storyRows(openings, ['2026-10-26', '2026-10-27', '2026-11-03', '2026-11-04'])
+  assert.equal(rows.length, 3)
+  assert.deepEqual(rows[0], { date: '2026-10-26', label: '10/26（月）', closed: false, am: 'many', pm: 'few' })
+  assert.equal(rows[1].am, 'full')
+  assert.equal(rows[2].am, 'closed')
+  assert.equal(storyHasOpening(rows), true)
+  assert.equal(storyHasOpening(rows.slice(1)), false, '空きが無ければ出さない')
+})
+
+test('今週の日：今日以降〜土曜の診療日だけ', () => {
+  const openings = []
+  for (let i = 0; i < 9; i++) openings.push({ date: addDays('2026-10-26', i), closed: i === 6 || i === 2, am: 2, pm: 2 })
+  // 10/26（月）の週を 10/27（火）から：火・(水休)・木・金・土
+  assert.deepEqual(storyWeekDates(openings, '2026-10-26', '2026-10-27'), ['2026-10-27', '2026-10-29', '2026-10-30', '2026-10-31'])
+})
+
+test('説明文：見出し・時点・取り直しの注意（枠数そのものは出さない）', () => {
+  const rows = storyRows([{ date: '2026-10-26', closed: false, am: 4, pm: 0 }], ['2026-10-26'])
+  const t = storyText(rows, 'day', '2026-10-25T21:15')
+  assert.equal(t.title, '本日のご予約の空き')
+  assert.match(t.body, /10\/26（月） 午前 空きあり／午後 ご予約いっぱい/)
+  assert.match(t.body, /10\/25 21:15時点/)
+  assert.match(t.body, /取り直して/)
+  assert.doesNotMatch(t.body, /4枠|NaN|undefined/)
+  assert.equal(storyText(rows, 'week', '2026-10-25T21:15').title, '今週のご予約の空き状況')
 })
 
 console.log(`\n${passed} 件すべて成功`)

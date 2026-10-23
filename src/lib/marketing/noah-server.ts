@@ -14,6 +14,7 @@
  */
 import { createHmac } from 'node:crypto'
 import { SITE_URL } from '@/lib/site/seo'
+import { PDCA_KV_KEY, pdcaReminder, type PdcaItem } from './pdca'
 import { RESERVE_URL } from './clinic'
 import { kvGet, kvSet } from './kv-store-server'
 import { fetchHubStats } from './booking-stats'
@@ -225,12 +226,17 @@ export async function runNoahNightly(
     weekly: jst.weekday === 6,
     weekdays: weekdayAverages(months, date),
   })
-  const text = nightlyText(summary, { next, draftDay, draftMade, tips })
+  // PDCA（施策）で手をつけたいこと（振り返りの時期・まもなく終わる・記録が止まっている）
+  const pdca = await kvGet<{ items?: PdcaItem[] }>(PDCA_KV_KEY).catch(() => null)
+  const pdcaLines = Array.isArray(pdca?.items) ? pdcaReminder(pdca.items, date) : []
+  const base = nightlyText(summary, { next, draftDay, draftMade, tips })
+  const text = pdcaLines.length ? `${base}\n\n【PDCA】\n${pdcaLines.map((l) => `・${l}`).join('\n')}` : base
   if (dry) return { status: 'dry', text, draft: { made: false, reason: draftDay ? '（試しの実行のため作っていません）' : undefined } }
 
   const visits = summary.today?.visits ?? 0
   const buttons = [{ label: 'グラフを見る', uri: SALES_URL, primary: true }]
   if (draft.made && draft.week) buttons.push({ label: '下書きを確認', uri: `${AUTOPILOT_URL}?week=${draft.week}`, primary: false })
+  if (pdcaLines.length) buttons.push({ label: 'PDCAを開く', uri: `${SITE_URL}/marketing/sales/pdca`, primary: false })
   const result = await notifyOwner([ownerCard(`${dateLabel(date)}の締め：来院${people(visits)}`, text, buttons)])
   await kvSet(MARK_KEY(date), {
     date,
