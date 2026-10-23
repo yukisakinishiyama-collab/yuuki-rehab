@@ -17,6 +17,7 @@
  * - /api/marketing/go                 … 患者がタップする計測リンク
  * - /api/marketing/jobs/run           … Vercel Cron（CRON_SECRETで保護）
  * - /api/marketing/autopilot/run      … 自動下書きの定期実行（CRON_SECRETで保護）
+ * - /api/marketing/noah/nightly       … NOAH集計の毎晩のまとめ（CRON_SECRETで保護）
  * - /api/marketing/reservation-notify … GAS予約システムからの通知（RESERVATION_NOTIFY_SECRETで保護）
  * - /api/marketing/instagram/callback … Instagramの許可画面からの戻り（/connectで発行したstateのCookie一致で保護）
  */
@@ -29,6 +30,7 @@ const PUBLIC_PATHS = [
   '/api/marketing/go',
   '/api/marketing/jobs/run',
   '/api/marketing/autopilot/run',
+  '/api/marketing/noah/nightly',
   '/api/marketing/reservation-notify',
   '/api/marketing/instagram/callback',
 ]

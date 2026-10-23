@@ -31,7 +31,9 @@ import {
   planSlots,
   trackingUrl,
   weekdayOf,
+  type OpeningDay,
 } from './autopilot-planner'
+import { nextDayAvailabilityText } from './noah-analysis'
 import {
   getAutopilotSettings,
   getProposal,
@@ -221,6 +223,70 @@ async function draftAvailability(
     variants: [withTracking(variant, week, index)],
     status: 'proposed',
   }
+}
+
+/**
+ * 空きが多い翌診療日の「空き状況」投稿（Googleのみ・定型文）を、その週の投稿案に1本足す。
+ * NOAHの毎晩のまとめ（noah-server.ts）から呼ばれる。承認されるまで投稿しない。
+ * - 自動投稿・Google・空き状況の投稿がオフなら作らない
+ * - その週の投稿案がまだ無ければ作らない（日曜の自動下書きを止めないため）
+ * - 同じ日の空き状況の案がすでにあれば作らない
+ */
+export async function addNextDayAvailabilityDraft(
+  day: OpeningDay,
+  now = new Date(),
+): Promise<{ made: boolean; week?: string; itemId?: string; reason?: string }> {
+  const settings = await getAutopilotSettings()
+  if (!settings.enabled) return { made: false, reason: '自動投稿がオフです' }
+  if (!settings.google || !settings.availabilityPost) return { made: false, reason: 'Googleの空き状況の投稿がオフです' }
+  const week = mondayOf(day.date)
+  const proposal = await getProposal(week)
+  if (!proposal || proposal.status !== 'ready') return { made: false, week, reason: 'この週の投稿案がありません' }
+  const themeId = `availability-day:${day.date}`
+  const same = proposal.items.find((i) => i.themeId === themeId)
+  if (same) return { made: true, week, itemId: same.id }
+  const covered = proposal.items.some(
+    (i) => i.category === 'availability' && i.scheduledAt.slice(0, 10) === day.date && (i.status === 'proposed' || i.status === 'approved'),
+  )
+  if (covered) return { made: false, week, reason: '同じ日の空き状況の投稿案があります' }
+
+  const jst = jstParts(now)
+  const scheduledAt = `${day.date}T08:00`
+  if (scheduledAt <= addMinutesLocal(jst.local, 30)) return { made: false, week, reason: '投稿の時刻に間に合いません' }
+  const profile = profileFor(settings)
+  const text = nextDayAvailabilityText(day, jst.local, profile.phone)
+  if (!text) return { made: false, week, reason: '案内できる空きがありません' }
+
+  const index = proposal.items.length + 1
+  const content: GeneratedContent = {
+    title: text.title,
+    hook: text.title,
+    body: text.body,
+    cta: { label: '予約', url: profile.reserveUrl },
+    hashtags: [],
+    warnings: ['予約システムの空き枠数から自動で作った定型文です（AIは使っていません）'],
+  }
+  const variant: ContentVariant = {
+    id: crypto.randomUUID(),
+    channel: 'google_business',
+    content,
+    compliance: checkGenerated(content, profile.bannedPhrases),
+    status: 'draft',
+  }
+  const item: ProposalItem = {
+    id: crypto.randomUUID(),
+    scheduledAt,
+    category: 'availability',
+    themeId,
+    objective: '予約枠案内',
+    theme: text.title,
+    campaign: campaignFor(week, index),
+    variants: [withTracking(variant, week, index)],
+    status: 'proposed',
+  }
+  proposal.items = [...proposal.items, item].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+  await saveProposal(proposal)
+  return { made: true, week, itemId: item.id }
 }
 
 function seedFromLibrary(t: ThemeSeed): Seed {
