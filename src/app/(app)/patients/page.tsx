@@ -60,6 +60,9 @@ export default function PatientsPage() {
     setPatients(getPatients())
     setPins(getPinnedIds())
     setRecentIds(getRecentViews().map(v => v.id))
+    // 「今日」の画面の検索から来たとき（/patients?q=お名前）
+    const q = new URLSearchParams(window.location.search).get('q')
+    if (q) setSearch(q)
   }, [])
 
   // SOAPノートを一度だけ読み込み、患者別にグループ化（来院日の降順）

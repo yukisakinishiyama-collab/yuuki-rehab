@@ -2,7 +2,7 @@
 // ──────────────────────────────────────────────
 // 目標と課題カード（NextGen v2.0）
 // カルテ概要タブの最上部に置き、「本人の目標」「臨床目標」「問題リスト」を
-// その場で編集できる。ここで入れた内容が患者説明モードの表示元になる。
+// その場で編集できる。
 // ──────────────────────────────────────────────
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
@@ -13,8 +13,6 @@ import {
   PROBLEM_STATUS_ORDER,
 } from '@/lib/clinical-goals-store'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
-import { CONDITION_IMAGES, recommendConditionImage } from '@/lib/condition-images'
-import { isFeatureEnabled } from '@/lib/feature-flags'
 import { Card, CardHeader, CardContent, SectionTitle } from './shared'
 import { Target, Plus, Trash2 } from 'lucide-react'
 
@@ -44,14 +42,6 @@ export default function GoalsProblemsCard({ patient }: Props) {
   const [problems, setProblems] = useState<ClinicalProblem[]>(() => getProblems(patient.id))
   const [newGoalLabel, setNewGoalLabel] = useState('')
   const [newProblemLabel, setNewProblemLabel] = useState('')
-
-  // 「おまかせ」を選んだときに実際に出る写真（診断・部位からの推奨）
-  const recommendedTitle =
-    recommendConditionImage({
-      diagnosis: patient.diagnosisLabel,
-      bodyRegion: patient.bodyRegion,
-      mainComplaint: patient.mainComplaint,
-    })?.title ?? '該当なし'
 
   function persistGoals(next: PatientGoals) {
     setGoals(next)
@@ -121,7 +111,6 @@ export default function GoalsProblemsCard({ patient }: Props) {
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-teal-600" />
           <SectionTitle>目標と課題</SectionTitle>
-          <span className="text-[11px] text-gray-400">患者説明モードに表示されます</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -208,10 +197,10 @@ export default function GoalsProblemsCard({ patient }: Props) {
           </div>
         </div>
 
-        {/* 次回確認すること（患者説明モードにそのまま表示される） */}
+        {/* 次回確認すること */}
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-            📅 次回、一緒に確認すること（患者さんに見せる文章で・空欄なら説明モードに出ません）
+            📅 次回、一緒に確認すること
           </label>
           <div className="flex items-center gap-1.5">
             <input
@@ -231,32 +220,6 @@ export default function GoalsProblemsCard({ patient }: Props) {
             />
           </div>
         </div>
-
-        {/* 説明モードに出す実写画像（最終選択は施術者。画像統合指示書§9） */}
-        {isFeatureEnabled('conditionImages') && (
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-              🖼 説明モードに出す写真
-            </label>
-            <select
-              value={goals.explanationImageId ?? ''}
-              onChange={e => persistGoals({ ...goals, explanationImageId: e.target.value })}
-              className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-white
-                focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            >
-              <option value="">
-                おまかせ（{recommendedTitle}）
-              </option>
-              {CONDITION_IMAGES.map(c => (
-                <option key={c.conditionId} value={c.conditionId}>{c.title}</option>
-              ))}
-              <option value="none">写真を表示しない</option>
-            </select>
-            <p className="text-[11px] text-gray-400 mt-1">
-              未登録の写真スロットは自動的に非表示になります（イラスト管理からアップロードできます）
-            </p>
-          </div>
-        )}
 
         {/* 問題リスト */}
         <div>

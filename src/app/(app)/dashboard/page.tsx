@@ -1,5 +1,5 @@
-import Dashboard from '@/components/rehab/Dashboard'
+import TodayDashboard from '@/components/clinic/TodayDashboard'
 
 export default function DashboardPage() {
-  return <Dashboard />
+  return <TodayDashboard />
 }

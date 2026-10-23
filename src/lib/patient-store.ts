@@ -7,7 +7,6 @@ import type {
   PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake,
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
-import { SAMPLE_PATIENTS, SAMPLE_EVALUATIONS, SAMPLE_EXERCISES, SAMPLE_SOAP_NOTES } from './patient-data'
 
 const STORE_VERSION = '1'
 
@@ -48,18 +47,21 @@ function set<T>(key: string, data: T[]): void {
   import('./sync-service').then(({ scheduleSync }) => scheduleSync())
 }
 
+/**
+ * 端末の準備。見本の患者さんは入れない（本物のカルテと混ざらないように）。
+ * 以前は「準備済み」の印が無い端末で見本データを書き込んでいたが、クラウドから取り込んだ直後の
+ * 端末（印はクラウドに同期されない）で本物のカルテを見本で上書きし、それがクラウドへ戻る恐れがあった。
+ * いまは印を付けるだけで、既にあるデータには一切さわらない。
+ */
 export function initPatientStore(): void {
   if (typeof window === 'undefined') return
-  const initialized = localStorage.getItem(KEYS.initialized)
-  const version = localStorage.getItem(KEYS.version)
-  if (initialized && version === STORE_VERSION) return
-
-  localStorage.setItem(KEYS.patients, JSON.stringify(SAMPLE_PATIENTS))
-  localStorage.setItem(KEYS.evaluations, JSON.stringify(SAMPLE_EVALUATIONS))
-  localStorage.setItem(KEYS.exercises, JSON.stringify(SAMPLE_EXERCISES))
-  localStorage.setItem(KEYS.soapNotes, JSON.stringify(SAMPLE_SOAP_NOTES))
-  localStorage.setItem(KEYS.initialized, 'true')
-  localStorage.setItem(KEYS.version, STORE_VERSION)
+  try {
+    if (localStorage.getItem(KEYS.initialized) && localStorage.getItem(KEYS.version) === STORE_VERSION) return
+    localStorage.setItem(KEYS.initialized, 'true')
+    localStorage.setItem(KEYS.version, STORE_VERSION)
+  } catch {
+    // localStorage が使えない環境でも続行
+  }
 }
 
 // ── 患者 ──

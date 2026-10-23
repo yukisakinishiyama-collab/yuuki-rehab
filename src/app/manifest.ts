@@ -2,15 +2,15 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'YUUKI REHAB | 運動器リハビリ動画分析',
-    short_name: 'YUUKI REHAB',
-    description: 'ゆうき整骨院のリハビリ管理・動画分析・プロトコル立案・復帰基準テストシステム',
+    name: 'ゆうき整骨院 院内アプリ',
+    short_name: 'ゆうき院内',
+    description: 'ゆうき整骨院の院内アプリ（予約管理・カルテ・経営・集客）',
     start_url: '/dashboard',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#080e1a',
+    background_color: '#13253d',
     theme_color: '#0d9488',
-    categories: ['medical', 'health', 'fitness'],
+    categories: ['medical', 'business'],
     icons: [
       {
         src: '/icon.png.png',

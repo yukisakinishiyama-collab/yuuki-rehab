@@ -1,23 +1,22 @@
 'use client'
 // ──────────────────────────────────────────────
-// 患者詳細ページ（タブ構成）
+// カルテ（患者さん1人分）
+// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・キャンセル
 // ──────────────────────────────────────────────
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
-  SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
+  SpecialTestRecord, SOAPNote, ProgressRecord,
   SpecialTestResult, QuickMemo, Intake, CancellationRecord,
 } from '@/types/patient'
-import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
+import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
 const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-600' : 'text-green-600'
 import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
-  getSOAPNotes, getExercises, getPatientExercises, savePatientExercise,
-  deletePatientExercise, getProgressRecords, getRehabPlans,
+  getSOAPNotes, getProgressRecords,
   getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
@@ -32,20 +31,15 @@ import ROMInputForm from './ROMInputForm'
 import StrengthInputForm from './StrengthInputForm'
 import SpecialTestInputForm from './SpecialTestInputForm'
 import SOAPForm from './SOAPForm'
-import ExerciseCard from './ExerciseCard'
-import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
-import ExplanationMode from './ExplanationMode'
 import GoalsProblemsCard from './GoalsProblemsCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
 import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
-import DrillsBrowser from '@/components/site/DrillsBrowser'
-import { guessDrillDiseaseSlug } from '@/lib/drill-match'
 
 // ── 月次カルテ印刷 ────────────────────────────────────────────
 function printMonthlyChart(
@@ -603,11 +597,10 @@ function Row({ label, value, highlight, className = '' }: {
 
 // ── 問診票サマリーカード ────────────────────────────────────
 function IntakeCard({
-  intake, onReferral, onProtocol,
+  intake, onReferral,
 }: {
   intake: Intake
   onReferral?: () => void
-  onProtocol?: () => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -648,16 +641,6 @@ function IntakeCard({
               className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
             >
               📄 紹介状
-            </button>
-          )}
-          {onProtocol && (
-            <button
-              type="button"
-              onClick={onProtocol}
-              title="プロトコルを作成"
-              className="px-2.5 py-1.5 bg-teal-600 text-white text-xs font-medium rounded-lg hover:bg-teal-700 transition-colors shadow-sm whitespace-nowrap"
-            >
-              📋 プロトコル
             </button>
           )}
         </div>
@@ -711,29 +694,34 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'cancel' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'drills' | 'explanation'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'cancel'
+/** 「評価・測定」の中の切り替え */
+type EvalKey = 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
+const EVAL_TABS: { key: EvalKey; label: string }[] = [
+  { key: 'evaluation', label: '初回評価' },
+  { key: 'rom', label: 'ROM' },
+  { key: 'strength', label: '筋力' },
+  { key: 'special', label: 'スペシャルテスト' },
+  { key: 'progress', label: '経過グラフ' },
+]
 
 interface Props {
   patient: Patient
 }
 
 export default function PatientDetail({ patient }: Props) {
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabKey>('intake')
+  const [activeTab, setActiveTab] = useState<TabKey>('soap')
+  const [evalTab, setEvalTab] = useState<EvalKey>('evaluation')
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [romRecords, setRomRecords] = useState<ROMRecord[]>([])
   const [strengthRecords, setStrengthRecords] = useState<StrengthRecord[]>([])
   const [specialTests, setSpecialTests] = useState<SpecialTestRecord[]>([])
   const [soapNotes, setSoapNotes] = useState<SOAPNote[]>([])
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [patientExercises, setPatientExercises] = useState<PatientExercise[]>([])
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
-  const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
-  const [showExplanation, setShowExplanation] = useState(false)
   const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
   const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
@@ -748,45 +736,11 @@ export default function PatientDetail({ patient }: Props) {
     setStrengthRecords(getStrengthRecords(patient.id))
     setSpecialTests(getSpecialTests(patient.id))
     setSoapNotes(getSOAPNotes(patient.id).sort((a, b) => b.visitDate.localeCompare(a.visitDate)))
-    setExercises(getExercises())
-    setPatientExercises(getPatientExercises(patient.id))
     setProgressRecords(getProgressRecords(patient.id))
-    setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
-  }
-
-  // 問診票データからプロトコル作成ページへのURLを生成
-  function buildProtocolUrl(intake: Intake): string {
-    const BODY_REGION_TO_JOINT: Record<string, string> = {
-      fkl: '膝関節', fkr: '膝関節', bkl: '膝関節', bkr: '膝関節',
-      fsl: '肩関節', fsr: '肩関節', bsl: '肩関節', bsr: '肩関節',
-      fhil: '股関節', fhir: '股関節', bgl: '股関節', bgr: '股関節',
-      fal: '足関節', far: '足関節', bhal: '足関節', bher: '足関節',
-      fab: '腰部', blb: '腰部', fn: '頚部', bn: '頚部',
-      fel: '肘関節', fer: '肘関節', bel: '肘関節', ber: '肘関節',
-      fhdl: '手関節・手指', fhdr: '手関節・手指',
-    }
-    const JOINT_NAME_TO_KEY: Record<string, string> = {
-      '膝関節': 'knee', '肩関節': 'shoulder', '股関節': 'hip',
-      '足関節': 'ankle', '肘関節': 'elbow', '手関節・手指': 'hand',
-      '腰部': 'spine', '頚部': 'spine',
-    }
-    const jointNames = [...new Set(intake.painLocations.map(l => BODY_REGION_TO_JOINT[l]).filter(Boolean))]
-    const jointKey = jointNames[0] ? (JOINT_NAME_TO_KEY[jointNames[0]] ?? 'other') : ''
-    const notesParts: string[] = []
-    if (intake.chiefComplaint) notesParts.push(intake.chiefComplaint)
-    if (intake.importantGoal) notesParts.push(`目標: ${intake.importantGoal}`)
-    if (intake.therapistNotes) notesParts.push(`施術者メモ: ${intake.therapistNotes}`)
-    const params = new URLSearchParams()
-    if (intake.suspectedDiagnosis) params.set('diagnosis', intake.suspectedDiagnosis)
-    if (jointKey) params.set('joint', jointKey)
-    if (intake.sportsActivity) params.set('sport', intake.sportsActivity)
-    if (intake.injuryDate) params.set('eventDate', intake.injuryDate)
-    if (notesParts.length) params.set('notes', notesParts.join('\n'))
-    return `/protocols/new?${params.toString()}`
   }
 
   // ── 算出値 ──
@@ -853,64 +807,31 @@ export default function PatientDetail({ patient }: Props) {
   // ── ROM グラフデータ（最初の動作） ──
   const romMovements = [...new Set(romRecords.map(r => r.movement))].slice(0, 4)
 
-  // ── 運動割り当て ──
-  function handleAssignExercise(exerciseId: string) {
-    const pe: PatientExercise = {
-      id: nanoid(),
-      patientId: patient.id,
-      exerciseId,
-      assignedDate: new Date().toISOString().split('T')[0],
-      status: 'active',
-      adherenceRate: 0,
-      painAfterExercise: null,
-      memo: '',
-    }
-    savePatientExercise(pe)
-    reload()
-  }
-
-  function handleRemoveExercise(patientExerciseId: string) {
-    deletePatientExercise(patientExerciseId)
-    reload()
-  }
-
-  const assignedExerciseIds = new Set(patientExercises.filter(pe => pe.status === 'active').map(pe => pe.exerciseId))
-
-  const TABS: { key: TabKey; label: string; icon: string; badge?: number }[] = [
-    { key: 'intake', label: '問診票', icon: '📋', badge: intakes.length || undefined },
-    { key: 'overview', label: '概要', icon: '👁' },
-    { key: 'plan', label: 'リハビリ計画', icon: '📅', badge: rehabPlans.length || undefined },
-    { key: 'evaluation', label: '初回評価', icon: '🩺' },
-    { key: 'soap', label: 'SOAPカルテ', icon: '📝' },
-    { key: 'memo', label: '簡易メモ', icon: '🗒️', badge: quickMemos.length || undefined },
-    { key: 'cancel', label: 'キャンセル', icon: '🚫', badge: cancelSummary.total || undefined },
-    { key: 'rom', label: 'ROM', icon: '📐' },
-    { key: 'strength', label: '筋力', icon: '💪' },
-    { key: 'special', label: 'スペシャルテスト', icon: '🔍' },
-    { key: 'progress', label: '進捗', icon: '📈' },
-    { key: 'exercises', label: '運動メニュー', icon: '🏃' },
-    { key: 'drills', label: '競技復帰ドリル', icon: '🏅' },
-    { key: 'explanation', label: '患者説明', icon: '📄' },
+  const TABS: { key: TabKey; label: string; badge?: number }[] = [
+    { key: 'soap', label: 'SOAPカルテ', badge: soapNotes.length || undefined },
+    { key: 'overview', label: '概要' },
+    { key: 'eval', label: '評価・測定' },
+    { key: 'intake', label: '問診票', badge: intakes.length || undefined },
+    { key: 'memo', label: '簡易メモ', badge: quickMemos.length || undefined },
+    { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
-
-  const guessedDrillSlug = guessDrillDiseaseSlug(patient.diagnosisLabel, patient.bodyRegion)
 
   return (
     <div className="space-y-0">
-      {/* ヘッダーカード */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
-        <div className="px-6 pt-5 pb-4">
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 mb-3 transition-colors"
+      {/* ヘッダー（お名前・大事な数字・よく使うボタン・タブ） */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="px-4 pb-4 pt-4 sm:px-6">
+          <Link
+            href="/patients"
+            className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
           >
-            ← 患者一覧に戻る
-          </button>
-          <div className="flex items-start justify-between gap-4">
+            ← カルテ一覧
+          </Link>
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-semibold text-gray-900">{patient.name}</h1>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="text-sm text-gray-400">{patient.kana}</span>
+              {patient.kana && <p className="text-sm text-slate-500">{patient.kana}</p>}
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">{patient.name}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge color="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
                 {patient.diagnosisLabel && <Badge color="gray">{patient.diagnosisLabel}</Badge>}
                 <RetentionRiskBadge level={retentionRisk.level} />
@@ -920,74 +841,102 @@ export default function PatientDetail({ patient }: Props) {
                     type="button"
                     onClick={() => setActiveTab('cancel')}
                     title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-colors ${
                       cancelSummary.no_show > 0
-                        ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                        ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                        : 'border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
                     }`}
                   >
-                    🚫 キャンセル {cancelSummary.total}回
-                    <span className="opacity-70 tabular-nums">
+                    キャンセル {cancelSummary.total}回
+                    <span className="font-medium opacity-70 tabular-nums">
                       （前{cancelSummary.advance}・当{cancelSummary.same_day}・無{cancelSummary.no_show}）
                     </span>
                   </button>
                 )}
-                {/* 患者説明モード（NextGen v2.0・フラグでOFF可能） */}
-                {isFeatureEnabled('explanationMode') && (
-                  <button
-                    type="button"
-                    onClick={() => setShowExplanation(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
-                  >
-                    🖥️ 患者さんへ説明
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowReferralModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm"
-                >
-                  📄 紹介状・報告書
-                </button>
-                <Link
-                  href={`/patients/${patient.id}/return-criteria`}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors shadow-sm"
-                >
-                  🏆 復帰基準テスト
-                </Link>
               </div>
             </div>
             {improvementScore && (
-              <div className="flex flex-col items-center flex-shrink-0">
+              <div className="flex shrink-0 flex-col items-center">
                 <ProgressGauge score={improvementScore.total} size={72} />
-                <span className="text-xs text-gray-400 mt-1">改善スコア</span>
+                <span className="mt-1 text-xs text-slate-500">改善スコア</span>
               </div>
             )}
           </div>
+
+          {/* 大事な数字 */}
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { label: '来院回数（SOAP）', value: `${soapNotes.length}回` },
+              { label: '最後の記録', value: latestSoap?.visitDate || '—' },
+              {
+                label: '最新の痛み（NRS）',
+                value: latestSoap ? `${latestSoap.painToday} / 10` : '—',
+                tone: latestSoap ? NRS_COLOR(latestSoap.painToday) : '',
+              },
+              { label: '初回来院', value: patient.firstVisitDate || '—' },
+            ].map(f => (
+              <div key={f.label} className="min-w-0 rounded-xl bg-slate-50 px-3 py-2">
+                <dt className="text-[11px] font-bold text-slate-500">{f.label}</dt>
+                <dd className={`mt-0.5 truncate text-base font-black ${f.tone || 'text-slate-900'}`}>{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+
           {latestSoap && (
             <div className="mt-4 max-w-lg">
               <PhaseStepper currentPhase={currentPhase} />
             </div>
           )}
+
+          {/* よく使うボタン */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('soap')}
+              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-800"
+            >
+              今日のSOAPを書く
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReferralModal(true)}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+            >
+              紹介状・報告書
+            </button>
+            <Link
+              href={`/patients/${patient.id}/return-criteria`}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+            >
+              復帰基準テスト
+            </Link>
+            <Link
+              href={`/patients/${patient.id}/outcome-scores`}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+            >
+              アウトカム評価
+            </Link>
+          </div>
         </div>
 
-        {/* タブバー */}
-        <div className="px-1 overflow-x-auto border-t border-gray-100">
+        {/* タブ */}
+        <div className="overflow-x-auto border-t border-slate-100 px-1" role="group" aria-label="カルテの内容">
           <div className="flex min-w-max">
             {TABS.map(tab => (
               <button
                 key={tab.key}
                 type="button"
+                aria-pressed={activeTab === tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`relative px-3.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`relative whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
                   activeTab === tab.key
-                    ? 'border-teal-600 text-teal-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-teal-600 text-teal-800'
+                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
                 }`}
               >
-                {tab.icon} {tab.label}
+                {tab.label}
                 {tab.badge != null && tab.badge > 0 && (
-                  <span className="ml-1 bg-teal-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                  <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600 tabular-nums">
                     {tab.badge}
                   </span>
                 )}
@@ -1015,7 +964,6 @@ export default function PatientDetail({ patient }: Props) {
                       setSelectedIntake(intake)
                       setShowReferralModal(true)
                     }}
-                    onProtocol={() => router.push(buildProtocolUrl(intake))}
                   />
                 ))}
               </div>
@@ -1142,80 +1090,25 @@ export default function PatientDetail({ patient }: Props) {
           </div>
         )}
 
-        {/* ── リハビリ計画タブ ── */}
-        {activeTab === 'plan' && (
-          <div className="space-y-4">
-            {rehabPlans.length === 0 ? (
-              <Card>
-                <CardContent className="py-10 text-center">
-                  <p className="text-gray-400 text-sm mb-2">リハビリ計画がまだありません</p>
-                  <p className="text-gray-400 text-xs">「プロトコル立案」でプロトコルを作成し、「カルテへ反映」ボタンで追加できます</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 px-1">
-                  <span className="text-sm font-medium text-gray-700">{rehabPlans.length}フェーズのリハビリ計画</span>
-                  <span className="text-xs text-gray-400">（プロトコルから反映）</span>
-                </div>
-                {rehabPlans.map((plan, i) => (
-                  <Card key={plan.id}>
-                    <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                          i === 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {plan.phase}
-                        </span>
-                        <div>
-                          <SectionTitle>{plan.mainProblem || PHASE_SHORT_LABELS[plan.phase]}</SectionTitle>
-                          <p className="text-xs text-gray-400 mt-0.5">{PHASE_LABELS[plan.phase]}</p>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        {plan.shortTermGoal && (
-                          <div>
-                            <p className="text-xs font-medium text-gray-400 mb-1">短期ゴール</p>
-                            <p className="text-gray-700 bg-green-50 rounded-lg p-2 text-xs">{plan.shortTermGoal}</p>
-                          </div>
-                        )}
-                        {plan.midTermGoal && (
-                          <div>
-                            <p className="text-xs font-medium text-gray-400 mb-1">中期ゴール</p>
-                            <p className="text-gray-700 bg-blue-50 rounded-lg p-2 text-xs">{plan.midTermGoal}</p>
-                          </div>
-                        )}
-                        {plan.longTermGoal && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-400 mb-1">長期ゴール</p>
-                            <p className="text-gray-700 bg-purple-50 rounded-lg p-2 text-xs">{plan.longTermGoal}</p>
-                          </div>
-                        )}
-                        {plan.recommendedFrequency && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-400 mb-1">運動メニュー</p>
-                            <p className="text-gray-700 text-xs">{plan.recommendedFrequency}</p>
-                          </div>
-                        )}
-                        {plan.precautions && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-400 mb-1">進行基準</p>
-                            <p className="text-gray-700 bg-amber-50 rounded-lg p-2 text-xs">{plan.precautions}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </>
-            )}
+        {/* ── 評価・測定タブ（初回評価・ROM・筋力・スペシャルテスト・経過グラフ） ── */}
+        {activeTab === 'eval' && (
+          <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="評価・測定の切り替え">
+            {EVAL_TABS.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={evalTab === t.key}
+                onClick={() => setEvalTab(t.key)}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors ${
+                  evalTab === t.key ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         )}
-
-        {/* ── 初回評価タブ ── */}
-        {activeTab === 'evaluation' && (
+        {activeTab === 'eval' && evalTab === 'evaluation' && (
           <div className="space-y-6">
             {evaluations.length > 0 && (
               <Card>
@@ -1308,7 +1201,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── ROM タブ ── */}
-        {activeTab === 'rom' && (
+        {activeTab === 'eval' && evalTab === 'rom' && (
           <div className="space-y-6">
             {romRecords.length > 0 && (
               <Card>
@@ -1377,7 +1270,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 筋力タブ ── */}
-        {activeTab === 'strength' && (
+        {activeTab === 'eval' && evalTab === 'strength' && (
           <div className="space-y-6">
             {strengthRecords.length > 0 && (
               <Card>
@@ -1419,7 +1312,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── スペシャルテストタブ ── */}
-        {activeTab === 'special' && (
+        {activeTab === 'eval' && evalTab === 'special' && (
           <div className="space-y-6">
 
             {/* ── アウトカムスコアへのショートカット ── */}
@@ -1592,7 +1485,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 進捗タブ ── */}
-        {activeTab === 'progress' && (
+        {activeTab === 'eval' && evalTab === 'progress' && (
           <div className="space-y-6">
             {improvementScore && (
               <Card>
@@ -1640,89 +1533,8 @@ export default function PatientDetail({ patient }: Props) {
           </div>
         )}
 
-        {/* ── 運動メニュータブ ── */}
-        {activeTab === 'exercises' && (
-          <div className="space-y-6">
-            {/* 処方中の運動 */}
-            {patientExercises.filter(pe => pe.status === 'active').length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-gray-700 mb-3">処方中の運動</h3>
-                <div className="space-y-3">
-                  {patientExercises.filter(pe => pe.status === 'active').map(pe => {
-                    const exercise = exercises.find(e => e.id === pe.exerciseId)
-                    if (!exercise) return null
-                    return (
-                      <ExerciseCard
-                        key={pe.id}
-                        exercise={exercise}
-                        patientExercise={pe}
-                        onRemove={handleRemoveExercise}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
-            {/* 追加可能な運動 */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-700 mb-3">追加できる運動</h3>
-              <div className="space-y-3">
-                {exercises
-                  .filter(e => e.bodyRegion === patient.bodyRegion || e.bodyRegion === 'lumbar')
-                  .filter(e => !assignedExerciseIds.has(e.id))
-                  .map(exercise => (
-                    <ExerciseCard
-                      key={exercise.id}
-                      exercise={exercise}
-                      onAssign={handleAssignExercise}
-                    />
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── 競技復帰ドリルタブ ── */}
-        {activeTab === 'drills' && (
-          <div>
-            <p className="text-xs text-gray-400 mb-4">
-              {guessedDrillSlug
-                ? `診断名「${patient.diagnosisLabel}」から関連するドリルを表示しています。絞り込み条件は自由に変更できます。`
-                : '患者の診断名から自動で絞り込めなかったため、全疾患を表示しています。上の絞り込みから選択してください。'}
-            </p>
-            <DrillsBrowser initialDiseaseSlug={guessedDrillSlug} />
-          </div>
-        )}
-
-        {/* ── 患者説明タブ ── */}
-        {activeTab === 'explanation' && (
-          <PatientExplanationSheet
-            patient={patient}
-            evaluation={latestEval}
-            soapNote={latestSoap}
-            improvementScore={improvementScore?.total ?? 0}
-            currentPhase={currentPhase}
-            romRecords={romRecords}
-            strengthRecords={strengthRecords}
-            patientExercises={patientExercises}
-            exercises={exercises}
-          />
-        )}
       </div>
-
-      {/* 紹介状・報告書 フローティングボタン
-          （患者説明モード中は非表示＝患者向け全画面の上にスタッフUIを出さない） */}
-      {!showExplanation && (
-        <button
-          type="button"
-          onClick={() => setShowReferralModal(true)}
-          style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 40 }}
-          className="flex items-center gap-2 px-4 py-3 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl hover:bg-teal-700 transition-colors"
-        >
-          📄 紹介状・報告書
-        </button>
-      )}
 
       {/* 紹介状・報告書モーダル */}
       {showReferralModal && (
@@ -1740,15 +1552,6 @@ export default function PatientDetail({ patient }: Props) {
         />
       )}
 
-      {/* 患者説明モード（全画面・専門情報は表示しない）
-          必ず最後に描画し、最前面（z-index最大）でスタッフ向けUIをすべて覆う */}
-      {showExplanation && (
-        <ExplanationMode
-          key={patient.id}
-          patient={patient}
-          onClose={() => setShowExplanation(false)}
-        />
-      )}
     </div>
   )
 }
