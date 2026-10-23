@@ -61,8 +61,12 @@ export function proxy(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl
-  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
-    return NextResponse.next()
+  // そのパスちょうど（か、その下）だけを通す。「/api/marketing/go」で「/api/marketing/goal…」まで通さないように
+  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+    // 外から呼ばれる通り道では役割を決めないので、送られてきた役割ヘッダーは捨てる
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.delete(ROLE_HEADER)
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
   // 動画の保存完了の通知（Vercel Blob のサーバーから。署名は /api/upload 側の handleUpload が確かめる）
   if (pathname.startsWith('/api/upload') && request.headers.get('x-vercel-signature')) {
