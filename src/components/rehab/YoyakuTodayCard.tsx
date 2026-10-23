@@ -17,6 +17,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
 const FEED_KEY_STORAGE = 'yoyaku_feed_key'
+// 最後に取れた予約の控え（このタブの中だけ。タブを閉じれば消える）。
+// 予約システムは起動に3〜5秒かかるので、画面を開いたらまず控えを出し、うしろで新しくする
+const FEED_CACHE_STORAGE = 'yoyaku_feed_cache'
 
 interface FeedRow {
   time: string
@@ -37,6 +40,26 @@ interface Feed {
   error?: string
   today?: string
   days?: FeedDay[]
+}
+
+function readFeedCache(): { feed: Feed; updatedAt: string } | null {
+  try {
+    const raw = sessionStorage.getItem(FEED_CACHE_STORAGE)
+    if (!raw) return null
+    const value = JSON.parse(raw) as { feed?: Feed; updatedAt?: string }
+    return value.feed?.ok ? { feed: value.feed, updatedAt: value.updatedAt ?? '' } : null
+  } catch {
+    return null
+  }
+}
+
+function writeFeedCache(feed: Feed | null, updatedAt = '') {
+  try {
+    if (feed) sessionStorage.setItem(FEED_CACHE_STORAGE, JSON.stringify({ feed, updatedAt }))
+    else sessionStorage.removeItem(FEED_CACHE_STORAGE)
+  } catch {
+    // 保存できない環境では控えを使わない（毎回取りに行く）
+  }
 }
 
 /** 電話番号を数字だけに正規化して比較する */
@@ -85,6 +108,12 @@ export default function YoyakuTodayCard() {
     const saved = localStorage.getItem(FEED_KEY_STORAGE) || ''
     if (saved) {
       setFeedKey(saved)
+      // 控えがあれば、取りに行くあいだも先に出しておく
+      const cached = readFeedCache()
+      if (cached) {
+        setFeed(cached.feed)
+        setUpdatedAt(cached.updatedAt)
+      }
     } else {
       setNeedsSetup(true)
     }
@@ -101,6 +130,7 @@ export default function YoyakuTodayCard() {
         if (!data.ok) {
           if (data.error === 'unauthorized') {
             localStorage.removeItem(FEED_KEY_STORAGE)
+            writeFeedCache(null)
             setFeedKey('')
             setNeedsSetup(true)
             setError('連携キーが一致しません。予約管理の管理者パスワードを入力してください。')
@@ -109,8 +139,10 @@ export default function YoyakuTodayCard() {
           }
           return
         }
+        const time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
         setFeed(data)
-        setUpdatedAt(new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }))
+        setUpdatedAt(time)
+        writeFeedCache(data, time)
       } catch {
         setError('予約の取得に失敗しました。通信環境をご確認ください。')
       } finally {
