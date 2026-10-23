@@ -231,11 +231,12 @@ function buildKarteRows(): { rows: KarteRow[]; recent: KarteRow[] } {
  * 症状・施術の内容・「治る」などの言葉は入れない（決まった、ていねいな文だけ）。
  */
 export function followUpMessage(name: string): string {
-  const who = name.trim() ? `${name.trim()}様` : ''
+  // LINE・SMS・電話の前のメモ、どれに使っても通じる言い方にする（「このLINEから」とは書かない）
+  const who = name.trim() ? `${name.trim()}様　` : ''
   return [
-    `${who}　ゆうき整骨院です。`,
+    `${who}ゆうき整骨院です。`,
     'その後、お身体の具合はいかがでしょうか。前回から少し間があきましたので、ご様子をうかがいたくご連絡しました。',
-    '気になることがあれば、いつでもお気軽にご相談ください。ご予約は、24時間のネット予約かこのLINEからどうぞ。',
+    '気になることがあれば、いつでもお気軽にご相談ください。ご予約は、24時間のネット予約、またはお電話・LINEからどうぞ。',
   ].join('\n')
 }
 
@@ -253,14 +254,20 @@ function CopyFollowUp({ name }: { name: string }) {
     window.setTimeout(() => setDone(false), 2500)
   }
   return (
-    <button
-      type="button"
-      onClick={copy}
-      className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
-      aria-label={`${name}様への声かけの文を写す`}
-    >
-      {done ? '写しました' : '声かけ文'}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={copy}
+        className="inline-flex h-11 shrink-0 items-center rounded-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:h-8"
+        aria-label={`${name}様への声かけの文を写す`}
+      >
+        {done ? '写しました' : '声かけ文'}
+      </button>
+      {/* 読み上げ（スクリーンリーダー）にも「写しました」を伝える */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {done ? `${name}様への声かけの文を写しました` : ''}
+      </span>
+    </>
   )
 }
 
