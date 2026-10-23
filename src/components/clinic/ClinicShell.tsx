@@ -9,7 +9,7 @@
  */
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ExternalLink, MoreHorizontal, X } from 'lucide-react'
 import { ROLE_COOKIE } from '@/lib/marketing/auth-shared'
 import { NAV, activeSection, type NavSection } from './nav'
@@ -170,6 +170,41 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
   const role = useRoleLabel()
   const [moreOpen, setMoreOpen] = useState(false)
   const { section, link } = activeSection(pathname)
+  const headerRef = useRef<HTMLElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
+
+  // スマホの上の見出しの高さを CSS 変数（--shell-top）にする。
+  // 画面の中で上に貼り付く部品（自動投稿の「まとめて承認」など）が見出しの下に隠れないように使う
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const apply = () => document.documentElement.style.setProperty('--shell-top', `${el.offsetHeight}px`)
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty('--shell-top')
+    }
+  }, [])
+
+  // そのほかのメニュー: 開いたら中へフォーカス、Esc で閉じる、後ろの画面は動かさない
+  useEffect(() => {
+    if (!moreOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    sheetRef.current?.querySelector<HTMLElement>('a, button')?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMoreOpen(false)
+    }
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+      previous?.focus?.()
+    }
+  }, [moreOpen])
   const title = link?.label ?? section?.label ?? '院内アプリ'
 
   return (
@@ -181,13 +216,14 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
 
       {/* スマホ：上の見出し */}
       <header
+        ref={headerRef}
         className="no-print sticky z-20 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden"
         style={{ top: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
           <div className="min-w-0">
             <p className="text-[11px] font-bold tracking-wide text-teal-700">ゆうき整骨院 院内アプリ</p>
-            <h1 className="truncate text-[17px] font-black leading-tight">{title}</h1>
+            <p className="truncate text-[17px] font-black leading-tight">{title}</p>
           </div>
           <button
             type="button"
@@ -212,7 +248,7 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
 
       {/* スマホ：下のタブ */}
       <nav
-        aria-label="院内アプリのメニュー"
+        aria-label="主な画面"
         className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
@@ -243,6 +279,7 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
         <div className="no-print fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="そのほかのメニュー">
           <button type="button" className="absolute inset-0 bg-slate-900/50" aria-label="閉じる" onClick={() => setMoreOpen(false)} />
           <div
+            ref={sheetRef}
             className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-[#13253d] text-white shadow-xl"
             style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))' }}
           >

@@ -920,14 +920,13 @@ export default function PatientDetail({ patient }: Props) {
         </div>
 
         {/* タブ */}
-        <div className="overflow-x-auto border-t border-slate-100 px-1" role="tablist" aria-label="カルテの内容">
+        <div className="overflow-x-auto border-t border-slate-100 px-1" role="group" aria-label="カルテの内容">
           <div className="flex min-w-max">
             {TABS.map(tab => (
               <button
                 key={tab.key}
                 type="button"
-                role="tab"
-                aria-selected={activeTab === tab.key}
+                aria-pressed={activeTab === tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`relative whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
                   activeTab === tab.key
@@ -1093,13 +1092,12 @@ export default function PatientDetail({ patient }: Props) {
 
         {/* ── 評価・測定タブ（初回評価・ROM・筋力・スペシャルテスト・経過グラフ） ── */}
         {activeTab === 'eval' && (
-          <div className="mb-4 flex flex-wrap gap-1.5" role="tablist" aria-label="評価・測定の切り替え">
+          <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="評価・測定の切り替え">
             {EVAL_TABS.map(t => (
               <button
                 key={t.key}
                 type="button"
-                role="tab"
-                aria-selected={evalTab === t.key}
+                aria-pressed={evalTab === t.key}
                 onClick={() => setEvalTab(t.key)}
                 className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors ${
                   evalTab === t.key ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'

@@ -586,7 +586,10 @@ function AutopilotInner() {
 
       {/* まとめて承認 */}
       {proposal && proposal.status === 'ready' && approvable.length > 0 && isAdmin && (
-        <div className="sticky top-0 z-10 rounded-xl border border-teal-200 bg-teal-50 p-3 shadow-sm">
+        <div
+          className="sticky z-10 rounded-xl border border-teal-200 bg-teal-50 p-3 shadow-sm"
+          style={{ top: 'calc(var(--shell-top, 0px) + env(safe-area-inset-top, 0px))' }}
+        >
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"

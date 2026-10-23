@@ -744,13 +744,12 @@ export default function SalesPage() {
       {month && totals && (
         <>
           {months.length > 1 && (
-            <div className="flex flex-wrap gap-1" role="tablist" aria-label="表示する月">
+            <div className="flex flex-wrap gap-1" role="group" aria-label="表示する月">
               {months.slice(0, 13).map((m) => (
                 <button
                   key={m.month}
                   type="button"
-                  role="tab"
-                  aria-selected={m.month === month.month}
+                    aria-pressed={m.month === month.month}
                   onClick={() => setSelected(m.month)}
                   className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
                     m.month === month.month

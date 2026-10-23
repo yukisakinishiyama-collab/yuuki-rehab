@@ -7,7 +7,7 @@
  * - 予約管理（GASの予約画面）は常駐の iframe。/yoyaku を開くたびに読み込み直さない
  * - 起動時にクラウドの控えからカルテを取り込み（変わっていれば読み直す）
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CloudUpload, Smartphone } from 'lucide-react'
 import AuthGuard from './AuthGuard'
@@ -21,20 +21,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
 
-  // 起動時にクラウドからデータを取得し、差分があればリロード
+  // カルテを使う画面（今日・カルテ）を開いたとき、クラウドの控えを取り込む（1回だけ）。
+  // 集客・経営の画面では取り込まない（入力中に読み直しが起きないように）。
+  const usesKarte = pathname === '/dashboard' || pathname.startsWith('/patients')
+  const pulledRef = useRef(false)
   useEffect(() => {
+    if (!usesKarte || pulledRef.current) return
+    pulledRef.current = true
     import('@/lib/sync-service').then(async ({ pullFromCloud, isSyncEnabled }) => {
       if (!isSyncEnabled()) return
       setSyncing(true)
       const before = localStorage.getItem('pt_patients')
       const ok = await pullFromCloud()
       setSyncing(false)
-      if (ok) {
-        const after = localStorage.getItem('pt_patients')
-        if (before !== after) window.location.reload()
-      }
+      if (ok && before !== localStorage.getItem('pt_patients')) window.location.reload()
     })
-  }, [])
+  }, [usesKarte])
 
   async function handlePushSync() {
     setSyncing(true)

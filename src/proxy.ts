@@ -14,8 +14,9 @@
  * 保護対象: 院内アプリの画面（/dashboard・/patients・/yoyaku・/marketing・/login）と、
  *           院内アプリだけが使うAPI（/api/marketing・/api/sync・/api/yoyaku・/api/intake-analysis・
  *           /api/referral-generate）。カルテ（患者さんの記録）を外から見られないようにする。
- * 保護しないもの: 公開ホームページ、患者さんが使う LIFF（/liff・/api/liff）、
- *           動画の保存（/api/upload：保存の完了通知を Vercel から受けるため）
+ *           動画の保存（/api/upload）も保護する。ただし Vercel Blob からの保存完了の通知
+ *           （x-vercel-signature 付き。中身は handleUpload が署名で確かめる）だけは通す。
+ * 保護しないもの: 公開ホームページ、患者さんが使う LIFF（/liff・/api/liff）
  * 除外（外部から呼ばれる必要があるもの）:
  * - /api/marketing/line/webhook       … LINEサーバーからの通知（署名検証で保護）
  * - /api/marketing/go                 … 患者がタップする計測リンク
@@ -48,6 +49,8 @@ function pass(request: NextRequest, role: MarketingRole) {
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   // 読み取り可能CookieでクライアントUIのボタン表示を制御（認可の本体はサーバー側）
   response.cookies.set(ROLE_COOKIE, role, { path: '/', sameSite: 'lax' })
+  // 以前の path=/marketing の Cookie が残っていると古い役割が先に読まれるため、消しておく
+  response.headers.append('Set-Cookie', `${ROLE_COOKIE}=; Path=/marketing; Max-Age=0; SameSite=Lax`)
   return response
 }
 
@@ -60,6 +63,12 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     return NextResponse.next()
+  }
+  // 動画の保存完了の通知（Vercel Blob のサーバーから。署名は /api/upload 側の handleUpload が確かめる）
+  if (pathname.startsWith('/api/upload') && request.headers.get('x-vercel-signature')) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.delete(ROLE_HEADER)
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   const header = request.headers.get('authorization') ?? ''
@@ -93,5 +102,6 @@ export const config = {
     '/api/yoyaku/:path*',
     '/api/intake-analysis/:path*',
     '/api/referral-generate/:path*',
+    '/api/upload/:path*',
   ],
 }

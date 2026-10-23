@@ -315,7 +315,10 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
           {/* 右：結果 + 履歴 */}
           <div className="space-y-4">
             {/* リアルタイム結果 */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-4">
+            <div
+              className="bg-white rounded-xl border border-gray-200 p-4 sticky"
+              style={{ top: 'calc(var(--shell-top, 0px) + env(safe-area-inset-top, 0px) + 1rem)' }}
+            >
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">スコア結果</h3>
               {result ? (
                 <div className={`rounded-xl border p-4 ${COLOR_MAP[result.color].bg} ${COLOR_MAP[result.color].border}`}>

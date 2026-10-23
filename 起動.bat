@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title ゆうき整骨院 リハビリ管理システム
+title ゆうき整骨院 院内アプリ
 
 cd /d "C:\Users\PC\yuuki-rehab"
 
@@ -8,7 +8,7 @@ cd /d "C:\Users\PC\yuuki-rehab"
 netstat -ano | findstr ":3000 " | findstr "LISTENING" >nul 2>&1
 if %errorlevel% == 0 (
     echo サーバーは起動済みです。ブラウザを開きます...
-    start "" "http://localhost:3000/patients/dashboard"
+    start "" "http://localhost:3000/dashboard"
     exit /b 0
 )
 
@@ -30,5 +30,5 @@ exit /b 1
 
 :open
 echo 起動完了！ブラウザを開きます...
-start "" "http://localhost:3000/patients/dashboard"
+start "" "http://localhost:3000/dashboard"
 exit /b 0
