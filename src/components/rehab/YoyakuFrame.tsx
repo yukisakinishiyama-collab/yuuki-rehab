@@ -3,9 +3,10 @@
 // 予約管理の常駐フレーム
 // AppShell内に常駐させ、タブ切替では非表示にするだけにする。
 // これにより /yoyaku を再訪してもGAS画面を再読み込みせず、一瞬で表示される。
-// 初回に /yoyaku を開いたときだけ iframe をマウントする（無駄な読み込み防止）。
+// 院内アプリを開いて少ししたら、裏で先に読み込んでおく（予約システムは起動に3〜5秒かかるため、
+// 最初に「予約」を押したときに待たないように）。通信を節約する設定の端末では、開いたときだけ読み込む。
 // ──────────────────────────────────────────────
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 const RESERVATION_ADMIN_URL =
@@ -20,6 +21,14 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   // 初めて表示された時点でマウントし、以後はセッション中ずっと保持する
   // （レンダー中のstate調整パターン。effect不要でラッチできる）
   if (visible && !mounted) setMounted(true)
+
+  useEffect(() => {
+    if (mounted) return
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+    if (conn?.saveData) return
+    const id = window.setTimeout(() => setMounted(true), 2500)
+    return () => window.clearTimeout(id)
+  }, [mounted])
 
   if (!mounted) return null
 

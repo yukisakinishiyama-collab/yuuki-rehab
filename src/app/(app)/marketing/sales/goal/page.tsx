@@ -406,7 +406,7 @@ export default function GoalPage() {
   useEffect(() => {
     let alive = true
     Promise.all([
-      fetch('/api/marketing/noah', { cache: 'no-store' }).then(async (r) => (r.ok ? ((await r.json()) as { store: NoahStore | null }) : null)),
+      fetch('/api/marketing/noah?lite=1', { cache: 'no-store' }).then(async (r) => (r.ok ? ((await r.json()) as { store: NoahStore | null }) : null)),
       fetch('/api/marketing/keiei-extra', { cache: 'no-store' }).then(async (r) =>
         r.ok ? ((await r.json()) as { months: ExtraMonth[] }) : null,
       ),

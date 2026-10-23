@@ -52,9 +52,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "YUUKI REHAB",
   },
+  // アイコンは小さく縮めたもの（元の icon.png.png は 1.3MB あり、どの画面でも読み込まれて遅くしていた）
   icons: {
-    icon: "/icon.png.png?v=20260521",
-    apple: "/icon.png.png?v=20260521",
+    icon: [
+      { url: "/favicon-48.png?v=20261024", sizes: "48x48", type: "image/png" },
+      { url: "/app-icon-192.png?v=20261024", sizes: "192x192", type: "image/png" },
+    ],
+    apple: { url: "/apple-icon-180.png?v=20261024", sizes: "180x180" },
   },
 };
 
@@ -69,8 +73,6 @@ export default function RootLayout({
       className={`${sora.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
     >
       <head>
-        <link rel="icon" href="/icon.png.png?v=20260521" type="image/png" />
-        <link rel="apple-touch-icon" href="/icon.png.png?v=20260521" />
         <meta name="theme-color" content="#0d9488" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

@@ -4,14 +4,16 @@ import { listEvents } from '@/lib/marketing/analytics-store-server'
 import { listContacts } from '@/lib/marketing/line-store-server'
 import { listJobs } from '@/lib/marketing/jobs-store-server'
 import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
-import { fetchHubStats, sourceLabel } from '@/lib/marketing/booking-stats'
+import { sourceLabel } from '@/lib/marketing/booking-stats'
+import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
 import { listProposals } from '@/lib/marketing/autopilot-store-server'
 
 export const dynamic = 'force-dynamic'
 
 /** 予約（流入元別）と、自動投稿ごとの予約数。予約システムが未対応なら null */
 async function bookingsBySource(days: number, since: string, clicks: Array<{ meta: Record<string, string> }>) {
-  const stats = await fetchHubStats(days)
+  // 予約システムの数字は控えから（画面を待たせない。古ければ返したあとで取り直す）
+  const stats = await fetchHubStatsFast(days)
   if (!stats) return null
   const sinceDay = since.slice(0, 10)
   const rows = stats.bookings.filter((b) => b.received >= sinceDay)
