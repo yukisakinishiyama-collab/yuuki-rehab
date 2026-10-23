@@ -6,13 +6,15 @@
  * - PC（幅1024px以上）: 左に固定のメニュー。経営・集客は中の画面まで並べる
  * - スマホ: 上に今の画面の名前（経営・集客は中の切り替えボタン）、下に5つのタブ
  * - 印刷（カルテの印刷など）にはメニューを出さない（no-print）
+ * - 「経営」は隠しコマンドで開いたときだけ出す（患者さんの目に入らないように。src/lib/clinic/keiei-mode.ts）
  */
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ExternalLink, MoreHorizontal, X } from 'lucide-react'
+import { ExternalLink, EyeOff, MoreHorizontal, X } from 'lucide-react'
 import { ROLE_COOKIE } from '@/lib/marketing/auth-shared'
-import { NAV, activeSection, type NavSection } from './nav'
+import { closeKeiei, countSecretKey, countSecretTap, extendKeiei, openKeiei, useKeieiOpen } from '@/lib/clinic/keiei-mode'
+import { activeSection, visibleNav, type NavSection } from './nav'
 
 /** ログイン中の役割（proxy が付ける読み取り用の Cookie。サーバー側の表示では出さない） */
 function readRoleLabel(): string | null {
@@ -32,19 +34,30 @@ function useRoleLabel(): string | null {
   return useSyncExternalStore(noSubscribe, readRoleLabel, () => null)
 }
 
-function Brand() {
+/** ロゴの印（隠しコマンド：2秒以内に5回押すと経営メニューが出る。見た目はただのロゴ） */
+function BrandMark({ onSecret }: { onSecret: () => void }) {
   return (
-    <Link href="/dashboard" className="flex items-center gap-3 rounded-lg px-2 py-1 focus-visible:outline-2 focus-visible:outline-teal-300">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/15 ring-1 ring-teal-400/30" aria-hidden>
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M10 3v14M3 10h14" stroke="#5eead4" strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-      </span>
-      <span className="min-w-0 leading-tight">
+    <span
+      onClick={() => countSecretTap() && onSecret()}
+      className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-teal-500/15 ring-1 ring-teal-400/30"
+      aria-hidden
+    >
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 3v14M3 10h14" stroke="#5eead4" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    </span>
+  )
+}
+
+function Brand({ onSecret }: { onSecret: () => void }) {
+  return (
+    <div className="flex items-center gap-3 px-2 py-1">
+      <BrandMark onSecret={onSecret} />
+      <Link href="/dashboard" className="min-w-0 rounded-lg leading-tight focus-visible:outline-2 focus-visible:outline-teal-300">
         <span className="block text-[15px] font-black tracking-wide text-white">ゆうき整骨院</span>
         <span className="block text-[11px] font-bold tracking-[0.14em] text-teal-200/80">院内アプリ</span>
-      </span>
-    </Link>
+      </Link>
+    </div>
   )
 }
 
@@ -53,22 +66,28 @@ function SideNav({
   extras,
   role,
   showBrand = true,
+  keieiOpen,
+  onSecret,
+  onHide,
 }: {
   pathname: string
   extras?: ReactNode
   role: string | null
   showBrand?: boolean
+  keieiOpen: boolean
+  onSecret: () => void
+  onHide: () => void
 }) {
   const { section: current, link: currentLink } = activeSection(pathname)
   return (
     <div className="flex h-full flex-col">
       {showBrand && (
         <div className="px-4 pb-4 pt-5">
-          <Brand />
+          <Brand onSecret={onSecret} />
         </div>
       )}
       <nav aria-label="院内アプリのメニュー" className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-        {NAV.filter((s) => s.key !== 'settings').map((section) => {
+        {visibleNav(keieiOpen).filter((s) => s.key !== 'settings').map((section) => {
           const active = current?.key === section.key
           const Icon = section.icon
           return (
@@ -112,6 +131,16 @@ function SideNav({
         })}
       </nav>
       <div className="space-y-1 border-t border-white/10 px-3 pb-4 pt-3">
+        {keieiOpen && (
+          <button
+            type="button"
+            onClick={onHide}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-bold text-amber-200 hover:bg-white/5"
+          >
+            <EyeOff className="h-4 w-4" aria-hidden />
+            経営を隠す
+          </button>
+        )}
         {extras}
         <Link
           href="/marketing/settings"
@@ -167,11 +196,42 @@ function SubNav({ section, pathname }: { section: NavSection; pathname: string }
 
 export default function ClinicShell({ children, extras }: { children: ReactNode; extras?: ReactNode }) {
   const pathname = usePathname() ?? '/'
+  const router = useRouter()
   const role = useRoleLabel()
   const [moreOpen, setMoreOpen] = useState(false)
   const { section, link } = activeSection(pathname)
   const headerRef = useRef<HTMLElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
+  const keieiOpen = useKeieiOpen()
+  const [notice, setNotice] = useState('')
+  const onKeiei = section?.key === 'keiei'
+
+  function flash(text: string) {
+    setNotice(text)
+    window.setTimeout(() => setNotice(''), 3500)
+  }
+  const onSecret = () => flash('経営メニューを表示しました（操作がないと10分で隠れます）')
+  function hideKeiei() {
+    closeKeiei()
+    setMoreOpen(false)
+    flash('経営メニューを隠しました')
+    if (onKeiei) router.push('/dashboard')
+  }
+
+  // 隠しコマンド（PC）：入力欄の外で Shift＋K を3回。開いている間は、操作のたびに自動で隠れるまでの時間をのばす
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (countSecretKey(e)) flash('経営メニューを表示しました（操作がないと10分で隠れます）')
+      else extendKeiei()
+    }
+    const onPointer = () => extendKeiei()
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onPointer)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onPointer)
+    }
+  }, [])
 
   // スマホの上の見出しの高さを CSS 変数（--shell-top）にする。
   // 画面の中で上に貼り付く部品（自動投稿の「まとめて承認」など）が見出しの下に隠れないように使う
@@ -205,13 +265,23 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
       previous?.focus?.()
     }
   }, [moreOpen])
-  const title = link?.label ?? section?.label ?? '院内アプリ'
+  // 経営の画面は、隠れているときは中身を出さない（時間切れで閉じたときも、ここで目隠しになる）
+  const covered = onKeiei && !keieiOpen
+  const title = covered ? '院内アプリ' : (link?.label ?? section?.label ?? '院内アプリ')
+  const tabs = visibleNav(keieiOpen).filter((s) => s.tab)
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* PC：左のメニュー */}
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 bg-[#13253d] lg:block">
-        <SideNav pathname={pathname} extras={extras} role={role} />
+        <SideNav
+          pathname={pathname}
+          extras={extras}
+          role={role}
+          keieiOpen={keieiOpen}
+          onSecret={onSecret}
+          onHide={hideKeiei}
+        />
       </aside>
 
       {/* スマホ：上の見出し */}
@@ -222,19 +292,38 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
       >
         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold tracking-wide text-teal-700">ゆうき整骨院 院内アプリ</p>
+            {/* 隠しコマンド（スマホ）：この文字を2秒以内に5回押す。見た目はただの見出し */}
+            <p
+              onClick={() => countSecretTap() && onSecret()}
+              className="select-none text-[11px] font-bold tracking-wide text-teal-700"
+            >
+              ゆうき整骨院 院内アプリ
+            </p>
             <p className="truncate text-[17px] font-black leading-tight">{title}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
-            aria-label="そのほかのメニュー"
-          >
-            <MoreHorizontal className="h-5 w-5" aria-hidden />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {keieiOpen && (
+              <button
+                type="button"
+                onClick={hideKeiei}
+                className="flex h-10 items-center gap-1 rounded-full px-3 text-[12px] font-bold text-amber-800 hover:bg-amber-50"
+                aria-label="経営を隠す"
+              >
+                <EyeOff className="h-4 w-4" aria-hidden />
+                隠す
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+              aria-label="そのほかのメニュー"
+            >
+              <MoreHorizontal className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
         </div>
-        {section && section.children && (
+        {section && section.children && !covered && (
           <div className="px-4">
             <SubNav section={section} pathname={pathname} />
           </div>
@@ -243,7 +332,9 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
 
       {/* 印刷時はメニュー分の余白を詰めて、紙の幅いっぱいに出す */}
       <div className="print-full-width lg:pl-60">
-        <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 sm:px-6 lg:pb-10 lg:pt-6">{children}</main>
+        <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 sm:px-6 lg:pb-10 lg:pt-6">
+          {covered ? <Covered onOpen={() => openKeiei()} /> : children}
+        </main>
       </div>
 
       {/* スマホ：下のタブ */}
@@ -252,8 +343,8 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
         className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <ul className="mx-auto grid max-w-lg grid-cols-5">
-          {NAV.filter((s) => s.tab).map((s) => {
+        <ul className={`mx-auto grid max-w-lg ${tabs.length >= 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          {tabs.map((s) => {
             const on = section?.key === s.key
             const Icon = s.icon
             return (
@@ -284,7 +375,7 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
             style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))' }}
           >
             <div className="flex items-center justify-between px-4 pb-1 pt-3">
-              <Brand />
+              <Brand onSecret={onSecret} />
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
@@ -295,11 +386,51 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
               </button>
             </div>
             <div className="max-h-[70vh] overflow-y-auto" onClick={(e) => (e.target as HTMLElement).closest('a') && setMoreOpen(false)}>
-              <SideNav pathname={pathname} extras={extras} role={role} showBrand={false} />
+              <SideNav
+                pathname={pathname}
+                extras={extras}
+                role={role}
+                showBrand={false}
+                keieiOpen={keieiOpen}
+                onSecret={onSecret}
+                onHide={hideKeiei}
+              />
             </div>
           </div>
         </div>
       )}
+
+      {/* 隠しモードの切りかえを知らせる短い表示（数秒で消える） */}
+      {notice && (
+        <div
+          role="status"
+          className="no-print fixed inset-x-0 z-50 mx-auto w-fit max-w-[calc(100%-32px)] rounded-full bg-slate-900/90 px-4 py-2 text-center text-[13px] font-bold text-white shadow-lg"
+          style={{ bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}
+        >
+          {notice}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 経営の画面が隠れているときの目隠し（見た目はふつうの「閉じています」） */
+function Covered({ onOpen }: { onOpen: () => void }) {
+  return (
+    <div className="mx-auto mt-10 max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center">
+      <p className="text-sm font-bold text-slate-700">この画面は閉じています</p>
+      <div className="mt-4 flex justify-center gap-2">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+        >
+          開く
+        </button>
+        <Link href="/dashboard" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
+          今日へ
+        </Link>
+      </div>
     </div>
   )
 }

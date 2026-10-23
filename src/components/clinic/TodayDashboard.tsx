@@ -5,7 +5,7 @@
  *
  * 朝いちばんに開いて「今日やること」が一目でわかる画面。
  * - 今日の予約（予約システムと連携）と、キャンセルのカルテへの取り込み
- * - 昨日の締め（NOAHの来院数・金額）と次の一手
+ * - 昨日の締め（NOAHの来院数・金額）と次の一手 … 経営メニューを隠しコマンドで開いているときだけ
  * - 気にかけたい患者さん（しばらく記録がない・離脱リスクが高い）と最近ひらいたカルテ
  * - 承認を待っている投稿
  */
@@ -23,6 +23,7 @@ import { dateLabel, people, yen, type NightlySummary } from '@/lib/marketing/noa
 import type { OpeningDay } from '@/lib/marketing/autopilot-planner'
 import type { WeeklyProposal } from '@/lib/marketing/autopilot-types'
 import type { Patient } from '@/types/patient'
+import { useKeieiOpen } from '@/lib/clinic/keiei-mode'
 
 // ── 小さな部品 ─────────────────────────────────────────
 
@@ -312,6 +313,7 @@ function KartePanel() {
 export default function TodayDashboard() {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const keieiOpen = useKeieiOpen()
 
   function search(e: FormEvent) {
     e.preventDefault()
@@ -356,7 +358,8 @@ export default function TodayDashboard() {
           <YoyakuCancelSyncCard />
         </div>
         <div className="min-w-0 space-y-5">
-          <SalesPanel />
+          {/* 売上などの数字は、経営メニューを隠しコマンドで開いているときだけ出す（患者さんの目に入らないように） */}
+          {keieiOpen && <SalesPanel />}
           <KartePanel />
         </div>
       </div>
