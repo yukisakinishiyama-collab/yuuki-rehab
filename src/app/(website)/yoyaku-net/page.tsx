@@ -12,7 +12,8 @@ import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
  * source / campaign は予約システムまで引き継がれる（どの投稿から予約が入ったかが残る）。
  *
  * 検索に出す本来のページは院のサイト（shimonoseki-yuuki.com）なので、このページは検索の対象外（noindex）。
- * 表現は広告ガイドラインの範囲（効果の保証・体験談・割引の強調はしない）。
+ * 表現は広告ガイドラインの範囲（効果の保証・体験談・割引の強調はしない）。Googleの投稿（広告）から来るページなので、
+ * 柔道整復師法の広告の決まりに合わせ、扱う症状などは書かず、予約・場所・時間の案内だけにする。
  */
 export const metadata: Metadata = {
   title: 'ネット予約（24時間）',
@@ -53,7 +54,7 @@ export default async function YoyakuNetPage({
         <p className="text-sm font-bold tracking-wide text-teal-700">ゆうき整骨院（下関市彦島）</p>
         <h1 className="mt-1 text-3xl font-black leading-tight text-slate-900">ネット予約（24時間）</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-slate-600">
-          空き状況を見て、その場で予約が確定します。スポーツのケガ、手術の前後のリハビリ、交通事故のケガなど、まずはお気軽にどうぞ。
+          空き状況を見て、その場で予約が確定します。
         </p>
 
         <a
