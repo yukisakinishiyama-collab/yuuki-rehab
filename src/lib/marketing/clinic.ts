@@ -9,6 +9,9 @@ import type { ClinicProfile } from './types'
 export const RESERVE_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec'
 
+/** 院のホームページ（検索に出す本来のサイト。Netlify） */
+export const HOMEPAGE_URL = 'https://shimonoseki-yuuki.com/'
+
 export const DEFAULT_CLINIC_PROFILE: ClinicProfile = {
   name: 'ゆうき整骨院',
   address: '山口県下関市彦島江の浦町9丁目1-14',
@@ -41,6 +44,7 @@ export function clinicProfileToPrompt(profile: ClinicProfile): string {
     `所在地: ${profile.address}（${profile.parking}）`,
     `電話: ${profile.phone}`,
     `診療時間: ${profile.hours}／休診: ${profile.closedDays}`,
+    `ホームページ: ${HOMEPAGE_URL}`,
     `ネット予約（24時間・即時確定）: ${profile.reserveUrl}`,
     `公式LINE: ${profile.lineUrl}`,
     `Google店舗ページ: ${profile.googleMapUrl}`,
