@@ -66,6 +66,11 @@
   --duration-slower: 600ms;
 }
 
+/* 日本語フォント（@fontsource/zen-kaku-gothic-new を layout.tsx で読み込み。src/app/fonts/README.md） */
+:root {
+  --font-zen-kaku: "Zen Kaku Gothic New";
+}
+
 /* ─────────────────────────────────────────────
    ダークモード対応（system preference）
 ───────────────────────────────────────────── */
