@@ -225,6 +225,53 @@ function buildKarteRows(): { rows: KarteRow[]; recent: KarteRow[] } {
   return { rows, recent }
 }
 
+/**
+ * 間があいた方への声かけの文（LINEや電話の前に写して使う）
+ *
+ * 文はこの端末の中で作るだけで、外へは送らない。送るかどうか・文を直すかは院長・スタッフが決める。
+ * 症状・施術の内容・「治る」などの言葉は入れない（決まった、ていねいな文だけ）。
+ */
+export function followUpMessage(name: string): string {
+  // LINE・SMS・電話の前のメモ、どれに使っても通じる言い方にする（「このLINEから」とは書かない）
+  const who = name.trim() ? `${name.trim()}様　` : ''
+  return [
+    `${who}ゆうき整骨院です。`,
+    'その後、お身体の具合はいかがでしょうか。前回から少し間があきましたので、ご様子をうかがいたくご連絡しました。',
+    '気になることがあれば、いつでもお気軽にご相談ください。ご予約は、24時間のネット予約、またはお電話・LINEからどうぞ。',
+  ].join('\n')
+}
+
+function CopyFollowUp({ name }: { name: string }) {
+  const [done, setDone] = useState(false)
+  async function copy() {
+    const text = followUpMessage(name)
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // 写せない環境では、選んでコピーできるように表示する
+      window.prompt('この文をコピーしてお使いください', text)
+    }
+    setDone(true)
+    window.setTimeout(() => setDone(false), 2500)
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={copy}
+        className="inline-flex h-11 shrink-0 items-center rounded-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:h-8"
+        aria-label={`${name}様への声かけの文を写す`}
+      >
+        {done ? '写しました' : '声かけ文'}
+      </button>
+      {/* 読み上げ（スクリーンリーダー）にも「写しました」を伝える */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {done ? `${name}様への声かけの文を写しました` : ''}
+      </span>
+    </>
+  )
+}
+
 function KartePanel() {
   const [data, setData] = useState<{ rows: KarteRow[]; recent: KarteRow[] } | null>(null)
   useEffect(() => {
@@ -261,16 +308,21 @@ function KartePanel() {
           {watch.length > 0 && (
             <div>
               <p className="mb-1.5 text-xs font-black text-slate-700">気にかけたい方（しばらく記録がない・離脱リスクが高い）</p>
+              <p className="mb-1.5 text-[11px] text-slate-500">「声かけ文」で、LINEや電話の前に使えるていねいな文を写せます（送るのはご自身で）。</p>
               <ul className="divide-y divide-slate-100">
                 {watch.slice(0, 5).map((r) => (
-                  <li key={r.patient.id}>
-                    <Link href={`/patients/${r.patient.id}`} className="flex items-center justify-between gap-3 py-2 hover:bg-slate-50">
+                  <li key={r.patient.id} className="flex items-center gap-2">
+                    <Link
+                      href={`/patients/${r.patient.id}`}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 py-2 hover:bg-slate-50"
+                    >
                       <span className="min-w-0 truncate text-sm font-bold text-slate-800">{r.patient.name}</span>
                       <span className="shrink-0 text-xs text-slate-500">
                         {r.days >= 999 ? '記録なし' : `最後の記録から${r.days}日`}
                         {r.risk === 'high' && <span className="ml-1.5 rounded bg-red-50 px-1.5 py-0.5 font-bold text-red-700">リスク高</span>}
                       </span>
                     </Link>
+                    <CopyFollowUp name={r.patient.name} />
                   </li>
                 ))}
               </ul>
