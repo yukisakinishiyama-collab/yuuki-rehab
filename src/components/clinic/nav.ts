@@ -1,8 +1,11 @@
 /**
  * 院内アプリのメニュー（予約管理・カルテ・経営・集客）
  *
- * PCは左のメニュー、スマホは下の5つのタブ（今日・予約・カルテ・経営・集客）と、
+ * PCは左のメニュー、スマホは下のタブ（今日・予約・カルテ・集客）と、
  * 経営・集客の中の切り替え（上の横並びのボタン）で使う。
+ *
+ * 「経営」（売上などの数字）は患者さんの目に入らないよう、ふだんは出さない（secret）。
+ * 隠しコマンドで開いたときだけ表示する（src/lib/clinic/keiei-mode.ts）。
  */
 import {
   BookOpen,
@@ -14,6 +17,7 @@ import {
   House,
   ListChecks,
   Megaphone,
+  Mountain,
   MessageCircle,
   PenLine,
   Settings,
@@ -41,10 +45,12 @@ export interface NavSection {
   children?: NavLink[]
   /** 下のタブに出すか（スマホ） */
   tab: boolean
+  /** ふだんは隠す（隠しコマンドで開いたときだけ出す） */
+  secret?: boolean
 }
 
 export const NAV: NavSection[] = [
-  { key: 'today', label: '今日', href: '/dashboard', icon: House, hint: '今日の予約と昨日の締め', tab: true },
+  { key: 'today', label: '今日', href: '/dashboard', icon: House, hint: '今日の予約とお知らせ', tab: true },
   { key: 'yoyaku', label: '予約', href: '/yoyaku', icon: CalendarClock, hint: '予約表・空き・受付', tab: true },
   { key: 'karte', label: 'カルテ', href: '/patients', icon: ClipboardList, hint: '患者さんの記録', tab: true },
   {
@@ -52,10 +58,12 @@ export const NAV: NavSection[] = [
     label: '経営',
     href: '/marketing/sales',
     icon: ChartColumn,
-    hint: '売上・来院・効果',
+    hint: '売上・来院・目標',
     tab: true,
+    secret: true,
     children: [
       { href: '/marketing/sales', label: '売上・来院', icon: ChartColumn },
+      { href: '/marketing/sales/goal', label: '月の目標への道すじ', icon: Mountain },
       { href: '/marketing/analytics', label: '集客の効果', icon: ChartLine },
     ],
   },
@@ -80,6 +88,11 @@ export const NAV: NavSection[] = [
   },
   { key: 'settings', label: '設定', href: '/marketing/settings', icon: Settings, hint: '院の情報・連携', tab: false },
 ]
+
+/** いま表示してよい項目（隠しモードが閉じていれば secret を除く） */
+export function visibleNav(keieiOpen: boolean): NavSection[] {
+  return NAV.filter((s) => !s.secret || keieiOpen)
+}
 
 /** いまの画面がどの項目か（いちばん長く一致する入口で決める） */
 export function activeSection(pathname: string): { section: NavSection | null; link: NavLink | null } {
