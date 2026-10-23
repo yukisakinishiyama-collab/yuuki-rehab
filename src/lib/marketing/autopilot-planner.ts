@@ -262,8 +262,13 @@ export function storyWeekDates(openings: OpeningDay[], weekStart: string, fromDa
 }
 
 /** ストーリーの見出しと、承認画面・手動投稿用の説明文 */
-export function storyText(rows: StoryRow[], scope: 'day' | 'week', asOfLocal: string): { title: string; body: string } {
-  const title = scope === 'day' ? '本日のご予約の空き' : '今週のご予約の空き状況'
+export function storyText(
+  rows: StoryRow[],
+  scope: 'day' | 'week',
+  asOfLocal: string,
+  titleOverride?: string,
+): { title: string; body: string } {
+  const title = titleOverride ?? (scope === 'day' ? '本日のご予約の空き' : '今週のご予約の空き状況')
   const asOf = `${Number(asOfLocal.slice(5, 7))}/${Number(asOfLocal.slice(8, 10))} ${asOfLocal.slice(11, 16)}`
   const lines = rows.map((r) =>
     r.closed ? `・${r.label} 休診` : `・${r.label} 午前 ${STORY_LEVEL_LABELS[r.am]}／午後 ${STORY_LEVEL_LABELS[r.pm]}`,
@@ -276,4 +281,30 @@ export function storyText(rows: StoryRow[], scope: 'day' | 'week', asOfLocal: st
     '画像には「ネット予約は24時間受付・プロフィールのリンクから」と電話番号を載せます。',
   ].join('\n')
   return { title, body }
+}
+
+/**
+ * 「今の空きでストーリー画像を作る」（院内アプリの手動の道具）で使う日と見出し。
+ * today＝本日 / next＝次の診療日（明日なら「明日の」）/ week＝この1週間（今日から7日間の診療日）
+ */
+export function storyRange(
+  range: 'today' | 'next' | 'week',
+  openings: OpeningDay[],
+  today: string,
+): { scope: 'day' | 'week'; dates: string[]; title: string } {
+  if (range === 'today') return { scope: 'day', dates: [today], title: '本日のご予約の空き' }
+  if (range === 'next') {
+    const next = [...openings].filter((o) => o.date > today && !o.closed).sort((a, b) => a.date.localeCompare(b.date))[0]
+    if (!next) return { scope: 'day', dates: [], title: '次の診療日のご予約の空き' }
+    const tomorrow = addDays(today, 1)
+    return { scope: 'day', dates: [next.date], title: next.date === tomorrow ? '明日のご予約の空き' : '次の診療日のご予約の空き' }
+  }
+  // この1週間（今日から7日間の診療日。週をまたいでもよい）
+  const end = addDays(today, 6)
+  const dates = openings
+    .filter((o) => !o.closed && o.date >= today && o.date <= end)
+    .map((o) => o.date)
+    .sort()
+    .slice(0, 6)
+  return { scope: 'week', dates, title: 'この1週間のご予約の空き' }
 }
