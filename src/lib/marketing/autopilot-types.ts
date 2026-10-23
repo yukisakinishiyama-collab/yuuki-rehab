@@ -72,7 +72,7 @@ export const CATEGORY_LABELS: Record<ThemeCategory, string> = {
   expertise: '症状・ケガの解説',
   prevention: '予防・セルフケア',
   clinic: '院のご案内',
-  availability: '今週の空き状況',
+  availability: '空き状況のご案内',
   owner: '院長メモから',
 }
 
