@@ -7,7 +7,10 @@ import {
   baseline,
   insights,
   isCompleteMonth,
+  isJpHoliday,
+  remainingOpenDays,
   remainingWeekdays,
+  saturdayRatio,
   requirement,
   scaleInput,
   simDefaults,
@@ -57,11 +60,14 @@ test('月が終わった月は見込み＝実績', () => {
   assert.equal(b.lastComplete.month, '2026-10')
 })
 
-test('試算の初期値は月末の見込みに近い', () => {
+test('試算の初期値は月末の見込みと同じ（補正で丸めのずれを吸収）', () => {
   const b = baseline([october])
   const d = simDefaults(b)
   const r = simulate(d)
-  assert.ok(Math.abs(r.sales - b.projectedSales) / b.projectedSales < 0.02, `${r.sales} vs ${b.projectedSales}`)
+  assert.ok(Math.abs(r.noahSales - b.projectedSales) < 1, `${r.noahSales} vs ${b.projectedSales}`)
+  assert.ok(Math.abs(d.calib - 1) < 0.05, `補正はふつう1に近い ${d.calib}`)
+  const full = baseline([{ ...october, asOf: '2026-10-31' }])
+  assert.ok(Math.abs(simulate(simDefaults(full)).noahSales - full.sales) < 1, '月が終わった月は実績と同じ')
 })
 
 test('来院だけ・自費の1回あたりだけ・そろって上げる の3通りが目標に届く', () => {
@@ -132,6 +138,93 @@ test('NOAH以外の収入（サブスクなど）は合計に足し、来院で�
 test('記録がない・来院0の月は null', () => {
   assert.equal(baseline([]), null)
   assert.equal(baseline([{ ...october, days: october.days.map((r) => r.map((v, i) => (i === 0 ? v : 0))) }]), null)
+})
+
+test('祝日：振替休日・国民の休日・ハッピーマンデー・春分秋分', () => {
+  for (const d of ['2026-01-01', '2026-01-12', '2026-02-23', '2026-03-20', '2026-05-06', '2026-07-20', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12', '2026-11-03', '2026-11-23', '2025-11-24', '2027-01-11']) {
+    assert.equal(isJpHoliday(d), true, d)
+  }
+  for (const d of ['2026-10-23', '2026-05-07', '2026-09-24', '2026-12-25', '2026-03-19']) {
+    assert.equal(isJpHoliday(d), false, d)
+  }
+})
+
+test('これからの営業日は日曜・祝日を除き、平日と土曜に分ける', () => {
+  // 2026-11：日曜5日・祝日2日（3日・23日）を除いて23日。そのうち土曜は4日
+  assert.deepEqual(remainingOpenDays('2026-11', 0), { week: 19, sat: 4 })
+  assert.equal(remainingWeekdays('2026-11', 0), 23)
+  // 2026-10：24日〜31日は祝日なし（平日5・土曜2）
+  assert.deepEqual(remainingOpenDays('2026-10', 23), { week: 5, sat: 2 })
+})
+
+test('土曜は半日として見込む（土曜の割合はこれまでの記録から）', () => {
+  const r = saturdayRatio([october])
+  assert.ok(r.visits > 0.2 && r.visits < 1, `来院 ${r.visits}`)
+  assert.ok(r.sales > 0.2 && r.sales < 1, `金額 ${r.sales}`)
+  const b = baseline([october])
+  // 平日1日あたりに直した金額 × （平日5 ＋ 土曜2 × 割合）
+  let sat = 0
+  for (const row of october.days) if (row[1] > 0 && new Date(Date.UTC(2026, 9, row[0])).getUTCDay() === 6) sat += 1
+  const perWeekday = b.sales / (b.openDaysSoFar - sat + r.sales * sat)
+  assert.equal(b.projectedSales, Math.round(b.sales + perWeekday * (5 + r.sales * 2)))
+  const flat = Math.round(b.sales + (b.sales / b.openDaysSoFar) * 7)
+  assert.ok(b.projectedSales < flat, '土曜を1日と数えるより少なめ')
+})
+
+test('区分の合計が全体と合わない月でも、初期値は実際の見込みと同じ・注意を出す', () => {
+  // 自費の来院・金額を2重に数えてしまった月（架空）
+  const broken = { ...october, days: october.days.map((r) => r.map((v, i) => (i === 5 || i === 6 ? v * 2 : v))) }
+  const b = baseline([broken])
+  assert.equal(b.mismatch, true)
+  assert.equal(baseline([october]).mismatch, false)
+  const d = simDefaults(b)
+  assert.ok(Math.abs(simulate(d).noahSales - b.projectedSales) < 1)
+  assert.ok(d.calib < 1, `補正で下げる ${d.calib}`)
+  const req = requirement(GOAL, d)
+  assert.ok(Math.abs(simulate({ ...d, selfUnit: req.selfUnitOnly.selfUnit }).sales - GOAL) < 1, '自費だけでも補正込みで届く')
+  assert.match(insights(GOAL, b, d).map((i) => i.text).join('\n'), /合っていません/)
+})
+
+test('差が小さいときも、段階の目標は目標を超えず、上乗せの合計＝差', () => {
+  const b = baseline([october])
+  const d = simDefaults(b)
+  const goal = Math.round(simulate(d).sales + 35_000)
+  const st = stages(goal, d, b.maxDayVisits)
+  assert.equal(st.length, 4)
+  for (const x of st) assert.ok(x.target <= goal, `${x.target} > ${goal}`)
+  for (let i = 1; i < st.length; i++) assert.ok(st[i].target >= st[i - 1].target)
+  assert.ok(Math.abs(st.reduce((s, x) => s + x.add, 0) - (goal - simulate(d).sales)) < 1)
+})
+
+test('自費の来院が無い月は、自費の段を「自費の方を増やす」目安にする', () => {
+  const noSelf = { ...october, days: october.days.map((r) => r.map((v, i) => (i === 5 || i === 6 ? 0 : v))) }
+  const fixed = { ...noSelf, days: noSelf.days.map((r) => [r[0], r[3] + r[9], r[4] + r[10], ...r.slice(3)]) }
+  const b = baseline([fixed])
+  const st = stages(GOAL, simDefaults(b), b.maxDayVisits)
+  assert.match(st[2].measure, /自費・商品の方を \+/)
+  assert.doesNotMatch(st[2].measure, /\+0円/)
+})
+
+test('新しい月に来院がまだ無いときは、前の月（実績）を使い、言葉も実績に合わせる', () => {
+  const full = { ...october, asOf: '2026-10-31' }
+  const nov = { ...october, month: '2026-11', asOf: '2026-11-01', days: [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], repeat: undefined }
+  const b = baseline([nov, full])
+  assert.equal(b.month, '2026-10')
+  assert.equal(b.complete, true)
+  const text = insights(GOAL, b, simDefaults(b)).map((i) => i.text).join('\n')
+  assert.match(text, /10月は/)
+  assert.doesNotMatch(text, /月末の見込み|今月まだ/)
+})
+
+test('来院だけで：切り上げると目標を下回らない', () => {
+  const d = simDefaults(baseline([october]))
+  const req = requirement(GOAL, d)
+  const r = simulate({
+    ...d,
+    perDay: Math.ceil(req.visitsOnly.perDay * 10 - 1e-9) / 10,
+    accVisits: Math.ceil(d.accVisits * req.visitsOnly.ratio - 1e-9),
+  })
+  assert.ok(r.sales >= GOAL, `${r.sales}`)
 })
 
 console.log(`\n${passed} OK`)

@@ -444,11 +444,13 @@ export default function GoalPage() {
   }
 
   const now = defaults ? simulate(defaults) : null
+  // いちばん上に出す数字は、試算ではなく実際の見込み（月が終わっていれば実績）＋その他の収入
+  const headline = base ? base.projectedSales + extraAmount : 0
   const result = input ? simulate(input) : null
   const req = defaults ? requirement(goal, defaults) : null
   const plan = defaults && base ? stages(goal, defaults, base.maxDayVisits) : []
   const notes = defaults && base ? insights(goal, base, defaults) : []
-  const stageIdx = now ? currentStageIndex(plan, now.sales) : 0
+  const stageIdx = now ? currentStageIndex(plan, headline) : 0
   const stage = plan[stageIdx]
   const nextAction = stage ? (ACTIONS[stage.key].find((a) => !checks.has(a.id)) ?? ACTIONS[stage.key][0]) : null
   const goneNote = notes.find((n) => n.text.includes('まだ来られていない'))
@@ -584,6 +586,11 @@ export default function GoalPage() {
         </div>
       )}
 
+      {base?.mismatch && (
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          NOAHの区分の合計が全体と合っていない月です。いちばん上の数字は全体の金額から出していますが、区分ごとの数字は目安として見てください。
+        </p>
+      )}
       {base && defaults && now && req && input && result && (
         <>
           {/* ── 現在地 ── */}
@@ -594,15 +601,15 @@ export default function GoalPage() {
                   {base.complete ? `${ym(base.month)}の売上（実績）` : `${ym(base.month)}の着地見込み（予測）`}
                 </p>
                 <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-[34px] font-black leading-none tabular-nums sm:text-[40px]">{man(now.sales)}円</span>
+                  <span className="text-[34px] font-black leading-none tabular-nums sm:text-[40px]">{man(headline)}円</span>
                   <span className="text-sm text-white/60">／ 目標 {man(goal)}円</span>
                 </p>
                 <div className="mt-4">
-                  <Bar100 value={now.sales} goal={goal} tone="light" />
+                  <Bar100 value={headline} goal={goal} tone="light" />
                 </div>
                 <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm">
-                  <span className="text-white/80">達成率 {goal > 0 ? fmt1((now.sales / goal) * 100) : 0}%</span>
-                  <span className="font-bold">{now.sales >= goal ? '目標に届いています' : `あと ${man(goal - now.sales)}円`}</span>
+                  <span className="text-white/80">達成率 {goal > 0 ? fmt1((headline / goal) * 100) : 0}%</span>
+                  <span className="font-bold">{headline >= goal ? '目標に届いています' : `あと ${man(goal - headline)}円`}</span>
                 </div>
                 {!base.complete && (
                   <p className="mt-3 border-t border-white/10 pt-3 text-xs text-white/60">
@@ -614,7 +621,7 @@ export default function GoalPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-bold text-slate-500">1日の来院（実績）</p>
-                  <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{fmt1(base.perDay)}人</p>
+                  <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{fmt1(base.perDaySoFar)}人</p>
                   <p className="text-[11px] text-slate-500">最多の日 {fmt(base.maxDayVisits)}人</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -624,10 +631,10 @@ export default function GoalPage() {
                 </div>
               </div>
 
-              {stage && nextAction && now.sales < goal && (
+              {stage && nextAction && headline < goal && (
                 <Card>
                   <p className="text-xs font-bold text-teal-700">
-                    今週いちばんにやること（段階 {stageIdx + 1}／4：{STAGE_SHORT[stage.key]}）
+                    {base.complete ? 'まずやること' : '今週いちばんにやること'}（段階 {stageIdx + 1}／4：{STAGE_SHORT[stage.key]}）
                   </p>
                   <p className="mt-1.5 text-base font-bold leading-relaxed text-slate-900">{nextAction.text}</p>
                   {stage.key === 'keep' && goneNote && <p className="mt-2 text-xs leading-relaxed text-slate-500">{goneNote.text}</p>}
@@ -809,8 +816,8 @@ export default function GoalPage() {
                 </div>
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <dt className="text-white/60">いまの見込み</dt>
-                    <dd className="font-bold tabular-nums">{man(now.sales)}円</dd>
+                    <dt className="text-white/60">{base.complete ? '実績' : 'いまの見込み'}</dt>
+                    <dd className="font-bold tabular-nums">{man(headline)}円</dd>
                   </div>
                   <div>
                     <dt className="text-white/60">目標</dt>
@@ -825,22 +832,27 @@ export default function GoalPage() {
                 </dl>
               </section>
 
-              {now.sales < goal && (
+              {headline < goal && (
                 <div className="flex flex-wrap gap-2" role="group" aria-label="目標に届く組み合わせ">
-                  <button
-                    type="button"
-                    onClick={() => setSim(req.balanced.input)}
-                    className="h-10 rounded-full bg-teal-600 px-4 text-sm font-bold text-white hover:bg-teal-700"
-                  >
-                    そろって{fmt1(req.balanced.k)}倍（おすすめ）
-                  </button>
+                  {req.balanced.result.sales >= goal ? (
+                    <button
+                      type="button"
+                      onClick={() => setSim(req.balanced.input)}
+                      className="h-10 rounded-full bg-teal-600 px-4 text-sm font-bold text-white hover:bg-teal-700"
+                    >
+                      そろって{fmt1(req.balanced.k)}倍（おすすめ）
+                    </button>
+                  ) : (
+                    <p className="w-full text-xs text-slate-500">来院・自費の1回あたり・交通事故をそろって5倍にしても届かない目標です。</p>
+                  )}
                   <button
                     type="button"
                     onClick={() =>
                       setSim({
                         ...defaults,
-                        perDay: Math.round(req.visitsOnly.perDay * 10) / 10,
-                        accVisits: Math.round(defaults.accVisits * req.visitsOnly.ratio),
+                        // 丸めで目標をわずかに下回らないよう、切り上げる
+                        perDay: Math.ceil(req.visitsOnly.perDay * 10 - 1e-9) / 10,
+                        accVisits: Math.ceil(defaults.accVisits * req.visitsOnly.ratio - 1e-9),
                       })
                     }
                     className="h-10 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700"
@@ -850,7 +862,7 @@ export default function GoalPage() {
                   {req.selfUnitOnly && (
                     <button
                       type="button"
-                      onClick={() => setSim({ ...defaults, selfUnit: Math.round(req.selfUnitOnly!.selfUnit) })}
+                      onClick={() => setSim({ ...defaults, selfUnit: Math.ceil(req.selfUnitOnly!.selfUnit) })}
                       className="h-10 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700"
                     >
                       自費の1回あたりだけで
@@ -952,7 +964,10 @@ export default function GoalPage() {
             <div className="space-y-3">
               {plan.length === 0 && (
                 <Card>
-                  <p className="text-sm text-slate-700">今月の見込みは目標に届いています。いまの取り組みを続けましょう。</p>
+                  <p className="text-sm text-slate-700">
+                    {base.complete ? `${ym(base.month)}の実績は目標に届きました。` : '今月の見込みは目標に届いています。'}
+                    いまの取り組みを続けましょう。
+                  </p>
                 </Card>
               )}
               {plan.map((st, i) => {
@@ -1023,7 +1038,9 @@ export default function GoalPage() {
                   <li>・保険の窓口負担を割り引いたり、金品や紹介のお礼で患者さんをさそったりしない（保険の取り扱いの決まりで禁じられています）。</li>
                   <li>・広告や投稿は「あはき・柔整広告ガイドライン」の範囲で。効果の保証・体験談・割引の強調はしない。</li>
                   <li>・自費は、必要な理由と料金を説明し、同意をいただいてから。強くすすめない。</li>
-                  <li>・ここの数字はNOAHの集計からの目安です。祝日や臨時の休診は、これからの日については考えていません。</li>
+                  <li>
+                    ・ここの数字はNOAHの集計からの目安です。これからの日は、日曜・祝日を休み、土曜を半日として見込んでいます（臨時の休診・年末年始は考えていません）。
+                  </li>
                 </ul>
               </Fold>
             </div>

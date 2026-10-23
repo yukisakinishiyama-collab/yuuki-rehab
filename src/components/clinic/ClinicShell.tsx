@@ -13,7 +13,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ExternalLink, EyeOff, MoreHorizontal, X } from 'lucide-react'
 import { ROLE_COOKIE } from '@/lib/marketing/auth-shared'
-import { closeKeiei, countSecretKey, countSecretTap, extendKeiei, openKeiei, useKeieiOpen } from '@/lib/clinic/keiei-mode'
+import { closeKeiei, countSecretKey, countSecretTap, extendKeiei, useKeieiOpen } from '@/lib/clinic/keiei-mode'
 import { activeSection, visibleNav, type NavSection } from './nav'
 
 /** ログイン中の役割（proxy が付ける読み取り用の Cookie。サーバー側の表示では出さない） */
@@ -333,7 +333,7 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
       {/* 印刷時はメニュー分の余白を詰めて、紙の幅いっぱいに出す */}
       <div className="print-full-width lg:pl-60">
         <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 sm:px-6 lg:pb-10 lg:pt-6">
-          {covered ? <Covered onOpen={() => openKeiei()} /> : children}
+          {covered ? <Covered /> : children}
         </main>
       </div>
 
@@ -414,20 +414,19 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
   )
 }
 
-/** 経営の画面が隠れているときの目隠し（見た目はふつうの「閉じています」） */
-function Covered({ onOpen }: { onOpen: () => void }) {
+/**
+ * 経営の画面が隠れているときの目隠し（見た目はふつうの「閉じています」）。
+ * URL（履歴・LINEのリンク）から来ても、ここからは開けない。開くのは隠しコマンドだけ。
+ */
+function Covered() {
   return (
     <div className="mx-auto mt-10 max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center">
       <p className="text-sm font-bold text-slate-700">この画面は閉じています</p>
-      <div className="mt-4 flex justify-center gap-2">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+      <div className="mt-4 flex justify-center">
+        <Link
+          href="/dashboard"
+          className="inline-flex h-11 items-center rounded-full bg-slate-900 px-6 text-sm font-bold text-white hover:bg-slate-800"
         >
-          開く
-        </button>
-        <Link href="/dashboard" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
           今日へ
         </Link>
       </div>

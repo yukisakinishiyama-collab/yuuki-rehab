@@ -63,7 +63,7 @@ export const NAV: NavSection[] = [
     secret: true,
     children: [
       { href: '/marketing/sales', label: '売上・来院', icon: ChartColumn },
-      { href: '/marketing/sales/goal', label: '月300万への道すじ', icon: Mountain },
+      { href: '/marketing/sales/goal', label: '月の目標への道すじ', icon: Mountain },
       { href: '/marketing/analytics', label: '集客の効果', icon: ChartLine },
     ],
   },

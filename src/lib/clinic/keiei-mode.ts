@@ -107,7 +107,8 @@ let keys: number[] = []
 export function countSecretKey(e: KeyboardEvent): boolean {
   const target = e.target as HTMLElement | null
   const typing = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
-  if (typing || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'k') return false
+  // 押しっぱなしの連打（e.repeat）は数えない
+  if (typing || e.repeat || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'k') return false
   const now = Date.now()
   keys = [...keys.filter((t) => now - t < 1500), now]
   if (keys.length >= 3) {

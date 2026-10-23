@@ -31,8 +31,19 @@ interface ExtraStore {
   months: Record<string, ExtraMonth>
 }
 
+/** 金額：数値か、数字だけの文字（カンマ・円・空白・全角数字は可。空は0）。それ以外は null */
 const amount = (v: unknown): number | null => {
-  const n = typeof v === 'string' ? Number(v.replace(/[,，円\s]/g, '')) : Number(v)
+  let n: number
+  if (typeof v === 'number') {
+    n = v
+  } else if (typeof v === 'string') {
+    const t = v.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[,，円\s]/g, '')
+    if (t === '') n = 0
+    else if (/^\d+(\.\d+)?$/.test(t)) n = Number(t)
+    else return null
+  } else {
+    return null
+  }
   return Number.isFinite(n) && n >= 0 && n < 100_000_000 ? Math.round(n) : null
 }
 
@@ -49,12 +60,16 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const denied = requireAdmin(request)
   if (denied) return denied
-  let body: Record<string, unknown>
+  let raw: unknown
   try {
-    body = (await request.json()) as Record<string, unknown>
+    raw = await request.json()
   } catch {
     return NextResponse.json({ error: '内容を読み取れませんでした' }, { status: 400 })
   }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return NextResponse.json({ error: '内容の形が正しくありません' }, { status: 400 })
+  }
+  const body = raw as Record<string, unknown>
   const month = String(body.month ?? '')
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
     return NextResponse.json({ error: '月の形が正しくありません（例 2026-10）' }, { status: 400 })
