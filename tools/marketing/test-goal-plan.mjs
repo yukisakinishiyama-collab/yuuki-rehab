@@ -72,6 +72,7 @@ test('来院だけ・自費の1回あたりだけ・そろって上げる の3�
   const bySelf = simulate({ ...d, selfUnit: req.selfUnitOnly.selfUnit })
   assert.ok(Math.abs(bySelf.sales - GOAL) / GOAL < 0.001, `自費だけ ${bySelf.sales}`)
   assert.ok(Math.abs(req.balanced.result.sales - GOAL) / GOAL < 0.01, `そろって ${req.balanced.result.sales}`)
+  assert.ok(req.balanced.result.sales >= GOAL, '丸めても目標を下回らない')
   assert.ok(req.balanced.k > 1 && req.balanced.k < req.visitsOnly.ratio)
 })
 

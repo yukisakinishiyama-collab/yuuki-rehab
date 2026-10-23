@@ -264,12 +264,14 @@ export function requirement(goal: number, base: SimInput): Requirement {
   }
 }
 
+/** 倍率 k をかける（丸めで目標をわずかに下回らないよう、切り上げる） */
 export function scaleInput(base: SimInput, k: number): SimInput {
+  if (k === 1) return { ...base }
   return {
     ...base,
-    perDay: round1(base.perDay * k),
-    accVisits: Math.round(base.accVisits * k),
-    selfUnit: Math.round(base.selfUnit * k),
+    perDay: Math.ceil(base.perDay * k * 10 - 1e-9) / 10,
+    accVisits: Math.ceil(base.accVisits * k - 1e-9),
+    selfUnit: Math.ceil((base.selfUnit * k) / 10 - 1e-9) * 10,
   }
 }
 

@@ -50,7 +50,7 @@ export interface NavSection {
 }
 
 export const NAV: NavSection[] = [
-  { key: 'today', label: '今日', href: '/dashboard', icon: House, hint: '今日の予約と昨日の締め', tab: true },
+  { key: 'today', label: '今日', href: '/dashboard', icon: House, hint: '今日の予約とお知らせ', tab: true },
   { key: 'yoyaku', label: '予約', href: '/yoyaku', icon: CalendarClock, hint: '予約表・空き・受付', tab: true },
   { key: 'karte', label: 'カルテ', href: '/patients', icon: ClipboardList, hint: '患者さんの記録', tab: true },
   {

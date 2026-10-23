@@ -3,13 +3,20 @@
 /**
  * 月の売上の目標（はじめは300万円）への道すじ — 院長のみ・経営メニュー（隠しモード）の中
  *
- * NOAH の集計（毎晩届く数字だけ）と、NOAH 以外の収入（アルファノートのサブスクなど）から、
- * いまの位置・目標に届く数字・試算・4つの段階と打ち手を出す。数字はすべて目安。
- * 計算は src/lib/marketing/goal-plan.ts（架空の数字で単体テストあり）。
+ * 4つのタブに分ける（ChatGPT とのデザイン相談をふまえた形。2026-10-23）
+ *   現在地 … 今月の着地見込み・目標との差・今週いちばんにやること（最初の1画面で分かる）
+ *   分析   … 売上の内訳・毎月の推移・いま言えること・自費メニュー上位・その他の収入（アルファノート）
+ *   試算   … 基本の2つ（1日の来院・自費の1回あたり）＋詳しい条件。目標に届く組み合わせはボタンで入れる
+ *   計画   … 4つの段階（いまの段階だけ開く）と打ち手のチェック・守ること
+ *
+ * 数字は NOAH の集計（毎晩届く数字だけ）と、NOAH に入らない収入（アルファノートのサブスクなど）から。すべて目安。
+ * 「実績」と「見込み（予測）」「試算」は、ラベルで必ず分けて見せる。
+ * 計算は src/lib/marketing/goal-plan.ts（架空の数字で単体テストあり）。データは院長だけが読めるAPIから取る。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ChevronDown, Minus, Plus } from 'lucide-react'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import type { NoahStore } from '@/lib/marketing/noah-types'
 import { dateLabel, monthPoints } from '@/lib/marketing/noah-analysis'
@@ -17,13 +24,14 @@ import {
   DEFAULT_GOAL,
   baseline,
   insights,
-  isCompleteMonth,
   man,
   requirement,
   simDefaults,
   simulate,
   stages,
+  type Baseline,
   type SimInput,
+  type Stage,
   type StageKey,
 } from '@/lib/marketing/goal-plan'
 
@@ -36,13 +44,18 @@ interface ExtraMonth {
   updatedAt: string
 }
 
+const NAVY = '#13253d'
+const TEAL = '#0d9488'
+const BLUE = '#2f5d9a'
+const MUTED = '#cbd5e1'
+
 const fmt = (n: number) => Math.round(n).toLocaleString('ja-JP')
 const fmt1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('ja-JP')
 const yen = (n: number) => `${fmt(n)}円`
 const ym = (month: string) => `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`
 const extraOf = (e?: ExtraMonth) => (e ? e.subscription + Math.max(0, e.cashless - e.overlap) : 0)
 
-// ── この端末に覚えておく小さな設定（目標の金額・チェックした打ち手） ──────────────
+// ── この端末に覚えておく小さな設定（目標の金額・チェックした打ち手）とタブ ──────────────
 
 const GOAL_KEY = 'keiei:goal'
 const CHECK_KEY = 'keiei:goal-checks'
@@ -75,46 +88,84 @@ function useLocal(key: string): string | null {
   return useSyncExternalStore(subscribeLocal, () => readLocal(key), () => null)
 }
 
+type TabKey = 'now' | 'analysis' | 'sim' | 'plan'
+const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: 'now', label: '現在地' },
+  { key: 'analysis', label: '分析' },
+  { key: 'sim', label: '試算' },
+  { key: 'plan', label: '計画' },
+]
+const isTab = (v: string): v is TabKey => TABS.some((t) => t.key === v)
+
+/** タブは URL の #now などに残す（読み直しや「戻る」でも同じタブ） */
+function readHash(): TabKey {
+  const h = window.location.hash.replace('#', '')
+  return isTab(h) ? h : 'now'
+}
+function subscribeHash(onChange: () => void) {
+  window.addEventListener('hashchange', onChange)
+  return () => window.removeEventListener('hashchange', onChange)
+}
+function useTab(): [TabKey, (t: TabKey) => void] {
+  const tab = useSyncExternalStore(subscribeHash, readHash, () => 'now' as TabKey)
+  const setTab = (t: TabKey) => {
+    window.history.replaceState(null, '', `#${t}`)
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    window.scrollTo({ top: 0 })
+  }
+  return [tab, setTab]
+}
+
 // ── 部品 ─────────────────────────────────────────────
 
-function Card({ title, sub, children, action }: { title: string; sub?: string; children: ReactNode; action?: ReactNode }) {
+function Card({ title, sub, children, action }: { title?: string; sub?: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="font-bold text-slate-900">{title}</h2>
-          {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+      {(title || action) && (
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <div className="min-w-0">
+            {title && <h2 className="text-[15px] font-bold text-slate-900">{title}</h2>}
+            {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
-      <div className="mt-3">{children}</div>
+      )}
+      {children}
     </section>
   )
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/** 折りたたみ（ふだんは閉じておく詳しい情報） */
+function Fold({ title, sub, children, open }: { title: string; sub?: string; children: ReactNode; open?: boolean }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
-      <p className="text-xs font-bold text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-black text-slate-900">{value}</p>
-      {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
+    <details open={open} className="group min-w-0 rounded-2xl border border-slate-200 bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-6 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-[15px] font-bold text-slate-900">{title}</span>
+          {sub && <span className="mt-0.5 block text-xs text-slate-500">{sub}</span>}
+        </span>
+        <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">{children}</div>
+    </details>
+  )
+}
+
+function Bar100({ value, goal, tone = 'teal' }: { value: number; goal: number; tone?: 'teal' | 'light' }) {
+  const pct = goal > 0 ? Math.min(100, (value / goal) * 100) : 0
+  return (
+    <div
+      className={`h-2.5 w-full overflow-hidden rounded-full ${tone === 'light' ? 'bg-white/15' : 'bg-slate-100'}`}
+      role="img"
+      aria-label={`目標の${Math.round(pct)}%`}
+    >
+      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: tone === 'light' ? '#5eead4' : TEAL }} />
     </div>
   )
 }
 
-function Progress({ value, goal }: { value: number; goal: number }) {
-  const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0
-  return (
-    <div>
-      <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`目標の${pct}%`}>
-        <div className="h-full rounded-full bg-teal-600" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="mt-1 text-xs text-slate-500">目標の {pct}%</p>
-    </div>
-  )
-}
-
-function Slider({
+/** −／＋ つきのスライダー（スマホでも細かく合わせられるように） */
+function Stepper({
   id,
   label,
   value,
@@ -135,25 +186,36 @@ function Slider({
   onChange: (v: number) => void
   hint?: string
 }) {
+  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step))
+  const btn =
+    'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100'
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-2">
         <label htmlFor={id} className="text-sm font-bold text-slate-700">
           {label}
         </label>
-        <span className="text-sm font-black tabular-nums text-slate-900">{display}</span>
+        <span className="text-lg font-black tabular-nums text-slate-900">{display}</span>
       </div>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={Math.min(max, Math.max(min, value))}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-teal-600"
-      />
-      {hint && <p className="text-[11px] text-slate-500">{hint}</p>}
+      <div className="mt-1.5 flex items-center gap-2">
+        <button type="button" className={btn} onClick={() => onChange(clamp(value - step))} aria-label={`${label}を減らす`}>
+          <Minus className="h-4 w-4" aria-hidden />
+        </button>
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={clamp(value)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="h-11 min-w-0 flex-1 accent-teal-600"
+        />
+        <button type="button" className={btn} onClick={() => onChange(clamp(value + step))} aria-label={`${label}を増やす`}>
+          <Plus className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+      {hint && <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>}
     </div>
   )
 }
@@ -162,13 +224,13 @@ function Slider({
 
 const ACTIONS: Record<StageKey, Array<{ id: string; text: string; href?: string; link?: string }>> = {
   keep: [
-    { id: 'keep-next', text: '施術の終わりに、次回の予約をその場で一緒に決める', href: '/yoyaku', link: '予約' },
     {
       id: 'keep-watch',
-      text: '「今日」の「気にかけたい方」を毎日見て、治療中なのに間があいた方へ声をかける（LINE・電話）',
+      text: '「今日」の「気にかけたい方」を見て、治療中なのに間があいた方へ声をかける（LINE・電話）',
       href: '/dashboard',
       link: '今日',
     },
+    { id: 'keep-next', text: '施術の終わりに、次回の予約をその場で一緒に決める', href: '/yoyaku', link: '予約' },
     { id: 'keep-plan', text: '初回に、回数と期間の目安・ゴール（競技復帰など）を説明して共有する', href: '/patients', link: 'カルテ' },
     { id: 'keep-graduate', text: '卒業のときに、再発予防のセルフケアと、気になったときの相談先を伝える（押しつけない）' },
   ],
@@ -192,63 +254,135 @@ const ACTIONS: Record<StageKey, Array<{ id: string; text: string; href?: string;
   ],
 }
 
+const STAGE_SHORT: Record<StageKey, string> = {
+  keep: '続けて通っていただく',
+  new: '新しい方を増やす',
+  value: '自費の価値を伝える',
+  capacity: '受けられる人数を広げる',
+}
+
+/** いまの段階：月末の見込みがまだ届いていない最初の段 */
+function currentStageIndex(plan: Stage[], projected: number): number {
+  const i = plan.findIndex((s) => s.target > projected)
+  return i === -1 ? Math.max(0, plan.length - 1) : i
+}
+
 // ── 毎月の推移 ─────────────────────────────────────────────
 
-function TrendChart({
-  rows,
-  goal,
-}: {
-  rows: Array<{ month: string; label: string; noah: number; extra: number; rest: number; partial: boolean }>
-  goal: number
-}) {
+interface TrendRow {
+  month: string
+  label: string
+  noah: number
+  extra: number
+  rest: number
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <div className="h-56 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="#e2e8f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-          <YAxis
-            tick={{ fontSize: 11, fill: '#64748b' }}
-            tickLine={false}
-            axisLine={false}
-            width={44}
-            tickFormatter={(n: number) => man(n)}
-            domain={[0, (max: number) => Math.max(max, goal) * 1.08]}
-          />
-          <Tooltip
-            cursor={{ fill: 'rgba(148,163,184,0.12)' }}
-            content={({ active, payload }) => {
-              const row = active && payload?.[0] ? (payload[0].payload as (typeof rows)[number]) : null
-              if (!row) return null
-              return (
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
-                  <p className="font-bold text-slate-900">{ym(row.month)}</p>
-                  <p className="text-slate-700">NOAH：{yen(row.noah)}</p>
-                  {row.extra > 0 && <p className="text-slate-700">NOAH以外：{yen(row.extra)}</p>}
-                  {row.rest > 0 && <p className="text-slate-500">月末までの見込み：+{yen(row.rest)}</p>}
-                </div>
-              )
-            }}
-          />
-          <ReferenceLine
-            y={goal}
-            stroke="#b45309"
-            strokeDasharray="5 3"
-            label={{ value: `目標 ${man(goal)}`, position: 'insideTopRight', fontSize: 11, fill: '#b45309' }}
-          />
-          <Bar dataKey="noah" stackId="s" fill="#2f5d9a" maxBarSize={28} isAnimationActive={false} />
-          <Bar dataKey="extra" stackId="s" fill="#0d9488" maxBarSize={28} isAnimationActive={false} />
-          <Bar dataKey="rest" stackId="s" fill="#cbd5e1" maxBarSize={28} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-        </BarChart>
-      </ResponsiveContainer>
+    <span className="inline-flex items-center gap-1">
+      <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: color }} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
+function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
+  return (
+    <div>
+      <div className="h-56 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} stroke="#e2e8f0" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+            <YAxis
+              tick={{ fontSize: 11, fill: '#64748b' }}
+              tickLine={false}
+              axisLine={false}
+              width={44}
+              tickFormatter={(n: number) => man(n)}
+              domain={[0, (max: number) => Math.max(max, goal) * 1.08]}
+            />
+            <Tooltip
+              cursor={{ fill: 'rgba(148,163,184,0.12)' }}
+              content={({ active, payload }) => {
+                const row = active && payload?.[0] ? (payload[0].payload as TrendRow) : null
+                if (!row) return null
+                return (
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
+                    <p className="font-bold text-slate-900">{ym(row.month)}</p>
+                    <p className="text-slate-700">実績（NOAH）：{yen(row.noah)}</p>
+                    {row.extra > 0 && <p className="text-slate-700">実績（その他の収入）：{yen(row.extra)}</p>}
+                    {row.rest > 0 && <p className="text-slate-500">月末までの見込み：+{yen(row.rest)}</p>}
+                  </div>
+                )
+              }}
+            />
+            <ReferenceLine
+              y={goal}
+              stroke="#b45309"
+              strokeDasharray="5 3"
+              label={{ value: `目標 ${man(goal)}`, position: 'insideTopRight', fontSize: 11, fill: '#b45309' }}
+            />
+            <Bar dataKey="noah" stackId="s" fill={BLUE} maxBarSize={28} isAnimationActive={false} />
+            <Bar dataKey="extra" stackId="s" fill={TEAL} maxBarSize={28} isAnimationActive={false} />
+            <Bar dataKey="rest" stackId="s" fill={MUTED} maxBarSize={28} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <Legend color={BLUE} label="実績（NOAH）" />
+        <Legend color={TEAL} label="実績（その他の収入）" />
+        <Legend color={MUTED} label="今月の見込み（予測）" />
+        <span>点線＝目標</span>
+      </p>
     </div>
   )
 }
+
+/** 売上の内訳（横に積んだ1本の棒と、区分ごとの小さなカード） */
+function Breakdown({ base, extraAmount }: { base: Baseline; extraAmount: number }) {
+  const parts = [
+    ...base.kinds.map((k) => ({ key: k.key as string, label: k.label, sales: k.sales, visits: k.visits, perVisit: k.perVisit })),
+    { key: 'extra', label: 'その他の収入', sales: extraAmount, visits: 0, perVisit: 0 },
+  ].filter((p) => p.key !== 'extra' || p.sales > 0)
+  const total = parts.reduce((s, p) => s + p.sales, 0)
+  const color: Record<string, string> = { ins: BLUE, self: TEAL, acc: '#c2410c', extra: '#7c3aed' }
+  return (
+    <div>
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label="売上の内訳">
+        {parts.map((p) => (
+          <div key={p.key} style={{ width: `${total > 0 ? (p.sales / total) * 100 : 0}%`, background: color[p.key] }} />
+        ))}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {parts.map((p) => (
+          <div key={p.key} className="rounded-xl bg-slate-50 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: color[p.key] }} aria-hidden />
+              {p.label}
+              <span className="ml-auto font-normal tabular-nums text-slate-500">{total > 0 ? Math.round((p.sales / total) * 100) : 0}%</span>
+            </p>
+            <p className="mt-1 text-lg font-black tabular-nums text-slate-900">{man(p.sales)}円</p>
+            {p.key !== 'extra' && (
+              <p className="text-[11px] tabular-nums text-slate-500">
+                {fmt(p.visits)}回・1回 {p.visits > 0 ? yen(p.perVisit) : '—'}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const pill =
+  'inline-flex h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50'
 
 // ── 画面 ─────────────────────────────────────────────
 
 export default function GoalPage() {
   const { isAdmin } = useMarketingRole()
+  const [tab, setTab] = useTab()
   const [store, setStore] = useState<NoahStore | null>(null)
   const [extras, setExtras] = useState<ExtraMonth[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -314,9 +448,12 @@ export default function GoalPage() {
   const req = defaults ? requirement(goal, defaults) : null
   const plan = defaults && base ? stages(goal, defaults, base.maxDayVisits) : []
   const notes = defaults && base ? insights(goal, base, defaults) : []
+  const stageIdx = now ? currentStageIndex(plan, now.sales) : 0
+  const stage = plan[stageIdx]
+  const nextAction = stage ? (ACTIONS[stage.key].find((a) => !checks.has(a.id)) ?? ACTIONS[stage.key][0]) : null
+  const goneNote = notes.find((n) => n.text.includes('まだ来られていない'))
 
-  // 毎月の推移（NOAH＋NOAH以外、途中の月は月末までの見込みを薄く）
-  const trend = [...months]
+  const trend: TrendRow[] = [...months]
     .sort((a, b) => a.month.localeCompare(b.month))
     .slice(-12)
     .map((m, i, arr) => {
@@ -330,7 +467,6 @@ export default function GoalPage() {
         noah,
         extra,
         rest,
-        partial: !isCompleteMonth(m),
       }
     })
 
@@ -366,7 +502,7 @@ export default function GoalPage() {
       setExtras((list) => [saved, ...list.filter((e) => e.month !== saved.month)])
       setExtraForm(null)
       setSim(null)
-      setMessage('NOAH以外の収入を保存しました')
+      setMessage('その他の収入を保存しました')
     } catch {
       setMessage('保存できませんでした（通信の失敗）')
     } finally {
@@ -376,22 +512,19 @@ export default function GoalPage() {
 
   const set = (patch: Partial<SimInput>) => input && setSim({ ...input, ...patch })
   const overCapacity = Boolean(input && base && input.perDay > base.maxDayVisits)
+  const asOfDay = base ? Number(base.asOf.slice(8, 10)) : 0
+  const actual = base ? base.sales + extraAmount : 0
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-black text-slate-900">月の売上 {man(goal)}円への道すじ</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            毎晩届くNOAHの集計と、NOAH以外の収入（アルファノートのサブスクなど）から、いまの位置と、目標に届くための数字を出します。数字はすべて目安です。
-          </p>
-          {base && <p className="mt-1 text-xs text-slate-500">NOAHの集計：{dateLabel(base.asOf)}まで</p>}
-        </div>
+    <div className="space-y-4">
+      {/* 見出し */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h1 className="min-w-0 text-lg font-black text-slate-900 sm:text-2xl">月商 {man(goal)}円への道すじ</h1>
         {editGoal === null ? (
           <button
             type="button"
             onClick={() => setEditGoal(String(goal / 10_000))}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            className="h-9 rounded-full px-3 text-sm font-bold text-teal-700 hover:bg-teal-50"
           >
             目標を変える
           </button>
@@ -411,223 +544,296 @@ export default function GoalPage() {
               inputMode="numeric"
               value={editGoal}
               onChange={(e) => setEditGoal(e.target.value)}
-              className="h-10 w-24 rounded-lg border border-slate-300 px-2 text-right text-sm"
+              className="h-11 w-24 rounded-xl border border-slate-300 px-3 text-right text-sm"
             />
             <span className="text-sm text-slate-600">万円</span>
-            <button type="submit" className="h-10 rounded-lg bg-slate-900 px-3 text-sm font-bold text-white">
+            <button type="submit" className="h-11 rounded-full bg-slate-900 px-5 text-sm font-bold text-white">
               決める
             </button>
           </form>
         )}
       </div>
-      {message && <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{message}</p>}
+
+      {/* タブ（上に貼り付く） */}
+      <div
+        className="sticky z-10 -mx-4 bg-slate-50/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6"
+        style={{ top: 'calc(var(--shell-top, 0px) + env(safe-area-inset-top, 0px))' }}
+      >
+        <div className="grid grid-cols-4 gap-1 rounded-full bg-slate-200/70 p-1" role="group" aria-label="表示する内容">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              aria-pressed={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={`h-10 rounded-full text-sm font-bold transition-colors ${
+                tab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {message && <p className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-700">{message}</p>}
       {!loaded && <p className="text-sm text-slate-400">読み込み中…</p>}
       {loaded && !base && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
           まだNOAHの集計が届いていません。毎晩21時すぎに届くと、ここに道すじが出ます。
         </div>
       )}
 
-      {base && defaults && now && req && (
+      {base && defaults && now && req && input && result && (
         <>
-          {/* いまの位置 */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat
-              label={base.complete ? `${ym(base.month)}の売上` : '今月の見込み（月末）'}
-              value={`${man(now.sales)}円`}
-              sub={
-                base.complete
-                  ? undefined
-                  : `${Number(base.asOf.slice(8, 10))}日までの実績 ${man(base.sales + extraAmount)}円${extraAmount > 0 ? '（NOAH以外を含む）' : ''}`
-              }
-            />
-            <Stat label="目標まで" value={now.sales >= goal ? '達成' : `あと${man(goal - now.sales)}円`} sub={`目標 ${man(goal)}円`} />
-            <Stat
-              label="1日の来院"
-              value={`${fmt1(base.perDay)}人`}
-              sub={`営業日 ${base.openDaysSoFar}日（今月の見込み ${base.openDaysMonth}日）・最多の日 ${fmt(base.maxDayVisits)}人`}
-            />
-            <Stat label="1回あたり（NOAH）" value={yen(base.perVisit)} sub={`来院 ${fmt(base.visits)}回・${yen(base.sales)}`} />
-          </div>
-          <Progress value={now.sales} goal={goal} />
+          {/* ── 現在地 ── */}
+          {tab === 'now' && (
+            <div className="space-y-4">
+              <section className="overflow-hidden rounded-2xl p-5 text-white sm:p-7" style={{ background: NAVY }}>
+                <p className="text-xs font-bold text-teal-200/90">
+                  {base.complete ? `${ym(base.month)}の売上（実績）` : `${ym(base.month)}の着地見込み（予測）`}
+                </p>
+                <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-[34px] font-black leading-none tabular-nums sm:text-[40px]">{man(now.sales)}円</span>
+                  <span className="text-sm text-white/60">／ 目標 {man(goal)}円</span>
+                </p>
+                <div className="mt-4">
+                  <Bar100 value={now.sales} goal={goal} tone="light" />
+                </div>
+                <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm">
+                  <span className="text-white/80">達成率 {goal > 0 ? fmt1((now.sales / goal) * 100) : 0}%</span>
+                  <span className="font-bold">{now.sales >= goal ? '目標に届いています' : `あと ${man(goal - now.sales)}円`}</span>
+                </div>
+                {!base.complete && (
+                  <p className="mt-3 border-t border-white/10 pt-3 text-xs text-white/60">
+                    {asOfDay}日までの実績 {man(actual)}円{extraAmount > 0 ? '（その他の収入を含む）' : ''}・NOAHの集計 {dateLabel(base.asOf)}まで
+                  </p>
+                )}
+              </section>
 
-          {/* 気づき */}
-          {notes.length > 0 && (
-            <Card title="いま言えること">
-              <ul className="space-y-2 text-sm text-slate-700">
-                {notes.map((n) => (
-                  <li key={n.text} className="flex gap-2">
-                    <span className={n.tone === 'warn' ? 'text-amber-600' : 'text-teal-700'} aria-hidden>
-                      ●
-                    </span>
-                    <span className="min-w-0">{n.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-bold text-slate-500">1日の来院（実績）</p>
+                  <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{fmt1(base.perDay)}人</p>
+                  <p className="text-[11px] text-slate-500">最多の日 {fmt(base.maxDayVisits)}人</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-bold text-slate-500">1回あたり（実績）</p>
+                  <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{yen(base.perVisit)}</p>
+                  <p className="text-[11px] text-slate-500">NOAHの分</p>
+                </div>
+              </div>
+
+              {stage && nextAction && now.sales < goal && (
+                <Card>
+                  <p className="text-xs font-bold text-teal-700">
+                    今週いちばんにやること（段階 {stageIdx + 1}／4：{STAGE_SHORT[stage.key]}）
+                  </p>
+                  <p className="mt-1.5 text-base font-bold leading-relaxed text-slate-900">{nextAction.text}</p>
+                  {stage.key === 'keep' && goneNote && <p className="mt-2 text-xs leading-relaxed text-slate-500">{goneNote.text}</p>}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {nextAction.href && (
+                      <Link
+                        href={nextAction.href}
+                        className="inline-flex h-11 items-center rounded-full bg-teal-600 px-5 text-sm font-bold text-white hover:bg-teal-700"
+                      >
+                        {nextAction.link}を開く
+                      </Link>
+                    )}
+                    <button type="button" onClick={() => setTab('plan')} className={pill}>
+                      計画を見る
+                    </button>
+                  </div>
+                </Card>
+              )}
+
+              {notes[0] && <p className="px-1 text-sm leading-relaxed text-slate-600">{notes[0].text}</p>}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => setTab('analysis')} className={`${pill} h-12 rounded-2xl`}>
+                  分析を見る
+                </button>
+                <button type="button" onClick={() => setTab('sim')} className={`${pill} h-12 rounded-2xl`}>
+                  試算する
+                </button>
+              </div>
+            </div>
           )}
 
-          {/* 売上の分け方 */}
-          <Card title="売上の分け方" sub={`${ym(base.month)}（${Number(base.asOf.slice(8, 10))}日まで）。売上 ＝ 来院 × 1回あたり`}>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px] text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                    <th className="py-1.5 pr-2 font-bold">区分</th>
-                    <th className="px-2 py-1.5 text-right font-bold">来院</th>
-                    <th className="px-2 py-1.5 text-right font-bold">割合</th>
-                    <th className="px-2 py-1.5 text-right font-bold">金額</th>
-                    <th className="px-2 py-1.5 text-right font-bold">売上の割合</th>
-                    <th className="py-1.5 pl-2 text-right font-bold">1回あたり</th>
-                  </tr>
-                </thead>
-                <tbody className="tabular-nums">
-                  {base.kinds.map((k) => (
-                    <tr key={k.key} className="border-b border-slate-100">
-                      <td className="py-1.5 pr-2 font-bold text-slate-800">{k.label}</td>
-                      <td className="px-2 py-1.5 text-right">{fmt(k.visits)}回</td>
-                      <td className="px-2 py-1.5 text-right">{Math.round(k.shareVisits * 100)}%</td>
-                      <td className="px-2 py-1.5 text-right">{yen(k.sales)}</td>
-                      <td className="px-2 py-1.5 text-right">{Math.round(k.shareSales * 100)}%</td>
-                      <td className="py-1.5 pl-2 text-right">{k.visits > 0 ? yen(k.perVisit) : '—'}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-b border-slate-100 text-slate-600">
-                    <td className="py-1.5 pr-2 font-bold">NOAH以外</td>
-                    <td className="px-2 py-1.5 text-right">—</td>
-                    <td className="px-2 py-1.5 text-right">—</td>
-                    <td className="px-2 py-1.5 text-right">{extraNow ? yen(extraAmount) : '未入力'}</td>
-                    <td className="px-2 py-1.5 text-right">—</td>
-                    <td className="py-1.5 pl-2 text-right">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            {(() => {
-              const m = months.find((x) => x.month === base.month)
-              const items = m ? [...m.self, ...m.goods].sort((a, b) => b[2] - a[2]).slice(0, 6) : []
-              if (items.length === 0) return null
-              return (
-                <div className="mt-3">
-                  <p className="text-xs font-bold text-slate-500">自費メニュー・商品（金額の多い順）</p>
-                  <ul className="mt-1 grid gap-x-6 gap-y-1 text-sm text-slate-700 sm:grid-cols-2">
-                    {items.map(([name, price, total, count]) => (
-                      <li key={name} className="flex justify-between gap-2 tabular-nums">
-                        <span className="min-w-0 truncate">{name}</span>
-                        <span className="shrink-0 text-slate-500">
-                          {yen(total)}（{fmt(count)}点・単価{yen(price)}）
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )
-            })()}
-          </Card>
+          {/* ── 分析 ── */}
+          {tab === 'analysis' && (
+            <div className="space-y-4">
+              <Card title="売上の内訳（実績）" sub={`${ym(base.month)} ${asOfDay}日まで。売上 ＝ 来院 × 1回あたり`}>
+                <Breakdown base={base} extraAmount={extraAmount} />
+              </Card>
 
-          {/* NOAH以外の収入 */}
-          <Card
-            title="NOAH以外の収入（アルファノート）"
-            sub="サブスクの収入と、QR・クレジットカードの支払い。カードやQRで窓口の料金を払われた分はNOAHにも入っているので、重なる分を引いて足します。"
-            action={
-              extraForm === null ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setExtraForm({
-                      subscription: String(extraNow?.subscription ?? ''),
-                      cashless: String(extraNow?.cashless ?? ''),
-                      overlap: String(extraNow?.overlap ?? ''),
-                    })
-                  }
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  {extraNow ? '直す' : '入れる'}
-                </button>
-              ) : undefined
-            }
-          >
-            {extraForm === null ? (
-              extraNow ? (
-                <dl className="grid gap-2 text-sm sm:grid-cols-4">
+              {trend.length > 0 && (
+                <Card title="毎月の推移">
+                  <TrendChart rows={trend} goal={goal} />
+                </Card>
+              )}
+
+              <Fold title="いま言えること" sub="NOAHの集計から計算した目安" open>
+                <ul className="space-y-2 text-sm leading-relaxed text-slate-700">
+                  {notes.map((n) => (
+                    <li key={n.text} className="flex gap-2">
+                      <span className={n.tone === 'warn' ? 'text-amber-600' : 'text-teal-700'} aria-hidden>
+                        ●
+                      </span>
+                      <span className="min-w-0">{n.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Fold>
+
+              {(() => {
+                const m = months.find((x) => x.month === base.month)
+                const items = m ? [...m.self, ...m.goods].sort((a, b) => b[2] - a[2]).slice(0, 8) : []
+                if (items.length === 0) return null
+                return (
+                  <Fold title="自費メニュー・商品" sub="金額の多い順">
+                    <ul className="divide-y divide-slate-100 text-sm">
+                      {items.map(([name, price, total, count]) => (
+                        <li key={name} className="flex items-baseline justify-between gap-3 py-2 tabular-nums">
+                          <span className="min-w-0 truncate text-slate-800">{name}</span>
+                          <span className="shrink-0 text-right">
+                            <span className="font-bold text-slate-900">{yen(total)}</span>
+                            <span className="block text-[11px] text-slate-500">
+                              {fmt(count)}点・単価{yen(price)}
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Fold>
+                )
+              })()}
+
+              <Fold
+                title="その他の収入（アルファノート）"
+                sub={extraNow ? `${ym(base.month)}：売上に足す分 ${yen(extraAmount)}` : `${ym(base.month)}の分はまだ入っていません`}
+              >
+                <p className="text-xs leading-relaxed text-slate-500">
+                  NOAHに入らない収入（サブスク）と、QR・クレジットカードの支払いです。窓口の料金をカードやQRで払われた分はNOAHにも入っているので、重なる分を引いて足します。
+                </p>
+                {extraForm === null ? (
+                  <>
+                    {extraNow && (
+                      <dl className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                        {(
+                          [
+                            ['サブスク', extraNow.subscription, ''],
+                            ['QR・カードの合計', extraNow.cashless, ''],
+                            ['うちNOAHと重なる分', extraNow.overlap, '−'],
+                            ['売上に足す分', extraAmount, ''],
+                          ] as const
+                        ).map(([label, v, sign]) => (
+                          <div key={label} className="rounded-xl bg-slate-50 px-3 py-2">
+                            <dt className="text-[11px] text-slate-500">{label}</dt>
+                            <dd className="font-bold tabular-nums">
+                              {sign}
+                              {yen(v)}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExtraForm({
+                          subscription: String(extraNow?.subscription ?? ''),
+                          cashless: String(extraNow?.cashless ?? ''),
+                          overlap: String(extraNow?.overlap ?? ''),
+                        })
+                      }
+                      className={`${pill} mt-3`}
+                    >
+                      {extraNow ? '直す' : '入れる'}
+                    </button>
+                  </>
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void saveExtra()
+                    }}
+                    className="mt-3 grid gap-3 sm:grid-cols-3"
+                  >
+                    {(
+                      [
+                        ['subscription', 'サブスク（円）'],
+                        ['cashless', 'QR・カードの合計（円）'],
+                        ['overlap', 'うちNOAHと重なる分（円）'],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <div key={key} className="min-w-0">
+                        <label htmlFor={`extra-${key}`} className="text-xs font-bold text-slate-600">
+                          {label}
+                        </label>
+                        <input
+                          id={`extra-${key}`}
+                          inputMode="numeric"
+                          value={extraForm[key]}
+                          onChange={(e) => setExtraForm({ ...extraForm, [key]: e.target.value })}
+                          className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 text-right text-sm tabular-nums"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex gap-2 sm:col-span-3">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="h-11 rounded-full bg-slate-900 px-6 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        {saving ? '保存中…' : '保存'}
+                      </button>
+                      <button type="button" onClick={() => setExtraForm(null)} className={pill}>
+                        やめる
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </Fold>
+            </div>
+          )}
+
+          {/* ── 試算 ── */}
+          {tab === 'sim' && (
+            <div className="space-y-4">
+              <section className="rounded-2xl p-5 text-white sm:p-6" style={{ background: NAVY }}>
+                <p className="text-xs font-bold text-teal-200/90">この条件だと、月の売上は（試算）</p>
+                <p className="mt-1 text-[34px] font-black leading-none tabular-nums">{man(result.sales)}円</p>
+                <div className="mt-3">
+                  <Bar100 value={result.sales} goal={goal} tone="light" />
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <dt className="text-xs text-slate-500">サブスク</dt>
-                    <dd className="font-bold tabular-nums">{yen(extraNow.subscription)}</dd>
+                    <dt className="text-white/60">いまの見込み</dt>
+                    <dd className="font-bold tabular-nums">{man(now.sales)}円</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-500">QR・カードの合計</dt>
-                    <dd className="font-bold tabular-nums">{yen(extraNow.cashless)}</dd>
+                    <dt className="text-white/60">目標</dt>
+                    <dd className="font-bold tabular-nums">{man(goal)}円</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-500">そのうちNOAHと重なる分</dt>
-                    <dd className="font-bold tabular-nums">−{yen(extraNow.overlap)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-slate-500">売上に足す分</dt>
-                    <dd className="font-black tabular-nums text-teal-700">{yen(extraAmount)}</dd>
+                    <dt className="text-white/60">目標との差</dt>
+                    <dd className="font-bold tabular-nums">
+                      {result.sales >= goal ? `+${man(result.sales - goal)}円` : `−${man(goal - result.sales)}円`}
+                    </dd>
                   </div>
                 </dl>
-              ) : (
-                <p className="text-sm text-slate-500">{ym(base.month)}の分はまだ入っていません。</p>
-              )
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void saveExtra()
-                }}
-                className="grid gap-3 sm:grid-cols-4"
-              >
-                {(
-                  [
-                    ['subscription', 'サブスク（円）'],
-                    ['cashless', 'QR・カードの合計（円）'],
-                    ['overlap', 'そのうちNOAHと重なる分（円）'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <div key={key} className="min-w-0">
-                    <label htmlFor={`extra-${key}`} className="text-xs font-bold text-slate-600">
-                      {label}
-                    </label>
-                    <input
-                      id={`extra-${key}`}
-                      inputMode="numeric"
-                      value={extraForm[key]}
-                      onChange={(e) => setExtraForm({ ...extraForm, [key]: e.target.value })}
-                      className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-2 text-right text-sm tabular-nums"
-                    />
-                  </div>
-                ))}
-                <div className="flex items-end gap-2">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50"
-                  >
-                    {saving ? '保存中…' : '保存'}
-                  </button>
+              </section>
+
+              {now.sales < goal && (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="目標に届く組み合わせ">
                   <button
                     type="button"
-                    onClick={() => setExtraForm(null)}
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-600"
+                    onClick={() => setSim(req.balanced.input)}
+                    className="h-10 rounded-full bg-teal-600 px-4 text-sm font-bold text-white hover:bg-teal-700"
                   >
-                    やめる
+                    そろって{fmt1(req.balanced.k)}倍（おすすめ）
                   </button>
-                </div>
-              </form>
-            )}
-          </Card>
-
-          {/* 目標に届く3つの道 */}
-          {now.sales < goal && (
-            <Card title={`${man(goal)}円に届く3つの道`} sub="どれか1つを選ぶのではなく、組み合わせの目安にしてください">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xs font-black text-slate-700">① 来院だけで</p>
-                  <p className="mt-1 text-lg font-black text-slate-900">1日 {fmt1(req.visitsOnly.perDay)}人</p>
-                  <p className="text-xs text-slate-500">
-                    いまの{fmt1(req.visitsOnly.ratio)}倍（月 {fmt(req.visitsOnly.visits)}回）
-                  </p>
                   <button
                     type="button"
                     onClick={() =>
@@ -637,64 +843,30 @@ export default function GoalPage() {
                         accVisits: Math.round(defaults.accVisits * req.visitsOnly.ratio),
                       })
                     }
-                    className="mt-2 text-xs font-bold text-teal-700 underline"
+                    className="h-10 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700"
                   >
-                    試算に入れる
+                    来院だけで
                   </button>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xs font-black text-slate-700">② 自費・商品の1回あたりだけで</p>
-                  {req.selfUnitOnly ? (
-                    <>
-                      <p className="mt-1 text-lg font-black text-slate-900">1回 {yen(req.selfUnitOnly.selfUnit)}</p>
-                      <p className="text-xs text-slate-500">いまの{fmt1(req.selfUnitOnly.ratio)}倍（来院はいまのまま）</p>
-                      <button
-                        type="button"
-                        onClick={() => setSim({ ...defaults, selfUnit: Math.round(req.selfUnitOnly!.selfUnit) })}
-                        className="mt-2 text-xs font-bold text-teal-700 underline"
-                      >
-                        試算に入れる
-                      </button>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-sm text-slate-500">自費の来院がないため計算できません</p>
+                  {req.selfUnitOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setSim({ ...defaults, selfUnit: Math.round(req.selfUnitOnly!.selfUnit) })}
+                      className="h-10 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700"
+                    >
+                      自費の1回あたりだけで
+                    </button>
+                  )}
+                  {sim && (
+                    <button type="button" onClick={() => setSim(null)} className="h-10 px-2 text-sm font-bold text-slate-500 underline">
+                      いまの数字に戻す
+                    </button>
                   )}
                 </div>
-                <div className="rounded-xl bg-teal-50 p-3 ring-1 ring-teal-200">
-                  <p className="text-xs font-black text-teal-800">③ そろって少しずつ（おすすめ）</p>
-                  <p className="mt-1 text-lg font-black text-slate-900">どれも {fmt1(req.balanced.k)}倍</p>
-                  <p className="text-xs text-slate-600">
-                    1日 {fmt1(req.balanced.input.perDay)}人・自費 1回 {yen(req.balanced.input.selfUnit)}・交通事故 月
-                    {fmt(req.balanced.input.accVisits)}回
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSim(req.balanced.input)}
-                    className="mt-2 text-xs font-bold text-teal-700 underline"
-                  >
-                    試算に入れる
-                  </button>
-                </div>
-              </div>
-            </Card>
-          )}
+              )}
 
-          {/* 試算 */}
-          {input && result && (
-            <Card
-              title="試算（数字を動かしてみる）"
-              sub="保険の1回あたりは決まった料金なので動かしません"
-              action={
-                sim && (
-                  <button type="button" onClick={() => setSim(null)} className="text-xs font-bold text-slate-600 underline">
-                    いまの数字に戻す
-                  </button>
-                )
-              }
-            >
-              <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Slider
+              <Card title="基本の条件">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Stepper
                     id="sim-perday"
                     label="1日の来院"
                     value={input.perDay}
@@ -705,28 +877,7 @@ export default function GoalPage() {
                     onChange={(v) => set({ perDay: v })}
                     hint={`いま ${fmt1(defaults.perDay)}人・最多の日 ${fmt(base.maxDayVisits)}人`}
                   />
-                  <Slider
-                    id="sim-days"
-                    label="1か月の営業日"
-                    value={input.days}
-                    min={15}
-                    max={31}
-                    step={1}
-                    display={`${input.days}日`}
-                    onChange={(v) => set({ days: v })}
-                  />
-                  <Slider
-                    id="sim-share"
-                    label="自費・商品の方の割合"
-                    value={Math.round(input.selfShare * 100)}
-                    min={0}
-                    max={100}
-                    step={1}
-                    display={`${Math.round(input.selfShare * 100)}%`}
-                    onChange={(v) => set({ selfShare: v / 100 })}
-                    hint={`交通事故以外の来院のうち。いま ${Math.round(defaults.selfShare * 100)}%`}
-                  />
-                  <Slider
+                  <Stepper
                     id="sim-selfunit"
                     label="自費・商品の1回あたり"
                     value={input.selfUnit}
@@ -737,7 +888,38 @@ export default function GoalPage() {
                     onChange={(v) => set({ selfUnit: v })}
                     hint={`いま ${yen(defaults.selfUnit)}`}
                   />
-                  <Slider
+                </div>
+                {overCapacity && (
+                  <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                    1日 {fmt1(input.perDay)}人は、これまでの最多の日（{fmt(base.maxDayVisits)}人）を超えます。予約枠・時間・人の体制の見直しが要ります。
+                  </p>
+                )}
+              </Card>
+
+              <Fold title="詳しい条件" sub="営業日・自費の方の割合・交通事故・その他の収入">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Stepper
+                    id="sim-days"
+                    label="1か月の営業日"
+                    value={input.days}
+                    min={15}
+                    max={31}
+                    step={1}
+                    display={`${input.days}日`}
+                    onChange={(v) => set({ days: v })}
+                  />
+                  <Stepper
+                    id="sim-share"
+                    label="自費・商品の方の割合"
+                    value={Math.round(input.selfShare * 100)}
+                    min={0}
+                    max={100}
+                    step={1}
+                    display={`${Math.round(input.selfShare * 100)}%`}
+                    onChange={(v) => set({ selfShare: v / 100 })}
+                    hint={`交通事故以外の来院のうち。いま ${Math.round(defaults.selfShare * 100)}%`}
+                  />
+                  <Stepper
                     id="sim-acc"
                     label="交通事故の来院（月）"
                     value={input.accVisits}
@@ -748,9 +930,9 @@ export default function GoalPage() {
                     onChange={(v) => set({ accVisits: v })}
                     hint={`1回あたり ${yen(input.accUnit)}`}
                   />
-                  <Slider
+                  <Stepper
                     id="sim-extra"
-                    label="NOAH以外の収入（月）"
+                    label="その他の収入（月）"
                     value={input.extra}
                     min={0}
                     max={Math.max(2_000_000, Math.ceil((defaults.extra * 3) / 100_000) * 100_000)}
@@ -760,99 +942,92 @@ export default function GoalPage() {
                     hint="サブスクなど（アルファノート）"
                   />
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs font-bold text-slate-500">この数字だと、月の売上は</p>
-                  <p className={`mt-1 text-3xl font-black ${result.sales >= goal ? 'text-teal-700' : 'text-slate-900'}`}>
-                    {man(result.sales)}円
-                  </p>
-                  <div className="mt-2">
-                    <Progress value={result.sales} goal={goal} />
-                  </div>
-                  <dl className="mt-3 space-y-1 text-xs text-slate-600">
-                    <div className="flex justify-between">
-                      <dt>来院（月）</dt>
-                      <dd className="tabular-nums">{fmt(result.visits)}回</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>NOAHの分</dt>
-                      <dd className="tabular-nums">{yen(result.noahSales)}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>NOAH以外</dt>
-                      <dd className="tabular-nums">{yen(result.extra)}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>1回あたり（NOAH）</dt>
-                      <dd className="tabular-nums">{yen(result.perVisit)}</dd>
-                    </div>
-                  </dl>
-                  {overCapacity && (
-                    <p className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-                      1日 {fmt1(input.perDay)}人は、これまでの最多の日（{fmt(base.maxDayVisits)}人）を超えます。予約枠・時間・人の体制の見直しが要ります。
-                    </p>
-                  )}
-                </div>
-              </div>
-            </Card>
+                <p className="mt-4 text-[11px] text-slate-500">保険の1回あたり（{yen(input.insUnit)}）は決まった料金なので動かしません。</p>
+              </Fold>
+            </div>
           )}
 
-          {/* 道すじ */}
-          {plan.length > 0 && (
-            <Card title="道すじ（4つの段階）" sub="上から順に。1段ずつ月の売上の目安を超えたら、次の段へ。チェックはこの端末に残ります">
-              <ol className="space-y-4">
-                {plan.map((st, i) => (
-                  <li key={st.key} className="rounded-xl border border-slate-200 p-3">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <p className="font-black text-slate-900">
-                        {i + 1}. {st.title}
-                      </p>
-                      <p className="text-sm font-bold text-teal-700">月 {man(st.target)}円（+{man(st.add)}円）</p>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-600">目安：{st.measure}</p>
-                    <ul className="mt-2 space-y-1.5">
-                      {ACTIONS[st.key].map((a) => (
-                        <li key={a.id} className="flex items-start gap-2 text-sm text-slate-700">
-                          <input
-                            id={`act-${a.id}`}
-                            type="checkbox"
-                            checked={checks.has(a.id)}
-                            onChange={() => toggleCheck(a.id)}
-                            className="mt-1 h-4 w-4 shrink-0 accent-teal-600"
-                          />
-                          <label htmlFor={`act-${a.id}`} className={`min-w-0 ${checks.has(a.id) ? 'text-slate-400 line-through' : ''}`}>
-                            {a.text}
-                          </label>
-                          {a.href && (
-                            <Link href={a.href} className="shrink-0 text-xs font-bold text-teal-700 underline">
-                              {a.link}
-                            </Link>
+          {/* ── 計画 ── */}
+          {tab === 'plan' && (
+            <div className="space-y-3">
+              {plan.length === 0 && (
+                <Card>
+                  <p className="text-sm text-slate-700">今月の見込みは目標に届いています。いまの取り組みを続けましょう。</p>
+                </Card>
+              )}
+              {plan.map((st, i) => {
+                const done = ACTIONS[st.key].filter((a) => checks.has(a.id)).length
+                const isNow = i === stageIdx
+                return (
+                  <details key={st.key} open={isNow} className="group rounded-2xl border border-slate-200 bg-white">
+                    <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 sm:px-6 [&::-webkit-details-marker]:hidden">
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+                          isNow ? 'bg-teal-600 text-white' : i < stageIdx ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-bold text-slate-900">
+                          {STAGE_SHORT[st.key]}
+                          {isNow && (
+                            <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 align-middle text-[11px] font-bold text-teal-700">
+                              いまの段階
+                            </span>
                           )}
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
-            </Card>
-          )}
+                        </span>
+                        <span className="block text-xs tabular-nums text-slate-500">
+                          月 {man(st.target)}円（+{man(st.add)}円）・{done}／{ACTIONS[st.key].length} 完了
+                        </span>
+                      </span>
+                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                    </summary>
+                    <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">
+                      <p className="text-xs leading-relaxed text-slate-500">目安：{st.measure}</p>
+                      <ul className="mt-3 space-y-1">
+                        {ACTIONS[st.key].map((a) => (
+                          <li key={a.id} className="flex items-start gap-3 rounded-xl px-1 py-1.5">
+                            <input
+                              id={`act-${a.id}`}
+                              type="checkbox"
+                              checked={checks.has(a.id)}
+                              onChange={() => toggleCheck(a.id)}
+                              className="mt-0.5 h-5 w-5 shrink-0 accent-teal-600"
+                            />
+                            <label
+                              htmlFor={`act-${a.id}`}
+                              className={`min-w-0 flex-1 text-sm leading-relaxed ${checks.has(a.id) ? 'text-slate-400 line-through' : 'text-slate-700'}`}
+                            >
+                              {a.text}
+                            </label>
+                            {a.href && (
+                              <Link
+                                href={a.href}
+                                className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                              >
+                                {a.link}
+                              </Link>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
+                )
+              })}
 
-          {/* 毎月の推移 */}
-          {trend.length > 0 && (
-            <Card title="毎月の推移" sub="青＝NOAH、緑＝NOAH以外、灰＝今月の月末までの見込み、点線＝目標">
-              <TrendChart rows={trend} goal={goal} />
-            </Card>
+              <Fold title="守ること">
+                <ul className="space-y-1.5 text-sm leading-relaxed text-slate-700">
+                  <li>・保険（療養費）は、行った施術のとおりに正しく請求する。売上の目標のために、部位・回数・内容を実際と違えて請求しない。</li>
+                  <li>・保険の窓口負担を割り引いたり、金品や紹介のお礼で患者さんをさそったりしない（保険の取り扱いの決まりで禁じられています）。</li>
+                  <li>・広告や投稿は「あはき・柔整広告ガイドライン」の範囲で。効果の保証・体験談・割引の強調はしない。</li>
+                  <li>・自費は、必要な理由と料金を説明し、同意をいただいてから。強くすすめない。</li>
+                  <li>・ここの数字はNOAHの集計からの目安です。祝日や臨時の休診は、これからの日については考えていません。</li>
+                </ul>
+              </Fold>
+            </div>
           )}
-
-          {/* 守ること */}
-          <Card title="守ること">
-            <ul className="space-y-1.5 text-sm text-slate-700">
-              <li>・保険（療養費）は、行った施術のとおりに正しく請求する。売上の目標のために、部位・回数・内容を実際と違えて請求しない。</li>
-              <li>・保険の窓口負担を割り引いたり、金品や紹介のお礼で患者さんをさそったりしない（保険の取り扱いの決まりで禁じられています）。</li>
-              <li>・広告や投稿は「あはき・柔整広告ガイドライン」の範囲で。効果の保証・体験談・割引の強調はしない。</li>
-              <li>・自費は、必要な理由と料金を説明し、同意をいただいてから。強くすすめない。</li>
-              <li>・ここの数字はNOAHの集計からの目安です。祝日や臨時の休診は、これからの日については考えていません。</li>
-            </ul>
-          </Card>
         </>
       )}
     </div>
