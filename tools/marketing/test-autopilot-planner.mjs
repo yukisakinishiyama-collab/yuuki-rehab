@@ -13,6 +13,7 @@ import {
   planSlots,
   storyHasOpening,
   storyLevel,
+  storyRange,
   storyRows,
   storyText,
   storyWeekDates,
@@ -213,6 +214,25 @@ test('説明文：見出し・時点・取り直しの注意（枠数そのも�
   assert.match(t.body, /取り直して/)
   assert.doesNotMatch(t.body, /4枠|NaN|undefined/)
   assert.equal(storyText(rows, 'week', '2026-10-25T21:15').title, '今週のご予約の空き状況')
+})
+
+
+test('手動のストーリー：本日・次の診療日（明日なら「明日の」）・この1週間', () => {
+  const openings = [
+    { date: '2026-10-24', closed: false, am: 2, pm: 2 },
+    { date: '2026-10-25', closed: true, am: 0, pm: 0 },
+    { date: '2026-10-26', closed: false, am: 4, pm: 1 },
+    { date: '2026-10-27', closed: false, am: 1, pm: 0 },
+  ]
+  assert.deepEqual(storyRange('today', openings, '2026-10-24'), { scope: 'day', dates: ['2026-10-24'], title: '本日のご予約の空き' })
+  const next = storyRange('next', openings, '2026-10-24')
+  assert.deepEqual(next.dates, ['2026-10-26'])
+  assert.equal(next.title, '次の診療日のご予約の空き', '土曜→月曜は明日ではない')
+  assert.equal(storyRange('next', openings, '2026-10-25').title, '明日のご予約の空き')
+  const week = storyRange('week', openings, '2026-10-24')
+  assert.deepEqual(week.dates, ['2026-10-24', '2026-10-26', '2026-10-27'], '今日から7日間の診療日（休診の日曜は除く）')
+  assert.equal(week.title, 'この1週間のご予約の空き')
+  assert.deepEqual(storyRange('next', [], '2026-10-24').dates, [])
 })
 
 console.log(`\n${passed} 件すべて成功`)
