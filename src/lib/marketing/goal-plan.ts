@@ -534,8 +534,8 @@ export function insights(goal: number, b: Baseline, base: SimInput): Insight[] {
   out.push({
     tone: 'info',
     text: b.complete
-      ? `${mName}は 1日 約${fmt1(base.perDay)}人・1回あたり 約${fmt(now.perVisit)}円で、売上の実績は 約${man(now.sales)}円${extraText}でした。目標まで あと${man(goal - now.sales)}円。`
-      : `いまのペース（1日 約${fmt1(base.perDay)}人・1回あたり 約${fmt(now.perVisit)}円）だと、月末の見込みは 約${man(now.sales)}円${extraText}です。目標まで あと${man(goal - now.sales)}円。`,
+      ? `${mName}は 1日 約${fmt1(b.perDaySoFar)}人・1回あたり 約${fmt(b.perVisit)}円で、売上の実績は 約${man(now.sales)}円${extraText}でした。目標まで あと${man(goal - now.sales)}円。`
+      : `いまのペース（1日 約${fmt1(b.perDaySoFar)}人・1回あたり 約${fmt(b.perVisit)}円）だと、月末の見込みは 約${man(now.sales)}円${extraText}です。目標まで あと${man(goal - now.sales)}円。`,
   })
   if (b.mismatch) out.push(mismatchNote)
   if (req.visitsOnly.ratio > 1.5) {

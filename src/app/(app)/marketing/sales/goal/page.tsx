@@ -887,7 +887,7 @@ export default function GoalPage() {
                     step={0.5}
                     display={`${fmt1(input.perDay)}人`}
                     onChange={(v) => set({ perDay: v })}
-                    hint={`いま ${fmt1(defaults.perDay)}人・最多の日 ${fmt(base.maxDayVisits)}人`}
+                    hint={`いま ${fmt1(defaults.perDay)}人（土曜の半日もならした月の平均）・最多の日 ${fmt(base.maxDayVisits)}人`}
                   />
                   <Stepper
                     id="sim-selfunit"
