@@ -29,6 +29,10 @@ import {
   mondayOf,
   pickThemes,
   planSlots,
+  storyHasOpening,
+  storyRows,
+  storyText,
+  storyWeekDates,
   trackingUrl,
   weekdayOf,
   type OpeningDay,
@@ -174,7 +178,44 @@ async function draftItem(
   }
 }
 
-/** 「今週の空き状況」（Googleのみ・定型文）。空きの少ない週や予約システム未対応なら作らない */
+/**
+ * Instagramストーリーの空き状況の案（定型の画像。AIは使わない）。案内できる空きが無ければ null。
+ * 画像は投稿する時刻に予約システムから空きを取り直して作る（publishers.ts）。ここでは承認用の説明と、取り直せなかったときの空きを持たせる
+ */
+function storyVariant(
+  scope: 'day' | 'week',
+  dates: string[],
+  openings: OpeningDay[],
+  nowLocal: string,
+  settings: AutopilotSettings,
+): ContentVariant | null {
+  const rows = storyRows(openings, dates)
+  if (!settings.availabilityStory || rows.length === 0 || !storyHasOpening(rows)) return null
+  const profile = profileFor(settings)
+  const text = storyText(rows, scope, nowLocal)
+  const content: GeneratedContent = {
+    title: text.title,
+    hook: text.title,
+    body: text.body,
+    cta: { label: '予約', url: profile.reserveUrl },
+    hashtags: [],
+    warnings: ['予約システムの空きから自動で作る定型の画像です（AIは使っていません）。リンクのスタンプはAPIでは付けられません'],
+    story: {
+      scope,
+      dates,
+      snapshot: openings.filter((o) => dates.includes(o.date)).map((o) => ({ date: o.date, closed: o.closed, am: o.am, pm: o.pm })),
+    },
+  }
+  return {
+    id: crypto.randomUUID(),
+    channel: 'instagram_story',
+    content,
+    compliance: checkGenerated(content, profile.bannedPhrases),
+    status: 'draft',
+  }
+}
+
+/** 「今週の空き状況」（Google＋Instagramストーリー・定型）。空きの少ない週や予約システム未対応なら作らない */
 async function draftAvailability(
   week: string,
   nowLocal: string,
@@ -194,33 +235,38 @@ async function draftAvailability(
   const stats = await fetchHubStats(1)
   if (!stats || stats.openings.length === 0) return null
   const profile = profileFor(settings)
-  const text = availabilityText(stats.openings, week, nowLocal, profile.phone)
-  if (!text) return null
-
-  const content: GeneratedContent = {
-    title: text.title,
-    hook: text.title,
-    body: text.body,
-    cta: { label: '予約', url: profile.reserveUrl },
-    hashtags: [],
-    warnings: ['予約システムの空き枠数から自動で作った定型文です（AIは使っていません）'],
+  const variants: ContentVariant[] = []
+  const text = settings.google && settings.availabilityPost ? availabilityText(stats.openings, week, nowLocal, profile.phone) : null
+  if (text) {
+    const content: GeneratedContent = {
+      title: text.title,
+      hook: text.title,
+      body: text.body,
+      cta: { label: '予約', url: profile.reserveUrl },
+      hashtags: [],
+      warnings: ['予約システムの空き枠数から自動で作った定型文です（AIは使っていません）'],
+    }
+    variants.push({
+      id: crypto.randomUUID(),
+      channel: 'google_business',
+      content,
+      compliance: checkGenerated(content, profile.bannedPhrases),
+      status: 'draft',
+    })
   }
-  const variant: ContentVariant = {
-    id: crypto.randomUUID(),
-    channel: 'google_business',
-    content,
-    compliance: checkGenerated(content, profile.bannedPhrases),
-    status: 'draft',
-  }
+  // 週のストーリー：投稿する日から土曜までの診療日
+  const story = storyVariant('week', storyWeekDates(stats.openings, week, scheduledAt.slice(0, 10)), stats.openings, nowLocal, settings)
+  if (story) variants.push(story)
+  if (variants.length === 0) return null
   return {
     id: crypto.randomUUID(),
     scheduledAt,
     category: 'availability',
     themeId: 'availability',
     objective: '予約枠案内',
-    theme: text.title,
+    theme: text?.title ?? '今週のご予約の空き状況',
     campaign: campaignFor(week, index),
-    variants: [withTracking(variant, week, index)],
+    variants: variants.map((v) => withTracking(v, week, index)),
     status: 'proposed',
   }
 }
@@ -238,7 +284,8 @@ export async function addNextDayAvailabilityDraft(
 ): Promise<{ made: boolean; week?: string; itemId?: string; reason?: string }> {
   const settings = await getAutopilotSettings()
   if (!settings.enabled) return { made: false, reason: '自動投稿がオフです' }
-  if (!settings.google || !settings.availabilityPost) return { made: false, reason: 'Googleの空き状況の投稿がオフです' }
+  const wantsGoogle = settings.google && settings.availabilityPost
+  if (!wantsGoogle && !settings.availabilityStory) return { made: false, reason: '空き状況の投稿（Google・ストーリー）がオフです' }
   const week = mondayOf(day.date)
   const proposal = await getProposal(week)
   if (!proposal || proposal.status !== 'ready') return { made: false, week, reason: 'この週の投稿案がありません' }
@@ -254,34 +301,39 @@ export async function addNextDayAvailabilityDraft(
   const scheduledAt = `${day.date}T08:00`
   if (scheduledAt <= addMinutesLocal(jst.local, 30)) return { made: false, week, reason: '投稿の時刻に間に合いません' }
   const profile = profileFor(settings)
-  const text = nextDayAvailabilityText(day, jst.local, profile.phone)
-  if (!text) return { made: false, week, reason: '案内できる空きがありません' }
-
+  const text = wantsGoogle ? nextDayAvailabilityText(day, jst.local, profile.phone) : null
   const index = proposal.items.length + 1
-  const content: GeneratedContent = {
-    title: text.title,
-    hook: text.title,
-    body: text.body,
-    cta: { label: '予約', url: profile.reserveUrl },
-    hashtags: [],
-    warnings: ['予約システムの空き枠数から自動で作った定型文です（AIは使っていません）'],
+  const variants: ContentVariant[] = []
+  if (text) {
+    const content: GeneratedContent = {
+      title: text.title,
+      hook: text.title,
+      body: text.body,
+      cta: { label: '予約', url: profile.reserveUrl },
+      hashtags: [],
+      warnings: ['予約システムの空き枠数から自動で作った定型文です（AIは使っていません）'],
+    }
+    variants.push({
+      id: crypto.randomUUID(),
+      channel: 'google_business',
+      content,
+      compliance: checkGenerated(content, profile.bannedPhrases),
+      status: 'draft',
+    })
   }
-  const variant: ContentVariant = {
-    id: crypto.randomUUID(),
-    channel: 'google_business',
-    content,
-    compliance: checkGenerated(content, profile.bannedPhrases),
-    status: 'draft',
-  }
+  // その日の朝のストーリー（「本日のご予約の空き」）
+  const story = storyVariant('day', [day.date], [day], jst.local, settings)
+  if (story) variants.push(story)
+  if (variants.length === 0) return { made: false, week, reason: '案内できる空きがありません' }
   const item: ProposalItem = {
     id: crypto.randomUUID(),
     scheduledAt,
     category: 'availability',
     themeId,
     objective: '予約枠案内',
-    theme: text.title,
+    theme: text?.title ?? '本日のご予約の空き',
     campaign: campaignFor(week, index),
-    variants: [withTracking(variant, week, index)],
+    variants: variants.map((v) => withTracking(v, week, index)),
     status: 'proposed',
   }
   proposal.items = [...proposal.items, item].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
@@ -311,7 +363,7 @@ export async function generateWeek(week: string, now: Date): Promise<{ proposal:
   const count = Math.min(Math.max(Math.floor(settings.postsPerWeek), 1), 5)
   const slots = planSlots(week, settings.slots, count, jst.local)
   const channels = channelsFor(settings)
-  const wantsAvailability = settings.availabilityPost && settings.google
+  const wantsAvailability = (settings.availabilityPost && settings.google) || settings.availabilityStory
 
   if ((slots.length === 0 || channels.length === 0) && !wantsAvailability) {
     return { proposal: null, message: 'この週に作れる投稿枠がありません（時刻が過ぎているか、媒体がすべてオフです）' }
@@ -714,7 +766,8 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
   let sent = 0
   for (const group of groups.values()) {
     const google = group.find((j) => j.channel === 'google_business')
-    const instagram = group.find((j) => j.channel.startsWith('instagram'))
+    const story = group.find((j) => j.channel === 'instagram_story')
+    const instagram = group.find((j) => j.channel.startsWith('instagram') && j.channel !== 'instagram_story')
     const head = [
       `📌 投稿の時間です（${formatSlot(group[0].scheduledAt)}）`,
       `「${group[0].theme}」`,
@@ -724,6 +777,9 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
         : null,
       instagram
         ? '▶ Instagram：連携がまだのため手動です。本文の吹き出しをコピーし、「画像を開く」の画像（または院の写真）と一緒にInstagramアプリから投稿してください。'
+        : null,
+      story
+        ? `▶ ストーリー：連携がまだのため手動です。「ストーリー画像」を開いて保存し、Instagramアプリのストーリーで投稿してください（リンクのスタンプで予約ページ ${story.content.cta?.url ?? ''} を付けると便利です）。`
         : null,
       '',
       '投稿したら、いちばん下のボタンを押してください。',
@@ -743,6 +799,8 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
     const buttons = [
       ...(google ? [{ label: 'Googleに投稿した', postback: `ap:done:${google.id}`, primary: true }] : []),
       ...(instagram ? [{ label: 'Instagramに投稿した', postback: `ap:done:${instagram.id}`, primary: !google }] : []),
+      ...(story ? [{ label: 'ストーリーに出した', postback: `ap:done:${story.id}`, primary: !google && !instagram }] : []),
+      ...(story?.manualUrl ? [{ label: 'ストーリー画像', uri: story.manualUrl }] : []),
       ...(instagram ? [{ label: '画像を開く', uri: imageUrl }] : []),
       ...(google ? [{ label: 'Googleを開く', uri: GOOGLE_MANAGE_URL }] : []),
       { label: '投稿ジョブ画面', uri: `${SITE_URL}/marketing/jobs` },

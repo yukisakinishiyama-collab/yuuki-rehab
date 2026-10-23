@@ -13,7 +13,7 @@ import { getProposal } from '@/lib/marketing/autopilot-store-server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const CHANNELS = ['instagram_feed', 'instagram_carousel', 'instagram_reel', 'google_business', 'line_broadcast', 'note'] as const
+const CHANNELS = ['instagram_feed', 'instagram_carousel', 'instagram_reel', 'instagram_story', 'google_business', 'line_broadcast', 'note'] as const
 
 const ActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('approve_item'), itemId: z.string().min(1) }),

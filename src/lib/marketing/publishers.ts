@@ -13,6 +13,8 @@ export type PublishOutcome =
   | { kind: 'published'; url?: string; message: string }
   | { kind: 'action_required'; reason: string; manualUrl: string }
   | { kind: 'error'; message: string }
+  /** 出す必要がなくなった（例：ストーリーの時刻に空きが無くなっていた）。投稿はしない */
+  | { kind: 'skipped'; message: string }
 
 const MOCK = process.env.MARKETING_MODE === 'mock'
 
@@ -26,6 +28,8 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
     case 'instagram_carousel':
     case 'instagram_reel':
       return publishInstagram(channel, content)
+    case 'instagram_story':
+      return publishInstagramStory(content)
     case 'google_business':
       return publishGoogleBusiness(content)
     case 'line_broadcast':
@@ -48,11 +52,63 @@ async function uploadTemplateImage(
   name: string,
   size: 'instagram' | 'google' = 'instagram',
 ): Promise<string> {
-  const { renderTemplateImage } = await import('./image-template')
+  const { renderTemplateImage, toJpeg } = await import('./image-template')
   const { put } = await import('@vercel/blob')
   const png = await renderTemplateImage(title, subtitle, size)
-  const blob = await put(name, png, { access: 'public', contentType: 'image/png' })
+  // Instagram の API は JPEG の画像を受け付ける。Google はどちらでもよいので同じく JPEG に
+  const jpg = await toJpeg(png)
+  const blob = await put(name.replace(/\.png$/, '.jpg'), jpg, { access: 'public', contentType: 'image/jpeg' })
   return blob.url
+}
+
+/**
+ * Instagramストーリー（予約の空き状況）。
+ * 投稿する時刻に予約システムから空きを取り直して画像を作る（取り直せなければ下書きのときの空き）。
+ * 案内できる空きが無くなっていたら出さない（skipped）。リンクのスタンプはAPIで付けられないので、画像に「プロフィールのリンクから」と書く。
+ * Instagram が未接続の間は、画像だけ作って院長に送り、手で投稿してもらう（action_required の manualUrl に画像のURL）。
+ */
+async function publishInstagramStory(content: GeneratedContent): Promise<PublishOutcome> {
+  const story = content.story
+  if (!story || story.dates.length === 0) return { kind: 'error', message: 'ストーリーの空き状況の情報がありません' }
+  const { fetchHubStats } = await import('./booking-stats')
+  const { jstParts, storyHasOpening, storyRows, storyText } = await import('./autopilot-planner')
+  const fresh = await fetchHubStats(1).catch(() => null)
+  const openings = fresh?.openings?.length ? fresh.openings : story.snapshot
+  const rows = storyRows(openings, story.dates)
+  if (rows.length === 0 || !storyHasOpening(rows)) {
+    return { kind: 'skipped', message: '投稿の時刻に案内できる空きが無かったため、ストーリーは出しませんでした' }
+  }
+  const now = jstParts(new Date())
+  const text = storyText(rows, story.scope, now.local)
+  const asOfLabel = `${Number(now.local.slice(5, 7))}/${Number(now.local.slice(8, 10))} ${now.local.slice(11, 16)} 時点${fresh ? '' : '（前の晩の空き）'}`
+
+  let imageUrl: string
+  try {
+    const { renderStoryImage, toJpeg } = await import('./image-template')
+    const { put } = await import('@vercel/blob')
+    const jpg = await toJpeg(await renderStoryImage({ title: text.title, asOfLabel, scope: story.scope, rows }))
+    imageUrl = (await put(`marketing/story-${Date.now()}.jpg`, jpg, { access: 'public', contentType: 'image/jpeg' })).url
+  } catch (error) {
+    return { kind: 'error', message: `ストーリー画像を作れませんでした（${error instanceof Error ? error.message.slice(0, 80) : '不明'}）` }
+  }
+
+  const { getInstagramToken, getInstagramUserId, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
+  const token = await getInstagramToken()
+  const igUserId = await getInstagramUserId()
+  if (!token || !igUserId) {
+    return {
+      kind: 'action_required',
+      reason: 'Instagram API未接続のため手動投稿です。ストーリー用の画像を開いて保存し、Instagramアプリのストーリーで投稿してください（リンクのスタンプで予約ページを付けると便利です）。',
+      manualUrl: imageUrl,
+    }
+  }
+  try {
+    const creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, { image_url: imageUrl, media_type: 'STORIES' })
+    const postUrl = await igPublishContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, creationId)
+    return { kind: 'published', url: postUrl, message: 'Instagramのストーリーに出しました' }
+  } catch (error) {
+    return { kind: 'error', message: `Instagram APIエラー（ストーリー）: ${error instanceof Error ? error.message : '不明'}` }
+  }
 }
 
 /** メディアコンテナ作成（Instagramログイン方式は graph.instagram.com が接続先） */
@@ -121,7 +177,7 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
       const ts = Date.now()
       const childIds: string[] = []
       for (const [i, slide] of slides.entries()) {
-        const url = await uploadTemplateImage(slide.heading, slide.body.slice(0, 40), `marketing/ig-${ts}-s${i + 1}.png`)
+        const url = await uploadTemplateImage(slide.heading, slide.body.slice(0, 40), `marketing/ig-${ts}-s${i + 1}.jpg`)
         childIds.push(await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, { image_url: url, is_carousel_item: true }))
       }
       creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, {

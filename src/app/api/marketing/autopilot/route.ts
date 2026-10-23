@@ -26,6 +26,7 @@ const SettingsSchema = z.object({
   instagram: z.enum(['instagram_feed', 'instagram_carousel', 'off']),
   google: z.boolean(),
   availabilityPost: z.boolean(),
+  availabilityStory: z.boolean().default(true),
   generateHour: z.number().int().min(6).max(22),
   ownerNote: z.string().max(400),
   clinicProfile: z.record(z.string(), z.string().max(2000)).optional(),

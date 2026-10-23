@@ -12,6 +12,7 @@ import {
   effectiveStatus,
   jstDate,
   measure,
+  pdcaReminder,
   ruleReview,
 } from '../../src/lib/marketing/pdca.ts'
 
@@ -202,6 +203,24 @@ test('振り返りの下書き（AIなし）：届けば続ける・届かず増
   assert.match(adj.next, /できなかったやること/)
   assert.equal(ruleReview(it, { ...base, projected: 3, progress: 0.3, change: -0.7 }).decision, 'stop')
   assert.match(ruleReview(it, { ...base, projected: 3, progress: 0.3, change: -0.7 }).learned, /目標の30%（始める前の同じ日数より−70%）/)
+})
+
+test('毎晩のお知らせ：振り返りの時期・まもなく終わる・記録が止まっている', () => {
+  const today = '2026-11-01'
+  const ended = item({ id: 'a', title: '終わった施策', start: '2026-10-01', end: '2026-10-31' })
+  const reviewed = item({ id: 'b', title: '振り返り済み', start: '2026-10-01', end: '2026-10-31', review: { decision: 'continue', learned: '', next: '', at: '' } })
+  const soon = item({ id: 'c', title: 'もうすぐ', start: '2026-10-30', end: '2026-11-03', logs: [{ id: 'l', at: '2026-10-31', text: 'x' }] })
+  const quiet = item({ id: 'd', title: '止まっている', start: '2026-10-10', end: '2026-11-30', logs: [{ id: 'l', at: '2026-10-20', text: 'x' }] })
+  const active = item({ id: 'e', title: '動いている', start: '2026-10-10', end: '2026-11-30', actions: [{ id: 'x', text: 'x', done: true, doneAt: '2026-10-29' }] })
+  const done = item({ id: 'f', title: '完了', status: 'done', start: '2026-10-01', end: '2026-10-31' })
+  const lines = pdcaReminder([ended, reviewed, soon, quiet, active, done], today)
+  assert.deepEqual(lines, [
+    '振り返りの時期：「終わった施策」（10/31で終了）',
+    'まもなく終わる：「もうすぐ」（あと2日）',
+    '記録が止まっています：「止まっている」（この7日「やったこと」がありません）',
+  ])
+  assert.deepEqual(pdcaReminder([done, active], today), [])
+  assert.equal(pdcaReminder([item({ id: 'g', title: '今日まで', start: '2026-10-30', end: '2026-11-01' })], today)[0], 'まもなく終わる：「今日まで」（今日まで）')
 })
 
 console.log(`\n${passed} OK`)
