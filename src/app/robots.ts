@@ -2,18 +2,18 @@ import type { MetadataRoute } from 'next'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://yuuki-rehab.vercel.app'
 
-// 内部スタッフアプリ（(app)グループ）と管理系は検索・AIクロールの対象外
+// 院内アプリ（予約・カルテ・経営・集客）と管理系は検索・AIクロールの対象外
+// （以前の動作解析・プロトコルなどの機能は削除済み。古いURLも念のため除外しておく）
 const DISALLOW = [
-  '/cases/',
   '/dashboard/',
-  '/gonio/',
-  '/literature/',
-  '/marketing/',
-  '/patient/',
   '/patients/',
+  '/yoyaku/',
+  '/marketing/',
+  '/login',
+  '/liff/',
+  '/cases/',
   '/protocols/',
   '/rom/',
-  '/sports/',
   '/staff/',
 ]
 

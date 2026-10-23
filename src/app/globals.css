@@ -228,7 +228,7 @@ body {
   .print-break { page-break-after: always; }
 
   /* サイドバーを消したぶんの余白を詰める（md:ml-56 を打ち消す） */
-  .print-full-width { margin-left: 0 !important; }
+  .print-full-width { margin-left: 0 !important; padding-left: 0 !important; }
 
   /* 画面では下まで色を敷くために高さを確保しているが、
      紙ではその分がまるごと余白になり、次のページを作ってしまうので外す */

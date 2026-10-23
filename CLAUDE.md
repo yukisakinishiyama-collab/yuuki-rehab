@@ -16,25 +16,28 @@ npm run lint     # ESLint
 
 ## アーキテクチャ
 
-ゆうき整骨院の院内アプリで、同一の Next.js App Router 上に二つの独立した領域がある。
+ゆうき整骨院のサイトと院内アプリで、同一の Next.js App Router 上に二つの領域がある。
 
-**公開サイト** — `src/app/(website)/` — 症状別ページ（ACL、半月板など）、ブログ、FAQ、料金。コンポーネントは `src/components/site/`。
+**公開サイト** — `src/app/(website)/` — 症状別ページ（ACL、半月板など）、ブログ、FAQ、料金、競技復帰ドリル。コンポーネントは `src/components/site/`。患者さん向けの LINE 予約の入口 `src/app/liff/` と `/api/liff` も公開。
 
-**スタッフ用リハビリアプリ** — `src/app/(app)/` — ケース管理・動画アノテーション・AI 分析。コンポーネントは `src/components/rehab/`。
+**院内アプリ** — `src/app/(app)/` — 予約管理・カルテ・経営（売上・来院）・集客の4つに絞った院内専用アプリ。共通の枠は `src/components/rehab/AppShell.tsx` → `src/components/clinic/ClinicShell.tsx`（メニューは `src/components/clinic/nav.ts`。PCは左、スマホは下の5タブ）。
+
+- 今日（ホーム）: `/dashboard` → `src/components/clinic/TodayDashboard.tsx`
+- 予約: `/yoyaku`（GAS の予約管理画面を常駐 iframe で表示。`src/components/rehab/YoyakuFrame.tsx`）
+- カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・評価・問診・メモ・キャンセル・紹介状）
+- 経営: `/marketing/sales`（NOAH の売上・来院）、`/marketing/analytics`（集客の効果）
+- 集客: `/marketing/**`（自動投稿・投稿づくり・LINE導線・口コミ返信など。`src/lib/marketing/`）
+
+院内アプリと院内用のAPIは `src/proxy.ts` の Basic 認証（院長／スタッフのパスワード）で守る。以前あった動作解析（動画・姿勢）、プロトコル立案・疾患/文献ライブラリ、患者さん向けの説明・問診・カラダマップの画面は削除済み。
 
 ### データ層
 
-バックエンド DB は存在しない。ケース・コメント・評価の状態はすべて `src/lib/rehab-store.ts` 経由で `localStorage` に永続化される。初期モックデータは `src/lib/rehab-data.ts`。実サーバー処理は `src/app/api/` の三本のルートのみ：
+- カルテ: `src/lib/patient-store.ts` 経由で端末の `localStorage`（`pt_*`）に保存。`/api/sync` でクラウド（Supabase の KV）へ控えを保存・取り込み
+- 端末ログイン: `src/lib/rehab-store.ts`（院内専用のため未ログインなら自動ログイン）
+- 集客・経営: `src/lib/marketing/kv-store-server.ts`（Supabase 設定時は KV テーブル）
+- 予約: GAS の予約システム（`?api=feed` / `?api=hubstats` / `?api=noahstats`）と連携
 
-- `/api/ai-summary` — Anthropic SDK を呼び出し、専門家パネル（整形外科医・トレーナー・PT）の意見を取得
-- `/api/upload` — Vercel Blob への動画アップロード（最大 500 MB）用トークンを発行
-- `/api/submit` — 公開用受付フォームの送信処理
-
-### 動画・姿勢解析
-
-`src/lib/pose-analyzer.ts` が `@mediapipe/tasks-vision` をラップし、動画フレームから関節角度（膝・股関節・肩・足首・体幹など）を算出する。`@mediapipe/tasks-vision` は `next.config.ts` の `serverExternalPackages` に登録済みで、バンドルしてはならない。
-
-Canvas ベースのアノテーション（線・角度・矢印・円・フリーハンド・テキスト）は `src/components/rehab/VideoAnnotation*` にある。
+主な API: `/api/marketing/**`、`/api/sync`、`/api/yoyaku/feed`、`/api/intake-analysis`・`/api/referral-generate`（Anthropic SDK）、`/api/upload`（動画ストックの Vercel Blob 保存）、`/api/liff/verify`。
 
 ### スタイリング
 
@@ -42,7 +45,7 @@ Tailwind CSS 4（`@tailwindcss/postcss` 経由）。カスタムトークン（`
 
 ### 型定義
 
-ドメイン型は `src/types/rehab.ts`（Case、Video、User、Annotation、Evaluation など）。`src/types/index.ts` には旧型セット（DiseaseType、Exercise、Patient）があり、`src/lib/data.ts` のリハビリメニュー・運動データで使用される。
+カルテの型は `src/types/patient.ts`（Patient、SOAPNote、Evaluation、ROMRecord など）。復帰基準・アウトカム評価は `src/types/return-criteria.ts`・`src/types/outcome-scores.ts`。端末ログインのユーザーは `src/types/rehab.ts`。
 
 ### パスエイリアス
 
