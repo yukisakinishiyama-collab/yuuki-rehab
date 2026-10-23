@@ -254,6 +254,9 @@ const ACTIONS: Record<StageKey, Array<{ id: string; text: string; href?: string;
   ],
 }
 
+/** 段階ごとに、PDCA の画面で使うひな形（受けられる人数の段は、施策より体制の見直しなので出さない） */
+const STAGE_TEMPLATE: Partial<Record<StageKey, string>> = { keep: 'comeback', new: 'newcomers', value: 'self' }
+
 const STAGE_SHORT: Record<StageKey, string> = {
   keep: '続けて通っていただく',
   new: '新しい方を増やす',
@@ -1000,6 +1003,14 @@ export default function GoalPage() {
                     </summary>
                     <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">
                       <p className="text-xs leading-relaxed text-slate-500">目安：{st.measure}</p>
+                      {STAGE_TEMPLATE[st.key] && (
+                        <Link
+                          href={`/marketing/sales/pdca?t=${STAGE_TEMPLATE[st.key]}`}
+                          className="mt-2 inline-flex h-10 items-center rounded-full bg-teal-50 px-4 text-sm font-bold text-teal-800 hover:bg-teal-100"
+                        >
+                          この段階をPDCAで回す
+                        </Link>
+                      )}
                       <ul className="mt-3 space-y-1">
                         {ACTIONS[st.key].map((a) => (
                           <li key={a.id} className="flex items-start gap-3 rounded-xl px-1 py-1.5">
