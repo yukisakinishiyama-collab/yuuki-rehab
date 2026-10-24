@@ -18,7 +18,8 @@ import { publishToChannel } from '@/lib/marketing/publishers'
 import type { GeneratedContent } from '@/lib/marketing/types'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+// Instagram が画像を取り込み終わるのを待つため、少し長めに
+export const maxDuration = 120
 
 const RANGES = ['today', 'next', 'week'] as const
 type Range = (typeof RANGES)[number]

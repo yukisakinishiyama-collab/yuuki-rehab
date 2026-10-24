@@ -137,15 +137,54 @@ async function igCreateContainer(
   return data.id as string
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** コンテナの準備（status_code）が FINISHED になるまで待つ。ERROR なら理由つきで止める */
+async function igWaitForContainer(host: string, token: string, creationId: string): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    try {
+      const res = await fetch(
+        `${host}/v21.0/${creationId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`,
+      )
+      const data = await res.json()
+      const code = data.status_code as string | undefined
+      if (code === 'FINISHED' || code === 'PUBLISHED') return
+      if (code === 'ERROR' || code === 'EXPIRED') {
+        throw new Error(`Instagramが画像を取り込めませんでした（${data.status ?? code}）`)
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Instagramが画像')) throw error
+      // 状態の確認自体の失敗は、待ってもう一度見る
+    }
+    await sleep(2000)
+  }
+  // 待ちきれなくても公開を試す（公開側でもやり直す）
+}
+
 /** コンテナを公開し、投稿URL（permalink）を返す */
 async function igPublishContainer(host: string, igUserId: string, token: string, creationId: string): Promise<string> {
-  const res = await fetch(`${host}/v21.0/${igUserId}/media_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ creation_id: creationId, access_token: token }),
-  })
-  const data = await res.json()
-  if (!res.ok || !data.id) throw new Error(data.error?.message ?? '公開に失敗')
+  // Instagram側で画像の取り込みが終わる前に公開すると「Media ID is not available」になるため、
+  // コンテナが FINISHED になるまで待ってから公開する（最大およそ40秒）
+  await igWaitForContainer(host, token, creationId)
+
+  let data: { id?: string; error?: { message?: string } } = {}
+  let ok = false
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(`${host}/v21.0/${igUserId}/media_publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creation_id: creationId, access_token: token }),
+    })
+    data = await res.json()
+    ok = res.ok && Boolean(data.id)
+    if (ok) break
+    // まだ準備中と言われたときだけ、少し待ってやり直す
+    if (!/not available|not ready/i.test(data.error?.message ?? '')) break
+    await sleep(4000)
+  }
+  if (!ok || !data.id) throw new Error(data.error?.message ?? '公開に失敗')
 
   // メディアIDのままではURLにならないため、permalink（実際の投稿URL）を取得する（失敗しても投稿自体は成功扱い）
   try {
