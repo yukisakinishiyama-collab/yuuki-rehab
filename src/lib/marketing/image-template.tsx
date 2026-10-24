@@ -173,16 +173,74 @@ export interface StoryImageInput {
   asOfLabel: string
   scope: 'day' | 'week'
   rows: StoryRow[]
+  /** 院長のひとこと（最大40文字） */
+  note?: string
+  /** 時間ごとの残り枠の数を出すか（既定は出す） */
+  showRemaining?: boolean
+  /** ネット予約のQR（PNGのdata URL）。無ければQR無し */
+  qrDataUrl?: string
+}
+
+/** 時間ごとの枠（「15:30 残り2」）。午前・午後に分けて並べる */
+function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolean }) {
+  const slots = row.slots ?? []
+  // 時間が多い日は5列・小さめにして、下のQR・電話番号にかからないようにする
+  const many = slots.length > 10
+  const groups: Array<{ label: string; items: typeof slots }> = [
+    { label: '午前', items: slots.filter((s) => s.time < '13:00') },
+    { label: '午後', items: slots.filter((s) => s.time >= '13:00') },
+  ]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: many ? 12 : 24 }}>
+      {groups.map((g) => (
+        <div key={g.label} style={{ display: 'flex', flexDirection: 'column', gap: many ? 8 : 12 }}>
+          <div style={{ display: 'flex', fontSize: many ? 30 : 36, fontWeight: 700, color: '#bfdbe8' }}>{g.label}</div>
+          {g.items.length === 0 ? (
+            <div style={{ display: 'flex' }}>
+              <Pill level={row.closed ? 'closed' : 'full'} size={34} />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: many ? 10 : 14 }}>
+              {g.items.map((s) => (
+                <div
+                  key={s.time}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: many ? 170 : 207,
+                    padding: many ? '8px 0' : '16px 0',
+                    borderRadius: many ? 18 : 22,
+                    background: s.remaining <= 1 ? 'rgba(251,191,36,0.18)' : 'rgba(20,184,166,0.2)',
+                    border: `3px solid ${s.remaining <= 1 ? '#fbbf24' : '#14b8a6'}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', fontSize: many ? 38 : 46, fontWeight: 700 }}>{s.time}</div>
+                  <div style={{ display: 'flex', fontSize: many ? 22 : 28, color: s.remaining <= 1 ? '#fde68a' : '#99f6e4' }}>
+                    {showRemaining ? `残り${s.remaining}枠` : s.remaining <= 1 ? 'あと少し' : '空きあり'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /**
  * ストーリー画像（1080×1920）。Instagramの上下の帯（約250px）に文字がかからないよう、内側に寄せる。
- * 枠の数そのものは出さず、「空きあり／少しあり／ご予約いっぱい」で見せる。
+ * 1日分で時間が取れたときは「時間と残り枠」、それ以外は「空きあり／少しあり／いっぱい」で見せる。
+ * 下にネット予約のQR・電話番号・住所。
  */
 export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> {
   const { w, h } = IMAGE_SIZES.story
   const p = DEFAULT_CLINIC_PROFILE
   const single = input.scope === 'day' && input.rows.length === 1 ? input.rows[0] : null
+  const withSlots = single && single.slots !== undefined && !single.closed
+  const showRemaining = input.showRemaining !== false
   // 縮まないように（上から順に積む。日が多い週は文字を少し小さく）
   const fixed = { display: 'flex', flexShrink: 0 } as const
   const many = input.rows.length >= 5
@@ -193,19 +251,29 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
         height: h,
         display: 'flex',
         flexDirection: 'column',
-        padding: '230px 84px 270px',
+        padding: '220px 84px 260px',
         background: `linear-gradient(165deg, ${NAVY} 0%, ${NAVY_2} 100%)`,
         fontFamily: FONT,
         color: '#ffffff',
       }}
     >
-      <div style={{ ...fixed, fontSize: 30, fontWeight: 700, letterSpacing: 6, color: MINT }}>YUUKI SEIKOTSU-IN</div>
-      <div style={{ ...fixed, fontSize: 44, fontWeight: 700, marginTop: 8 }}>{p.name}</div>
-      <div style={{ ...fixed, fontSize: single ? 96 : 72, fontWeight: 700, marginTop: single ? 70 : 50, lineHeight: 1.2 }}>{input.title}</div>
-      <div style={{ ...fixed, fontSize: 34, color: '#bfdbe8', marginTop: 14 }}>{input.asOfLabel}</div>
+      <div style={{ ...fixed, fontSize: 28, fontWeight: 700, letterSpacing: 6, color: MINT }}>YUUKI SEIKOTSU-IN</div>
+      <div style={{ ...fixed, fontSize: 42, fontWeight: 700, marginTop: 6 }}>{p.name}</div>
+      <div style={{ ...fixed, fontSize: single ? (withSlots ? 80 : 96) : 72, fontWeight: 700, marginTop: withSlots ? 36 : single ? 70 : 50, lineHeight: 1.2 }}>{input.title}</div>
+      <div style={{ ...fixed, fontSize: 32, color: '#bfdbe8', marginTop: 10 }}>{input.asOfLabel}</div>
+      {input.note && (
+        <div style={{ ...fixed, marginTop: 24, padding: '18px 26px', borderRadius: 24, background: 'rgba(94,234,212,0.14)', border: `2px solid ${MINT}`, fontSize: 34, fontWeight: 700, color: '#ccfbf1' }}>
+          {input.note}
+        </div>
+      )}
 
-      {single ? (
-        <div style={{ ...fixed, flexDirection: 'column', marginTop: 70, gap: 34 }}>
+      {withSlots ? (
+        <div style={{ ...fixed, flexDirection: 'column', marginTop: 28, gap: 14 }}>
+          <div style={{ display: 'flex', fontSize: 46, fontWeight: 700 }}>{single!.label}</div>
+          <SlotGrid row={single!} showRemaining={showRemaining} />
+        </div>
+      ) : single ? (
+        <div style={{ ...fixed, flexDirection: 'column', marginTop: 60, gap: 34 }}>
           <div style={{ display: 'flex', fontSize: 56, fontWeight: 700 }}>{single.label}</div>
           {(['am', 'pm'] as const).map((half) => (
             <div
@@ -249,12 +317,17 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 20 }}>
-                  <div style={{ display: 'flex', width: 220, justifyContent: 'center' }}>
-                    <Pill level={r.am} size={30} />
-                  </div>
-                  <div style={{ display: 'flex', width: 220, justifyContent: 'center' }}>
-                    <Pill level={r.pm} size={30} />
-                  </div>
+                  {(['am', 'pm'] as const).map((half) => {
+                    const count = showRemaining && r.slots
+                      ? r.slots.filter((s) => (half === 'am' ? s.time < '13:00' : s.time >= '13:00')).reduce((n, s) => n + s.remaining, 0)
+                      : 0
+                    return (
+                      <div key={half} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 220, gap: 4 }}>
+                        <Pill level={r[half]} size={30} />
+                        {count > 0 && <div style={{ display: 'flex', fontSize: 22, color: '#bfdbe8' }}>{`残り${count}枠`}</div>}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -262,15 +335,26 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
         </div>
       )}
 
-      <div style={{ ...fixed, flexDirection: 'column', marginTop: 'auto', gap: 12 }}>
-        <div style={{ display: 'flex', fontSize: 52, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
-        <div style={{ display: 'flex', fontSize: 36 }}>プロフィールのリンクから、その場で予約が確定します</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginTop: 14 }}>
-          <div style={{ display: 'flex', fontSize: 34, color: '#bfdbe8' }}>お電話</div>
-          <div style={{ display: 'flex', fontSize: 56, fontWeight: 700, letterSpacing: 2 }}>{p.phone}</div>
+      <div style={{ ...fixed, marginTop: 'auto', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', fontSize: 46, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
+          <div style={{ display: 'flex', fontSize: 30 }}>{input.qrDataUrl ? 'QRから、その場で予約が確定します' : 'プロフィールのリンクから予約できます'}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: 10 }}>
+            <div style={{ display: 'flex', fontSize: 30, color: '#bfdbe8' }}>お電話</div>
+            <div style={{ display: 'flex', fontSize: 50, fontWeight: 700, letterSpacing: 2 }}>{p.phone}</div>
+          </div>
+          <div style={{ display: 'flex', fontSize: 28, color: '#bfdbe8' }}>{p.address.replace(/^山口県/, '')}（駐車場あり）</div>
+          <div style={{ display: 'flex', fontSize: 24, color: '#94a3b8', marginTop: 4 }}>（空き状況は変わることがあります）</div>
         </div>
-        <div style={{ display: 'flex', fontSize: 32, color: '#bfdbe8' }}>{p.address.replace(/^山口県/, '')}（駐車場あり）</div>
-        <div style={{ display: 'flex', fontSize: 26, color: '#94a3b8', marginTop: 6 }}>（空き状況は変わることがあります）</div>
+        {input.qrDataUrl && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', padding: 12, borderRadius: 24, background: '#ffffff' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- next/og（Satori）で描く画像の中 */}
+              <img src={input.qrDataUrl} width={232} height={232} alt="" />
+            </div>
+            <div style={{ display: 'flex', fontSize: 26, fontWeight: 700, color: MINT }}>ネット予約</div>
+          </div>
+        )}
       </div>
     </div>,
     w,

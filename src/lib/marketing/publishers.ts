@@ -71,22 +71,28 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   const story = content.story
   if (!story || story.dates.length === 0) return { kind: 'error', message: 'ストーリーの空き状況の情報がありません' }
   const { fetchHubStats } = await import('./booking-stats')
-  const { jstParts, storyHasOpening, storyRows, storyText } = await import('./autopilot-planner')
+  const { jstParts } = await import('./autopilot-planner')
+  const { buildStory, storyQrDataUrl, storyReserveLink } = await import('./story-server')
   const fresh = await fetchHubStats(1).catch(() => null)
   const openings = fresh?.openings?.length ? fresh.openings : story.snapshot
-  const rows = storyRows(openings, story.dates)
-  if (rows.length === 0 || !storyHasOpening(rows)) {
+  const now = jstParts(new Date())
+  // 院長が画面で直したところ（見出し・ひとこと・出さない時間など）も、出す時刻の空きに当てはめる
+  const built = buildStory(openings, story.dates, story.scope, now.local, story.title, story.edits ?? {})
+  const rows = built.rows
+  if (rows.length === 0 || !built.hasOpening) {
     return { kind: 'skipped', message: '投稿の時刻に案内できる空きが無かったため、ストーリーは出しませんでした' }
   }
-  const now = jstParts(new Date())
-  const text = storyText(rows, story.scope, now.local, story.title)
+  const text = { title: built.title }
   const asOfLabel = `${Number(now.local.slice(5, 7))}/${Number(now.local.slice(8, 10))} ${now.local.slice(11, 16)} 時点${fresh ? '' : '（前の晩の空き）'}`
 
   let imageUrl: string
   try {
     const { renderStoryImage, toJpeg } = await import('./image-template')
     const { put } = await import('@vercel/blob')
-    const jpg = await toJpeg(await renderStoryImage({ title: text.title, asOfLabel, scope: story.scope, rows }))
+    const qrDataUrl = await storyQrDataUrl(storyReserveLink(now.date))
+    const jpg = await toJpeg(
+      await renderStoryImage({ title: text.title, asOfLabel, scope: story.scope, rows, note: built.note, showRemaining: built.showRemaining, qrDataUrl }),
+    )
     imageUrl = (await put(`marketing/story-${Date.now()}.jpg`, jpg, { access: 'public', contentType: 'image/jpeg' })).url
   } catch (error) {
     // 画面に出す文は短くしてよいが、原因そのものは切らずにログへ残す

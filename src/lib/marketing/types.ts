@@ -116,6 +116,20 @@ export interface StoryContent {
   snapshot: Array<{ date: string; closed: boolean; am: number; pm: number }>
   /** 見出し（例「明日のご予約の空き」）。無ければ scope から決める（本日／今週） */
   title?: string
+  /** 院長が画面で直したところ（見出し・ひとこと・出さない時間・残り枠の数を出すか） */
+  edits?: StoryEdits
+}
+
+/** ストーリー画像を出す前に院長が直せるところ */
+export interface StoryEdits {
+  /** 見出し（最大24文字） */
+  title?: string
+  /** ひとこと（最大40文字。例「夕方は空きがあります」） */
+  note?: string
+  /** 出さない時間（'YYYY-MM-DD HH:MM'） */
+  hiddenSlots?: string[]
+  /** 残り枠の数を出すか（出さないときは「空きあり」だけ） */
+  showRemaining?: boolean
 }
 
 /** 媒体別バリアント（1プロジェクトから媒体ごとに生成） */

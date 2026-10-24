@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
-import { jstParts, storyHasOpening, storyRange, storyRows, storyText } from '@/lib/marketing/autopilot-planner'
+import { jstParts, storyRange } from '@/lib/marketing/autopilot-planner'
+import { buildStory, sanitizeStoryEdits, storyEditsProblem } from '@/lib/marketing/story-server'
 import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
 import { createJob, recordAttempt, updateJob } from '@/lib/marketing/jobs-store-server'
 import { publishToChannel } from '@/lib/marketing/publishers'
@@ -26,22 +27,26 @@ export async function POST(request: NextRequest) {
   const denied = requireAdmin(request)
   if (denied) return denied
 
-  const body = (await request.json().catch(() => ({}))) as { range?: string }
+  const body = (await request.json().catch(() => ({}))) as { range?: string; edits?: unknown }
   const range = RANGES.includes(body.range as Range) ? (body.range as Range) : null
   if (!range) return NextResponse.json({ error: 'range は today・next・week のどれかです' }, { status: 400 })
+  // 画面で直したところ（見出し・ひとこと・出さない時間・残り枠の数を出すか）
+  const edits = sanitizeStoryEdits(body.edits)
+  const problem = storyEditsProblem(edits)
+  if (problem) return NextResponse.json({ error: problem }, { status: 422 })
 
   const openings = (await fetchHubStatsFast(1, { force: true }))?.openings ?? []
   if (openings.length === 0) return NextResponse.json({ error: '予約システムから空きを受け取れませんでした' }, { status: 502 })
 
   const now = jstParts(new Date())
   const r = storyRange(range, openings, now.date)
-  const rows = storyRows(openings, r.dates)
-  if (rows.length === 0) return NextResponse.json({ error: '載せられる日がありません（休診の日など）' }, { status: 404 })
-  if (!storyHasOpening(rows)) {
+  const built = buildStory(openings, r.dates, r.scope, now.local, r.title, edits)
+  if (built.rows.length === 0) return NextResponse.json({ error: '載せられる日がありません（休診の日など）' }, { status: 404 })
+  if (!built.hasOpening) {
     return NextResponse.json({ error: '案内できる空きが無いため、ストーリーには出しませんでした（どこも「いっぱい」か休診です）' }, { status: 409 })
   }
 
-  const text = storyText(rows, r.scope, now.local, r.title)
+  const text = { title: built.title, body: built.body }
   const content: GeneratedContent = {
     title: text.title,
     hook: text.title,
@@ -54,6 +59,7 @@ export async function POST(request: NextRequest) {
       dates: r.dates,
       snapshot: openings.filter((o) => r.dates.includes(o.date)).map((o) => ({ date: o.date, closed: o.closed, am: o.am, pm: o.pm })),
       title: r.title,
+      edits,
     },
   }
 

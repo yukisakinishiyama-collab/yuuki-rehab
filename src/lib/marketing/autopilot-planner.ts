@@ -154,6 +154,15 @@ export interface OpeningDay {
   closed: boolean
   am: number
   pm: number
+  /** 空いている時間と残り枠（予約システム v3.10 以降。無ければ午前・午後だけで見せる） */
+  slots?: StorySlot[]
+}
+
+export interface StorySlot {
+  /** '15:30' */
+  time: string
+  /** その時間にあと何人受けられるか */
+  remaining: number
 }
 
 /**
@@ -223,6 +232,8 @@ export interface StoryRow {
   closed: boolean
   am: StoryLevel
   pm: StoryLevel
+  /** 空いている時間（取れたときだけ。編集で隠した時間は入らない） */
+  slots?: StorySlot[]
 }
 
 const STORY_WEEK = ['日', '月', '火', '水', '木', '金', '土']
@@ -234,12 +245,18 @@ export function storyRows(openings: OpeningDay[], dates: string[]): StoryRow[] {
   for (const date of dates) {
     const d = openings.find((o) => o.date === date)
     if (!d) continue
+    const slots = Array.isArray(d.slots)
+      ? d.slots
+          .filter((s) => s && /^\d{1,2}:\d{2}$/.test(String(s.time)) && Number(s.remaining) > 0)
+          .map((s) => ({ time: String(s.time).padStart(5, '0'), remaining: Math.floor(Number(s.remaining)) }))
+      : undefined
     rows.push({
       date,
       label: storyDayLabel(date),
       closed: d.closed,
       am: d.closed ? 'closed' : storyLevel(d.am),
       pm: d.closed ? 'closed' : storyLevel(d.pm),
+      ...(slots && !d.closed ? { slots } : {}),
     })
   }
   return rows

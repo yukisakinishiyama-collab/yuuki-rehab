@@ -9,7 +9,7 @@
  *            院長は「Instagramのストーリーに出す」でそのまま公開できる（出す瞬間の空きで作り直す）。保存して手で投稿してもよい。
  * どちらも患者さんの情報は使わない。作ったリンクはこの端末に最大10件だけ覚えておく。
  */
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { Check, Copy, Download, ExternalLink, ImageIcon, Link2, RefreshCw, Send } from 'lucide-react'
 import { SITE_URL } from '@/lib/site/seo'
@@ -295,17 +295,95 @@ function LinkMaker() {
 type Range = 'today' | 'next' | 'week'
 const RANGE_LABELS: Record<Range, string> = { today: '本日', next: '次の診療日', week: 'この1週間' }
 
+interface StoryEdits {
+  title?: string
+  note?: string
+  hiddenSlots?: string[]
+  showRemaining?: boolean
+}
+interface StoryDay {
+  date: string
+  label: string
+  closed: boolean
+  hasSlots: boolean
+  slots: Array<{ time: string; remaining: number; hidden: boolean }>
+}
+interface StoryPreview {
+  image: string
+  title: string
+  defaultTitle: string
+  hasOpening: boolean
+  days: StoryDay[]
+}
+
 function StoryMaker() {
   const [range, setRange] = useState<Range>('today')
   const [busy, setBusy] = useState(false)
-  const [image, setImage] = useState<{ url: string; name: string; hasOpening: boolean } | null>(null)
+  const [preview, setPreview] = useState<StoryPreview | null>(null)
   const [error, setError] = useState('')
+  // 院長が直すところ（見出し・ひとこと・出さない時間・残り枠の数）
+  const [title, setTitle] = useState('')
+  const [note, setNote] = useState('')
+  const [hidden, setHidden] = useState<string[]>([])
+  const [showRemaining, setShowRemaining] = useState(true)
+  const [dirty, setDirty] = useState(false)
   const [posting, setPosting] = useState(false)
   const [posted, setPosted] = useState<{ ok: boolean; message: string; url?: string | null; manualUrl?: string } | null>(null)
   const storyLink = buildUrl('reserve', 'instagram', `story-${today()}`)
 
-  // そのままInstagramのストーリーに出す（院長のみ。出す瞬間の空きで作り直す）
+  const edits = (): StoryEdits => ({
+    title: title.trim() || undefined,
+    note: note.trim() || undefined,
+    hiddenSlots: hidden.length ? hidden : undefined,
+    showRemaining,
+  })
+
+  async function render(r: Range, e: StoryEdits) {
+    setBusy(true)
+    setError('')
+    setPosted(null)
+    try {
+      const res = await fetch('/api/marketing/story/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ range: r, edits: e }),
+        cache: 'no-store',
+      })
+      const body = (await res.json().catch(() => ({}))) as Partial<StoryPreview> & { error?: string }
+      if (!res.ok || !body.image) {
+        setError(body.error ?? '画像を作れませんでした')
+        return
+      }
+      setPreview(body as StoryPreview)
+      setDirty(false)
+    } catch {
+      setError('画像を作れませんでした（通信の失敗）')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 日を選び直したら、直したところは最初に戻す
+  function make(r: Range) {
+    setRange(r)
+    setTitle('')
+    setNote('')
+    setHidden([])
+    setShowRemaining(true)
+    void render(r, { showRemaining: true })
+  }
+
+  function toggleSlot(key: string) {
+    setHidden((h) => (h.includes(key) ? h.filter((k) => k !== key) : [...h, key]))
+    setDirty(true)
+  }
+
+  // そのままInstagramのストーリーに出す（院長のみ。出す瞬間の空きで、同じ直し方で作り直す）
   async function publish() {
+    if (dirty) {
+      setPosted({ ok: false, message: '直したところを「画像に反映」してから出してください' })
+      return
+    }
     if (!window.confirm(`${RANGE_LABELS[range]}の空き状況を、Instagramのストーリーに公開します。よろしいですか？\n（出す瞬間の予約システムの空きで画像を作り直します。24時間で消えます）`)) return
     setPosting(true)
     setPosted(null)
@@ -313,7 +391,7 @@ function StoryMaker() {
       const res = await fetch('/api/marketing/story/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ range }),
+        body: JSON.stringify({ range, edits: edits() }),
       })
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string; url?: string | null; manualUrl?: string }
       if (res.ok && body.ok) setPosted({ ok: true, message: body.message ?? 'Instagramのストーリーに出しました', url: body.url })
@@ -325,35 +403,8 @@ function StoryMaker() {
     }
   }
 
-  // 作った画像の一時URLは、作り直す・画面を離れるときに片づける
-  useEffect(() => {
-    return () => {
-      if (image) URL.revokeObjectURL(image.url)
-    }
-  }, [image])
-
-  async function make(r: Range) {
-    setRange(r)
-    setBusy(true)
-    setError('')
-    setPosted(null)
-    try {
-      const res = await fetch(`/api/marketing/image?kind=story&range=${r}&fresh=1`, { cache: 'no-store' })
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        setError(body.error ?? '画像を作れませんでした')
-        setImage(null)
-        return
-      }
-      const blob = await res.blob()
-      const name = `story-${today()}-${r}.png`
-      setImage({ url: URL.createObjectURL(blob), name, hasOpening: res.headers.get('X-Story-Has-Opening') !== '0' })
-    } catch {
-      setError('画像を作れませんでした（通信の失敗）')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const slotDays = preview?.days.filter((d) => d.hasSlots && !d.closed) ?? []
+  const noSlotsYet = preview && preview.days.length > 0 && preview.days.every((d) => !d.hasSlots)
 
   return (
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
@@ -362,36 +413,83 @@ function StoryMaker() {
         今の空きでストーリー画像を作る
       </h2>
       <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-        予約システムの今の空きで作ります（枠の数は出さず「空きあり・少しあり・いっぱい」）。保存して、Instagramのストーリーで投稿してください。
+        予約システムの今の空きで作ります（時間と残り枠・ネット予約のQR・電話番号・住所入り）。見出しやひとこと、出さない時間を直してから出せます。
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
-          <button key={r} type="button" disabled={busy} onClick={() => void make(r)} className={range === r && image ? primary : pill}>
+          <button key={r} type="button" disabled={busy} onClick={() => make(r)} className={range === r && preview ? primary : pill}>
             {busy && range === r ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {RANGE_LABELS[r]}の空きで作る
           </button>
         ))}
       </div>
       {error && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{error}</p>}
-      {image && (
+      {preview && (
         <div className="mt-4 grid gap-4 sm:grid-cols-[auto_1fr]">
           {/* eslint-disable-next-line @next/next/no-img-element -- その場で作った画像（最適化は不要） */}
-          <img src={image.url} alt={`${RANGE_LABELS[range]}の空き状況のストーリー画像`} className="w-44 rounded-2xl border border-slate-200 sm:w-52" />
+          <img src={preview.image} alt={`${RANGE_LABELS[range]}の空き状況のストーリー画像`} className={`w-48 rounded-2xl border border-slate-200 sm:w-60 ${dirty ? 'opacity-60' : ''}`} />
           <div className="min-w-0 space-y-3 text-sm leading-relaxed text-slate-700">
-            {!image.hasOpening && (
-              <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-900">案内できる空きがありません（どこも「いっぱい」か休診です）。出すかどうか、ご判断ください。</p>
+            {!preview.hasOpening && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-900">案内できる空きがありません（どこも「いっぱい」か休診です）。この内容では出せません。</p>
             )}
+
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-bold text-slate-600">画像を直す</p>
+              <label className="block text-xs text-slate-500">
+                見出し（24文字まで）
+                <input className={input} value={title} maxLength={24} placeholder={preview.defaultTitle} onChange={(e) => { setTitle(e.target.value); setDirty(true) }} />
+              </label>
+              <label className="block text-xs text-slate-500">
+                ひとこと（40文字まで・空でもよい）
+                <input className={input} value={note} maxLength={40} placeholder="例：夕方は空きがあります" onChange={(e) => { setNote(e.target.value); setDirty(true) }} />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={showRemaining} onChange={(e) => { setShowRemaining(e.target.checked); setDirty(true) }} />
+                残り枠の数を出す（外すと「空きあり・あと少し」だけ）
+              </label>
+              {slotDays.map((d) => (
+                <div key={d.date}>
+                  <p className="text-xs text-slate-500">{d.label}：出さない時間は押して外す</p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {d.slots.length === 0 && <span className="text-xs text-slate-400">空いている時間はありません</span>}
+                    {d.slots.map((s) => {
+                      const key = `${d.date} ${s.time}`
+                      const off = hidden.includes(key)
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => toggleSlot(key)}
+                          aria-pressed={!off}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${off ? 'border-slate-200 bg-slate-100 text-slate-400 line-through' : 'border-teal-300 bg-teal-50 text-teal-800'}`}
+                        >
+                          {s.time}（{s.remaining}）
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+              {noSlotsYet && (
+                <p className="text-xs text-amber-700">予約システムから時間ごとの空きがまだ届いていません（予約システムの更新後に出ます）。いまは午前・午後で表示しています。</p>
+              )}
+              <button type="button" disabled={busy || !dirty} onClick={() => void render(range, edits())} className={pill}>
+                {busy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                画像に反映
+              </button>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => void publish()} disabled={posting || busy} className={primary}>
+              <button type="button" onClick={() => void publish()} disabled={posting || busy || !preview.hasOpening} className={primary}>
                 {posting ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
                 {posting ? 'ストーリーに出しています…' : 'Instagramのストーリーに出す'}
               </button>
-              <a href={image.url} download={image.name} className={pill}>
+              <a href={preview.image} download={`story-${today()}-${range}.png`} className={pill}>
                 <Download className="h-4 w-4" aria-hidden />
                 画像を保存
               </a>
             </div>
-            <p className="text-xs text-slate-500">「ストーリーに出す」は院長のみ。出す瞬間の空きで作り直して公開します（リンクのスタンプはInstagramの仕組み上つけられないので、画像に電話番号と「プロフィールのリンクから」を載せています）。</p>
+            <p className="text-xs text-slate-500">「ストーリーに出す」は院長のみ。出す瞬間の空きで、同じ直し方で作り直して公開します。</p>
             {posted && (
               <p role="status" className={`rounded-xl px-3 py-2 text-sm ${posted.ok ? 'bg-teal-50 text-teal-900' : 'bg-amber-50 text-amber-900'}`}>
                 {posted.ok ? <Check className="mr-1 inline h-4 w-4" aria-hidden /> : null}
@@ -410,10 +508,9 @@ function StoryMaker() {
                 ) : null}
               </p>
             )}
-            <p className="text-xs text-slate-500">スマホでは、画像を長押しして「写真に保存」でも保存できます。</p>
             <p className="text-xs font-bold text-slate-600">手で出すとき（リンクのスタンプをつけたいとき）</p>
             <ol className="list-decimal space-y-1 pl-5 text-xs text-slate-600">
-              <li>Instagramアプリで、ストーリーを作る → 保存した画像を選ぶ</li>
+              <li>「画像を保存」→ Instagramアプリでストーリーを作り、保存した画像を選ぶ</li>
               <li>「スタンプ」→「リンク」に、下のリンクを貼る（予約が計測されます）</li>
               <li>シェアする</li>
             </ol>
