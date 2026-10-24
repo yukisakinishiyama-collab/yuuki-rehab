@@ -13,7 +13,7 @@ import { publishToChannel } from '@/lib/marketing/publishers'
 import { cronOrAdmin } from '@/lib/marketing/auth'
 import { nudgeManualPosts } from '@/lib/marketing/autopilot-server'
 
-export const maxDuration = 120
+export const maxDuration = 300
 
 async function run() {
   // IGトークンの定期延長（60日期限対策）。失敗してもジョブ処理は続行する

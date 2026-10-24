@@ -50,10 +50,14 @@ const nextConfig: NextConfig = {
   env: {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
   },
-  serverExternalPackages: ['@anthropic-ai/sdk'],
+  // ffmpeg-static は実行ファイルの置き場所をそのまま使うため、まとめ（バンドル）に入れない
+  serverExternalPackages: ['@anthropic-ai/sdk', 'ffmpeg-static'],
   // 投稿画像（Instagramストーリーの空き状況・テンプレート画像）を作るサーバーの処理に、日本語フォントを同梱する
   outputFileTracingIncludes: {
     '/api/marketing/**': ['./assets/fonts/**/*'],
+    // AI動画（画像をつないだスライド動画）を組み立てる ffmpeg 本体
+    '/api/marketing/videos/ai': ['./node_modules/ffmpeg-static/ffmpeg*'],
+    '/api/marketing/jobs/run': ['./node_modules/ffmpeg-static/ffmpeg*'],
   },
   async redirects() {
     return [

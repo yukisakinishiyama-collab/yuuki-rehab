@@ -1,16 +1,16 @@
 /**
- * AI動画（OpenAI の動画生成）
+ * AI動画（OpenAI の画像 → スライド動画）
  *
  * GET  … 設定済みか・作れるテーマの一覧（院長のみ）
- * POST { action: 'check' }                … 作成中の動画の出来上がりを取りに行く（画面を開いたとき）
- * POST { action: 'start', themeKey? }     … いますぐ1本作り始める（院長のボタン）
+ * POST { action: 'check' }                … 途中で止まった作成中のものを片付ける（画面を開いたとき）
+ * POST { action: 'start', themeKey? }     … いますぐ1本作る（院長のボタン。1〜3分かかる）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { AI_VIDEO_THEMES, aiVideoConfigured, startAiVideo, tickAiVideos } from '@/lib/marketing/ai-video-server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   const denied = requireAdmin(request)
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (body.action === 'start') {
       const themeKey = AI_VIDEO_THEMES.some((t) => t.key === body.themeKey) ? body.themeKey : undefined
       const video = await startAiVideo('manual', themeKey)
-      return NextResponse.json({ ok: true, video, message: `「${video.title}」を作り始めました。数分で動画ストックに入ります` })
+      return NextResponse.json({ ok: true, video, message: `「${video.title}」ができました。動画ストックに入れました（公開はしていません）` })
     }
     const result = await tickAiVideos({ allowAutoStart: false })
     return NextResponse.json({ ok: true, ...result })

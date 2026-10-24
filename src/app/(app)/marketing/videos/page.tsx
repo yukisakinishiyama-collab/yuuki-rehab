@@ -58,7 +58,7 @@ export default function VideosPage() {
       if (res.status === 403) return // 院長以外は見るだけ
       const data = await res.json()
       setAiConfigured(data.configured !== false)
-      if (data.ready > 0 || data.failed > 0) load()
+      if (data.failed > 0) load()
     } catch {
       /* 取りに行けなくても一覧は出す */
     }
@@ -135,8 +135,8 @@ export default function VideosPage() {
           <div>
             <h2 className="font-bold text-violet-900">AI動画の自動作成（OpenAI）</h2>
             <p className="mt-1 text-xs text-violet-800">
-              毎週月曜・木曜の朝に1本ずつ（週2本）、8秒の縦動画を作ってここに貯めます。内容は「セルフケア・姿勢の雰囲気」と「院の雰囲気・季節の映像」を交互に。
-              顔の映らない人物・文字なしの映像で、公開はしません（使うかどうかは院長が決めます）。1本およそ120円です。
+              毎週月曜・木曜の朝に1本ずつ（週2本）、OpenAIで作った写真3枚をゆっくり動かしてつないだ約10秒の縦動画（音なし）をここに貯めます。内容は「セルフケア・姿勢の雰囲気」と「院の雰囲気・季節の映像」を交互に。
+              顔の映らない人物・文字なしの映像で、公開はしません（使うかどうかは院長が決めます）。1本およそ30円です。
             </p>
           </div>
           {aiConfigured ? (
@@ -145,7 +145,7 @@ export default function VideosPage() {
               disabled={aiBusy || generating}
               className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white hover:bg-violet-800 disabled:opacity-50"
             >
-              {aiBusy ? '依頼中…' : generating ? '作成中です…' : 'いま1本作る'}
+              {aiBusy ? '作成中…（1〜3分）' : generating ? '作成中です…' : 'いま1本作る'}
             </button>
           ) : null}
         </div>
@@ -217,7 +217,7 @@ export default function VideosPage() {
                   ) : (
                     <div className="flex h-full items-center justify-center px-4 text-center text-xs text-slate-400">
                       {v.ai?.status === 'generating'
-                        ? 'AIが作成中です（数分〜10分ほど）'
+                        ? 'AIが作成中です（1〜3分ほど）'
                         : v.ai?.status === 'failed'
                           ? `作成に失敗しました${v.ai.error ? `：${v.ai.error}` : ''}`
                           : '動画URL未登録'}

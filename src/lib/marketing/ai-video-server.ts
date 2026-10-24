@@ -1,34 +1,43 @@
 /**
- * AI動画の自動作成（OpenAI の動画生成 API = Sora）→ 動画ストックに貯める
+ * AI動画の自動作成（OpenAI の画像生成 → ゆっくり動くスライド動画）→ 動画ストックに貯める
+ *
+ * OpenAI の動画生成（Sora / Videos API）は 2026-09-24 で提供終了したため、
+ * 画像生成（gpt-image）で同じテーマの写真を3枚作り、ゆっくりズーム＋クロスフェードでつないだ
+ * 縦型（720x1280・約10秒・音なし）の mp4 にする。
  *
  * - 週2本（月曜・木曜の朝9時以降、その日まだ作っていなければ1本）。院長のボタンでも1本作れる
  * - 作るのは「セルフケア・姿勢の雰囲気」と「院の雰囲気・季節の映像」だけ
  *   （顔が映らない人物・実在の人や院を名指ししない・効果をうたう表現を入れない・文字を入れない）
- * - 動画の生成には数分かかるので、「作り始める」と「出来上がりを取りに行く」を分ける。
- *   取りに行くのは15分ごとの定期実行（/api/marketing/jobs/run）と、動画ストック画面を開いたとき
  * - 出来上がった動画は Vercel Blob に置き、動画ストックに「未使用・患者なし」で登録する（公開はしない）
  *
- * 必要な設定: OPENAI_API_KEY（Vercel の環境変数）。任意で OPENAI_VIDEO_MODEL（既定 sora-2）
+ * 必要な設定: OPENAI_API_KEY（Vercel の環境変数）。任意で OPENAI_IMAGE_MODEL（既定は gpt-image-2 → 1.5 → 1 の順に試す）
  */
 import { jstParts } from './autopilot-planner'
 import { listVideos, saveVideo } from './video-store-server'
 import type { StockVideo } from './video-types'
 
-const API = 'https://api.openai.com/v1/videos'
-const SECONDS = '8'
-const SIZE = '720x1280' // 縦型（リール・ストーリー向け）
+const IMAGES_API = 'https://api.openai.com/v1/images/generations'
+const IMAGE_SIZE = '1024x1536' // 縦 2:3（動画は 9:16 に切り抜く）
+const SHOT_SECONDS = 3.6
+const FADE_SECONDS = 0.6
+const FPS = 30
+const OUT_W = 720
+const OUT_H = 1280
 /** 自動で作る曜日（JST）: 月・木 */
 const AUTO_WEEKDAYS = new Set([1, 4])
 const AUTO_FROM_HOUR = 9
-/** これ以上たっても出来上がらなければ失敗扱い */
-const GIVE_UP_MS = 3 * 60 * 60 * 1000
+/** 作成中のまま、これ以上たったら失敗扱い（処理が途中で止まった場合） */
+const STALE_MS = 15 * 60 * 1000
 
 // 共通の注意書き（英語の方が生成の指示が通りやすい）
 const COMMON =
-  'Vertical 9:16 video, soft natural light, calm and clean Japanese aesthetic, slow gentle camera movement. ' +
+  'Photorealistic photograph, vertical composition, soft natural light, calm and clean Japanese aesthetic, gentle muted colors. ' +
   'No text, no captions, no logos, no watermarks. ' +
   'If any person appears, their face must never be visible (shot from behind, from the side below the chin, or cropped at the neck). ' +
   'No medical procedures, no needles, no injuries, no blood.'
+
+/** 1本の動画に使う3枚の撮り方（同じ場面を引き→寄りで） */
+const SHOTS = ['Wide establishing shot of the scene.', 'Medium shot, slightly closer.', 'Close-up detail shot of the same scene.']
 
 export interface AiVideoTheme {
   key: string
@@ -143,8 +152,9 @@ export function aiVideoConfigured(): boolean {
   return Boolean(process.env.OPENAI_API_KEY)
 }
 
-function model(): string {
-  return process.env.OPENAI_VIDEO_MODEL || 'sora-2'
+function imageModels(): string[] {
+  const fromEnv = process.env.OPENAI_IMAGE_MODEL
+  return fromEnv ? [fromEnv] : ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1']
 }
 
 function authHeaders(): Record<string, string> {
@@ -165,22 +175,104 @@ export function pickTheme(existing: StockVideo[], month: number): AiVideoTheme {
   return seasonal ?? fresh[0] ?? pool[0] ?? usable[0]
 }
 
-/** 1本作り始める（動画ストックに「AIが作成中」で登録） */
+/** モデルが使えない（未提供・未許可）ときは次のモデルを試す */
+function isModelProblem(status: number, message: string): boolean {
+  return status === 404 || /model|verif|not have access|does not exist/i.test(message)
+}
+
+/** 画像を1枚作る（PNG/JPEG のバイト列）。使えたモデル名も返す */
+async function generateImage(prompt: string, models: string[]): Promise<{ bytes: Buffer; model: string }> {
+  let lastError = ''
+  for (const model of models) {
+    const res = await fetch(IMAGES_API, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, size: IMAGE_SIZE, quality: 'medium', n: 1 }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
+    const item = data.data?.[0]
+    if (res.ok && item?.b64_json) return { bytes: Buffer.from(item.b64_json, 'base64'), model }
+    if (res.ok && item?.url) {
+      const img = await fetch(item.url)
+      if (img.ok) return { bytes: Buffer.from(await img.arrayBuffer()), model }
+    }
+    lastError = data.error?.message ?? `HTTP ${res.status}`
+    if (!isModelProblem(res.status, lastError)) break
+  }
+  throw new Error(`OpenAIで画像を作れませんでした（${lastError}）`)
+}
+
+/** 3枚の画像を、ゆっくりズーム＋クロスフェードの縦動画（mp4・音なし）にする */
+async function renderSlideshow(images: Buffer[]): Promise<{ mp4: Buffer; seconds: number }> {
+  const [{ default: ffmpegPath }, { spawn }, fs, path, os] = await Promise.all([
+    import('ffmpeg-static'),
+    import('node:child_process'),
+    import('node:fs/promises'),
+    import('node:path'),
+    import('node:os'),
+  ])
+  if (!ffmpegPath) throw new Error('動画を組み立てる道具（ffmpeg）が見つかりません')
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'aivideo-'))
+  try {
+    const inputs: string[] = []
+    for (const [i, bytes] of images.entries()) {
+      const file = path.join(dir, `shot${i}.img`)
+      await fs.writeFile(file, bytes)
+      inputs.push('-i', file)
+    }
+    const frames = Math.round(SHOT_SECONDS * FPS)
+    const parts: string[] = []
+    images.forEach((_, i) => {
+      // 交互にズームイン／ズームアウトして単調にしない
+      const zoom = i % 2 === 0 ? `min(1+0.0010*on,1.10)` : `max(1.10-0.0010*on,1.0)`
+      parts.push(
+        `[${i}:v]scale=${OUT_W * 2}:${OUT_H * 2}:force_original_aspect_ratio=increase,crop=${OUT_W * 2}:${OUT_H * 2},` +
+          `zoompan=z='${zoom}':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${OUT_W}x${OUT_H}:fps=${FPS},setsar=1,format=yuv420p[v${i}]`,
+      )
+    })
+    let last = 'v0'
+    for (let i = 1; i < images.length; i++) {
+      const offset = (SHOT_SECONDS - FADE_SECONDS) * i
+      const out = i === images.length - 1 ? 'out' : `x${i}`
+      parts.push(`[${last}][v${i}]xfade=transition=fade:duration=${FADE_SECONDS}:offset=${offset.toFixed(2)}[${out}]`)
+      last = out
+    }
+    const outFile = path.join(dir, 'out.mp4')
+    const args = [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      ...inputs,
+      '-filter_complex', parts.join(';'),
+      '-map', images.length > 1 ? '[out]' : '[v0]',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+      '-movflags', '+faststart',
+      outFile,
+    ]
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn(ffmpegPath, args)
+      let err = ''
+      p.stderr.on('data', (d) => (err += String(d)))
+      p.on('error', reject)
+      p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`動画の組み立てに失敗しました（${err.slice(-300) || code}）`))))
+    })
+    const seconds = SHOT_SECONDS * images.length - FADE_SECONDS * (images.length - 1)
+    return { mp4: await fs.readFile(outFile), seconds: Math.round(seconds * 10) / 10 }
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+/**
+ * 1本作る（1〜3分かかる）。先に「AIが作成中」で登録し、出来上がったら動画とサムネイルを入れる。
+ * 失敗したら「AI作成に失敗」にして理由を残す（例外は投げ直す）
+ */
 export async function startAiVideo(trigger: 'auto' | 'manual', themeKey?: string): Promise<StockVideo> {
   if (!aiVideoConfigured()) throw new Error('OPENAI_API_KEY が未設定です（Vercel の環境変数に入れてください）')
   const now = jstParts(new Date())
   const existing = await listVideos()
+  const running = existing.find((v) => v.ai?.status === 'generating' && Date.now() - Date.parse(v.ai.startedAt) < STALE_MS)
+  if (running) throw new Error(`いま「${running.title}」を作成中です。終わってからもう一度押してください`)
+
   const theme = (themeKey && AI_VIDEO_THEMES.find((t) => t.key === themeKey)) || pickTheme(existing, now.month)
-  const prompt = `${theme.prompt} ${COMMON}`
-
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: model(), prompt, seconds: SECONDS, size: SIZE }),
-  })
-  const data = (await res.json().catch(() => ({}))) as { id?: string; error?: { message?: string } }
-  if (!res.ok || !data.id) throw new Error(`OpenAIの動画生成を始められませんでした（${data.error?.message ?? `HTTP ${res.status}`}）`)
-
   const iso = new Date().toISOString()
   const video: StockVideo = {
     id: `v_ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -189,21 +281,20 @@ export async function startAiVideo(trigger: 'auto' | 'manual', themeKey?: string
     patientPresent: false,
     // 実在の人物が映らないAI映像なので、本人の掲載許可は要らない（「許可なし」の赤札にしない）
     permission: 'granted',
-    durationSec: Number(SECONDS),
     format: 'mp4',
-    resolution: SIZE,
+    resolution: `${OUT_W}x${OUT_H}`,
     orientation: 'portrait',
     bodyPart: theme.bodyPart,
     theme: theme.category === 'selfcare' ? 'セルフケア・姿勢' : '院の雰囲気・季節',
     channels: [],
     publishState: 'unused',
-    memo: 'AI（OpenAI）で作った映像です。実在の患者・院内の様子ではありません。使うときは文字や音を重ねて、効果をうたう表現は避けてください。',
+    memo: 'AI（OpenAIの画像）で作ったスライド動画です。実在の患者・院内の様子ではありません。音はないので、使うときは文字や音楽を重ねてください。効果をうたう表現は避けてください。',
     ai: {
       provider: 'openai',
-      model: model(),
-      openaiId: data.id,
+      model: imageModels()[0],
+      kind: 'image-slideshow',
       themeKey: theme.key,
-      prompt,
+      prompt: `${theme.prompt} ${COMMON}`,
       status: 'generating',
       startedDate: now.date,
       startedAt: iso,
@@ -213,92 +304,62 @@ export async function startAiVideo(trigger: 'auto' | 'manual', themeKey?: string
     updatedAt: iso,
   }
   await saveVideo(video)
-  return video
-}
+  const ai = video.ai!
 
-/** 作成中の動画を見に行き、出来上がっていれば Blob に置いてストックを更新する */
-async function collect(video: StockVideo): Promise<'ready' | 'failed' | 'waiting'> {
-  const ai = video.ai
-  if (!ai || ai.status !== 'generating') return 'waiting'
-  const res = await fetch(`${API}/${ai.openaiId}`, { headers: authHeaders() })
-  const data = (await res.json().catch(() => ({}))) as { status?: string; error?: { message?: string } }
-
-  const fail = async (message: string) => {
-    ai.status = 'failed'
-    ai.error = message.slice(0, 300)
-    await saveVideo(video)
-    return 'failed' as const
-  }
-
-  if (!res.ok) {
-    if (res.status === 404) return fail('OpenAI側に動画が見つかりませんでした')
-    if (Date.now() - Date.parse(ai.startedAt) > GIVE_UP_MS) return fail(`時間内に出来上がりませんでした（HTTP ${res.status}）`)
-    return 'waiting'
-  }
-  if (data.status === 'failed') return fail(data.error?.message ?? 'OpenAI側で作成に失敗しました')
-  if (data.status !== 'completed') {
-    if (Date.now() - Date.parse(ai.startedAt) > GIVE_UP_MS) return fail('時間内に出来上がりませんでした')
-    return 'waiting'
-  }
-
-  const { put } = await import('@vercel/blob')
-  const mp4 = await fetch(`${API}/${ai.openaiId}/content`, { headers: authHeaders() })
-  if (!mp4.ok) return 'waiting' // 取り出しの一時的な失敗は次の回にやり直す
-  const blob = await put(`marketing/videos/ai-${video.id}.mp4`, Buffer.from(await mp4.arrayBuffer()), {
-    access: 'public',
-    contentType: 'video/mp4',
-  })
-  video.url = blob.url
   try {
-    const thumb = await fetch(`${API}/${ai.openaiId}/content?variant=thumbnail`, { headers: authHeaders() })
-    if (thumb.ok) {
-      const type = thumb.headers.get('content-type') ?? 'image/webp'
-      const ext = type.includes('png') ? 'png' : type.includes('jpeg') ? 'jpg' : 'webp'
-      video.thumbUrl = (
-        await put(`marketing/videos/ai-${video.id}-thumb.${ext}`, Buffer.from(await thumb.arrayBuffer()), { access: 'public', contentType: type })
-      ).url
-    }
-  } catch {
-    /* サムネイルは無くてもよい */
+    // 1枚目で使えるモデルを決めてから、残り2枚を同じモデルで同時に作る
+    const first = await generateImage(`${theme.prompt} ${SHOTS[0]} ${COMMON}`, imageModels())
+    const rest = await Promise.all(SHOTS.slice(1).map((shot) => generateImage(`${theme.prompt} ${shot} ${COMMON}`, [first.model])))
+    const images = [first.bytes, ...rest.map((r) => r.bytes)]
+    ai.model = first.model
+    ai.images = images.length
+
+    const { mp4, seconds } = await renderSlideshow(images)
+    const { put } = await import('@vercel/blob')
+    video.url = (await put(`marketing/videos/ai-${video.id}.mp4`, mp4, { access: 'public', contentType: 'video/mp4' })).url
+    video.thumbUrl = (await put(`marketing/videos/ai-${video.id}-thumb.png`, images[0], { access: 'public', contentType: 'image/png' })).url
+    video.durationSec = seconds
+    ai.status = 'ready'
+    ai.error = undefined
+    await saveVideo(video)
+    return video
+  } catch (error) {
+    ai.status = 'failed'
+    ai.error = (error instanceof Error ? error.message : String(error)).slice(0, 300)
+    await saveVideo(video).catch(() => {})
+    throw error
   }
-  ai.status = 'ready'
-  ai.error = undefined
-  await saveVideo(video)
-  return 'ready'
 }
 
 export interface AiVideoTickResult {
   configured: boolean
   started?: string
-  ready: number
   failed: number
-  waiting: number
   error?: string
 }
 
 /**
- * 定期実行から呼ぶ: 作成中の動画を取りに行き、月・木の朝ならその日の1本を作り始める。
+ * 定期実行から呼ぶ: 途中で止まった作成中のものを失敗扱いにし、月・木の朝ならその日の1本を作る。
  * 失敗しても投稿ジョブの処理は止めない（呼び出し側で握りつぶしてよい）
  */
 export async function tickAiVideos(options: { allowAutoStart: boolean }): Promise<AiVideoTickResult> {
-  const result: AiVideoTickResult = { configured: aiVideoConfigured(), ready: 0, failed: 0, waiting: 0 }
+  const result: AiVideoTickResult = { configured: aiVideoConfigured(), failed: 0 }
   if (!result.configured) return result
 
   const videos = await listVideos()
-  for (const v of videos.filter((x) => x.ai?.status === 'generating').slice(0, 3)) {
-    try {
-      result[await collect(v)]++
-    } catch (error) {
-      result.waiting++
-      result.error = error instanceof Error ? error.message : String(error)
+  for (const v of videos) {
+    if (v.ai?.status === 'generating' && Date.now() - Date.parse(v.ai.startedAt) > STALE_MS) {
+      v.ai.status = 'failed'
+      v.ai.error = '作成の途中で止まりました（時間切れ）'
+      await saveVideo(v).catch(() => {})
+      result.failed++
     }
   }
 
   if (options.allowAutoStart) {
     const now = jstParts(new Date())
     const doneToday = videos.some((v) => v.ai?.trigger === 'auto' && v.ai.startedDate === now.date)
-    const busy = videos.some((v) => v.ai?.status === 'generating')
-    if (AUTO_WEEKDAYS.has(now.weekday) && now.hour >= AUTO_FROM_HOUR && !doneToday && !busy) {
+    if (AUTO_WEEKDAYS.has(now.weekday) && now.hour >= AUTO_FROM_HOUR && !doneToday) {
       try {
         result.started = (await startAiVideo('auto')).title
       } catch (error) {

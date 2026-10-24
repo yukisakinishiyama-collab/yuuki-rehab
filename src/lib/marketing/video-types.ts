@@ -64,9 +64,12 @@ export const AI_STATUS_LABELS: Record<AiVideoStatus, string> = {
 
 export interface AiVideoInfo {
   provider: 'openai'
+  /** 画像を作ったモデル（gpt-image-2 など） */
   model: string
-  /** OpenAI 側の動画ID（出来上がりを取りに行くのに使う） */
-  openaiId: string
+  /** 動画の作り方: OpenAIの画像を数枚つないだスライド動画 */
+  kind: 'image-slideshow'
+  /** 使った画像の枚数 */
+  images?: number
   /** 何を作るかのテーマ（theme-library の key） */
   themeKey: string
   prompt: string
