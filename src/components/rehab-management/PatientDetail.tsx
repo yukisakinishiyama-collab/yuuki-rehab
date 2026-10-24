@@ -35,6 +35,7 @@ import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import GoalsProblemsCard from './GoalsProblemsCard'
+import PatientProfileCard from './PatientProfileCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
 import { nanoid } from 'nanoid'
@@ -974,6 +975,8 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── 概要タブ ── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* 基本情報と保険証（NOAHから取り込んだ方）。情報が無い方には出さない */}
+            <PatientProfileCard patient={patient} />
             {/* 目標と課題（NextGen v2.0・説明モードの表示元）
                 key=patient.id で患者切替時に必ず読み直す（別患者のデータ混入防止） */}
             {isFeatureEnabled('goalsProblems') && (

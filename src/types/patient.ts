@@ -60,6 +60,47 @@ export interface Patient {
   therapistNotes: string
   createdAt: string
   updatedAt: string
+  // ── ここから下は NOAH（レセコン）からの取り込みで入る項目（手で作ったカルテには無いことがある） ──
+  postalCode?: string
+  address?: string
+  email?: string
+  occupation?: string
+  /** 保険証の情報（NOAHから写したもの。自費カルテの参考。保険の請求には使わない） */
+  insurance?: PatientInsurance
+  /** NOAHのどの受診者番号から作ったか（同じ方の番号はまとめる）・来院の期間と回数 */
+  noah?: NoahLink
+}
+
+/** 保険証の情報（NOAHの「受診者入力」「ハガキ・名簿」から） */
+export interface PatientInsurance {
+  /** 区分（通常・被爆・母子家庭・交通事故 など） */
+  category?: string
+  /** 種別（社会保険・組合保険・一般国保・後期高齢者 など） */
+  kind?: string
+  insurerNumber?: string
+  insurerName?: string
+  /** 記号・番号（取り込み後に受診者入力の画面から足す） */
+  symbol?: string
+  number?: string
+  /** 負担割合（例 '3割'） */
+  burdenRatio?: string
+  validUntil?: string
+  /** 続柄（本人・家族） */
+  relation?: string
+  insuredName?: string
+  insuredKana?: string
+  insuredBirthDate?: string
+  /** いつの時点の情報か（取り込んだ日） */
+  asOf?: string
+}
+
+export interface NoahLink {
+  /** NOAHの受診者番号（保険証が変わると番号が増えるので複数） */
+  ids: string[]
+  firstVisit?: string
+  lastVisit?: string
+  visitCount?: number
+  importedAt: string
 }
 
 // ──────────────────────────────────────────────

@@ -81,6 +81,22 @@ export function savePatient(patient: Patient): void {
   set(KEYS.patients, list)
 }
 
+/** まとめて保存（NOAHからの取り込みなど。1件ずつ保存すると同期が何百回も走るため、1回で書く） */
+export function savePatientsBulk(patients: Patient[]): void {
+  const list = getPatients()
+  const index = new Map(list.map((p, i) => [p.id, i]))
+  for (const p of patients) {
+    const i = index.get(p.id)
+    if (i === undefined) {
+      index.set(p.id, list.length)
+      list.push(p)
+    } else {
+      list[i] = p
+    }
+  }
+  set(KEYS.patients, list)
+}
+
 export function deletePatient(id: string): void {
   set(KEYS.patients, getPatients().filter(p => p.id !== id))
 }

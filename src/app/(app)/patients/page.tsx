@@ -18,6 +18,7 @@ import { getPatients, initPatientStore, getSOAPNotes, getCancellations } from '@
 import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils'
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
+import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,7 @@ const FILTER_OPTIONS = [
   { label: '腰部',       value: 'lumbar' },
   { label: '頚部',       value: 'cervical' },
   { label: '離脱リスク高', value: 'high_risk' },
+  { label: '🎂 誕生日が近い', value: 'birthday' },
 ]
 
 const SORT_OPTIONS = [
@@ -114,6 +116,9 @@ export default function PatientsPage() {
     return map
   }, [patients, notesByPatient, cancelByPatient])
 
+  // 誕生日が近い方（今日〜BIRTHDAY_SOON_DAYS日以内）
+  const birthdaySoonCount = useMemo(() => patients.filter(p => isBirthdaySoon(p.birthDate)).length, [patients])
+
   const highRiskCount = useMemo(
     () => patients.filter(p => riskByPatient.get(p.id)?.level === 'high').length,
     [patients, riskByPatient],
@@ -131,6 +136,7 @@ export default function PatientsPage() {
       if (!matchSearch) return false
       if (filter === 'all') return true
       if (filter === 'high_risk') return riskByPatient.get(p.id)?.level === 'high'
+      if (filter === 'birthday') return isBirthdaySoon(p.birthDate)
       return p.bodyRegion === filter
     })
 
@@ -177,12 +183,27 @@ export default function PatientsPage() {
                 <AlertTriangle className="w-3 h-3" />離脱リスク高 {highRiskCount}名
               </span>
             )}
+            {birthdaySoonCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('birthday')}
+                title={`${BIRTHDAY_SOON_DAYS}日以内に誕生日の方`}
+                className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100"
+              >
+                🎂 誕生日が近い {birthdaySoonCount}名
+              </button>
+            )}
           </div>
         </div>
-        <Link href="/patients/new" className={cn(buttonVariants({ variant: 'default' }))}>
-          <Plus className="w-4 h-4" />
-          新規患者登録
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link href="/patients/import" className={cn(buttonVariants({ variant: 'outline' }))}>
+            NOAHから取り込む
+          </Link>
+          <Link href="/patients/new" className={cn(buttonVariants({ variant: 'default' }))}>
+            <Plus className="w-4 h-4" />
+            新規患者登録
+          </Link>
+        </div>
       </div>
 
       {/* 最近閲覧した患者 */}
@@ -331,6 +352,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
     : (latestNote?.painToday ?? 0) >= 4 ? 'text-yellow-600'
     : 'text-green-600'
   const age = calcAge(patient.birthDate)
+  const bday = birthdayLabel(patient.birthDate)
 
   return (
     // ピンボタンを内包するため button ではなく div role="button" を使用
@@ -358,6 +380,11 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
             <span className="font-semibold text-gray-900">{patient.name}</span>
             {/* 生年月日未入力の患者では年齢を表示しない（NaN歳の防止） */}
             {Number.isFinite(age) && <span className="text-sm text-gray-400">{age}歳</span>}
+            {bday && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-[11px] font-bold text-pink-700">
+                🎂 {bday}
+              </span>
+            )}
             <Badge variant="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
             <Badge variant={riskVariant[riskLevel]}>
               離脱リスク{RISK_LABELS[riskLevel]}
