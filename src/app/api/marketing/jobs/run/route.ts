@@ -72,7 +72,16 @@ async function run() {
     }
   }
 
-  return { ok: true, processed: results.length, results, nudged }
+  // AI動画（週2本）: 作成中のものを取りに行き、月・木の朝なら1本作り始める。失敗しても投稿の結果は返す
+  let aiVideos: unknown = null
+  try {
+    const { tickAiVideos } = await import('@/lib/marketing/ai-video-server')
+    aiVideos = await tickAiVideos({ allowAutoStart: true })
+  } catch (error) {
+    console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
+  }
+
+  return { ok: true, processed: results.length, results, nudged, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

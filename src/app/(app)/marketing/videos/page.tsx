@@ -7,6 +7,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  AI_STATUS_LABELS,
   PERMISSION_LABELS,
   PUBLISH_STATE_LABELS,
   canPublishVideo,
@@ -42,9 +43,62 @@ export default function VideosPage() {
     }
   }, [])
 
-  useEffect(() => {
-    load()
+  // AI動画（OpenAI）: 設定済みか・作成中の出来上がりの取りに行き・いますぐ1本
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiMessage, setAiMessage] = useState('')
+
+  const checkAi = useCallback(async () => {
+    try {
+      const res = await fetch('/api/marketing/videos/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check' }),
+      })
+      if (res.status === 403) return // 院長以外は見るだけ
+      const data = await res.json()
+      setAiConfigured(data.configured !== false)
+      if (data.ready > 0 || data.failed > 0) load()
+    } catch {
+      /* 取りに行けなくても一覧は出す */
+    }
   }, [load])
+
+  useEffect(() => {
+    // 一覧を出してから、作成中のAI動画の出来上がりを見に行く
+    const t = setTimeout(() => {
+      load().then(checkAi)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [load, checkAi])
+
+  // 作成中のものがある間は、1分ごとに出来上がりを見に行く
+  const generating = videos.some((v) => v.ai?.status === 'generating')
+  useEffect(() => {
+    if (!generating) return
+    const t = setInterval(checkAi, 60_000)
+    return () => clearInterval(t)
+  }, [generating, checkAi])
+
+  async function startAi() {
+    setAiBusy(true)
+    setAiMessage('')
+    try {
+      const res = await fetch('/api/marketing/videos/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+      setAiMessage(data.message)
+      await load()
+    } catch (e) {
+      setAiMessage(`作れませんでした: ${e instanceof Error ? e.message : '不明'}`)
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase()
@@ -73,6 +127,34 @@ export default function VideosPage() {
         >
           ＋ 動画を登録
         </Link>
+      </div>
+
+      {/* AI動画（OpenAI） */}
+      <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-violet-900">AI動画の自動作成（OpenAI）</h2>
+            <p className="mt-1 text-xs text-violet-800">
+              毎週月曜・木曜の朝に1本ずつ（週2本）、8秒の縦動画を作ってここに貯めます。内容は「セルフケア・姿勢の雰囲気」と「院の雰囲気・季節の映像」を交互に。
+              顔の映らない人物・文字なしの映像で、公開はしません（使うかどうかは院長が決めます）。1本およそ120円です。
+            </p>
+          </div>
+          {aiConfigured ? (
+            <button
+              onClick={startAi}
+              disabled={aiBusy || generating}
+              className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white hover:bg-violet-800 disabled:opacity-50"
+            >
+              {aiBusy ? '依頼中…' : generating ? '作成中です…' : 'いま1本作る'}
+            </button>
+          ) : null}
+        </div>
+        {aiConfigured === false ? (
+          <p className="mt-2 rounded bg-white px-2 py-1 text-xs text-amber-700">
+            OpenAI のAPIキーがまだ設定されていません。Vercel の環境変数に OPENAI_API_KEY を入れると動き始めます。
+          </p>
+        ) : null}
+        {aiMessage ? <p className="mt-2 text-xs text-violet-900">{aiMessage}</p> : null}
       </div>
 
       {/* 検索・絞り込み */}
@@ -133,14 +215,23 @@ export default function VideosPage() {
                   {v.url ? (
                     <video src={v.url} controls preload="metadata" poster={v.thumbUrl} className="h-full w-full object-contain" />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                      動画URL未登録
+                    <div className="flex h-full items-center justify-center px-4 text-center text-xs text-slate-400">
+                      {v.ai?.status === 'generating'
+                        ? 'AIが作成中です（数分〜10分ほど）'
+                        : v.ai?.status === 'failed'
+                          ? `作成に失敗しました${v.ai.error ? `：${v.ai.error}` : ''}`
+                          : '動画URL未登録'}
                     </div>
                   )}
                 </div>
                 <div className="p-3">
                   <h3 className="font-bold leading-snug">{v.title}</h3>
                   <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                    {v.ai ? (
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 font-medium text-violet-700">
+                        {AI_STATUS_LABELS[v.ai.status]}
+                      </span>
+                    ) : null}
                     <span className={`rounded px-1.5 py-0.5 font-medium ${PERMISSION_TONE[v.permission]}`}>
                       {PERMISSION_LABELS[v.permission]}
                     </span>
