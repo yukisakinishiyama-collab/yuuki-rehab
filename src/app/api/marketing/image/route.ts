@@ -76,9 +76,11 @@ export async function GET(request: NextRequest) {
     const sizeKey = (params.get('size') ?? 'instagram') as keyof typeof IMAGE_SIZES
     return png(await renderTemplateImage(title, subtitle, sizeKey), 'post-image.png')
   } catch (error) {
-    return NextResponse.json(
-      { error: `画像生成に失敗しました（${error instanceof Error ? error.message.slice(0, 80) : '不明'}）` },
-      { status: 500 },
-    )
+    // 原因を80字で切ると「Failed to load external module sharp」までしか出ず、
+    // その先の本当の理由（ネイティブモジュールが見つからない等）が分からなくなる。
+    // この画面は院内専用（proxy.ts のBasic認証の内側）なので、全文をそのまま出す。
+    console.error('[marketing/image] 画像生成に失敗しました', error)
+    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error)
+    return NextResponse.json({ error: '画像生成に失敗しました', detail }, { status: 500 })
   }
 }

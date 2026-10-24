@@ -7,11 +7,15 @@
  * サーバー（Vercel）には日本語のフォントが入っていないので、assets/fonts の Zen Kaku Gothic New を読み込んで
  * next/og（Satori）で描く（以前の SVG＋sharp だと、サーバーでは日本語が□になるおそれがあった）。
  * ネイビーのブランド色。Instagram に渡すときは JPEG に直す（toJpeg）。
+ *
+ * sharp（JPEG変換だけに使う）はネイティブモジュールで、本番では読み込みに失敗することがある。
+ * 先頭で import すると、このファイルを読み込んだだけで落ちてしまい、
+ * sharp を使わない PNG の生成（next/og）まで巻き添えで止まる。
+ * そのため toJpeg の中で、JPEGに直す直前にだけ読み込む。
  */
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
-import sharp from 'sharp'
 import { DEFAULT_CLINIC_PROFILE } from './clinic'
 import { STORY_LEVEL_LABELS, type StoryLevel, type StoryRow } from './autopilot-planner'
 
@@ -56,8 +60,18 @@ async function render(node: React.ReactElement, w: number, h: number): Promise<B
   return Buffer.from(await res.arrayBuffer())
 }
 
-/** PNG → JPEG（InstagramのAPIは JPEG の画像を受け付ける） */
+/**
+ * PNG → JPEG（InstagramのAPIは JPEG の画像を受け付ける）
+ *
+ * sharp はここでしか使わないので、使う直前に読み込む。
+ * 読み込めなかったときは原因（ネイティブモジュールの解決失敗など）をそのまま残す。
+ * ここで短く丸めると、本番で何が起きているのか追えなくなる。
+ */
 export async function toJpeg(png: Buffer): Promise<Buffer> {
+  const { default: sharp } = await import('sharp').catch((error: unknown) => {
+    const cause = error instanceof Error ? (error.stack ?? error.message) : String(error)
+    throw new Error(`JPEG変換に使う sharp を読み込めませんでした: ${cause}`)
+  })
   return sharp(png).jpeg({ quality: 90, mozjpeg: true }).toBuffer()
 }
 

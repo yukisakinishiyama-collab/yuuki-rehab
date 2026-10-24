@@ -89,7 +89,10 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
     const jpg = await toJpeg(await renderStoryImage({ title: text.title, asOfLabel, scope: story.scope, rows }))
     imageUrl = (await put(`marketing/story-${Date.now()}.jpg`, jpg, { access: 'public', contentType: 'image/jpeg' })).url
   } catch (error) {
-    return { kind: 'error', message: `ストーリー画像を作れませんでした（${error instanceof Error ? error.message.slice(0, 80) : '不明'}）` }
+    // 画面に出す文は短くしてよいが、原因そのものは切らずにログへ残す
+    // （sharp が読み込めない等は、80字で切ると理由が分からなくなる）
+    console.error('[publishers] ストーリー画像を作れませんでした', error)
+    return { kind: 'error', message: `ストーリー画像を作れませんでした（${error instanceof Error ? error.message.slice(0, 200) : '不明'}）` }
   }
 
   const { getInstagramToken, getInstagramUserId, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
