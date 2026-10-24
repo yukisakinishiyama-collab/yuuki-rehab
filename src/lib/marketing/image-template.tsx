@@ -177,8 +177,15 @@ export interface StoryImageInput {
   note?: string
   /** 時間ごとの残り枠の数を出すか（既定は出す） */
   showRemaining?: boolean
-  /** ネット予約のQR（PNGのdata URL）。無ければQR無し */
+  /** ネット予約のQR（PNGのdata URL）。cta が 'qr' のときだけ描く */
   qrDataUrl?: string
+  /**
+   * 予約への入り口の書き方。
+   * sticker … Instagramアプリで「リンク」のスタンプを付けて出す（押せる。既定）
+   * profile … アプリから自動で出す（APIではスタンプを付けられないので、プロフィールのリンクへ案内）
+   * qr      … QRを描く（ストーリーではスマホで見ている人は読めないので、印刷物などの用途だけ）
+   */
+  cta?: 'sticker' | 'profile' | 'qr'
 }
 
 /** 時間ごとの枠（「15:30 残り2」）。午前・午後に分けて並べる */
@@ -236,6 +243,7 @@ function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolea
  * 下にネット予約のQR・電話番号・住所。
  */
 export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> {
+  const cta = input.cta ?? 'sticker'
   const { w, h } = IMAGE_SIZES.story
   const p = DEFAULT_CLINIC_PROFILE
   const single = input.scope === 'day' && input.rows.length === 1 ? input.rows[0] : null
@@ -338,7 +346,13 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
       <div style={{ ...fixed, marginTop: 'auto', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', fontSize: 46, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
-          <div style={{ display: 'flex', fontSize: 30 }}>{input.qrDataUrl ? 'QRから、その場で予約が確定します' : 'プロフィールのリンクから予約できます'}</div>
+          <div style={{ display: 'flex', fontSize: 30 }}>
+            {cta === 'qr' && input.qrDataUrl
+              ? 'QRから、その場で予約が確定します'
+              : cta === 'profile'
+                ? 'プロフィールのリンクから、その場で予約が確定します'
+                : 'リンクを押すと、その場で予約が確定します'}
+          </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: 10 }}>
             <div style={{ display: 'flex', fontSize: 30, color: '#bfdbe8' }}>お電話</div>
             <div style={{ display: 'flex', fontSize: 50, fontWeight: 700, letterSpacing: 2 }}>{p.phone}</div>
@@ -346,7 +360,7 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
           <div style={{ display: 'flex', fontSize: 28, color: '#bfdbe8' }}>{p.address.replace(/^山口県/, '')}（駐車場あり）</div>
           <div style={{ display: 'flex', fontSize: 24, color: '#94a3b8', marginTop: 4 }}>（空き状況は変わることがあります）</div>
         </div>
-        {input.qrDataUrl && (
+        {cta === 'qr' && input.qrDataUrl && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <div style={{ display: 'flex', padding: 12, borderRadius: 24, background: '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element -- next/og（Satori）で描く画像の中 */}

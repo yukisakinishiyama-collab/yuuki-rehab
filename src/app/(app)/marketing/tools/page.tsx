@@ -313,6 +313,8 @@ interface StoryPreview {
   title: string
   defaultTitle: string
   hasOpening: boolean
+  /** リンクのスタンプに貼る、ネット予約の計測つきリンク */
+  link?: string
   days: StoryDay[]
 }
 
@@ -330,6 +332,10 @@ function StoryMaker() {
   const [posting, setPosting] = useState(false)
   const [posted, setPosted] = useState<{ ok: boolean; message: string; url?: string | null; manualUrl?: string } | null>(null)
   const storyLink = buildUrl('reserve', 'instagram', `story-${today()}`)
+  // 「リンクつきで出す」用：共有に渡す画像（押した直後に共有を始められるよう、作った時点で用意しておく）
+  const [shareFile, setShareFile] = useState<File | null>(null)
+  const [shareStep, setShareStep] = useState<'' | 'shared' | 'saved'>('')
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const edits = (): StoryEdits => ({
     title: title.trim() || undefined,
@@ -356,6 +362,13 @@ function StoryMaker() {
       }
       setPreview(body as StoryPreview)
       setDirty(false)
+      setShareStep('')
+      try {
+        const blob = await (await fetch(body.image)).blob()
+        setShareFile(new File([blob], `story-${today()}-${r}.png`, { type: 'image/png' }))
+      } catch {
+        setShareFile(null)
+      }
     } catch {
       setError('画像を作れませんでした（通信の失敗）')
     } finally {
@@ -376,6 +389,34 @@ function StoryMaker() {
   function toggleSlot(key: string) {
     setHidden((h) => (h.includes(key) ? h.filter((k) => k !== key) : [...h, key]))
     setDirty(true)
+  }
+
+  /**
+   * リンクつきで出す（スマホ）：リンクをコピーし、画像をInstagramへ共有する。
+   * Instagramアプリのストーリーで「スタンプ」→「リンク」に貼れば、見た人が押してそのまま予約画面へ行ける。
+   * コピーと共有は、押した操作のなかで同時に始める（スマホのブラウザが許すのは押した直後だけのため）
+   */
+  function shareWithLink() {
+    if (!preview) return
+    const link = preview.link ?? storyLink
+    const copying = navigator.clipboard ? navigator.clipboard.writeText(link).then(() => true, () => false) : Promise.resolve(false)
+    void copying.then(setLinkCopied)
+    if (shareFile && typeof navigator.canShare === 'function' && navigator.canShare({ files: [shareFile] })) {
+      navigator
+        .share({ files: [shareFile] })
+        .then(() => setShareStep('shared'))
+        .catch((e: unknown) => {
+          // 共有をやめたとき（AbortError）は何もしない
+          if (!(e instanceof DOMException && e.name === 'AbortError')) setShareStep('saved')
+        })
+      return
+    }
+    // パソコンなど共有ができないとき：画像を保存して、スマホのInstagramから出す
+    const a = document.createElement('a')
+    a.href = preview.image
+    a.download = `story-${today()}-${range}.png`
+    a.click()
+    setShareStep('saved')
   }
 
   // そのままInstagramのストーリーに出す（院長のみ。出す瞬間の空きで、同じ直し方で作り直す）
@@ -413,7 +454,8 @@ function StoryMaker() {
         今の空きでストーリー画像を作る
       </h2>
       <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-        予約システムの今の空きで作ります（時間と残り枠・ネット予約のQR・電話番号・住所入り）。見出しやひとこと、出さない時間を直してから出せます。
+        予約システムの今の空きで作ります（時間と残り枠・電話番号・住所入り）。見出しやひとこと、出さない時間を直してから出せます。
+        見た人が<b>押して予約できる</b>のは、Instagramアプリで「リンク」のスタンプを付けたときだけです（画像の中のURLやQRはスマホでは押せません）。
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
@@ -479,17 +521,42 @@ function StoryMaker() {
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => void publish()} disabled={posting || busy || !preview.hasOpening} className={primary}>
-                {posting ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
-                {posting ? 'ストーリーに出しています…' : 'Instagramのストーリーに出す'}
+            <div className="space-y-2 rounded-xl border-2 border-teal-200 bg-teal-50/40 p-3">
+              <p className="text-xs font-bold text-teal-800">おすすめ：押せるリンクつきで出す（スマホで）</p>
+              <button type="button" onClick={shareWithLink} disabled={busy || dirty || !preview.hasOpening} className={primary}>
+                <Link2 className="h-4 w-4" aria-hidden />
+                リンクつきでストーリーに出す
               </button>
-              <a href={preview.image} download={`story-${today()}-${range}.png`} className={pill}>
-                <Download className="h-4 w-4" aria-hidden />
-                画像を保存
-              </a>
+              <ol className="list-decimal space-y-1 pl-5 text-xs leading-relaxed text-slate-700">
+                <li>出てきた画面で「Instagram」→「ストーリーズ」を選ぶ（パソコンでは画像が保存されるので、スマホのInstagramで選ぶ）</li>
+                <li>上の「スタンプ」→「リンク」を押し、URLの欄に<b>貼り付け</b>（リンクは自動でコピーしています）</li>
+                <li>スタンプを画像の下のあたりに置いて「シェア」</li>
+              </ol>
+              {shareStep && (
+                <p role="status" className="rounded-lg bg-white px-3 py-2 text-xs text-teal-900">
+                  {shareStep === 'shared' ? 'Instagramに画像を渡しました。' : '画像を保存しました。'}
+                  {linkCopied ? 'リンクはコピー済みです。スタンプの「リンク」に貼り付けてください。' : 'リンクをコピーできなかったので、下の「ストーリー用のリンクをコピー」を押してください。'}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <CopyButton text={preview.link ?? storyLink} label="ストーリー用のリンクをコピー" />
+                <a href={preview.image} download={`story-${today()}-${range}.png`} className={pill}>
+                  <Download className="h-4 w-4" aria-hidden />
+                  画像を保存
+                </a>
+              </div>
             </div>
-            <p className="text-xs text-slate-500">「ストーリーに出す」は院長のみ。出す瞬間の空きで、同じ直し方で作り直して公開します。</p>
+
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-bold text-slate-600">自動で出す（院長のみ）</p>
+              <button type="button" onClick={() => void publish()} disabled={posting || busy || !preview.hasOpening} className={pill}>
+                {posting ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
+                {posting ? 'ストーリーに出しています…' : 'アプリからそのまま出す'}
+              </button>
+              <p className="text-xs leading-relaxed text-slate-500">
+                InstagramのAPIではリンクのスタンプを付けられないため、画像には「プロフィールのリンクから予約」と入ります（見た人はプロフィールを開いてから予約）。出す瞬間の空きで作り直して公開します。
+              </p>
+            </div>
             {posted && (
               <p role="status" className={`rounded-xl px-3 py-2 text-sm ${posted.ok ? 'bg-teal-50 text-teal-900' : 'bg-amber-50 text-amber-900'}`}>
                 {posted.ok ? <Check className="mr-1 inline h-4 w-4" aria-hidden /> : null}
@@ -508,15 +575,6 @@ function StoryMaker() {
                 ) : null}
               </p>
             )}
-            <p className="text-xs font-bold text-slate-600">手で出すとき（リンクのスタンプをつけたいとき）</p>
-            <ol className="list-decimal space-y-1 pl-5 text-xs text-slate-600">
-              <li>「画像を保存」→ Instagramアプリでストーリーを作り、保存した画像を選ぶ</li>
-              <li>「スタンプ」→「リンク」に、下のリンクを貼る（予約が計測されます）</li>
-              <li>シェアする</li>
-            </ol>
-            <div className="flex flex-wrap items-center gap-2">
-              <CopyButton text={storyLink} label="ストーリー用のリンクをコピー" />
-            </div>
           </div>
         </div>
       )}
