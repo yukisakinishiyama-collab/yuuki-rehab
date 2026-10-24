@@ -1,18 +1,19 @@
 /**
  * 院内アプリの「今の空きでストーリー画像を作る」（見本の画像と、直せる中身）
  *
- * POST { range: 'today' | 'next' | 'week', edits?: StoryEdits, sample?: true }
+ * POST { range: 'today' | 'next' | 'week', edits?: StoryEdits, cta?: 'sticker' | 'profile', sample?: true }
+ *   cta … sticker＝Instagramアプリで「リンク」のスタンプを付けて出す用（既定）／profile＝アプリから自動で出す用
  * → { image: 'data:image/png;base64,…', title, hasOpening, days: [{ date, label, slots: [{ time, remaining, hidden }] }] }
  * - 予約システムから空きを取り直して作る（v3.10 以降は時間と残り枠も）
  * - 見出し・ひとこと・出さない時間・残り枠の数を出すか、を当てはめる（公開のときも同じ編集で作り直す）
- * - 下にネット予約のQR（ストーリーの計測つきリンク）
+ * - ストーリーの画像の中のQRは、スマホで見ている人には読めないので描かない（予約への入り口はリンクのスタンプか、プロフィールのリンク）
  * 患者さんの情報は使わない。院内専用（proxy の認証の内側）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { addDays, jstParts, storyRange, storyRows, type OpeningDay } from '@/lib/marketing/autopilot-planner'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
 import { renderStoryImage } from '@/lib/marketing/image-template'
-import { buildStory, sanitizeStoryEdits, storyEditsProblem, storyQrDataUrl, storyReserveLink } from '@/lib/marketing/story-server'
+import { buildStory, sanitizeStoryEdits, storyEditsProblem, storyReserveLink } from '@/lib/marketing/story-server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -39,7 +40,8 @@ function sampleOpenings(today: string): OpeningDay[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => ({}))) as { range?: string; edits?: unknown; sample?: boolean }
+    const body = (await request.json().catch(() => ({}))) as { range?: string; edits?: unknown; sample?: boolean; cta?: string }
+    const cta = body.cta === 'profile' ? 'profile' : 'sticker'
     const range = RANGES.includes(body.range as Range) ? (body.range as Range) : null
     if (!range) return NextResponse.json({ error: 'range は today・next・week のどれかです' }, { status: 400 })
     const edits = sanitizeStoryEdits(body.edits)
@@ -56,7 +58,6 @@ export async function POST(request: NextRequest) {
     if (story.rows.length === 0) return NextResponse.json({ error: '載せられる日がありません（休診の日など）' }, { status: 404 })
 
     const asOfLabel = `${Number(now.local.slice(5, 7))}/${Number(now.local.slice(8, 10))} ${now.local.slice(11, 16)} 時点`
-    const qrDataUrl = await storyQrDataUrl(storyReserveLink(now.date))
     const png = await renderStoryImage({
       title: story.title,
       asOfLabel,
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       rows: story.rows,
       note: story.note,
       showRemaining: story.showRemaining,
-      qrDataUrl,
+      cta,
     })
 
     // 編集の画面に出す「時間の一覧」（隠した時間も含めて全部。隠したものは hidden）
@@ -83,6 +84,8 @@ export async function POST(request: NextRequest) {
         title: story.title,
         defaultTitle: r.title,
         hasOpening: story.hasOpening,
+        // リンクのスタンプに貼る、ネット予約の計測つきリンク
+        link: storyReserveLink(now.date),
         days,
       },
       { headers: { 'Cache-Control': 'no-store' } },

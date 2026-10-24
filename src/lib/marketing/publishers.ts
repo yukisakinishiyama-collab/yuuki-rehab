@@ -72,7 +72,7 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   if (!story || story.dates.length === 0) return { kind: 'error', message: 'ストーリーの空き状況の情報がありません' }
   const { fetchHubStats } = await import('./booking-stats')
   const { jstParts } = await import('./autopilot-planner')
-  const { buildStory, storyQrDataUrl, storyReserveLink } = await import('./story-server')
+  const { buildStory } = await import('./story-server')
   const fresh = await fetchHubStats(1).catch(() => null)
   const openings = fresh?.openings?.length ? fresh.openings : story.snapshot
   const now = jstParts(new Date())
@@ -89,9 +89,18 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   try {
     const { renderStoryImage, toJpeg } = await import('./image-template')
     const { put } = await import('@vercel/blob')
-    const qrDataUrl = await storyQrDataUrl(storyReserveLink(now.date))
+    // APIで出すストーリーには「リンク」のスタンプを付けられない（Instagramの決まり）。画像の中のQRもスマホでは読めないので、
+    // プロフィールのリンクへ案内する。手で出すとき（院内アプリの「リンクつきで出す」）はスタンプで押せるようにする
     const jpg = await toJpeg(
-      await renderStoryImage({ title: text.title, asOfLabel, scope: story.scope, rows, note: built.note, showRemaining: built.showRemaining, qrDataUrl }),
+      await renderStoryImage({
+        title: text.title,
+        asOfLabel,
+        scope: story.scope,
+        rows,
+        note: built.note,
+        showRemaining: built.showRemaining,
+        cta: 'profile',
+      }),
     )
     imageUrl = (await put(`marketing/story-${Date.now()}.jpg`, jpg, { access: 'public', contentType: 'image/jpeg' })).url
   } catch (error) {
