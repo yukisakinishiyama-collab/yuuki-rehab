@@ -5,12 +5,13 @@
  *
  * リンク … 行き先（ネット予約など）と「どこに貼るか（流入元）」「計測名」を入れると、計測つきのリンクとQRができる。
  *          押されると /api/marketing/go がクリックを数え、予約システムにも流入元・計測名が残る（「集客の効果」で見られる）。
- * ストーリー … 予約システムの今の空きで、Instagramのストーリー用の画像（1080×1920）を作る。保存して手で投稿する。
+ * ストーリー … 予約システムの今の空きで、Instagramのストーリー用の画像（1080×1920）を作る。
+ *            院長は「Instagramのストーリーに出す」でそのまま公開できる（出す瞬間の空きで作り直す）。保存して手で投稿してもよい。
  * どちらも患者さんの情報は使わない。作ったリンクはこの端末に最大10件だけ覚えておく。
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Check, Copy, Download, ExternalLink, ImageIcon, Link2, RefreshCw } from 'lucide-react'
+import { Check, Copy, Download, ExternalLink, ImageIcon, Link2, RefreshCw, Send } from 'lucide-react'
 import { SITE_URL } from '@/lib/site/seo'
 import { SOURCE_LABELS } from '@/lib/marketing/booking-stats-labels'
 
@@ -299,7 +300,30 @@ function StoryMaker() {
   const [busy, setBusy] = useState(false)
   const [image, setImage] = useState<{ url: string; name: string; hasOpening: boolean } | null>(null)
   const [error, setError] = useState('')
+  const [posting, setPosting] = useState(false)
+  const [posted, setPosted] = useState<{ ok: boolean; message: string; url?: string | null; manualUrl?: string } | null>(null)
   const storyLink = buildUrl('reserve', 'instagram', `story-${today()}`)
+
+  // そのままInstagramのストーリーに出す（院長のみ。出す瞬間の空きで作り直す）
+  async function publish() {
+    if (!window.confirm(`${RANGE_LABELS[range]}の空き状況を、Instagramのストーリーに公開します。よろしいですか？\n（出す瞬間の予約システムの空きで画像を作り直します。24時間で消えます）`)) return
+    setPosting(true)
+    setPosted(null)
+    try {
+      const res = await fetch('/api/marketing/story/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ range }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string; url?: string | null; manualUrl?: string }
+      if (res.ok && body.ok) setPosted({ ok: true, message: body.message ?? 'Instagramのストーリーに出しました', url: body.url })
+      else setPosted({ ok: false, message: body.error ?? 'ストーリーに出せませんでした', manualUrl: body.manualUrl })
+    } catch {
+      setPosted({ ok: false, message: 'ストーリーに出せませんでした（通信の失敗）' })
+    } finally {
+      setPosting(false)
+    }
+  }
 
   // 作った画像の一時URLは、作り直す・画面を離れるときに片づける
   useEffect(() => {
@@ -312,6 +336,7 @@ function StoryMaker() {
     setRange(r)
     setBusy(true)
     setError('')
+    setPosted(null)
     try {
       const res = await fetch(`/api/marketing/image?kind=story&range=${r}&fresh=1`, { cache: 'no-store' })
       if (!res.ok) {
@@ -356,11 +381,37 @@ function StoryMaker() {
             {!image.hasOpening && (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-900">案内できる空きがありません（どこも「いっぱい」か休診です）。出すかどうか、ご判断ください。</p>
             )}
-            <a href={image.url} download={image.name} className={primary}>
-              <Download className="h-4 w-4" aria-hidden />
-              画像を保存
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => void publish()} disabled={posting || busy} className={primary}>
+                {posting ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
+                {posting ? 'ストーリーに出しています…' : 'Instagramのストーリーに出す'}
+              </button>
+              <a href={image.url} download={image.name} className={pill}>
+                <Download className="h-4 w-4" aria-hidden />
+                画像を保存
+              </a>
+            </div>
+            <p className="text-xs text-slate-500">「ストーリーに出す」は院長のみ。出す瞬間の空きで作り直して公開します（リンクのスタンプはInstagramの仕組み上つけられないので、画像に電話番号と「プロフィールのリンクから」を載せています）。</p>
+            {posted && (
+              <p role="status" className={`rounded-xl px-3 py-2 text-sm ${posted.ok ? 'bg-teal-50 text-teal-900' : 'bg-amber-50 text-amber-900'}`}>
+                {posted.ok ? <Check className="mr-1 inline h-4 w-4" aria-hidden /> : null}
+                {posted.message}
+                {posted.url ? (
+                  <>
+                    {' '}
+                    <a href={posted.url} target="_blank" rel="noreferrer" className="underline">投稿を開く</a>
+                  </>
+                ) : null}
+                {posted.manualUrl ? (
+                  <>
+                    {' '}
+                    <a href={posted.manualUrl} target="_blank" rel="noreferrer" className="underline">画像を開く</a>
+                  </>
+                ) : null}
+              </p>
+            )}
             <p className="text-xs text-slate-500">スマホでは、画像を長押しして「写真に保存」でも保存できます。</p>
+            <p className="text-xs font-bold text-slate-600">手で出すとき（リンクのスタンプをつけたいとき）</p>
             <ol className="list-decimal space-y-1 pl-5 text-xs text-slate-600">
               <li>Instagramアプリで、ストーリーを作る → 保存した画像を選ぶ</li>
               <li>「スタンプ」→「リンク」に、下のリンクを貼る（予約が計測されます）</li>

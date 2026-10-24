@@ -63,16 +63,30 @@ async function render(node: React.ReactElement, w: number, h: number): Promise<B
 /**
  * PNG → JPEG（InstagramのAPIは JPEG の画像を受け付ける）
  *
- * sharp はここでしか使わないので、使う直前に読み込む。
- * 読み込めなかったときは原因（ネイティブモジュールの解決失敗など）をそのまま残す。
- * ここで短く丸めると、本番で何が起きているのか追えなくなる。
+ * まず sharp（速い・ネイティブモジュール）で変換する。本番で sharp が読み込めないことがあるため、
+ * 失敗したら pngjs＋jpeg-js（JavaScriptだけで動く。少し遅いが確実）で変換する。
+ * sharp が失敗した原因はログに残す（短く丸めると、本番で何が起きているのか追えなくなる）。
  */
 export async function toJpeg(png: Buffer): Promise<Buffer> {
-  const { default: sharp } = await import('sharp').catch((error: unknown) => {
-    const cause = error instanceof Error ? (error.stack ?? error.message) : String(error)
-    throw new Error(`JPEG変換に使う sharp を読み込めませんでした: ${cause}`)
-  })
-  return sharp(png).jpeg({ quality: 90, mozjpeg: true }).toBuffer()
+  try {
+    const { default: sharp } = await import('sharp')
+    return await sharp(png).jpeg({ quality: 90, mozjpeg: true }).toBuffer()
+  } catch (error) {
+    console.warn('[image-template] sharp でJPEGに直せなかったため、JavaScriptだけの変換に切り替えます', error)
+  }
+  const [{ PNG }, jpeg] = await Promise.all([import('pngjs'), import('jpeg-js')])
+  const decoded = PNG.sync.read(png)
+  // JPEG に透明は無いので、白の上に重ねる
+  const data = Buffer.alloc(decoded.width * decoded.height * 4)
+  for (let i = 0; i < data.length; i += 4) {
+    const a = decoded.data[i + 3] / 255
+    data[i] = Math.round(decoded.data[i] * a + 255 * (1 - a))
+    data[i + 1] = Math.round(decoded.data[i + 1] * a + 255 * (1 - a))
+    data[i + 2] = Math.round(decoded.data[i + 2] * a + 255 * (1 - a))
+    data[i + 3] = 255
+  }
+  const encoded = jpeg.encode({ data, width: decoded.width, height: decoded.height }, 90)
+  return Buffer.from(encoded.data)
 }
 
 /** テンプレート画像PNGを生成する（タイトル＋サブタイトル＋院名） */
@@ -251,7 +265,11 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
       <div style={{ ...fixed, flexDirection: 'column', marginTop: 'auto', gap: 12 }}>
         <div style={{ display: 'flex', fontSize: 52, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
         <div style={{ display: 'flex', fontSize: 36 }}>プロフィールのリンクから、その場で予約が確定します</div>
-        <div style={{ display: 'flex', fontSize: 32, color: '#bfdbe8', marginTop: 10 }}>急なケガ・強い痛みはお電話で {p.phone}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginTop: 14 }}>
+          <div style={{ display: 'flex', fontSize: 34, color: '#bfdbe8' }}>お電話</div>
+          <div style={{ display: 'flex', fontSize: 56, fontWeight: 700, letterSpacing: 2 }}>{p.phone}</div>
+        </div>
+        <div style={{ display: 'flex', fontSize: 32, color: '#bfdbe8' }}>{p.address.replace(/^山口県/, '')}（駐車場あり）</div>
         <div style={{ display: 'flex', fontSize: 26, color: '#94a3b8', marginTop: 6 }}>（空き状況は変わることがあります）</div>
       </div>
     </div>,

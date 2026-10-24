@@ -79,7 +79,7 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
     return { kind: 'skipped', message: '投稿の時刻に案内できる空きが無かったため、ストーリーは出しませんでした' }
   }
   const now = jstParts(new Date())
-  const text = storyText(rows, story.scope, now.local)
+  const text = storyText(rows, story.scope, now.local, story.title)
   const asOfLabel = `${Number(now.local.slice(5, 7))}/${Number(now.local.slice(8, 10))} ${now.local.slice(11, 16)} 時点${fresh ? '' : '（前の晩の空き）'}`
 
   let imageUrl: string

@@ -114,6 +114,8 @@ export interface StoryContent {
   dates: string[]
   /** 下書きを作ったときの空き（取り直せなかったときに使う） */
   snapshot: Array<{ date: string; closed: boolean; am: number; pm: number }>
+  /** 見出し（例「明日のご予約の空き」）。無ければ scope から決める（本日／今週） */
+  title?: string
 }
 
 /** 媒体別バリアント（1プロジェクトから媒体ごとに生成） */
