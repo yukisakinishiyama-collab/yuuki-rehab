@@ -30,6 +30,8 @@ interface FeedRow {
   status: string
   reservationNo: string
   memo: string
+  /** サブスク（月額）の患者さん（予約管理画面でチェックした人。予約システム v3.11 から） */
+  sub?: boolean
 }
 interface FeedDay {
   date: string
@@ -257,6 +259,7 @@ export default function YoyakuTodayCard() {
           <div className="space-y-3">
             {feed.days.map((day) => {
               const activeRows = day.rows.filter((row) => row.status !== 'キャンセル')
+              const subCount = activeRows.filter((row) => row.sub).length
               return (
                 <div key={day.date}>
                   <div className="flex items-center gap-2 mb-1.5">
@@ -264,6 +267,9 @@ export default function YoyakuTodayCard() {
                       {dateLabel(day.date, todayString)}
                     </span>
                     <span className="text-[11px] text-gray-400">{activeRows.length}件</span>
+                    {subCount > 0 && (
+                      <span className="text-[11px] text-violet-600">うちサブスク {subCount}件</span>
+                    )}
                   </div>
                   {day.rows.length === 0 ? (
                     <p className="text-xs text-gray-400 pl-1">予約はありません</p>
@@ -284,6 +290,14 @@ export default function YoyakuTodayCard() {
                                 <span className={`text-sm font-medium text-gray-800 truncate ${row.status === 'キャンセル' ? 'line-through text-gray-400' : ''}`}>
                                   {row.name}
                                 </span>
+                                {row.sub && (
+                                  <span
+                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700"
+                                    title="サブスク（月額）の患者さん。予約管理画面でチェック・解除できます"
+                                  >
+                                    サブスク
+                                  </span>
+                                )}
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded border ${kubunStyle(row.kubun)}`}>
                                   {row.kubun || '区分なし'}
                                 </span>
