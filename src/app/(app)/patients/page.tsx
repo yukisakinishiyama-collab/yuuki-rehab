@@ -19,6 +19,7 @@ import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
 import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
+import { useLineLinks } from '@/lib/line-link-client'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ const FILTER_OPTIONS = [
   { label: '頚部',       value: 'cervical' },
   { label: '離脱リスク高', value: 'high_risk' },
   { label: '🎂 誕生日が近い', value: 'birthday' },
+  { label: 'LINE連携済み', value: 'line' },
 ]
 
 const SORT_OPTIONS = [
@@ -116,6 +118,10 @@ export default function PatientsPage() {
     return map
   }, [patients, notesByPatient, cancelByPatient])
 
+  // 公式LINEと結びついている方（サーバーの一覧をキーで引く）
+  const { linkFor } = useLineLinks()
+  const lineLinkedCount = useMemo(() => patients.filter(p => Boolean(linkFor(p))).length, [patients, linkFor])
+
   // 誕生日が近い方（今日〜BIRTHDAY_SOON_DAYS日以内）
   const birthdaySoonCount = useMemo(() => patients.filter(p => isBirthdaySoon(p.birthDate)).length, [patients])
 
@@ -137,6 +143,7 @@ export default function PatientsPage() {
       if (filter === 'all') return true
       if (filter === 'high_risk') return riskByPatient.get(p.id)?.level === 'high'
       if (filter === 'birthday') return isBirthdaySoon(p.birthDate)
+      if (filter === 'line') return Boolean(linkFor(p))
       return p.bodyRegion === filter
     })
 
@@ -191,6 +198,16 @@ export default function PatientsPage() {
                 className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100"
               >
                 🎂 誕生日が近い {birthdaySoonCount}名
+              </button>
+            )}
+            {lineLinkedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('line')}
+                title="公式LINEと結びついている方"
+                className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100"
+              >
+                LINE連携済み {lineLinkedCount}名
               </button>
             )}
           </div>
@@ -306,6 +323,7 @@ export default function PatientsPage() {
                     notes={notesByPatient.get(patient.id) ?? []}
                     riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
                     cancelSummary={cancelByPatient.get(patient.id)}
+                    lineLinked={Boolean(linkFor(patient))}
                     pinned
                     onTogglePin={() => handleTogglePin(patient.id)}
                     onClick={() => router.push(`/patients/${patient.id}`)}
@@ -322,6 +340,7 @@ export default function PatientsPage() {
                 notes={notesByPatient.get(patient.id) ?? []}
                 riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
                 cancelSummary={cancelByPatient.get(patient.id)}
+                lineLinked={Boolean(linkFor(patient))}
                 pinned={false}
                 onTogglePin={() => handleTogglePin(patient.id)}
                 onClick={() => router.push(`/patients/${patient.id}`)}
@@ -334,11 +353,13 @@ export default function PatientsPage() {
   )
 }
 
-function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onTogglePin, onClick }: {
+function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pinned, onTogglePin, onClick }: {
   patient: Patient
   notes: SOAPNote[]
   riskLevel: 'low' | 'medium' | 'high'
   cancelSummary?: CancellationSummary
+  /** 公式LINEと結びついているか */
+  lineLinked?: boolean
   pinned: boolean
   onTogglePin: () => void
   onClick: () => void
@@ -383,6 +404,11 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
             {bday && (
               <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-[11px] font-bold text-pink-700">
                 🎂 {bday}
+              </span>
+            )}
+            {lineLinked && (
+              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700" title="公式LINEと結びついています">
+                LINE
               </span>
             )}
             <Badge variant="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
