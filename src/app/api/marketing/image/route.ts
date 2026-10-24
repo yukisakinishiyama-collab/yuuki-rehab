@@ -78,9 +78,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // 原因を80字で切ると「Failed to load external module sharp」までしか出ず、
     // その先の本当の理由（ネイティブモジュールが見つからない等）が分からなくなる。
-    // この画面は院内専用（proxy.ts のBasic認証の内側）なので、全文をそのまま出す。
+    // この画面は院内専用（proxy.ts のBasic認証の内側）なので、理由をそのまま出してよい。
+    // 画面に返すのは message まで（読んで貼ってもらうため）。スタックはログだけに残す。
     console.error('[marketing/image] 画像生成に失敗しました', error)
-    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error)
+    const detail = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ error: '画像生成に失敗しました', detail }, { status: 500 })
   }
 }
