@@ -69,6 +69,8 @@ export default function PatientProfileCard({ patient }: { patient: Patient }) {
                         LINE連携済み
                       </span>
                       <span className="text-xs text-slate-500">{lineLink.linkedAt.slice(0, 10)} に結びつけ</span>
+                      {lineLink.patientNo && <span className="text-xs text-slate-700">患者番号 <b>{lineLink.patientNo}</b></span>}
+                      {lineLink.birthDate && !patient.birthDate && <span className="text-xs text-slate-500">生年月日 {lineLink.birthDate}（LINEで入力）</span>}
                       <button type="button" onClick={onUnlink} className="text-xs text-slate-400 underline hover:text-red-600">
                         外す
                       </button>

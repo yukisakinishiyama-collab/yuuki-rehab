@@ -32,6 +32,8 @@ export default function LiffLinkPage() {
   const [ticket, setTicket] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [birth, setBirth] = useState('')
+  const [done, setDone] = useState<{ patientNo: string | null; patientNoMessage: string }>({ patientNo: null, patientNoMessage: '' })
   const [message, setMessage] = useState('')
   const [doneName, setDoneName] = useState('')
 
@@ -79,9 +81,9 @@ export default function LiffLinkPage() {
       const res = await fetch('/api/liff/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket, name, phone }),
+        body: JSON.stringify({ ticket, name, phone, birthDate: birth }),
       })
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; name?: string } | null
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; name?: string; patientNo?: string | null; patientNoMessage?: string } | null
       if (!res.ok || !data?.ok) {
         setMessage(data?.error || 'うまくいきませんでした。もう一度お試しください')
         // チケット切れ（15分）のときは開き直してもらう
@@ -89,6 +91,7 @@ export default function LiffLinkPage() {
         return
       }
       setDoneName(data.name || name)
+      setDone({ patientNo: data.patientNo ?? null, patientNoMessage: data.patientNoMessage ?? '' })
       setPhase('done')
     } catch {
       setMessage('通信に失敗しました。電波のよいところでもう一度お試しください')
@@ -124,8 +127,8 @@ export default function LiffLinkPage() {
         </p>
         <h1 style={{ fontSize: 22, margin: '0 0 8px', lineHeight: 1.4 }}>LINEとカルテを結びつける</h1>
         <p style={{ fontSize: 14, lineHeight: 1.8, color: '#4b5b6e', margin: '0 0 22px' }}>
-          院で登録しているお名前と電話番号を入れてください。
-          結びつくと、誕生日のご挨拶や院からのお知らせがこのLINEに届きます。
+          院で登録しているお名前・電話番号・生年月日を入れてください。
+          結びつくと、誕生日のご挨拶や院からのお知らせがこのLINEに届き、ネット予約で使える患者番号もお知らせします。
         </p>
 
         {phase === 'loading' && (
@@ -173,6 +176,17 @@ export default function LiffLinkPage() {
                 required
               />
             </label>
+            <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 700 }}>
+              生年月日
+              <input
+                style={input}
+                type="date"
+                value={birth}
+                onChange={(e) => setBirth(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                required
+              />
+            </label>
             <p style={{ fontSize: 12, color: '#68788e', lineHeight: 1.7, margin: 0 }}>
               ご家族のカルテを結びつけるときは、その方のお名前と、院に登録している電話番号を入れてください。
             </p>
@@ -202,6 +216,17 @@ export default function LiffLinkPage() {
           <div style={{ background: '#fff', border: '1px solid #cdeedb', borderRadius: 14, padding: 20, lineHeight: 1.8, fontSize: 15 }}>
             <p style={{ margin: '0 0 8px', fontWeight: 800, color: '#06a04a' }}>結びつきました</p>
             <p style={{ margin: 0 }}>{doneName}さんのカルテと、このLINEを結びつけました。ありがとうございます。</p>
+            {done.patientNo ? (
+              <div style={{ marginTop: 14, padding: '12px 14px', background: '#f0fdf4', borderRadius: 12 }}>
+                <p style={{ margin: 0, fontSize: 12, color: '#166534', fontWeight: 700 }}>あなたの患者番号</p>
+                <p style={{ margin: '2px 0 6px', fontSize: 30, fontWeight: 900, letterSpacing: '0.08em', color: '#131e2e' }}>{done.patientNo}</p>
+                <p style={{ margin: 0, fontSize: 12.5, color: '#4b5b6e', lineHeight: 1.7 }}>
+                  ネット予約の「患者番号をお持ちの方」に、この番号と電話番号の下4桁を入れると、お名前などが自動で入ります。LINEにも同じ内容をお送りしました。
+                </p>
+              </div>
+            ) : done.patientNoMessage ? (
+              <p style={{ margin: '12px 0 0', fontSize: 12.5, color: '#4b5b6e', lineHeight: 1.7 }}>{done.patientNoMessage}</p>
+            ) : null}
             <button
               type="button"
               onClick={() => getLiff()?.closeWindow()}

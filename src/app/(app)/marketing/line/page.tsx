@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CONTACT_TAGS, INTENT_LABELS, type BotReply, type IntentKey, type LineContact } from '@/lib/marketing/line-types'
 import KarteLinkCard from '@/components/clinic/KarteLinkCard'
+import BirthdayCard from '@/components/clinic/BirthdayCard'
 
 export default function LinePage() {
   const [contacts, setContacts] = useState<LineContact[]>([])
@@ -92,6 +93,7 @@ export default function LinePage() {
       )}
 
       <KarteLinkCard />
+      <BirthdayCard />
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
         {/* 顧客一覧 */}

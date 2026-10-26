@@ -30,7 +30,7 @@ interface FeedRow {
   status: string
   reservationNo: string
   memo: string
-  /** サブスク（月額）の患者さん（予約管理画面でチェックした人。予約システム v3.11 から） */
+  /** 会員（月額のサブスク）の患者さん（予約管理画面でチェックした人。予約システム v3.11 から） */
   sub?: boolean
 }
 interface FeedDay {
@@ -268,7 +268,7 @@ export default function YoyakuTodayCard() {
                     </span>
                     <span className="text-[11px] text-gray-400">{activeRows.length}件</span>
                     {subCount > 0 && (
-                      <span className="text-[11px] text-violet-600">うちサブスク {subCount}件</span>
+                      <span className="text-[11px] text-violet-600">うち会員 {subCount}件</span>
                     )}
                   </div>
                   {day.rows.length === 0 ? (
@@ -293,9 +293,9 @@ export default function YoyakuTodayCard() {
                                 {row.sub && (
                                   <span
                                     className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700"
-                                    title="サブスク（月額）の患者さん。予約管理画面でチェック・解除できます"
+                                    title="会員（月額）の患者さん。予約管理画面でチェック・解除できます"
                                   >
-                                    サブスク
+                                    会員
                                   </span>
                                 )}
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded border ${kubunStyle(row.kubun)}`}>
