@@ -10,7 +10,7 @@
 // 流れ: LIFF SDK → IDトークン → /api/liff/verify（短命チケット）→ 入力 → /api/liff/link
 // LINE の外（ふつうのブラウザ）で開いたときは、LINE から開くよう案内するだけ。
 // ──────────────────────────────────────────────
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 interface LiffApi {
   init(config: { liffId: string }): Promise<void>
@@ -32,7 +32,28 @@ export default function LiffLinkPage() {
   const [ticket, setTicket] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [birth, setBirth] = useState('')
+  // 生年月日は 年・月・日 の3つを手で入れる（カレンダーだと何十年もさかのぼるのが大変なため）
+  const [by, setBy] = useState('')
+  const [bm, setBm] = useState('')
+  const [bd, setBd] = useState('')
+  const monthRef = useRef<HTMLInputElement>(null)
+  const dayRef = useRef<HTMLInputElement>(null)
+  const birth = by.length === 4 && bm && bd ? `${by}-${bm.padStart(2, '0')}-${bd.padStart(2, '0')}` : ''
+  const thisYear = new Date().getFullYear()
+  const birthOk = (() => {
+    if (!birth) return false
+    const y = Number(by)
+    const m = Number(bm)
+    const d = Number(bd)
+    if (y < 1900 || y > thisYear || m < 1 || m > 12 || d < 1) return false
+    return d <= new Date(y, m, 0).getDate()
+  })()
+  /** 全角数字も受け取り、数字だけにして最大桁で切る */
+  const digitsOnly = (value: string, max: number) =>
+    value
+      .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+      .replace(/\D/g, '')
+      .slice(0, max)
   const [done, setDone] = useState<{ patientNo: string | null; patientNoMessage: string }>({ patientNo: null, patientNoMessage: '' })
   const [message, setMessage] = useState('')
   const [doneName, setDoneName] = useState('')
@@ -75,6 +96,10 @@ export default function LiffLinkPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (phase === 'sending') return
+    if (!birthOk) {
+      setMessage('生年月日を確かめてください（例：1990年1月23日 → 1990・1・23）')
+      return
+    }
     setMessage('')
     setPhase('sending')
     try {
@@ -176,17 +201,58 @@ export default function LiffLinkPage() {
                 required
               />
             </label>
-            <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 700 }}>
-              生年月日
-              <input
-                style={input}
-                type="date"
-                value={birth}
-                onChange={(e) => setBirth(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-                required
-              />
-            </label>
+            <div style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 700 }}>
+              <span>生年月日（西暦で数字を入れてください）</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.6fr auto 1fr auto 1fr auto', alignItems: 'center', gap: 6 }}>
+                <input
+                  style={{ ...input, textAlign: 'center', padding: '14px 6px' }}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="bday-year"
+                  placeholder="1990"
+                  aria-label="生まれた年（西暦4桁）"
+                  value={by}
+                  onChange={(e) => {
+                    const v = digitsOnly(e.target.value, 4)
+                    setBy(v)
+                    if (v.length === 4) monthRef.current?.focus()
+                  }}
+                  required
+                />
+                <span>年</span>
+                <input
+                  ref={monthRef}
+                  style={{ ...input, textAlign: 'center', padding: '14px 6px' }}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="bday-month"
+                  placeholder="1"
+                  aria-label="月"
+                  value={bm}
+                  onChange={(e) => {
+                    const v = digitsOnly(e.target.value, 2)
+                    setBm(v)
+                    if (v.length === 2 || Number(v) >= 2) dayRef.current?.focus()
+                  }}
+                  required
+                />
+                <span>月</span>
+                <input
+                  ref={dayRef}
+                  style={{ ...input, textAlign: 'center', padding: '14px 6px' }}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="bday-day"
+                  placeholder="23"
+                  aria-label="日"
+                  value={bd}
+                  onChange={(e) => setBd(digitsOnly(e.target.value, 2))}
+                  required
+                />
+                <span>日</span>
+              </div>
+              {birth && !birthOk && <span style={{ fontSize: 12, color: '#c0392b', fontWeight: 400 }}>日付を確かめてください</span>}
+            </div>
             <p style={{ fontSize: 12, color: '#68788e', lineHeight: 1.7, margin: 0 }}>
               ご家族のカルテを結びつけるときは、その方のお名前と、院に登録している電話番号を入れてください。
             </p>
