@@ -1,10 +1,10 @@
 'use client'
 /**
- * 患者さんの動き（離反・リピート・サブスク）— 院長のみ・経営メニュー（隠しモード）の中
+ * 患者さんの動き（離反・リピート・会員）— 院長のみ・経営メニュー（隠しモード）の中
  *
  * - カルテ（この端末）から、最後に来た日と空いている日数を出し、帯ごとの人数と「声かけの候補」を出す
  * - NOAH のリピート率（先月来た人のうち今月まだ来ていない人 など）を月ごとに並べる
- * - 予約システムの「サブスク」のチェックがある方（予約のある方）と、LINE連携の人数
+ * - 予約システムの「会員」のチェックがある方（予約のある方）と、LINE連携の人数
  * 名前はこの画面（院内）だけ。外部には何も送らない。計算は lib/marketing/patient-movement.ts（単体テストあり）
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -80,7 +80,7 @@ export default function PatientMovementPage() {
         .then((d: Feed) => (d.ok ? setFeed(d) : setFeedError('予約システムから読めませんでした')))
         .catch(() => setFeedError('予約システムから読めませんでした'))
     } else {
-      setFeedError('「今日の予約」で予約システムと連携すると、サブスクの方が出ます')
+      setFeedError('「今日の予約」で予約システムと連携すると、会員の方が出ます')
     }
   }, [today])
 
@@ -117,7 +117,7 @@ export default function PatientMovementPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-black text-slate-900">患者さんの動き</h1>
-        <p className="text-xs text-slate-500">離反・リピート・サブスク。名前はこの画面（院内）だけで、外には送りません。</p>
+        <p className="text-xs text-slate-500">離反・リピート・会員。名前はこの画面（院内）だけで、外には送りません。</p>
       </div>
 
       {/* 帯ごとの人数 */}
@@ -229,13 +229,13 @@ export default function PatientMovementPage() {
         )}
       </section>
 
-      {/* サブスク・LINE */}
+      {/* 会員・LINE */}
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="font-bold text-slate-900">サブスク（月額）の方 {feed ? `${subs.length}名` : ''}</h2>
-          <p className="text-[11px] text-slate-500">予約管理画面で「サブスク」にチェックした方のうち、この30日〜14日先に予約のある方。</p>
+          <h2 className="font-bold text-slate-900">会員（月額）の方 {feed ? `${subs.length}名` : ''}</h2>
+          <p className="text-[11px] text-slate-500">予約管理画面で「会員」にチェックした方のうち、この30日〜14日先に予約のある方。</p>
           {feedError && <p className="mt-2 text-xs text-amber-700">{feedError}</p>}
-          {feed && subs.length === 0 && <p className="mt-2 text-sm text-slate-500">予約のあるサブスクの方はいません。</p>}
+          {feed && subs.length === 0 && <p className="mt-2 text-sm text-slate-500">予約のある会員の方はいません。</p>}
           {subs.length > 0 && (
             <ul className="mt-2 divide-y divide-slate-100 text-sm">
               {subs.map((s) => (

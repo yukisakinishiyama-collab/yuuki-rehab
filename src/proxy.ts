@@ -36,6 +36,7 @@ const PUBLIC_PATHS = [
   '/api/marketing/jobs/run',
   '/api/marketing/autopilot/run',
   '/api/marketing/noah/nightly',
+  '/api/marketing/line/birthday/run',
   '/api/marketing/reservation-notify',
   '/api/marketing/instagram/callback',
 ]

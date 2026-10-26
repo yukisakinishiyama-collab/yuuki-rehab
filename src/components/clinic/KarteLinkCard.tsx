@@ -48,7 +48,7 @@ export default function KarteLinkCard() {
       <p className="mt-1 text-xs leading-relaxed text-slate-600">
         リッチメニューの「カルテ連携」から開けます（7マス版のメニューは
         <a href="/marketing/line/richmenu" className="underline">こちら</a>）。
-        患者さんがこのページをLINEの中で開き、お名前と電話番号を入れると、カルテと結びつきます。
+        患者さんがこのページをLINEの中で開き、お名前・電話番号・生年月日を入れると、カルテと結びつき、ネット予約で使える患者番号がLINEに届きます。
         結びついた方には、誕生日のご挨拶など院からのお知らせをLINEで送れるようになります
         （送る文面は院長が決めてから。自動では送りません）。
       </p>

@@ -21,6 +21,12 @@ export interface LineLink {
   linkedAt: string
   /** どこで結びついたか */
   via: 'liff-link' | 'reservation'
+  /** 生年月日（'YYYY-MM-DD'。誕生日のご挨拶に使う。患者さんが連携のときに入れたもの） */
+  birthDate?: string
+  /** 予約システム（患者マスタ）の患者番号。ネット予約の「患者番号をお持ちの方」で使える */
+  patientNo?: string
+  /** 番号を発行できなかった理由（同じ電話番号で別の方が登録済み、など） */
+  patientNoError?: string
 }
 
 /** 画面に出す分（封印済みの参照は出さない） */

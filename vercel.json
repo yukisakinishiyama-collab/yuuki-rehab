@@ -83,6 +83,10 @@
     {
       "path": "/api/marketing/noah/nightly",
       "schedule": "15 14 * * *"
+    },
+    {
+      "path": "/api/marketing/line/birthday/run",
+      "schedule": "0 0 * * *"
     }
   ]
 }
