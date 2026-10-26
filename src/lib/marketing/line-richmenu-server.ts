@@ -56,7 +56,10 @@ export async function listRichMenus(): Promise<RichMenuListItem[]> {
 export async function getDefaultRichMenuId(): Promise<string | null> {
   const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', { headers: { Authorization: `Bearer ${token()}` } })
   if (res.status === 404) return null
-  if (!res.ok) throw new Error(`LINE API ${res.status}`)
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { message?: string }
+    throw new Error(`LINE API ${res.status}（デフォルトの取得）: ${data.message ?? ''}`)
+  }
   const data = (await res.json()) as { richMenuId?: string }
   return data.richMenuId ?? null
 }

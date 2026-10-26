@@ -21,8 +21,19 @@ export async function GET(request: NextRequest) {
   if (denied) return denied
   if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) return NextResponse.json({ ok: true, configured: false, defaultId: null, menus: [] })
   try {
-    const [defaultId, menus] = await Promise.all([getDefaultRichMenuId(), listRichMenus()])
-    return NextResponse.json({ ok: true, configured: true, defaultId, menus })
+    // どちらかが失敗しても、もう片方は返す（原因が分かるように warning に入れる）
+    const [d, m] = await Promise.allSettled([getDefaultRichMenuId(), listRichMenus()])
+    const warning = [d, m]
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+      .join(' / ')
+    return NextResponse.json({
+      ok: true,
+      configured: true,
+      defaultId: d.status === 'fulfilled' ? d.value : null,
+      menus: m.status === 'fulfilled' ? m.value : [],
+      warning: warning || undefined,
+    })
   } catch (error) {
     return fail(error)
   }
