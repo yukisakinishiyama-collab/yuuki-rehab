@@ -139,6 +139,7 @@ interface Status {
   configured: boolean
   defaultId: string | null
   menus: Array<{ richMenuId: string; name: string }>
+  warning?: string
 }
 
 export default function RichMenuPage() {
@@ -278,6 +279,7 @@ export default function RichMenuPage() {
         ) : (
           <p className="mt-1 text-slate-600">LINE の管理画面のメニューを表示中（API のメニューは無し）</p>
         )}
+        {status?.warning && <p className="mt-1 text-xs text-amber-700">確認できなかった項目: {status.warning}</p>}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm space-y-3">
