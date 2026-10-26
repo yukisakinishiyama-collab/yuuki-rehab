@@ -29,6 +29,7 @@ import {
   Star,
   Users,
   Video,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -71,6 +72,7 @@ export const NAV: NavSection[] = [
       { href: '/marketing/sales/monthly', label: '月次レポート', icon: CalendarCheck },
       { href: '/marketing/sales/patients', label: '患者さんの動き', icon: Users },
       { href: '/marketing/sales/goal', label: '月の目標への道すじ', icon: Mountain },
+      { href: '/marketing/sales/profit', label: '経費・利益', icon: Wallet },
       { href: '/marketing/sales/pdca', label: 'PDCA（施策）', icon: RefreshCcw },
       { href: '/marketing/sales/chat', label: '経営相談（AI）', icon: Sparkles },
       { href: '/marketing/analytics', label: '集客の効果', icon: ChartLine },
