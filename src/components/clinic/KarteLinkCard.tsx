@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { useLineLinks } from '@/lib/line-link-client'
+import { LIFF_ID as DEFAULT_LIFF_ID } from '@/lib/marketing/clinic'
 
 const LIFF_ID_STORAGE = 'liff_id'
 
@@ -17,7 +18,7 @@ export default function KarteLinkCard() {
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末の控えを最初に1回読むだけ
-      setLiffId(localStorage.getItem(LIFF_ID_STORAGE) || '')
+      setLiffId(localStorage.getItem(LIFF_ID_STORAGE) || DEFAULT_LIFF_ID)
     } catch {
       /* noop */
     }
@@ -45,6 +46,8 @@ export default function KarteLinkCard() {
         </span>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-slate-600">
+        リッチメニューの「カルテ連携」から開けます（7マス版のメニューは
+        <a href="/marketing/line/richmenu" className="underline">こちら</a>）。
         患者さんがこのページをLINEの中で開き、お名前と電話番号を入れると、カルテと結びつきます。
         結びついた方には、誕生日のご挨拶など院からのお知らせをLINEで送れるようになります
         （送る文面は院長が決めてから。自動では送りません）。

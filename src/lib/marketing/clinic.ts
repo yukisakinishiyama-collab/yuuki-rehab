@@ -9,6 +9,11 @@ import type { ClinicProfile } from './types'
 export const RESERVE_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec'
 
+/** 公式LINEの LIFF（ネット予約のリッチメニューに入れているもの。/link を足すとカルテ連携） */
+export const LIFF_ID = '2010991753-yKKnDDnb'
+/** LINE の中から開くネット予約（LIFF 経由。予約完了の通知が本人の LINE に届く） */
+export const LIFF_RESERVE_URL = `https://liff.line.me/${LIFF_ID}`
+
 /** 院のホームページ（検索に出す本来のサイト。Netlify） */
 export const HOMEPAGE_URL = 'https://shimonoseki-yuuki.com/'
 
