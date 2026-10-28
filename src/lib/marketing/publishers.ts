@@ -267,7 +267,7 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
 
 /**
  * Google Business Profile（投稿 = localPosts）。
- * APIは利用申請の承認制。承認後に次の環境変数を設定すると自動投稿になる（未設定の間は手動投稿モード）:
+ * APIは利用申請の承認制（2026-10-26 承認済み）。次の環境変数を設定すると自動投稿になる（未設定の間は手動投稿モード）:
  *   GBP_CLIENT_ID / GBP_CLIENT_SECRET … Google CloudのOAuthクライアント
  *   GBP_REFRESH_TOKEN                … ビジネスプロフィールのオーナーで同意して得たリフレッシュトークン
  *   GBP_LOCATION_NAME                … 'accounts/{accountId}/locations/{locationId}'
@@ -281,7 +281,7 @@ async function publishGoogleBusiness(content: GeneratedContent): Promise<Publish
   if (!clientId || !clientSecret || !refreshToken || !location || !/^accounts\/\d+\/locations\/\d+$/.test(location)) {
     return {
       kind: 'action_required',
-      reason: 'Google Business Profile APIは利用申請の承認待ちです。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
+      reason: 'Googleとの接続（GBP_*の設定）がまだのため手動投稿です。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
       manualUrl,
     }
   }
