@@ -95,11 +95,11 @@ export async function POST(request: NextRequest) {
     patientNo,
     patientNoError: patientNo ? undefined : patientNoError,
   }
-  await saveLineLink(link)
-
-  // 本人へ1通（送れなくても結びつけは成功あつかい）
+  // 本人へ1通（送れなくても結びつけは成功あつかい）。送れなかった理由は控えておく
   let notified = false
+  let notifyError = ''
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  if (!token) notifyError = 'LINE_CHANNEL_ACCESS_TOKEN 未設定'
   if (token) {
     const numberLine = patientNo
       ? `\n\n患者番号：${patientNo}\nネット予約の「患者番号をお持ちの方」に、この番号と電話番号の下4桁を入れると、お名前などが自動で入ります。`
@@ -112,10 +112,23 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
       })
       notified = res.ok
-    } catch {
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '')
+        notifyError = `HTTP ${res.status} ${detail}`.slice(0, 300)
+      }
+    } catch (error) {
       notified = false
+      notifyError = (error instanceof Error ? error.message : String(error)).slice(0, 300)
     }
   }
+  await saveLineLink({ ...link, notified, notifyError: notified ? undefined : notifyError || undefined })
 
-  return NextResponse.json({ ok: true, name, notified, again: Boolean(existing), patientNo: patientNo ?? null, patientNoMessage: patientNo ? '' : patientNoErrorText(patientNoError) })
+  return NextResponse.json({
+    ok: true,
+    name,
+    notified,
+    again: Boolean(existing),
+    patientNo: patientNo ?? null,
+    patientNoMessage: patientNo ? '' : patientNoErrorText(patientNoError),
+  })
 }

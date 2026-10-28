@@ -27,6 +27,10 @@ export interface LineLink {
   patientNo?: string
   /** 番号を発行できなかった理由（同じ電話番号で別の方が登録済み、など） */
   patientNoError?: string
+  /** 結びつけたときの「番号のお知らせ」をLINEへ送れたか */
+  notified?: boolean
+  /** 送れなかったときの理由（LINEの返事。原因を調べるため） */
+  notifyError?: string
 }
 
 /** 画面に出す分（封印済みの参照は出さない） */
