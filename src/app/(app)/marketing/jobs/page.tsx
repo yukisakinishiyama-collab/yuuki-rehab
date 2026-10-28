@@ -29,7 +29,7 @@ const CONNECTION_ITEMS: Array<{ key: string; label: string; hint: string }> = [
   { key: 'openaiImage', label: '画像生成（OpenAI）', hint: 'OPENAI_API_KEY（Phase 5で使用）' },
   { key: 'lineChannel', label: 'LINE Messaging API', hint: 'LINE_CHANNEL_SECRET / ACCESS_TOKEN' },
   { key: 'instagram', label: 'Instagram Graph API', hint: '下の「Instagramとつなぐ」から接続' },
-  { key: 'googleBusiness', label: 'Google Business Profile API', hint: '利用申請の承認待ち（手動投稿モードで運用）' },
+  { key: 'googleBusiness', label: 'Google Business Profile API', hint: '申請は承認済み。接続の設定（GBP_*）待ち（その間は手動投稿モード）' },
   { key: 'cronSecret', label: 'ジョブ実行の保護（CRON_SECRET）', hint: '本番デプロイ時に設定推奨' },
 ]
 

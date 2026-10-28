@@ -567,7 +567,7 @@ function AutopilotInner() {
         { label: 'AI下書き', ok: conn.ai, note: conn.ai ? '稼働中' : conn.mock ? 'モック' : 'APIキー未設定' },
         { label: '院長LINE通知', ok: conn.ownerLine, note: conn.ownerLine ? '通知あり' : '未設定' },
         { label: 'Instagram', ok: conn.instagram, note: conn.instagram ? '自動投稿' : '未連携（時刻にLINEで本文が届きます）' },
-        { label: 'Google', ok: conn.googleApi, note: conn.googleApi ? '自動投稿' : 'API承認待ち（時刻にLINEで本文が届きます）' },
+        { label: 'Google', ok: conn.googleApi, note: conn.googleApi ? '自動投稿' : '接続の設定待ち（時刻にLINEで本文が届きます）' },
         { label: '予約の流入元', ok: conn.bookingStats, note: conn.bookingStats ? '集計できます' : '未設定' },
       ]
     : []
@@ -696,7 +696,7 @@ function AutopilotInner() {
         <ol className="list-decimal space-y-1 pl-4">
           <li>毎週日曜の夕方、テーマ集（症状の解説・予防・院のご案内）と院長メモから翌週分の投稿案をAIが作り、表現チェックをかけます。</li>
           <li>院長のLINEにお知らせが届きます。この画面で内容を確認して「承認」。LINEの「このまま全部承認」でも承認できます。</li>
-          <li>予定の時刻に自動で投稿します。Instagram未連携・Google（API承認待ち）の間は、時刻になると本文がLINEに届くので、コピーして貼り付けて「投稿した」を押すだけです。</li>
+          <li>予定の時刻に自動で投稿します。Instagram未連携・Google（接続の設定待ち）の間は、時刻になると本文がLINEに届くので、コピーして貼り付けて「投稿した」を押すだけです。</li>
           <li>承認しなかった案は投稿されません。投稿のリンクは計測付きで、どの投稿から予約が入ったかが「効果測定」でわかります。</li>
         </ol>
       </section>
