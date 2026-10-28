@@ -90,7 +90,10 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-blue-900/60 mt-10 pt-6 text-center text-xs text-blue-400">
-          © {new Date().getFullYear()} ゆうき整骨院 All Rights Reserved.
+          <Link href="/privacy" className="inline-block mb-2 text-blue-300 hover:text-white transition-colors">
+            プライバシーポリシー
+          </Link>
+          <div>© {new Date().getFullYear()} ゆうき整骨院 All Rights Reserved.</div>
         </div>
       </div>
     </footer>
