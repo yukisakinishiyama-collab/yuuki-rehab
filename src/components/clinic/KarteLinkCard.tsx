@@ -17,12 +17,15 @@ export default function KarteLinkCard() {
   // 「連携が済みました＋患者番号」のLINEが届いたと確かめられていない方への送り直し
   const pendingNotice = (links ?? []).filter(l => l.notified !== true).length
   const [resendState, setResendState] = useState('')
-  const resend = async () => {
-    if (pendingNotice === 0) return
-    if (!window.confirm(`連携のお知らせ（患者番号つき）を、まだ届いたと確かめられていない ${pendingNotice}人にLINEで送ります。よろしいですか？`)) return
+  const linkedTotal = (links ?? []).length
+  const resend = async (all: boolean) => {
+    const count = all ? linkedTotal : pendingNotice
+    if (count === 0) return
+    const who = all ? '連携した全員' : 'まだ届いたと確かめられていない方'
+    if (!window.confirm(`連携のお知らせ（患者番号つき）を、${who}（${count}人）にLINEで送ります。取り消しはできません。よろしいですか？`)) return
     setResendState('送っています…')
     try {
-      const res = await fetch('/api/line-link/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await fetch('/api/line-link/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(all ? { all: true } : {}) })
       const d = (await res.json()) as { ok?: boolean; sent?: number; failed?: number; errors?: string[]; error?: string }
       if (!res.ok || !d.ok) throw new Error(d.error ?? `HTTP ${res.status}`)
       setResendState(`${d.sent ?? 0}人に送りました${d.failed ? `（${d.failed}人は送れませんでした：${(d.errors ?? []).join(' / ')}）` : ''}`)
@@ -98,11 +101,19 @@ export default function KarteLinkCard() {
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <button
               type="button"
-              onClick={resend}
+              onClick={() => void resend(false)}
               disabled={pendingNotice === 0 || resendState === '送っています…'}
               className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               連携のお知らせを送り直す（未確認 {pendingNotice}人）
+            </button>
+            <button
+              type="button"
+              onClick={() => void resend(true)}
+              disabled={linkedTotal === 0 || resendState === '送っています…'}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              連携した全員に送る（{linkedTotal}人）
             </button>
             {resendState && <span className="text-slate-600">{resendState}</span>}
           </div>
