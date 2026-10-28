@@ -5,7 +5,7 @@ import type { Metadata } from 'next'
  *
  * Google の OAuth 同意画面（Googleビジネスプロフィールへの投稿連携）を「本番環境」に公開するには、
  * プライバシーポリシーの URL が必要なため設けた。院の個人情報の扱い全体を書いている。
- * 外部サービスの一覧は、実際に使っているもの（予約=GAS、LINE、Vercel/Supabase、紹介状下書き=Anthropic）と
+ * 外部サービスの一覧は、実際に使っているもの（予約=GAS、LINE、Vercel/Supabase）と
  * 合わせること。使うサービスが変わったら、ここも直す。
  */
 export const metadata: Metadata = {
@@ -60,7 +60,6 @@ const sections: Section[] = [
       '予約の管理：Google（スプレッドシート・Apps Script）',
       '公式LINE・LINEからのご予約：LINEヤフー株式会社',
       'ホームページ・院内システムの運用と記録の控えの保管：Vercel、Supabase',
-      '紹介状など文章の下書き作成：Anthropic（AIのサービス。お名前や症状など、下書きに必要な情報を送ります）',
     ],
     after: [
       'これらには海外（米国など）の事業者が含まれ、情報が海外のサーバーで保管・処理される場合があります。個人情報を適切に扱う事業者を選び、必要な管理を行います。',
