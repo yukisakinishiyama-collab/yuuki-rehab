@@ -13,7 +13,24 @@ const LIFF_ID_STORAGE = 'liff_id'
 
 export default function KarteLinkCard() {
   const [liffId, setLiffId] = useState('')
-  const { links, error } = useLineLinks()
+  const { links, error, reload } = useLineLinks()
+  // 「連携が済みました＋患者番号」のLINEが届いたと確かめられていない方への送り直し
+  const pendingNotice = (links ?? []).filter(l => l.notified !== true).length
+  const [resendState, setResendState] = useState('')
+  const resend = async () => {
+    if (pendingNotice === 0) return
+    if (!window.confirm(`連携のお知らせ（患者番号つき）を、まだ届いたと確かめられていない ${pendingNotice}人にLINEで送ります。よろしいですか？`)) return
+    setResendState('送っています…')
+    try {
+      const res = await fetch('/api/line-link/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const d = (await res.json()) as { ok?: boolean; sent?: number; failed?: number; errors?: string[]; error?: string }
+      if (!res.ok || !d.ok) throw new Error(d.error ?? `HTTP ${res.status}`)
+      setResendState(`${d.sent ?? 0}人に送りました${d.failed ? `（${d.failed}人は送れませんでした：${(d.errors ?? []).join(' / ')}）` : ''}`)
+      reload()
+    } catch (e) {
+      setResendState(e instanceof Error ? e.message : '送れませんでした')
+    }
+  }
 
   useEffect(() => {
     try {
@@ -78,6 +95,17 @@ export default function KarteLinkCard() {
           ) : (
             <p className="text-xs text-amber-700">LIFF ID を入れると、URLとQRが出ます。</p>
           )}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={resend}
+              disabled={pendingNotice === 0 || resendState === '送っています…'}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              連携のお知らせを送り直す（未確認 {pendingNotice}人）
+            </button>
+            {resendState && <span className="text-slate-600">{resendState}</span>}
+          </div>
           <p className="text-[11px] leading-relaxed text-slate-500">
             受付では、友だち追加のあとに「メニューのカルテ連携から、お名前と電話番号を入れてください」とご案内ください。
             ご家族のカルテは、その方のお名前と院に登録している電話番号で結びつけられます。
