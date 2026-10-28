@@ -25,7 +25,25 @@ function isReservationOrigin(origin: string): boolean {
 
 export default function YoyakuFrame({ visible }: { visible: boolean }) {
   const [mounted, setMounted] = useState(false)
+  // 予約管理画面を開くURL。院内アプリから開くときは署名つきにして、
+  // 予約システム側のパスワード入力を省く（院内アプリ自体がパスワードで守られているため）
+  const [adminUrl, setAdminUrl] = useState('')
   const router = useRouter()
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/yoyaku/admin-url', { cache: 'no-store' })
+      .then(r => r.json())
+      .then((d: { ok?: boolean; url?: string }) => {
+        if (alive && d.ok && d.url) setAdminUrl(d.url)
+      })
+      .catch(() => {
+        if (alive) setAdminUrl(RESERVATION_ADMIN_URL) // 取れなければ今までどおり（パスワードを入力）
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // 初めて表示された時点でマウントし、以後はセッション中ずっと保持する
   // （レンダー中のstate調整パターン。effect不要でラッチできる）
@@ -66,6 +84,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   }, [router])
 
   if (!mounted) return null
+  const openUrl = adminUrl || RESERVATION_ADMIN_URL
 
   return (
     <div className={visible ? 'flex h-[calc(100dvh-13rem)] min-h-[480px] flex-col lg:h-[calc(100dvh-5.5rem)]' : 'hidden'}>
@@ -88,7 +107,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             患者用予約ページ
           </a>
           <a
-            href={RESERVATION_ADMIN_URL}
+            href={openUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-800"
@@ -101,11 +120,15 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
 
       {/* 予約管理画面（GAS）を埋め込み（常駐・再読み込みなし） */}
       <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <iframe
-          src={RESERVATION_ADMIN_URL}
-          title="予約管理（GAS）"
-          className="w-full h-full border-0"
-        />
+        {adminUrl ? (
+          <iframe
+            src={adminUrl}
+            title="予約管理（GAS）"
+            className="w-full h-full border-0"
+          />
+        ) : (
+          <p className="flex h-full items-center justify-center text-xs text-slate-400">予約管理を開いています…</p>
+        )}
       </div>
 
       <p className="text-[11px] text-slate-400 mt-2">
