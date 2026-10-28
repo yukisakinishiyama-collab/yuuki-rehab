@@ -265,8 +265,8 @@ export default function ReferralLetterModal({ patient, intakes, soapNotes, selec
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: letterType,
+          // お名前はAIへ送らない（下書きは「患者様」で作り、宛名などは院内の画面で入れる）
           patient: {
-            name: patient.name,
             diagnosis: patient.diagnosisLabel,
             bodyRegion: patient.bodyRegion,
           },
