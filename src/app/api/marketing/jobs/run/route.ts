@@ -72,11 +72,12 @@ async function run() {
     }
   }
 
-  // AI動画（週2本）: 作成中のものを取りに行き、月・木の朝なら1本作り始める。失敗しても投稿の結果は返す
+  // AI動画: 作成中のものの片付けだけ行う。自動で作り始めるのは止めている（2026-10-29 院長の指示）。
+  // 作るときは動画ストックの「1本作る」ボタンから。再開するときは allowAutoStart を true に戻す
   let aiVideos: unknown = null
   try {
     const { tickAiVideos } = await import('@/lib/marketing/ai-video-server')
-    aiVideos = await tickAiVideos({ allowAutoStart: true })
+    aiVideos = await tickAiVideos({ allowAutoStart: false })
   } catch (error) {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
