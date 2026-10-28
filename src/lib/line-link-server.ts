@@ -28,7 +28,7 @@ export async function listLineLinks(): Promise<LineLinkSummary[]> {
   return rows
     .map(({ value }) => value)
     .filter((v): v is LineLink => Boolean(v && v.key))
-    .map(({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError }) => ({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError }))
+    .map(({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError, notified, notifyError }) => ({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError, notified, notifyError }))
     .sort((a, b) => (a.linkedAt < b.linkedAt ? 1 : -1))
 }
 

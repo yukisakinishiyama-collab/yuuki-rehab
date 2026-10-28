@@ -54,7 +54,7 @@ export default function LiffLinkPage() {
       .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
       .replace(/\D/g, '')
       .slice(0, max)
-  const [done, setDone] = useState<{ patientNo: string | null; patientNoMessage: string }>({ patientNo: null, patientNoMessage: '' })
+  const [done, setDone] = useState<{ patientNo: string | null; patientNoMessage: string; notified: boolean }>({ patientNo: null, patientNoMessage: '', notified: false })
   const [message, setMessage] = useState('')
   const [doneName, setDoneName] = useState('')
 
@@ -108,7 +108,7 @@ export default function LiffLinkPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticket, name, phone, birthDate: birth }),
       })
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; name?: string; patientNo?: string | null; patientNoMessage?: string } | null
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; name?: string; patientNo?: string | null; patientNoMessage?: string; notified?: boolean } | null
       if (!res.ok || !data?.ok) {
         setMessage(data?.error || 'うまくいきませんでした。もう一度お試しください')
         // チケット切れ（15分）のときは開き直してもらう
@@ -116,7 +116,7 @@ export default function LiffLinkPage() {
         return
       }
       setDoneName(data.name || name)
-      setDone({ patientNo: data.patientNo ?? null, patientNoMessage: data.patientNoMessage ?? '' })
+      setDone({ patientNo: data.patientNo ?? null, patientNoMessage: data.patientNoMessage ?? '', notified: Boolean(data.notified) })
       setPhase('done')
     } catch {
       setMessage('通信に失敗しました。電波のよいところでもう一度お試しください')
@@ -287,8 +287,14 @@ export default function LiffLinkPage() {
                 <p style={{ margin: 0, fontSize: 12, color: '#166534', fontWeight: 700 }}>あなたの患者番号</p>
                 <p style={{ margin: '2px 0 6px', fontSize: 30, fontWeight: 900, letterSpacing: '0.08em', color: '#131e2e' }}>{done.patientNo}</p>
                 <p style={{ margin: 0, fontSize: 12.5, color: '#4b5b6e', lineHeight: 1.7 }}>
-                  ネット予約の「患者番号をお持ちの方」に、この番号と電話番号の下4桁を入れると、お名前などが自動で入ります。LINEにも同じ内容をお送りしました。
+                  ネット予約の「患者番号をお持ちの方」に、この番号と電話番号の下4桁を入れると、お名前などが自動で入ります。
+                  {done.notified ? 'LINEにも同じ内容をお送りしました。' : ''}
                 </p>
+                {!done.notified && (
+                  <p style={{ margin: '8px 0 0', fontSize: 12.5, color: '#9a3412', fontWeight: 700, lineHeight: 1.7 }}>
+                    LINEへのお知らせは送れませんでした。この画面のスクリーンショットを撮るか、番号を控えておいてください。
+                  </p>
+                )}
               </div>
             ) : done.patientNoMessage ? (
               <p style={{ margin: '12px 0 0', fontSize: 12.5, color: '#4b5b6e', lineHeight: 1.7 }}>{done.patientNoMessage}</p>
