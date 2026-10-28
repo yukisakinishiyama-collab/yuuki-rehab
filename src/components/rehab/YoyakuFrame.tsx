@@ -7,7 +7,10 @@
 // 最初に「予約」を押したときに待たないように）。通信を節約する設定の端末では、開いたときだけ読み込む。
 // ──────────────────────────────────────────────
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ExternalLink } from 'lucide-react'
+import { getPatients, initPatientStore } from '@/lib/patient-store'
+import { matchKartePatients } from '@/lib/karte-link'
 
 const RESERVATION_ADMIN_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec?page=admin'
@@ -15,8 +18,14 @@ const RESERVATION_ADMIN_URL =
 const RESERVATION_PATIENT_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec'
 
+/** 予約管理画面（GAS）からの合図を受けるのは、Googleのこの2つの入れ物だけ */
+function isReservationOrigin(origin: string): boolean {
+  return origin === 'https://script.google.com' || origin.endsWith('.googleusercontent.com')
+}
+
 export default function YoyakuFrame({ visible }: { visible: boolean }) {
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   // 初めて表示された時点でマウントし、以後はセッション中ずっと保持する
   // （レンダー中のstate調整パターン。effect不要でラッチできる）
@@ -29,6 +38,32 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
     const id = window.setTimeout(() => setMounted(true), 2500)
     return () => window.clearTimeout(id)
   }, [mounted])
+
+  // 予約管理画面で氏名を押したとき、その患者さんのカルテを開く
+  // （予約システムから届くのは氏名と電話番号だけ。カルテは端末の中で探す）
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!isReservationOrigin(event.origin)) return
+      const data = event.data as { type?: string; name?: string; phone?: string } | null
+      if (!data || typeof data.type !== 'string') return
+      if (data.type === 'yuuki:karte-hello') {
+        // 「院内アプリの中にいます」と返す（予約画面はこれで、別タブではなくアプリ内でカルテを開く）
+        const source = event.source as Window | null
+        source?.postMessage({ type: 'yuuki:karte-hello-ack' }, { targetOrigin: event.origin })
+        return
+      }
+      if (data.type !== 'yuuki:open-karte') return
+      const name = String(data.name ?? '')
+      const phone = String(data.phone ?? '')
+      if (!name && !phone) return
+      initPatientStore()
+      const found = matchKartePatients(getPatients(), name, phone)
+      if (found.length === 1) router.push(`/patients/${found[0].id}`)
+      else router.push(`/patients?karte=${encodeURIComponent(name)}&tel=${encodeURIComponent(phone)}`)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [router])
 
   if (!mounted) return null
 

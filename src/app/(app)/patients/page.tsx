@@ -18,6 +18,7 @@ import { getPatients, initPatientStore, getSOAPNotes, getCancellations } from '@
 import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils'
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
+import { matchKartePatients } from '@/lib/karte-link'
 import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
 import { useLineLinks } from '@/lib/line-link-client'
 import { buttonVariants } from '@/components/ui/button'
@@ -58,16 +59,31 @@ export default function PatientsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('visit')
   const [pins, setPins] = useState<string[]>([])
   const [recentIds, setRecentIds] = useState<string[]>([])
+  // 予約管理画面から「カルテを開く」で来たのに見つからなかった方（お名前を出して、登録しやすくする）
+  const [karteMiss, setKarteMiss] = useState('')
 
   useEffect(() => {
     initPatientStore()
-    setPatients(getPatients())
+    const list = getPatients()
+    setPatients(list)
     setPins(getPinnedIds())
     setRecentIds(getRecentViews().map(v => v.id))
+    const params = new URLSearchParams(window.location.search)
     // 「今日」の画面の検索から来たとき（/patients?q=お名前）
-    const q = new URLSearchParams(window.location.search).get('q')
+    const q = params.get('q')
     if (q) setSearch(q)
-  }, [])
+    // 予約管理画面で氏名を押して来たとき（/patients?karte=お名前&tel=電話番号）
+    const karte = params.get('karte') ?? ''
+    const tel = params.get('tel') ?? ''
+    if (!karte && !tel) return
+    const found = matchKartePatients(list, karte, tel)
+    if (found.length === 1) {
+      router.replace(`/patients/${found[0].id}`)
+      return
+    }
+    setSearch(karte)
+    if (found.length === 0) setKarteMiss(karte || tel)
+  }, [router])
 
   // SOAPノートを一度だけ読み込み、患者別にグループ化（来院日の降順）
   const notesByPatient = useMemo(() => {
@@ -294,6 +310,21 @@ export default function PatientsPage() {
           </label>
         </div>
       </div>
+
+      {/* 予約管理画面から来たのにカルテが無かったとき */}
+      {karteMiss && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>
+            予約の「{karteMiss}」さんのカルテが見つかりませんでした。お名前を確かめるか、新しく登録してください。
+          </span>
+          <Link href="/patients/new" className={cn(buttonVariants({ size: 'sm' }), 'bg-amber-600 hover:bg-amber-700')}>
+            この方のカルテを作る
+          </Link>
+          <button type="button" onClick={() => setKarteMiss('')} className="ml-auto text-xs text-amber-700 underline">
+            閉じる
+          </button>
+        </div>
+      )}
 
       {/* 患者リスト */}
       {isEmpty ? (
