@@ -25,6 +25,7 @@
  * - /api/marketing/noah/nightly       … NOAH集計の毎晩のまとめ（CRON_SECRETで保護）
  * - /api/marketing/reservation-notify … GAS予約システムからの通知（RESERVATION_NOTIFY_SECRETで保護）
  * - /api/marketing/instagram/callback … Instagramの許可画面からの戻り（/connectで発行したstateのCookie一致で保護）
+ * - /api/marketing/google/callback    … Googleの許可画面からの戻り（同上。/connectで発行したstateのCookie一致で保護）
  */
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -39,6 +40,7 @@ const PUBLIC_PATHS = [
   '/api/marketing/line/birthday/run',
   '/api/marketing/reservation-notify',
   '/api/marketing/instagram/callback',
+  '/api/marketing/google/callback',
 ]
 
 /** 認証済みの役割を権威的にヘッダー注入し、UI表示用Cookieを添えて通過させる */

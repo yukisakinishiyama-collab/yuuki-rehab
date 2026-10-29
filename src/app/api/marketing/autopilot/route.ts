@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { isInstagramConnected } from '@/lib/marketing/instagram-token'
+import { isGbpConnected } from '@/lib/marketing/gbp-token'
 import { z } from 'zod'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { generateNow } from '@/lib/marketing/autopilot-server'
@@ -42,9 +43,7 @@ export async function GET() {
       connections: {
         ai: Boolean(process.env.ANTHROPIC_API_KEY) && process.env.MARKETING_MODE !== 'mock',
         instagram: await isInstagramConnected(),
-        googleApi: Boolean(
-          process.env.GBP_CLIENT_ID && process.env.GBP_CLIENT_SECRET && process.env.GBP_REFRESH_TOKEN && process.env.GBP_LOCATION_NAME,
-        ),
+        googleApi: await isGbpConnected(),
         ownerLine: Boolean(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.RESERVATION_NOTIFY_LINE_USER_ID),
         bookingStats: Boolean(process.env.RESERVATION_NOTIFY_SECRET),
         mock: process.env.MARKETING_MODE === 'mock',

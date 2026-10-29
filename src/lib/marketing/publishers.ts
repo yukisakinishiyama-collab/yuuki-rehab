@@ -8,6 +8,7 @@
  * - トークン設定済みの媒体のみ実APIを呼ぶ
  */
 import type { Channel, GeneratedContent } from './types'
+import { getGbpCredentials } from './gbp-token'
 
 export type PublishOutcome =
   | { kind: 'published'; url?: string; message: string }
@@ -267,24 +268,22 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
 
 /**
  * Google Business Profile（投稿 = localPosts）。
- * APIは利用申請の承認制（2026-10-26 承認済み）。次の環境変数を設定すると自動投稿になる（未設定の間は手動投稿モード）:
- *   GBP_CLIENT_ID / GBP_CLIENT_SECRET … Google CloudのOAuthクライアント
- *   GBP_REFRESH_TOKEN                … ビジネスプロフィールのオーナーで同意して得たリフレッシュトークン
- *   GBP_LOCATION_NAME                … 'accounts/{accountId}/locations/{locationId}'
+ * APIは利用申請の承認制（2026-10-26 承認済み）。接続すると自動投稿になる（未接続の間は手動投稿モード）:
+ *   GBP_CLIENT_ID / GBP_CLIENT_SECRET … Google CloudのOAuthクライアント（Vercelの環境変数）
+ *   リフレッシュトークンと投稿先の店舗 … 投稿ジョブ画面の「Googleとつなぐ」で保存（gbp-token.ts）。
+ *                                     環境変数 GBP_REFRESH_TOKEN / GBP_LOCATION_NAME を設定した場合はそちらが優先
  */
 async function publishGoogleBusiness(content: GeneratedContent): Promise<PublishOutcome> {
   const manualUrl = 'https://business.google.com/'
-  const clientId = process.env.GBP_CLIENT_ID
-  const clientSecret = process.env.GBP_CLIENT_SECRET
-  const refreshToken = process.env.GBP_REFRESH_TOKEN
-  const location = process.env.GBP_LOCATION_NAME
-  if (!clientId || !clientSecret || !refreshToken || !location || !/^accounts\/\d+\/locations\/\d+$/.test(location)) {
+  const credentials = await getGbpCredentials()
+  if (!credentials) {
     return {
       kind: 'action_required',
-      reason: 'Googleとの接続（GBP_*の設定）がまだのため手動投稿です。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
+      reason: 'Googleとの接続がまだのため手動投稿です。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
       manualUrl,
     }
   }
+  const { clientId, clientSecret, refreshToken, location } = credentials
 
   try {
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
