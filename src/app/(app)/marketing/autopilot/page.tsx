@@ -93,6 +93,7 @@ function VariantPreview({
 }) {
   // 媒体の切り替え・保存のたびに親が key を変えて作り直すので、初期値は props から取るだけでよい
   const [hook, setHook] = useState(variant.content.hook)
+  const [imageBroken, setImageBroken] = useState(false)
   const [body, setBody] = useState(variant.content.body)
   const [tags, setTags] = useState(variant.content.hashtags.join(' '))
 
@@ -141,10 +142,17 @@ function VariantPreview({
               src={postImageUrl(c, variant.channel, theme)}
               alt={c.altText || '投稿画像の見本'}
               loading="lazy"
+              onError={() => setImageBroken(true)}
+              onLoad={() => setImageBroken(false)}
               className="w-32 rounded-xl border border-slate-200 sm:w-40"
             />
           </a>
           <figcaption className="text-xs leading-relaxed text-slate-500">
+            {imageBroken && (
+              <span className="mb-1 block font-bold text-red-700">
+                画像を読み込めませんでした。見本を確かめられないまま承認しないでください（画面を開き直すか、作り直す／テンプレ画像にする）。
+              </span>
+            )}
             {c.image
               ? `AI画像（ChatGPTで作成）に見出しを重ねた、投稿と同じ画像です。${variant.channel === 'instagram_carousel' ? '1枚目（表紙）に使い、2枚目からは文字のスライドです。' : ''}押すと大きく開きます。`
               : 'テンプレ画像（紺の背景＋見出し）で投稿します。下の「画像を作る」でAI画像にできます。'}

@@ -26,7 +26,8 @@ export function imageSizeFor(channel: Channel): 'instagram' | 'google' | 'note' 
  * どれも生成後の表現チェック（checkGenerated）の対象になっている文言だけを使う
  */
 export function imageTextFor(content: GeneratedContent, channel: Channel, theme = ''): { title: string; subtitle: string } {
-  if (channel === 'instagram_carousel' && content.slides?.[0]) {
+  // カルーセルはスライドが2枚以上のときだけカルーセルで出す（publishers.ts）。1枚以下はフィードと同じ見出し
+  if (channel === 'instagram_carousel' && (content.slides?.length ?? 0) >= 2 && content.slides?.[0]) {
     const cover = content.slides[0]
     return { title: cover.heading || content.imageText || content.title || theme, subtitle: cover.body.slice(0, 40) }
   }

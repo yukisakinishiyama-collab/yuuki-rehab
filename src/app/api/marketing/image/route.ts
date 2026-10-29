@@ -75,16 +75,18 @@ export async function GET(request: NextRequest) {
     const title = params.get('title') ?? 'タイトル未設定'
     const subtitle = params.get('subtitle') ?? ''
     const sizeKey = (params.get('size') ?? 'instagram') as keyof typeof IMAGE_SIZES
-    // AI画像（下書きに付いた写真）があれば、投稿と同じく写真＋見出しで描く。読めなければテンプレ画像（投稿と同じ扱い）
+    // AI画像（下書きに付いた写真）があれば、投稿と同じく写真＋見出しで描く。
+    // 読めないときはテンプレ画像に差し替えず、失敗を返す（テンプレを見て承認したのに、公開ではAI写真が出る…を防ぐ）
     const photo = params.get('photo')
     if (photo) {
       try {
         return png(await renderPhotoPostImage(await loadPhotoDataUrl(photo), title, subtitle, sizeKey), 'post-image.png')
       } catch (error) {
-        console.warn('[marketing/image] AI画像を使えなかったため、テンプレ画像で描きます', error)
-        const res = png(await renderTemplateImage(title, subtitle, sizeKey), 'post-image.png')
-        res.headers.set('X-Photo-Fallback', '1')
-        return res
+        console.warn('[marketing/image] AI画像を読み込めませんでした', error)
+        return NextResponse.json(
+          { error: 'AI画像を読み込めませんでした。開き直すか、「テンプレ画像にする」を押してください', detail: error instanceof Error ? error.message : String(error) },
+          { status: 502 },
+        )
       }
     }
     return png(await renderTemplateImage(title, subtitle, sizeKey), 'post-image.png')

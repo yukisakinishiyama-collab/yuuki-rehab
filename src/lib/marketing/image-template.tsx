@@ -144,10 +144,23 @@ export async function renderTemplateImage(
 export function isAllowedPhotoUrl(url: string): boolean {
   try {
     const u = new URL(url)
-    return u.protocol === 'https:' && u.hostname.endsWith('.public.blob.vercel-storage.com')
+    if (u.protocol !== 'https:' || !u.hostname.endsWith('.public.blob.vercel-storage.com')) return false
+    if (!u.pathname.startsWith('/marketing/ai-photos/')) return false
+    // 自院の Blob ストアだけに絞る。公開URLのホスト名は <ストアID>.public.blob.vercel-storage.com
+    // （ストアIDは @vercel/blob と同じく、トークン vercel_blob_rw_<ストアID>_… か BLOB_STORE_ID（store_ を除く）から取る）
+    const storeId = blobStoreId()
+    return storeId ? u.hostname === `${storeId.toLowerCase()}.public.blob.vercel-storage.com` : true
   } catch {
     return false
   }
+}
+
+function blobStoreId(): string {
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim() ?? ''
+  const fromToken = token.startsWith('vercel_blob_rw_') ? (token.split('_')[3] ?? '') : ''
+  if (fromToken) return fromToken
+  const fromEnv = process.env.BLOB_STORE_ID?.trim() ?? ''
+  return fromEnv.startsWith('store_') ? fromEnv.slice('store_'.length) : fromEnv
 }
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024
@@ -160,6 +173,7 @@ export async function loadPhotoDataUrl(url: string): Promise<string> {
   if (!res.ok) throw new Error(`AI画像を読み込めませんでした（HTTP ${res.status}）`)
   const type = (res.headers.get('content-type') ?? '').split(';')[0].trim()
   if (!/^image\/(png|jpeg|webp)$/.test(type)) throw new Error(`AI画像の形式が正しくありません（${type || '不明'}）`)
+  if (Number(res.headers.get('content-length') ?? 0) > MAX_PHOTO_BYTES) throw new Error('AI画像が大きすぎます')
   const bytes = Buffer.from(await res.arrayBuffer())
   if (bytes.length > MAX_PHOTO_BYTES) throw new Error('AI画像が大きすぎます')
   return `data:${type};base64,${bytes.toString('base64')}`

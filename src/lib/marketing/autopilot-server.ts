@@ -506,6 +506,9 @@ function weeklyNotice(proposal: WeeklyProposal, followers?: string | null): Owne
     ...lines,
     '',
     '内容を確認して承認すると、予定の時刻に投稿されます。',
+    ...(items.some((i) => i.variants.some((v) => v.content.image))
+      ? ['画像はAI（ChatGPT）で作っています。「内容を確認する」で画像も見てから承認してください。']
+      : []),
     '承認しなかった投稿は出ません。',
     ...(followers ? ['', followers] : []),
   ].join('\n')
@@ -773,6 +776,10 @@ export async function applyProposalAction(week: string, input: ProposalAction, a
       if (typeof input.title === 'string') content.title = input.title.slice(0, 200)
       if (typeof input.hook === 'string') content.hook = input.hook.slice(0, 300)
       if (typeof input.body === 'string' && input.body.trim()) content.body = input.body.slice(0, 5000)
+      // 文章を直したら、AIが書いた画像の場面の説明は古くなるので消す（作り直すときは直した文章から場面を作る）
+      if (content.body !== variant.content.body || content.hook !== variant.content.hook || content.title !== variant.content.title) {
+        delete content.imagePrompt
+      }
       if (Array.isArray(input.hashtags)) content.hashtags = input.hashtags.map((h) => String(h).slice(0, 50)).slice(0, 30)
       variant.content = content
       variant.editedAt = new Date().toISOString()

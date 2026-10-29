@@ -26,10 +26,23 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ''}` }
 }
 
-/** モデルが使えない（未提供・未許可）ときは次のモデルを試す */
-function isModelProblem(status: number, message: string): boolean {
-  return status === 404 || /model|verif|not have access|does not exist/i.test(message)
+/** モデルが使えない（未提供・未許可・提供終了）ときは次のモデルを試す */
+function isModelProblem(status: number, message: string, code?: string): boolean {
+  if (status === 429) return false
+  return status === 404 || code === 'model_not_found' || /does not exist|not have access|must be verified|verification|deprecated|not supported/i.test(message)
 }
+
+/** Retry-After（秒数か日付）を秒にする */
+function retryAfterSeconds(value: string | null): number {
+  if (!value) return 8
+  const seconds = Number(value)
+  if (Number.isFinite(seconds)) return Math.max(seconds, 1)
+  const at = Date.parse(value)
+  return Number.isFinite(at) ? Math.max((at - Date.now()) / 1000, 1) : 8
+}
+
+/** 混み合いのとき、これより長く待てと言われたらやり直さずに失敗にする（時間切れで落ちるより、理由を返す） */
+const MAX_RETRY_WAIT_SECONDS = 20
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -44,6 +57,7 @@ export async function generateOpenAiImage(
   const models = options.models ?? imageModels()
   let lastError = ''
   let lastStatus = 0
+  let lastCode: string | undefined
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       // signal … 時間切れで打ち切ったら、OpenAIへの要求も止める（裏で作り続けて同時に何枚も走らないように）
@@ -55,7 +69,7 @@ export async function generateOpenAiImage(
       })
       const data = (await res.json().catch(() => ({}))) as {
         data?: Array<{ b64_json?: string; url?: string }>
-        error?: { message?: string }
+        error?: { message?: string; code?: string }
       }
       const item = data.data?.[0]
       if (res.ok && item?.b64_json) return { bytes: Buffer.from(item.b64_json, 'base64'), model }
@@ -65,15 +79,21 @@ export async function generateOpenAiImage(
       }
       lastError = data.error?.message ?? `HTTP ${res.status}`
       lastStatus = res.status
+      lastCode = data.error?.code
       if (res.status === 429 && attempt === 0) {
-        const wait = Math.min(Number(res.headers.get('retry-after')) || 8, 20)
-        await sleep(wait * 1000)
+        // 言われた時間は守る（早すぎるやり直しはまた断られる）。長すぎるなら待たずに失敗にする
+        const wait = retryAfterSeconds(res.headers.get('retry-after'))
+        if (wait > MAX_RETRY_WAIT_SECONDS) {
+          lastError = `混み合っています。${Math.ceil(wait)}秒ほどおいてからもう一度お試しください（${lastError}）`
+          break
+        }
+        await sleep(wait * 1000 + Math.random() * 1000)
         options.signal?.throwIfAborted()
         continue
       }
       break
     }
-    if (!isModelProblem(lastStatus, lastError)) break
+    if (!isModelProblem(lastStatus, lastError, lastCode)) break
   }
   throw new Error(`OpenAIで画像を作れませんでした（${lastError}）`)
 }

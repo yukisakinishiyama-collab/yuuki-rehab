@@ -58,6 +58,8 @@ function ComposeInner() {
   const [activeTab, setActiveTab] = useState<string>('')
   const [imageBusy, setImageBusy] = useState(false)
   const [imageNote, setImageNote] = useState('')
+  /** 見本の画像が読めなかったURL（読めない画像を見たまま承認しないように） */
+  const [brokenPreview, setBrokenPreview] = useState('')
 
   useEffect(() => {
     if (projectIdFromUrl) {
@@ -383,7 +385,7 @@ function ComposeInner() {
         )}
 
         <p className="text-xs text-slate-500">
-          ⚠ 患者氏名・診療内容など個人を特定できる情報は入力しないでください（AIへ送信されます）。
+          ⚠ 患者氏名・診療内容など個人を特定できる情報は入力しないでください（文章はAI（Claude）、画像の場面の説明はChatGPT（OpenAI）へ送信されます）。
         </p>
 
         <button
@@ -456,6 +458,8 @@ function ComposeInner() {
                     <img
                       src={debouncedPreview || previewUrl}
                       alt={activeVariant.content.altText || '投稿画像の見本'}
+                      onError={() => setBrokenPreview(debouncedPreview || previewUrl)}
+                      onLoad={() => setBrokenPreview('')}
                       className="w-full max-w-[260px] rounded-lg border border-slate-200 bg-slate-100"
                     />
                   </a>
@@ -497,6 +501,11 @@ function ComposeInner() {
                         )}
                       </div>
                     )}
+                    {brokenPreview && brokenPreview === (debouncedPreview || previewUrl) && (
+                      <p className="rounded bg-red-50 p-2 text-xs font-bold text-red-700">
+                        画像を読み込めませんでした。見本を確かめられないまま承認しないでください（開き直すか、作り直す／テンプレ画像にする）。
+                      </p>
+                    )}
                     {imageNote && <p className="text-xs font-medium text-slate-700">{imageNote}</p>}
                   </div>
                 </div>
@@ -508,7 +517,11 @@ function ComposeInner() {
                 <input
                   value={activeVariant.content.hook}
                   onChange={(e) => {
-                    updateVariantContent(project.id, activeVariant.id, (v) => (v.content.hook = e.target.value))
+                    updateVariantContent(project.id, activeVariant.id, (v) => {
+                      v.content.hook = e.target.value
+                      // 文章を直したら、AIが書いた画像の場面の説明は古くなるので消す（作り直すときは直した文章から場面を作る）
+                      delete v.content.imagePrompt
+                    })
                     refresh()
                   }}
                   className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
@@ -519,7 +532,10 @@ function ComposeInner() {
                 <textarea
                   value={activeVariant.content.body}
                   onChange={(e) => {
-                    updateVariantContent(project.id, activeVariant.id, (v) => (v.content.body = e.target.value))
+                    updateVariantContent(project.id, activeVariant.id, (v) => {
+                      v.content.body = e.target.value
+                      delete v.content.imagePrompt
+                    })
                     refresh()
                   }}
                   rows={12}

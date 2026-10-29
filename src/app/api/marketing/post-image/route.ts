@@ -10,10 +10,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { aiPostImageConfigured, createPostPhoto } from '@/lib/marketing/post-image-server'
+import { aiPostImageConfigured, createPostPhotoWithin } from '@/lib/marketing/post-image-server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+// 画像の生成は混み合うと2分ほどかかることがある。打ち切り（150秒）のあとに理由を返す余裕を残す
+export const maxDuration = 180
+const PHOTO_LIMIT_MS = 150 * 1000
 
 const RequestSchema = z.object({
   theme: z.string().min(1).max(300),
@@ -37,11 +39,14 @@ export async function POST(request: NextRequest) {
     })
   }
   try {
-    const image = await createPostPhoto({
-      scene: input.scene,
-      theme: input.theme,
-      content: { title: input.title ?? '', hook: input.hook ?? '', body: '', cta: { label: '', url: '' }, hashtags: [], warnings: [] },
-    })
+    const image = await createPostPhotoWithin(
+      {
+        scene: input.scene,
+        theme: input.theme,
+        content: { title: input.title ?? '', hook: input.hook ?? '', body: '', cta: { label: '', url: '' }, hashtags: [], warnings: [] },
+      },
+      PHOTO_LIMIT_MS,
+    )
     return NextResponse.json({ ok: true, configured: true, image })
   } catch (error) {
     console.error('[marketing/post-image] AI画像を作れませんでした', error)
