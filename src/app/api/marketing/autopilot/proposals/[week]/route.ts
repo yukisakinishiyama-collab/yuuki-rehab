@@ -2,7 +2,7 @@
  * 週の投稿案への操作（承認画面から）
  *
  * 承認・承認取消・見送り・戻す … 公開を左右するため院長（管理者）のみ
- * 本文の修正・媒体の出し分け・作り直し … スタッフも可（下書きの編集にあたる。公開には院長の承認が必要）
+ * 本文の修正・媒体の出し分け・作り直し・AI画像の作り直し／外す … スタッフも可（下書きの編集にあたる。公開には院長の承認が必要）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -11,7 +11,8 @@ import { ADMIN_ACTIONS, applyProposalAction, type ProposalAction } from '@/lib/m
 import { getProposal } from '@/lib/marketing/autopilot-store-server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+// 作り直し（文章＋AI画像）は2分を超えることがある
+export const maxDuration = 300
 
 const CHANNELS = ['instagram_feed', 'instagram_carousel', 'instagram_reel', 'instagram_story', 'google_business', 'line_broadcast', 'note'] as const
 
@@ -32,6 +33,8 @@ const ActionSchema = z.discriminatedUnion('action', [
     hashtags: z.array(z.string().max(50)).max(30).optional(),
   }),
   z.object({ action: z.literal('regenerate_item'), itemId: z.string().min(1), theme: z.string().max(200).optional() }),
+  z.object({ action: z.literal('regenerate_image'), itemId: z.string().min(1) }),
+  z.object({ action: z.literal('remove_image'), itemId: z.string().min(1) }),
 ])
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/

@@ -9,6 +9,7 @@
  */
 import type { Channel, GeneratedContent } from './types'
 import { getGbpCredentials } from './gbp-token'
+import { imageTextFor } from './post-image'
 
 export type PublishOutcome =
   | { kind: 'published'; url?: string; message: string }
@@ -46,16 +47,28 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
   }
 }
 
-/** テンプレート画像を生成してVercel Blobに公開し、Instagram APIに渡せる公開URLを返す */
-async function uploadTemplateImage(
-  title: string,
-  subtitle: string,
+/**
+ * 投稿画像を作って Vercel Blob に公開し、Instagram・Google の API に渡せる公開URLを返す。
+ * 下書きにAI画像（photoUrl）があれば写真＋見出し、無い・読めないときはテンプレ画像（これまでどおり）
+ */
+async function uploadPostImage(
+  text: { title: string; subtitle: string },
   name: string,
   size: 'instagram' | 'google' = 'instagram',
+  photoUrl?: string,
 ): Promise<string> {
-  const { renderTemplateImage, toJpeg } = await import('./image-template')
+  const { renderTemplateImage, renderPhotoPostImage, loadPhotoDataUrl, toJpeg } = await import('./image-template')
   const { put } = await import('@vercel/blob')
-  const png = await renderTemplateImage(title, subtitle, size)
+  let png: Buffer | null = null
+  if (photoUrl) {
+    try {
+      png = await renderPhotoPostImage(await loadPhotoDataUrl(photoUrl), text.title, text.subtitle, size)
+    } catch (error) {
+      // AI画像が読めなくても投稿は止めない（テンプレ画像で出す）
+      console.warn('[publishers] AI画像を使えなかったため、テンプレ画像で投稿します', error)
+    }
+  }
+  if (!png) png = await renderTemplateImage(text.title, text.subtitle, size)
   // Instagram の API は JPEG の画像を受け付ける。Google はどちらでもよいので同じく JPEG に
   const jpg = await toJpeg(png)
   const blob = await put(name.replace(/\.png$/, '.jpg'), jpg, { access: 'public', contentType: 'image/jpeg' })
@@ -235,7 +248,13 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
       const ts = Date.now()
       const childIds: string[] = []
       for (const [i, slide] of slides.entries()) {
-        const url = await uploadTemplateImage(slide.heading, slide.body.slice(0, 40), `marketing/ig-${ts}-s${i + 1}.jpg`)
+        // 1枚目（表紙）だけAI画像＋見出し。2枚目以降は読みやすいテンプレ（文字のスライド）
+        const url = await uploadPostImage(
+          i === 0 ? imageTextFor(content, 'instagram_carousel') : { title: slide.heading, subtitle: slide.body.slice(0, 40) },
+          `marketing/ig-${ts}-s${i + 1}.jpg`,
+          'instagram',
+          i === 0 ? content.image?.photoUrl : undefined,
+        )
         childIds.push(await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, { image_url: url, is_carousel_item: true }))
       }
       creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, {
@@ -245,8 +264,7 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
       })
     } else {
       // フィード単枚（カルーセル指定でもスライドが足りなければ1枚投稿に落とす）
-      const title = content.imageText || content.title || content.hook
-      const url = await uploadTemplateImage(title, content.hook.slice(0, 40), `marketing/ig-${Date.now()}.png`)
+      const url = await uploadPostImage(imageTextFor(content, 'instagram_feed'), `marketing/ig-${Date.now()}.png`, 'instagram', content.image?.photoUrl)
       creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, { image_url: url, caption })
     }
 
@@ -258,7 +276,7 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
     if (/BLOB|blob/.test(message)) {
       return {
         kind: 'action_required',
-        reason: `投稿画像の公開に失敗しました（${message}）。テンプレ画像をダウンロードして手動投稿してください。`,
+        reason: `投稿画像の公開に失敗しました（${message}）。投稿画像をダウンロードして手動投稿してください。`,
         manualUrl,
       }
     }
@@ -306,10 +324,10 @@ async function publishGoogleBusiness(content: GeneratedContent): Promise<Publish
       }
     }
 
-    // 投稿画像（テンプレート・4:3）。画像が作れなくても文章だけで投稿する
+    // 投稿画像（4:3。AI画像があれば写真＋見出し、無ければテンプレート）。画像が作れなくても文章だけで投稿する
     let media: Array<{ mediaFormat: 'PHOTO'; sourceUrl: string }> | undefined
     try {
-      const url = await uploadTemplateImage(content.imageText || content.title || content.hook, content.hook.slice(0, 40), `marketing/gbp-${Date.now()}.png`, 'google')
+      const url = await uploadPostImage(imageTextFor(content, 'google_business'), `marketing/gbp-${Date.now()}.png`, 'google', content.image?.photoUrl)
       media = [{ mediaFormat: 'PHOTO', sourceUrl: url }]
     } catch {
       media = undefined

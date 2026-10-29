@@ -42,6 +42,7 @@ export async function GET() {
       proposals: proposals.slice(0, 6),
       connections: {
         ai: Boolean(process.env.ANTHROPIC_API_KEY) && process.env.MARKETING_MODE !== 'mock',
+        aiImage: Boolean(process.env.OPENAI_API_KEY) && process.env.MARKETING_MODE !== 'mock',
         instagram: await isInstagramConnected(),
         googleApi: await isGbpConnected(),
         ownerLine: Boolean(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.RESERVATION_NOTIFY_LINE_USER_ID),

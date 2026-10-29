@@ -12,6 +12,7 @@ import { useSearchParams } from 'next/navigation'
 import { loadClinicProfile } from '@/lib/marketing/store'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import { CHANNEL_LABELS, type Channel, type ContentVariant } from '@/lib/marketing/types'
+import { postImageUrl, usesAiImage } from '@/lib/marketing/post-image'
 import {
   activeVariants,
   approvalBlocker,
@@ -26,6 +27,8 @@ import {
 
 interface Connections {
   ai: boolean
+  /** AI画像（ChatGPT＝OpenAIの画像生成） */
+  aiImage?: boolean
   instagram: boolean
   googleApi: boolean
   ownerLine: boolean
@@ -75,12 +78,14 @@ function ComplianceBox({ variant }: { variant: ContentVariant }) {
 
 function VariantPreview({
   variant,
+  theme,
   editing,
   onSave,
   onCancel,
   busy,
 }: {
   variant: ContentVariant
+  theme: string
   editing: boolean
   onSave: (patch: { hook: string; body: string; hashtags: string[] }) => void
   onCancel: () => void
@@ -88,6 +93,7 @@ function VariantPreview({
 }) {
   // 媒体の切り替え・保存のたびに親が key を変えて作り直すので、初期値は props から取るだけでよい
   const [hook, setHook] = useState(variant.content.hook)
+  const [imageBroken, setImageBroken] = useState(false)
   const [body, setBody] = useState(variant.content.body)
   const [tags, setTags] = useState(variant.content.hashtags.join(' '))
 
@@ -128,6 +134,31 @@ function VariantPreview({
   const c = variant.content
   return (
     <div className="space-y-2 text-sm">
+      {usesAiImage(variant.channel) && (
+        <figure className="flex items-start gap-3">
+          <a href={postImageUrl(c, variant.channel, theme)} target="_blank" rel="noopener" className="shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 院内だけで使うその場の見本（最適化は不要） */}
+            <img
+              src={postImageUrl(c, variant.channel, theme)}
+              alt={c.altText || '投稿画像の見本'}
+              loading="lazy"
+              onError={() => setImageBroken(true)}
+              onLoad={() => setImageBroken(false)}
+              className="w-32 rounded-xl border border-slate-200 sm:w-40"
+            />
+          </a>
+          <figcaption className="text-xs leading-relaxed text-slate-500">
+            {imageBroken && (
+              <span className="mb-1 block font-bold text-red-700">
+                画像を読み込めませんでした。見本を確かめられないまま承認しないでください（画面を開き直すか、作り直す／テンプレ画像にする）。
+              </span>
+            )}
+            {c.image
+              ? `AI画像（ChatGPTで作成）に見出しを重ねた、投稿と同じ画像です。${variant.channel === 'instagram_carousel' ? '1枚目（表紙）に使い、2枚目からは文字のスライドです。' : ''}押すと大きく開きます。`
+              : 'テンプレ画像（紺の背景＋見出し）で投稿します。下の「画像を作る」でAI画像にできます。'}
+          </figcaption>
+        </figure>
+      )}
       {c.hook && <p className="font-bold text-slate-900">{c.hook}</p>}
       {c.slides && c.slides.length > 0 && (
         <ol className="grid gap-1.5 sm:grid-cols-2">
@@ -180,11 +211,14 @@ function VariantPreview({
 function ItemCard({
   item,
   isAdmin,
+  aiImage,
   busy,
   act,
 }: {
   item: ProposalItem
   isAdmin: boolean
+  /** AI画像（ChatGPT）が使えるか */
+  aiImage: boolean
   busy: boolean
   act: (body: Record<string, unknown>) => Promise<void>
 }) {
@@ -237,6 +271,7 @@ function ItemCard({
             <VariantPreview
               key={`${variant.id}:${variant.editedAt ?? ''}:${editing}`}
               variant={variant}
+              theme={item.theme}
               editing={editing}
               busy={busy}
               onCancel={() => setEditing(false)}
@@ -259,6 +294,26 @@ function ItemCard({
               >
                 {excluded.has(variant.channel) ? `${channelShort(variant.channel)}にも出す` : `${channelShort(variant.channel)}には出さない`}
               </button>
+              {usesAiImage(variant.channel) && aiImage && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => act({ action: 'regenerate_image', itemId: item.id })}
+                  className="rounded border border-sky-300 bg-sky-50 px-2 py-1 font-bold text-sky-800 disabled:opacity-50"
+                >
+                  {variant.content.image ? '画像を作り直す' : '画像を作る（AI）'}
+                </button>
+              )}
+              {usesAiImage(variant.channel) && variant.content.image && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => act({ action: 'remove_image', itemId: item.id })}
+                  className="rounded border border-slate-300 px-2 py-1 font-bold text-slate-600"
+                >
+                  テンプレ画像にする
+                </button>
+              )}
             </div>
           )}
         </>
@@ -316,7 +371,7 @@ function ItemCard({
             }}
             className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
           >
-            {busy ? '作り直し中…（1分ほど）' : 'この枠を作り直す'}
+            {busy ? '作り直し中…（1〜3分）' : 'この枠を作り直す'}
           </button>
         </div>
       )}
@@ -525,7 +580,13 @@ function AutopilotInner() {
   async function act(body: Record<string, unknown>) {
     if (!proposal) return
     setBusy(true)
-    setMessage(body.action === 'regenerate_item' ? 'AIが作り直しています…（1分ほどかかります）' : '処理中…')
+    setMessage(
+      body.action === 'regenerate_item'
+        ? 'AIが文章と画像を作り直しています…（1〜3分かかります）'
+        : body.action === 'regenerate_image'
+          ? 'ChatGPTで画像を作っています…（1分ほどかかります）'
+          : '処理中…',
+    )
     try {
       const res = await fetch(`/api/marketing/autopilot/proposals/${proposal.weekStart}`, {
         method: 'PATCH',
@@ -544,7 +605,7 @@ function AutopilotInner() {
 
   async function generateNow() {
     setBusy(true)
-    setMessage('AIが投稿案を作っています…（1〜2分かかります。画面はそのままでお待ちください）')
+    setMessage('AIが投稿案と画像を作っています…（2〜4分かかります。画面はそのままでお待ちください）')
     try {
       const res = await fetch('/api/marketing/autopilot', {
         method: 'POST',
@@ -565,6 +626,7 @@ function AutopilotInner() {
   const chips: Array<{ label: string; ok: boolean; note: string }> = conn
     ? [
         { label: 'AI下書き', ok: conn.ai, note: conn.ai ? '稼働中' : conn.mock ? 'モック' : 'APIキー未設定' },
+        { label: 'AI画像（ChatGPT）', ok: Boolean(conn.aiImage), note: conn.aiImage ? '稼働中' : conn.mock ? 'モック' : 'OPENAI_API_KEY 未設定（テンプレ画像）' },
         { label: '院長LINE通知', ok: conn.ownerLine, note: conn.ownerLine ? '通知あり' : '未設定' },
         { label: 'Instagram', ok: conn.instagram, note: conn.instagram ? '自動投稿' : '未連携（時刻にLINEで本文が届きます）' },
         { label: 'Google', ok: conn.googleApi, note: conn.googleApi ? '自動投稿' : '接続の設定待ち（時刻にLINEで本文が届きます）' },
@@ -647,7 +709,7 @@ function AutopilotInner() {
             ) : (
               <ul className="space-y-4">
                 {proposal.items.map((item) => (
-                  <ItemCard key={item.id} item={item} isAdmin={isAdmin} busy={busy} act={act} />
+                  <ItemCard key={item.id} item={item} isAdmin={isAdmin} aiImage={Boolean(conn?.aiImage)} busy={busy} act={act} />
                 ))}
               </ul>
             )}
