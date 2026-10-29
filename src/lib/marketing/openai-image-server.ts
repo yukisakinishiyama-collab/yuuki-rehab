@@ -38,7 +38,7 @@ function sleep(ms: number): Promise<void> {
 /** 画像を1枚作る（PNG のバイト列）。使えたモデル名も返す */
 export async function generateOpenAiImage(
   prompt: string,
-  options: { size: OpenAiImageSize; quality?: 'low' | 'medium' | 'high'; models?: string[] },
+  options: { size: OpenAiImageSize; quality?: 'low' | 'medium' | 'high'; models?: string[]; signal?: AbortSignal },
 ): Promise<{ bytes: Buffer; model: string }> {
   if (!openAiImageConfigured()) throw new Error('OPENAI_API_KEY が未設定です（Vercel の環境変数に入れてください）')
   const models = options.models ?? imageModels()
@@ -46,10 +46,12 @@ export async function generateOpenAiImage(
   let lastStatus = 0
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      // signal … 時間切れで打ち切ったら、OpenAIへの要求も止める（裏で作り続けて同時に何枚も走らないように）
       const res = await fetch(IMAGES_API, {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, prompt, size: options.size, quality: options.quality ?? 'medium', n: 1 }),
+        signal: options.signal,
       })
       const data = (await res.json().catch(() => ({}))) as {
         data?: Array<{ b64_json?: string; url?: string }>
@@ -58,7 +60,7 @@ export async function generateOpenAiImage(
       const item = data.data?.[0]
       if (res.ok && item?.b64_json) return { bytes: Buffer.from(item.b64_json, 'base64'), model }
       if (res.ok && item?.url) {
-        const img = await fetch(item.url)
+        const img = await fetch(item.url, { signal: options.signal })
         if (img.ok) return { bytes: Buffer.from(await img.arrayBuffer()), model }
       }
       lastError = data.error?.message ?? `HTTP ${res.status}`
@@ -66,6 +68,7 @@ export async function generateOpenAiImage(
       if (res.status === 429 && attempt === 0) {
         const wait = Math.min(Number(res.headers.get('retry-after')) || 8, 20)
         await sleep(wait * 1000)
+        options.signal?.throwIfAborted()
         continue
       }
       break

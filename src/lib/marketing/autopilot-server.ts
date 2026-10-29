@@ -54,7 +54,15 @@ import {
   type ThemeCategory,
   type WeeklyProposal,
 } from './autopilot-types'
-import { CHANNEL_LABELS, type Channel, type ClinicProfile, type ContentVariant, type GeneratedContent, type Objective } from './types'
+import {
+  CHANNEL_LABELS,
+  type Channel,
+  type ClinicProfile,
+  type ContentVariant,
+  type GeneratedContent,
+  type Objective,
+  type PostImage,
+} from './types'
 import { postImageUrl, usesAiImage } from './post-image'
 import { aiPostImageConfigured, createPostPhotoWithin, sceneFromVariants, withPostImage } from './post-image-server'
 
@@ -792,27 +800,47 @@ export async function applyProposalAction(week: string, input: ProposalAction, a
         await attachItemPhoto(replacement, PHOTO_TIMEOUT_MS, true)
       }
       if (!replacement) return { ok: false, message: '作り直せませんでした（空き状況を取得できません）', proposal }
-      replacement.id = item.id
-      replacement.status = item.status
-      Object.assign(item, replacement)
-      await saveProposal(proposal)
+      // 作り直している間（文章＋画像で1〜3分）に承認などがあったかもしれないので、読み直してから置き換える
+      const latest = await getProposal(week)
+      const target = latest?.items.find((i) => i.id === item.id)
+      if (!latest || !target) return { ok: false, message: '投稿案が見つかりません', proposal }
+      if (target.status !== 'proposed' && target.status !== 'expired') {
+        return { ok: false, message: '作り直している間に承認・見送りされたため、作り直した案は使っていません', proposal: latest }
+      }
+      replacement.id = target.id
+      replacement.status = target.status
+      Object.assign(target, replacement)
+      await saveProposal(latest)
       return {
-        ok: item.variants.length > 0,
-        message: item.variants.length > 0 ? `「${item.theme.slice(0, 30)}」で作り直しました` : '作り直しに失敗しました。時間をおいてもう一度お試しください',
-        proposal,
+        ok: target.variants.length > 0,
+        message: target.variants.length > 0 ? `「${target.theme.slice(0, 30)}」で作り直しました` : '作り直しに失敗しました。時間をおいてもう一度お試しください',
+        proposal: latest,
       }
     }
     case 'regenerate_image': {
       if (!editable) return { ok: false, message: '承認済みの案は、先に承認を取り消してから画像を作り直してください', proposal }
       if (!item.variants.some((v) => usesAiImage(v.channel))) return { ok: false, message: 'この案には画像を使う媒体がありません', proposal }
       if (!aiPostImageConfigured()) return { ok: false, message: 'OpenAIのAPIキー（OPENAI_API_KEY）が未設定のため、AI画像は作れません', proposal }
+      const { scene, content } = sceneFromVariants(item.variants)
+      let image: PostImage
       try {
-        await attachItemPhoto(item, PHOTO_TIMEOUT_MS, false)
+        image = await createPostPhotoWithin({ scene, content, theme: item.theme }, PHOTO_TIMEOUT_MS)
       } catch (error) {
         return { ok: false, message: `AI画像を作れませんでした（${error instanceof Error ? error.message.slice(0, 160) : '不明'}）`, proposal }
       }
-      await saveProposal(proposal)
-      return { ok: true, message: 'AI画像を作り直しました（Instagram・Googleで同じ写真を使います）', proposal }
+      // 作っている間（1分ほど）に承認・作り直しなどがあったかもしれないので、読み直してから付ける
+      const latest = await getProposal(week)
+      const target = latest?.items.find((i) => i.id === item.id)
+      if (!latest || !target) return { ok: false, message: '投稿案が見つかりません', proposal }
+      if (target.status !== 'proposed' && target.status !== 'expired') {
+        return { ok: false, message: '画像を作っている間に承認・見送りされたため、画像は変えていません', proposal: latest }
+      }
+      if (target.theme !== item.theme) {
+        return { ok: false, message: '画像を作っている間に案が作り直されたため、画像は変えていません', proposal: latest }
+      }
+      target.variants = target.variants.map((v) => withoutPhotoNote(withPostImage(v, image)))
+      await saveProposal(latest)
+      return { ok: true, message: 'AI画像を作り直しました（Instagram・Googleで同じ写真を使います）', proposal: latest }
     }
     case 'remove_image': {
       if (!editable) return { ok: false, message: '承認済みの案は、先に承認を取り消してから変えてください', proposal }

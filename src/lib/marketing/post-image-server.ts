@@ -49,10 +49,15 @@ export function buildPostImagePrompt(scene: string | undefined, content: Generat
 }
 
 /** 写真を1枚作って Blob に置く（30秒〜1分ほど） */
-export async function createPostPhoto(input: { scene?: string; content?: GeneratedContent; theme: string }): Promise<PostImage> {
+export async function createPostPhoto(
+  input: { scene?: string; content?: GeneratedContent; theme: string },
+  signal?: AbortSignal,
+): Promise<PostImage> {
   if (!aiPostImageConfigured()) throw new Error('OpenAIのAPIキー（OPENAI_API_KEY）が未設定のため、AI画像は作れません')
   const prompt = buildPostImagePrompt(input.scene, input.content, input.theme)
-  const { bytes, model } = await generateOpenAiImage(prompt, { size: '1024x1024', quality: 'medium' })
+  const { bytes, model } = await generateOpenAiImage(prompt, { size: '1024x1024', quality: 'medium', signal })
+  // 時間切れで打ち切ったあとは置かない（使われない写真を残さない）
+  signal?.throwIfAborted()
   const { put } = await import('@vercel/blob')
   const name = `marketing/ai-photos/${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}.png`
   const blob = await put(name, bytes, { access: 'public', contentType: 'image/png' })
@@ -68,18 +73,22 @@ export function withPostImage(variant: ContentVariant, image: PostImage | null):
   return { ...variant, content }
 }
 
-/** 上限時間つきで写真を作る（自動下書きで、ほかの処理を待たせすぎないように） */
+/**
+ * 上限時間つきで写真を作る（自動下書きで、ほかの処理を待たせすぎないように）。
+ * 時間切れのときは OpenAI への要求そのものを止める（裏で作り続けると、同時に走る枚数が増えて混雑・費用のもとになる）
+ */
 export async function createPostPhotoWithin(
   input: { scene?: string; content?: GeneratedContent; theme: string },
   ms: number,
 ): Promise<PostImage> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`AI画像の作成が${Math.round(ms / 1000)}秒以内に終わりませんでした`)), ms)
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
   try {
-    return await Promise.race([createPostPhoto(input), timeout])
+    return await createPostPhoto(input, controller.signal)
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`AI画像の作成が${Math.round(ms / 1000)}秒以内に終わりませんでした`)
+    throw error
   } finally {
-    if (timer) clearTimeout(timer)
+    clearTimeout(timer)
   }
 }

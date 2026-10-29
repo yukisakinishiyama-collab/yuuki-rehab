@@ -120,17 +120,23 @@ function ComposeInner() {
         setImageNote(data.error ?? 'AI画像を作れませんでした（テンプレ画像で投稿します）')
         return
       }
-      for (const v of targets) {
+      // 作っている間（1分ほど）に承認・予約された媒体は変えない（読み直して、まだ下書き・確認待ちのものだけに付ける）
+      const latest = findProject(target.id)
+      const ids = new Set(targets.map((v) => v.id))
+      const applied = latest ? imageTargets(latest).filter((v) => ids.has(v.id)) : []
+      for (const v of applied) {
         updateVariantContent(target.id, v.id, (x) => {
           x.content.image = data.image
         })
       }
-      appendAudit('AI画像を作成', target.id, `${targets.length}媒体 / ${data.image.model}`)
+      if (applied.length > 0) appendAudit('AI画像を作成', target.id, `${applied.length}媒体 / ${data.image.model}`)
       setProject(findProject(target.id) ?? null)
-      const kept = target.variants.filter((v) => usesAiImage(v.channel) && !targets.includes(v)).length
+      const kept = (latest?.variants ?? []).filter((v) => usesAiImage(v.channel) && !applied.some((a) => a.id === v.id)).length
       setImageNote(
-        `AI画像を作りました（${targets.map((v) => CHANNEL_LABELS[v.channel]).join('・')}で同じ写真を使います）。内容に合っているか確認してください。` +
-          (kept ? ' 承認済み・予約済みの媒体の画像は変えていません。' : ''),
+        (applied.length > 0
+          ? `AI画像を作りました（${applied.map((v) => CHANNEL_LABELS[v.channel]).join('・')}で同じ写真を使います）。内容に合っているか確認してください。`
+          : 'AI画像はできましたが、作っている間に承認・予約されたため付けていません。') +
+          (applied.length > 0 && kept ? ' 承認済み・予約済みの媒体の画像は変えていません。' : ''),
       )
     } catch {
       setImageNote('通信に失敗しました。もう一度「AI画像を作る」を押してください（テンプレ画像のままでも投稿できます）')
@@ -551,12 +557,24 @@ function ComposeInner() {
                   </button>
                 )}
                 {isAdmin && (activeVariant.status === 'draft' || activeVariant.status === 'review') && (
-                  <button type="button" onClick={() => doTransition(activeVariant, 'approved')} className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">
+                  <button
+                    type="button"
+                    onClick={() => doTransition(activeVariant, 'approved')}
+                    disabled={imageBusy}
+                    title={imageBusy ? '画像を作っている間は承認できません' : ''}
+                    className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800 disabled:opacity-50"
+                  >
                     承認する
                   </button>
                 )}
                 {isAdmin && activeVariant.status === 'approved' && (
-                  <button type="button" onClick={() => doTransition(activeVariant, 'scheduled')} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white">
+                  <button
+                    type="button"
+                    onClick={() => doTransition(activeVariant, 'scheduled')}
+                    disabled={imageBusy}
+                    title={imageBusy ? '画像を作っている間は予約できません' : ''}
+                    className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  >
                     承認して予約する
                   </button>
                 )}
