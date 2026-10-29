@@ -137,7 +137,10 @@ export async function renderTemplateImage(
 
 // ── AI画像（写真）＋見出し ─────────────────────────────────────────
 
-/** AI画像の写真として読み込んでよいURL（自分たちの Vercel Blob に置いたものだけ） */
+/**
+ * AI画像の写真として読み込んでよいURL（Vercel Blob の公開URLだけ）。
+ * 写真のURLは院内アプリ（Basic認証の内側）か、承認済みの投稿ジョブからしか来ない
+ */
 export function isAllowedPhotoUrl(url: string): boolean {
   try {
     const u = new URL(url)
@@ -152,7 +155,8 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 /** 写真を読み込んで data URL にする（next/og の画像の中に描くため） */
 export async function loadPhotoDataUrl(url: string): Promise<string> {
   if (!isAllowedPhotoUrl(url)) throw new Error('AI画像の置き場所が正しくありません')
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+  // 転送（リダイレクト）は追わない（Blob 以外の場所へ連れて行かれないように）
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000), redirect: 'error' })
   if (!res.ok) throw new Error(`AI画像を読み込めませんでした（HTTP ${res.status}）`)
   const type = (res.headers.get('content-type') ?? '').split(';')[0].trim()
   if (!/^image\/(png|jpeg|webp)$/.test(type)) throw new Error(`AI画像の形式が正しくありません（${type || '不明'}）`)
