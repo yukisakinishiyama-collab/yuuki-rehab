@@ -9,6 +9,10 @@
  *
  * 必要な環境変数: GBP_CLIENT_ID / GBP_CLIENT_SECRET（Google Cloud「yuuki-marketing」のOAuthクライアント）
  * Google Cloud のOAuthクライアントに、コールバックURLを「承認済みのリダイレクトURI」として登録しておくこと。
+ * 登録済み（2026-10-29）: クライアント「ゆうき整骨院 投稿連携」
+ *   - https://yuuki-rehab.vercel.app/api/marketing/google/callback（このボタン用）
+ *   - https://developers.google.com/oauthplayground（手で確かめるとき用の予備）
+ * Vercelの環境変数を変えたら、再デプロイして初めて反映される。
  */
 export const GBP_SCOPE = 'https://www.googleapis.com/auth/business.manage'
 export const GBP_STATE_COOKIE = 'gbp_oauth_state'
