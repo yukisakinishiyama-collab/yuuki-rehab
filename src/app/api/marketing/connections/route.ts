@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { getInstagramToken, INSTAGRAM_GRAPH_HOST, isInstagramConnected } from '@/lib/marketing/instagram-token'
 import { instagramOAuthConfig } from '@/lib/marketing/instagram-oauth-server'
 import { lastOAuthResult } from '@/lib/marketing/instagram-oauth-result'
+import { gbpOAuthConfig } from '@/lib/marketing/gbp-oauth-server'
+import { gbpLocationTitle, isGbpConnected, lastGbpOAuthResult } from '@/lib/marketing/gbp-token'
 
 // 実疎通チェックを行うため常に動的実行
 export const dynamic = 'force-dynamic'
@@ -61,10 +63,8 @@ export async function GET(request: Request) {
       openaiImage: Boolean(process.env.OPENAI_API_KEY),
       lineChannel: Boolean(process.env.LINE_CHANNEL_SECRET && process.env.LINE_CHANNEL_ACCESS_TOKEN),
       instagram: await isInstagramConnected(),
-      // API利用申請が承認され、OAuthの値（GBP_*）を設定すると自動投稿になる
-      googleBusiness: Boolean(
-        process.env.GBP_CLIENT_ID && process.env.GBP_CLIENT_SECRET && process.env.GBP_REFRESH_TOKEN && process.env.GBP_LOCATION_NAME,
-      ),
+      // 申請は承認済み。GBP_CLIENT_ID/SECRET を設定し「Googleとつなぐ」を押すと自動投稿になる
+      googleBusiness: await isGbpConnected(),
       cronSecret: Boolean(process.env.CRON_SECRET),
     },
     details,
@@ -72,6 +72,12 @@ export async function GET(request: Request) {
     instagramOAuth: {
       ready: instagramOAuthConfig(new URL(request.url).origin).ready,
       last: await lastOAuthResult(),
+    },
+    // 「Googleとつなぐ」ボタン用（クライアントID/シークレットの有無・つないだ店舗名・直近の結果。秘密の値は返さない）
+    googleOAuth: {
+      ready: gbpOAuthConfig(new URL(request.url).origin).ready,
+      location: await gbpLocationTitle(),
+      last: await lastGbpOAuthResult(),
     },
   })
 }

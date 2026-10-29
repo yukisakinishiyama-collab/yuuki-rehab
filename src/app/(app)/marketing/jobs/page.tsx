@@ -13,6 +13,8 @@ interface Connections {
   details?: Record<string, { ok: boolean; note: string }>
   /** 「Instagramとつなぐ」ボタン用 */
   instagramOAuth?: { ready: boolean; last: { ok: boolean; message: string; at: string } | null }
+  /** 「Googleとつなぐ」ボタン用 */
+  googleOAuth?: { ready: boolean; location: string | null; last: { ok: boolean; message: string; at: string } | null }
 }
 
 const JOB_STATUS_LABEL: Record<PublishJob['status'], { label: string; tone: string }> = {
@@ -29,7 +31,7 @@ const CONNECTION_ITEMS: Array<{ key: string; label: string; hint: string }> = [
   { key: 'openaiImage', label: '画像生成（OpenAI）', hint: 'OPENAI_API_KEY（Phase 5で使用）' },
   { key: 'lineChannel', label: 'LINE Messaging API', hint: 'LINE_CHANNEL_SECRET / ACCESS_TOKEN' },
   { key: 'instagram', label: 'Instagram Graph API', hint: '下の「Instagramとつなぐ」から接続' },
-  { key: 'googleBusiness', label: 'Google Business Profile API', hint: '申請は承認済み。接続の設定（GBP_*）待ち（その間は手動投稿モード）' },
+  { key: 'googleBusiness', label: 'Google Business Profile API', hint: '下の「Googleとつなぐ」から接続' },
   { key: 'cronSecret', label: 'ジョブ実行の保護（CRON_SECRET）', hint: '本番デプロイ時に設定推奨' },
 ]
 
@@ -156,6 +158,34 @@ export default function JobsPage() {
             </p>
           ) : (
             <p className="mt-2 text-xs text-slate-500">ボタンを押すとInstagramの画面に移ります。yu.ki__seikotsuin で「許可」を押すと、この画面に戻って接続済みになります。</p>
+          )}
+        </div>
+        {/* Googleとつなぐ（OAuth）: 院長が許可するだけで接続。トークンや店舗IDのコピーは不要 */}
+        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold">Googleの自動投稿</span>
+            {isAdmin && conn?.googleOAuth?.ready ? (
+              <a href="/api/marketing/google/connect" className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">
+                {conn?.connections?.googleBusiness ? 'Googleとつなぎ直す' : 'Googleとつなぐ'}
+              </a>
+            ) : null}
+            {isAdmin && conn && !conn.googleOAuth?.ready ? (
+              <span className="text-xs text-slate-500">VercelにGBP_CLIENT_IDとGBP_CLIENT_SECRETを設定すると「Googleとつなぐ」ボタンが使えます。</span>
+            ) : null}
+            {!isAdmin ? <span className="text-xs text-slate-500">接続は院長が行います。</span> : null}
+            {conn?.connections?.googleBusiness && conn.googleOAuth?.location ? (
+              <span className="text-xs text-emerald-700">投稿先：{conn.googleOAuth.location}</span>
+            ) : null}
+          </div>
+          {conn?.googleOAuth?.last ? (
+            <p className={`mt-2 text-xs ${conn.googleOAuth.last.ok ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {conn.googleOAuth.last.ok ? '✓ ' : '! '}
+              {conn.googleOAuth.last.message}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">
+              ボタンを押すとGoogleの画面に移ります。ビジネスプロフィールのオーナーのアカウント（yukisakinishiyama@gmail.com）を選び、「このアプリはGoogleで確認されていません」と出たら「詳細」→「ゆうき整骨院 投稿連携（安全ではないページ）に移動」→「続行」で許可してください。この画面に戻って接続済みになります。
+            </p>
           )}
         </div>
         <p className="mt-2 text-xs text-slate-500">
