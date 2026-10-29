@@ -55,6 +55,8 @@ import {
   type WeeklyProposal,
 } from './autopilot-types'
 import { CHANNEL_LABELS, type Channel, type ClinicProfile, type ContentVariant, type GeneratedContent, type Objective } from './types'
+import { postImageUrl, usesAiImage } from './post-image'
+import { aiPostImageConfigured, createPostPhotoWithin, sceneFromVariants, withPostImage } from './post-image-server'
 
 export const AUTOPILOT_URL = `${SITE_URL}/marketing/autopilot`
 const GOOGLE_MANAGE_URL = 'https://business.google.com/'
@@ -62,6 +64,12 @@ const GOOGLE_MANAGE_URL = 'https://business.google.com/'
 const STALE_GENERATING_MS = 10 * 60 * 1000
 /** 投稿案を作ってからこの時間が経つまでは前日リマインドを送らない */
 const REMIND_AFTER_MS = 12 * 60 * 60 * 1000
+/** AI画像1枚を待つ上限（ChatGPTの画像生成。ふだんは30秒〜1分） */
+const PHOTO_TIMEOUT_MS = 100 * 1000
+/** 週の下書き作りで、AI画像に使ってよい時間の締め切り（下書き作りを始めてから。定期実行の上限300秒に収める） */
+const WEEK_PHOTO_BUDGET_MS = 230 * 1000
+/** AI画像が作れなかったときの注意メモの書き出し（作り直せたら消す） */
+const PHOTO_NOTE_PREFIX = 'AI画像を作れなかったため'
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -176,6 +184,54 @@ async function draftItem(
     status: 'proposed',
     errors: result.errors.map((e) => `${CHANNEL_LABELS[e.channel]}: ${e.error}`),
   }
+}
+
+/** 注意メモからAI画像の失敗メモを除く（作り直せたとき・外したとき） */
+function withoutPhotoNote(variant: ContentVariant): ContentVariant {
+  const warnings = variant.content.warnings.filter((w) => !w.startsWith(PHOTO_NOTE_PREFIX))
+  return warnings.length === variant.content.warnings.length ? variant : { ...variant, content: { ...variant.content, warnings } }
+}
+
+/**
+ * 投稿案にAI画像（ChatGPTで作る写真1枚。Instagram・Google で共通）を付ける。
+ * 下書きを書いたAI（Claude）の「画像の場面の説明」を使う。作れなければテンプレ画像のまま。
+ * notifyFailure=true なら、失敗の理由を注意メモに残す（自動下書き）。false なら例外を投げ直す（院長の「画像を作り直す」）
+ */
+async function attachItemPhoto(item: ProposalItem, ms: number, notifyFailure: boolean): Promise<void> {
+  if (!aiPostImageConfigured() || !item.variants.some((v) => usesAiImage(v.channel))) return
+  const { scene, content } = sceneFromVariants(item.variants)
+  try {
+    const image = await createPostPhotoWithin({ scene, content, theme: item.theme }, ms)
+    item.variants = item.variants.map((v) => withoutPhotoNote(withPostImage(v, image)))
+  } catch (error) {
+    if (!notifyFailure) throw error
+    console.warn('[autopilot] AI画像を作れませんでした', error)
+    markPhotoFailed(item, error instanceof Error ? error.message : String(error))
+  }
+}
+
+function markPhotoFailed(item: ProposalItem, reason: string): void {
+  const note = `${PHOTO_NOTE_PREFIX}、テンプレ画像で投稿します（${reason.slice(0, 120)}）。「画像を作り直す」でもう一度作れます`
+  item.variants = item.variants.map((v) =>
+    usesAiImage(v.channel) ? { ...v, content: { ...v.content, warnings: [...v.content.warnings.filter((w) => !w.startsWith(PHOTO_NOTE_PREFIX)), note] } } : v,
+  )
+}
+
+/** 週の投稿案にAI画像を付ける（同時に2枚まで。締め切りを過ぎたら残りはテンプレ画像のまま） */
+async function attachPhotos(items: ProposalItem[], deadline: number): Promise<void> {
+  if (!aiPostImageConfigured()) return
+  const queue = items.filter((i) => i.variants.some((v) => usesAiImage(v.channel)))
+  const worker = async () => {
+    for (let item = queue.shift(); item; item = queue.shift()) {
+      const left = deadline - Date.now()
+      if (left < 30 * 1000) {
+        markPhotoFailed(item, '時間内に作りきれませんでした')
+        continue
+      }
+      await attachItemPhoto(item, Math.min(left, PHOTO_TIMEOUT_MS), true)
+    }
+  }
+  await Promise.all([worker(), worker()])
 }
 
 /**
@@ -369,6 +425,7 @@ export async function generateWeek(week: string, now: Date): Promise<{ proposal:
     return { proposal: null, message: 'この週に作れる投稿枠がありません（時刻が過ぎているか、媒体がすべてオフです）' }
   }
 
+  const startedAt = Date.now()
   // 二重に作らないよう、先に「生成中」の印を置く
   const proposal: WeeklyProposal = { weekStart: week, createdAt: now.toISOString(), status: 'generating', items: [] }
   await saveProposal(proposal)
@@ -386,6 +443,8 @@ export async function generateWeek(week: string, now: Date): Promise<{ proposal:
     const drafted = await Promise.all(
       seeds.map((seed, i) => draftItem(seed, slots[i], i + 1, week, settings, month)),
     )
+    // 文章ができてから、投稿ごとにAI画像（ChatGPT）を付ける。作れなかった案はテンプレ画像のまま
+    await attachPhotos(drafted, startedAt + WEEK_PHOTO_BUDGET_MS)
     items.push(...drafted)
   }
   if (wantsAvailability) {
@@ -574,6 +633,8 @@ export type ProposalAction =
       hashtags?: string[]
     }
   | { action: 'regenerate_item'; itemId: string; theme?: string }
+  | { action: 'regenerate_image'; itemId: string }
+  | { action: 'remove_image'; itemId: string }
 
 /** 公開を左右する操作（院長＝管理者だけ） */
 export const ADMIN_ACTIONS = new Set(['approve_item', 'approve_all', 'unapprove_item', 'skip_item', 'restore_item'])
@@ -728,6 +789,7 @@ export async function applyProposalAction(week: string, input: ProposalAction, a
         if (!seed) return { ok: false, message: '別のテーマが見つかりませんでした。テーマを入力して作り直してください', proposal }
         if (theme) seed.id = `owner-${week}-${index}`
         replacement = await draftItem(seed, item.scheduledAt, index, week, settings, month)
+        await attachItemPhoto(replacement, PHOTO_TIMEOUT_MS, true)
       }
       if (!replacement) return { ok: false, message: '作り直せませんでした（空き状況を取得できません）', proposal }
       replacement.id = item.id
@@ -739,6 +801,24 @@ export async function applyProposalAction(week: string, input: ProposalAction, a
         message: item.variants.length > 0 ? `「${item.theme.slice(0, 30)}」で作り直しました` : '作り直しに失敗しました。時間をおいてもう一度お試しください',
         proposal,
       }
+    }
+    case 'regenerate_image': {
+      if (!editable) return { ok: false, message: '承認済みの案は、先に承認を取り消してから画像を作り直してください', proposal }
+      if (!item.variants.some((v) => usesAiImage(v.channel))) return { ok: false, message: 'この案には画像を使う媒体がありません', proposal }
+      if (!aiPostImageConfigured()) return { ok: false, message: 'OpenAIのAPIキー（OPENAI_API_KEY）が未設定のため、AI画像は作れません', proposal }
+      try {
+        await attachItemPhoto(item, PHOTO_TIMEOUT_MS, false)
+      } catch (error) {
+        return { ok: false, message: `AI画像を作れませんでした（${error instanceof Error ? error.message.slice(0, 160) : '不明'}）`, proposal }
+      }
+      await saveProposal(proposal)
+      return { ok: true, message: 'AI画像を作り直しました（Instagram・Googleで同じ写真を使います）', proposal }
+    }
+    case 'remove_image': {
+      if (!editable) return { ok: false, message: '承認済みの案は、先に承認を取り消してから変えてください', proposal }
+      item.variants = item.variants.map((v) => withoutPhotoNote(withPostImage(v, null)))
+      await saveProposal(proposal)
+      return { ok: true, message: 'AI画像を外しました（テンプレ画像で投稿します）', proposal }
     }
   }
   return { ok: false, message: '不明な操作です', proposal }
@@ -789,13 +869,8 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
     const messages: OwnerMessage[] = [head]
     if (google) messages.push(google.content.body)
     if (instagram) messages.push(`${instagram.content.body}\n\n${(instagram.content.hashtags ?? []).join(' ')}`.trim())
-    const imageUrl = instagram
-      ? `${SITE_URL}/api/marketing/image?${new URLSearchParams({
-          title: (instagram.content.imageText || instagram.content.slides?.[0]?.heading || instagram.content.title || instagram.theme).slice(0, 30),
-          subtitle: instagram.content.hook.slice(0, 30),
-          size: 'instagram',
-        }).toString()}`
-      : ''
+    // AI画像があれば写真＋見出し（投稿と同じ描き方）、無ければテンプレ画像
+    const imageUrl = instagram ? postImageUrl(instagram.content, instagram.channel, instagram.theme, SITE_URL) : ''
     const buttons = [
       ...(google ? [{ label: 'Googleに投稿した', postback: `ap:done:${google.id}`, primary: true }] : []),
       ...(instagram ? [{ label: 'Instagramに投稿した', postback: `ap:done:${instagram.id}`, primary: !google }] : []),

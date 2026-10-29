@@ -2,6 +2,7 @@
  * 投稿画像の生成（院内アプリから。プレビュー・手動投稿用のダウンロード）
  *
  * テンプレート：/api/marketing/image?title=足首の捻挫&subtitle=応急処置のポイント&size=instagram
+ * AI画像（写真＋見出し）：上に &photo=<下書きに付いた写真のURL（自分たちの Vercel Blob のものだけ）> を足す
  * ストーリー（空き状況）：/api/marketing/image?kind=story&scope=day&dates=2026-10-26
  *   または kind=story&range=today|next|week（本日・次の診療日・今週。fresh=1 で予約システムから取り直す）
  *   いまの予約システムの空きで作る（投稿するときも、その時刻の空きで作り直す）。
@@ -9,7 +10,7 @@
  * 生成ロジックは lib/marketing/image-template.tsx（Instagram自動投稿と共通）。
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { IMAGE_SIZES, renderStoryImage, renderTemplateImage } from '@/lib/marketing/image-template'
+import { IMAGE_SIZES, loadPhotoDataUrl, renderPhotoPostImage, renderStoryImage, renderTemplateImage } from '@/lib/marketing/image-template'
 import { addDays, jstParts, storyHasOpening, storyRange, storyRows, storyText, type OpeningDay } from '@/lib/marketing/autopilot-planner'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
 
@@ -74,6 +75,18 @@ export async function GET(request: NextRequest) {
     const title = params.get('title') ?? 'タイトル未設定'
     const subtitle = params.get('subtitle') ?? ''
     const sizeKey = (params.get('size') ?? 'instagram') as keyof typeof IMAGE_SIZES
+    // AI画像（下書きに付いた写真）があれば、投稿と同じく写真＋見出しで描く。読めなければテンプレ画像（投稿と同じ扱い）
+    const photo = params.get('photo')
+    if (photo) {
+      try {
+        return png(await renderPhotoPostImage(await loadPhotoDataUrl(photo), title, subtitle, sizeKey), 'post-image.png')
+      } catch (error) {
+        console.warn('[marketing/image] AI画像を使えなかったため、テンプレ画像で描きます', error)
+        const res = png(await renderTemplateImage(title, subtitle, sizeKey), 'post-image.png')
+        res.headers.set('X-Photo-Fallback', '1')
+        return res
+      }
+    }
     return png(await renderTemplateImage(title, subtitle, sizeKey), 'post-image.png')
   } catch (error) {
     // 原因を80字で切ると「Failed to load external module sharp」までしか出ず、

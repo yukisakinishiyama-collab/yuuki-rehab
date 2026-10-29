@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { checkContent } from './compliance'
 import { clinicProfileToPrompt } from './clinic'
+import { usesAiImage } from './post-image'
 import {
   CHANNEL_LABELS,
   type Channel,
@@ -40,6 +41,7 @@ export const GeneratedContentSchema = z.object({
     .optional(),
   imageText: z.string().optional(),
   altText: z.string().optional(),
+  imagePrompt: z.string().optional(),
   warnings: z.array(z.string()).default([]),
 })
 
@@ -47,7 +49,7 @@ export const CHANNEL_GUIDES: Record<Channel, string> = {
   instagram_feed:
     '1行目のフックで手を止めさせる。本文は改行多めで読みやすく、箇条書きとまとめを含める。ハッシュタグは10個前後（#下関市 #彦島 など地域タグ含む）。imageTextに画像に載せる短い文言、altTextに代替テキスト。',
   instagram_carousel:
-    'slides配列で表紙(order:1)＋内容2〜7枚＋最終CTAページを構成。各スライドはheading（短い見出し）とbody（2〜3文）。imagePromptに画像生成指示。captionとしてbodyに投稿本文、ハッシュタグも。',
+    'slides配列で表紙(order:1)＋内容2〜7枚＋最終CTAページを構成。各スライドはheading（短い見出し）とbody（2〜3文）。スライドごとの imagePrompt は不要（表紙の写真の場面は、全体の imagePrompt に書く）。captionとしてbodyに投稿本文、ハッシュタグも。',
   instagram_reel:
     'bodyに台本を書く。構成: 【冒頭3秒】フック→【シーン1..n】ナレーションと画面テキスト→【CTA】。撮影指示とBロール案も本文内に含める。hookにサムネイル文言。',
   instagram_story:
@@ -59,6 +61,18 @@ export const CHANNEL_GUIDES: Record<Channel, string> = {
   note:
     '1500〜2500字の記事。タイトル・導入・見出し構成（##）・本文・要点・根拠と限界・患者向けまとめ。エビデンスに言及する場合は出典の限界も明記。',
 }
+
+/**
+ * 投稿画像の場面の説明（imagePrompt）の書き方。ChatGPT（OpenAIの画像生成）に渡す。
+ * 文字は画像に入れず、imageText（表現チェック済み）を院のデザインで重ねるので、ここでは場面だけを書かせる
+ */
+const IMAGE_PROMPT_GUIDE = [
+  'imagePrompt には、この投稿の内容をひと目で伝える「写真の場面」を英語で1〜3文で書く（ChatGPTの画像生成に渡す）。',
+  '本文で扱う体の部位・動き・場面（例: 部活のグラウンド、デスクワーク、朝のウォーキング）・季節感を具体的に。',
+  '人物は顔を写さない（後ろ姿・首から下・手足のみ）。子どもは写さないか後ろ姿のみ。',
+  '施術・治療の場面、注射、出血、けが、レントゲン、白衣の医師、ビフォーアフター、痛がる表情、実在の人物・チーム・学校・院名は入れない。',
+  '文字・ロゴ・看板は入れない（画像に重ねる見出しは imageText に書く。imageText は20字前後）。altText には画像の内容を日本語で書く。',
+].join('')
 
 export function buildSystemPrompt(clinicText: string): string {
   return `あなたはゆうき整骨院の広報ライターです。以下の院情報だけを事実として使用してください。
@@ -152,7 +166,8 @@ function buildUserPrompt(input: GenerateInput, channel: Channel): string {
     `媒体別ガイド: ${CHANNEL_GUIDES[channel]}`,
     '',
     'JSONスキーマ:',
-    '{"title":string,"hook":string,"body":string,"cta":{"label":string,"url":string},"hashtags":string[],"slides"?:[{"order":number,"heading":string,"body":string,"imagePrompt"?:string}],"imageText"?:string,"altText"?:string,"warnings":string[]}',
+    '{"title":string,"hook":string,"body":string,"cta":{"label":string,"url":string},"hashtags":string[],"slides"?:[{"order":number,"heading":string,"body":string,"imagePrompt"?:string}],"imageText"?:string,"altText"?:string,"imagePrompt"?:string,"warnings":string[]}',
+    usesAiImage(channel) && IMAGE_PROMPT_GUIDE,
     `ctaのurlには原則 ${profile.reserveUrl} を使用（電話案内の場合は tel:${profile.phone.replace(/-/g, '')}）。`,
     '根拠が不十分・自信が持てない点があれば warnings に日本語で列挙する。',
   ]

@@ -2,6 +2,7 @@
  * 投稿画像の生成（共通モジュール・サーバー専用）
  *
  * - テンプレート画像（Instagramフィード・Google投稿）… /api/marketing/image（プレビュー・ダウンロード）と publishers.ts から
+ * - AI画像（ChatGPTで作った文字なしの写真）＋見出し … renderPhotoPostImage（同上。写真が読めなければテンプレ画像）
  * - Instagramストーリーの空き状況 … publishers.ts（投稿する時刻に空きを取り直して作る）と /api/marketing/image?kind=story から
  *
  * サーバー（Vercel）には日本語のフォントが入っていないので、assets/fonts の Zen Kaku Gothic New を読み込んで
@@ -127,6 +128,107 @@ export async function renderTemplateImage(
       </div>
       <div style={{ position: 'absolute', bottom: Math.round(h * 0.05), display: 'flex', fontSize: Math.round(subSize * 0.8), fontWeight: 700, color: MINT }}>
         {DEFAULT_CLINIC_PROFILE.name}
+      </div>
+    </div>,
+    w,
+    h,
+  )
+}
+
+// ── AI画像（写真）＋見出し ─────────────────────────────────────────
+
+/** AI画像の写真として読み込んでよいURL（自分たちの Vercel Blob に置いたものだけ） */
+export function isAllowedPhotoUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' && u.hostname.endsWith('.public.blob.vercel-storage.com')
+  } catch {
+    return false
+  }
+}
+
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024
+
+/** 写真を読み込んで data URL にする（next/og の画像の中に描くため） */
+export async function loadPhotoDataUrl(url: string): Promise<string> {
+  if (!isAllowedPhotoUrl(url)) throw new Error('AI画像の置き場所が正しくありません')
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`AI画像を読み込めませんでした（HTTP ${res.status}）`)
+  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim()
+  if (!/^image\/(png|jpeg|webp)$/.test(type)) throw new Error(`AI画像の形式が正しくありません（${type || '不明'}）`)
+  const bytes = Buffer.from(await res.arrayBuffer())
+  if (bytes.length > MAX_PHOTO_BYTES) throw new Error('AI画像が大きすぎます')
+  return `data:${type};base64,${bytes.toString('base64')}`
+}
+
+/**
+ * AI画像（文字なしの写真）に、見出し・院名・「画像はイメージです」を重ねた投稿画像PNG。
+ * 写真は媒体の大きさに合わせて切り抜く（中央）。下の方を紺のグラデーションにして文字を読みやすくする
+ */
+export async function renderPhotoPostImage(
+  photoDataUrl: string,
+  title: string,
+  subtitle: string,
+  sizeKey: keyof typeof IMAGE_SIZES = 'instagram',
+): Promise<Buffer> {
+  const { w, h } = IMAGE_SIZES[sizeKey] ?? IMAGE_SIZES.instagram
+  const safeTitle = title.slice(0, 50)
+  const safeSubtitle = subtitle.slice(0, 50)
+  const base = Math.min(w / 14, h / 11)
+  const titleSize = Math.round(base * (safeTitle.length > 32 ? 0.72 : safeTitle.length > 20 ? 0.84 : 1))
+  const subSize = Math.round(base * 0.42)
+  const pad = Math.round(Math.min(w, h) * 0.07)
+  const shadow = '0 2px 12px rgba(0,0,0,0.45)'
+  return render(
+    <div style={{ width: w, height: h, display: 'flex', position: 'relative', background: NAVY, fontFamily: FONT, color: '#ffffff' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- next/og（Satori）で描く画像の中 */}
+      <img src={photoDataUrl} width={w} height={h} alt="" style={{ position: 'absolute', left: 0, top: 0, width: w, height: h, objectFit: 'cover' }} />
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          bottom: 0,
+          width: w,
+          height: Math.round(h * 0.62),
+          display: 'flex',
+          background: 'linear-gradient(180deg, rgba(22,35,61,0) 0%, rgba(22,35,61,0.72) 42%, rgba(22,35,61,0.94) 100%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: Math.round(pad * 0.6),
+          right: Math.round(pad * 0.6),
+          display: 'flex',
+          padding: `${Math.round(subSize * 0.25)}px ${Math.round(subSize * 0.6)}px`,
+          borderRadius: 999,
+          background: 'rgba(22,35,61,0.55)',
+          fontSize: Math.round(subSize * 0.62),
+          color: '#e2e8f0',
+        }}
+      >
+        画像はイメージです
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: pad,
+          right: pad,
+          bottom: pad,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{ display: 'flex', width: Math.round(w * 0.06), height: 6, background: MINT, marginBottom: Math.round(titleSize * 0.4) }} />
+        <div style={{ display: 'flex', fontSize: titleSize, fontWeight: 700, lineHeight: 1.3, textShadow: shadow }}>{safeTitle}</div>
+        {safeSubtitle && (
+          <div style={{ display: 'flex', marginTop: Math.round(subSize * 0.6), fontSize: subSize, color: '#dbeafe', lineHeight: 1.5, textShadow: shadow }}>
+            {safeSubtitle}
+          </div>
+        )}
+        <div style={{ display: 'flex', marginTop: Math.round(subSize * 0.9), fontSize: Math.round(subSize * 0.8), fontWeight: 700, color: MINT }}>
+          {DEFAULT_CLINIC_PROFILE.name}
+        </div>
       </div>
     </div>,
     w,

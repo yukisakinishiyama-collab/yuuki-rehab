@@ -99,12 +99,35 @@ export interface GeneratedContent {
   slides?: CarouselSlide[]
   imageText?: string
   altText?: string
+  /**
+   * 画像の場面の説明（英語）。下書きを書いたAI（Claude）が本文の内容に合わせて書き、
+   * ChatGPT（OpenAIの画像生成）にそのまま渡す。文字・医療行為・顔などを入れない決まりは post-image-server.ts で足す
+   */
+  imagePrompt?: string
+  /** AIで作った投稿画像（文字なしの写真）。投稿するときに見出しの文字を重ねる。無ければテンプレ画像 */
+  image?: PostImage
   warnings: string[]
   /**
    * Instagramストーリーの空き状況（instagram_story のときだけ）。
    * 投稿する時刻に予約システムから空きを取り直して画像を作る（下書きのときの空きは snapshot）
    */
   story?: StoryContent
+}
+
+/**
+ * AIで作った投稿画像（ChatGPT＝OpenAIの画像生成）。
+ * 写真には文字を入れず、見出し（表現チェック済みの文言）は投稿するときに院のデザインで重ねる。
+ * Instagramフィード・カルーセルの1枚目・Google投稿・noteの見出し画像で同じ写真を使う（媒体ごとに切り抜く）
+ */
+export interface PostImage {
+  kind: 'ai'
+  /** 文字の入っていない写真（Vercel Blob の公開URL） */
+  photoUrl: string
+  /** OpenAIに渡した指示（場面の説明＋共通の決まり） */
+  prompt: string
+  /** 使えたモデル（例: gpt-image-2） */
+  model: string
+  createdAt: string
 }
 
 export interface StoryContent {

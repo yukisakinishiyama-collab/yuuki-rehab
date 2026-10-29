@@ -16,8 +16,8 @@
 import { jstParts } from './autopilot-planner'
 import { listVideos, saveVideo } from './video-store-server'
 import type { StockVideo } from './video-types'
+import { generateOpenAiImage, imageModels, openAiImageConfigured } from './openai-image-server'
 
-const IMAGES_API = 'https://api.openai.com/v1/images/generations'
 const IMAGE_SIZE = '1024x1536' // 縦 2:3（動画は 9:16 に切り抜く）
 const SHOT_SECONDS = 3.6
 const FADE_SECONDS = 0.6
@@ -150,16 +150,7 @@ export const AI_VIDEO_THEMES: AiVideoTheme[] = [
 ]
 
 export function aiVideoConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY)
-}
-
-function imageModels(): string[] {
-  const fromEnv = process.env.OPENAI_IMAGE_MODEL
-  return fromEnv ? [fromEnv] : ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1']
-}
-
-function authHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ''}` }
+  return openAiImageConfigured()
 }
 
 /** 次に作るテーマ。セルフケアと院の雰囲気を交互に、最近使ったものは避ける。季節ものはその月だけ */
@@ -176,31 +167,9 @@ export function pickTheme(existing: StockVideo[], month: number): AiVideoTheme {
   return seasonal ?? fresh[0] ?? pool[0] ?? usable[0]
 }
 
-/** モデルが使えない（未提供・未許可）ときは次のモデルを試す */
-function isModelProblem(status: number, message: string): boolean {
-  return status === 404 || /model|verif|not have access|does not exist/i.test(message)
-}
-
-/** 画像を1枚作る（PNG/JPEG のバイト列）。使えたモデル名も返す */
-async function generateImage(prompt: string, models: string[]): Promise<{ bytes: Buffer; model: string }> {
-  let lastError = ''
-  for (const model of models) {
-    const res = await fetch(IMAGES_API, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, size: IMAGE_SIZE, quality: 'medium', n: 1 }),
-    })
-    const data = (await res.json().catch(() => ({}))) as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
-    const item = data.data?.[0]
-    if (res.ok && item?.b64_json) return { bytes: Buffer.from(item.b64_json, 'base64'), model }
-    if (res.ok && item?.url) {
-      const img = await fetch(item.url)
-      if (img.ok) return { bytes: Buffer.from(await img.arrayBuffer()), model }
-    }
-    lastError = data.error?.message ?? `HTTP ${res.status}`
-    if (!isModelProblem(res.status, lastError)) break
-  }
-  throw new Error(`OpenAIで画像を作れませんでした（${lastError}）`)
+/** 画像を1枚作る（共通部品 openai-image-server.ts。縦 2:3） */
+function generateImage(prompt: string, models: string[]): Promise<{ bytes: Buffer; model: string }> {
+  return generateOpenAiImage(prompt, { size: IMAGE_SIZE, quality: 'medium', models })
 }
 
 /** 3枚の画像を、ゆっくりズーム＋クロスフェードの縦動画（mp4・音なし）にする */
