@@ -450,9 +450,11 @@ function RadarChart({ scores }: {
 
   const gridLevels = [25, 50, 75, 100]
 
-  // カラー：スコアに応じて
+  // カラー：スコアに応じて。線と塗りは明るい色、点数の文字は同じ色みの濃い色
+  // （文字は塗りの上に重なることもあるので、薄い塗りの上でもコントラスト比 4.5 以上ある 800 前後）
   const composite = vals[4]
   const color = composite >= 80 ? '#10b981' : composite >= 65 ? '#f59e0b' : '#ef4444'
+  const textColor = composite >= 80 ? '#065f46' : composite >= 65 ? '#92400e' : '#b91c1c'
 
   return (
     <svg viewBox="0 0 300 300" className="w-full max-w-xs mx-auto">
@@ -502,7 +504,7 @@ function RadarChart({ scores }: {
           y={p.y + (p.y > cy + 2 ? 14 : p.y < cy - 2 ? -7 : 5)}
           fontSize="13"
           fontWeight="700"
-          fill={color}
+          fill={textColor}
           textAnchor={p.x > cx + 2 ? 'start' : p.x < cx - 2 ? 'end' : 'middle'}
         >
           {vals[i]}
@@ -561,10 +563,10 @@ function ScoreBar({ label, score, threshold, icon: Icon, color }: {
           {label}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="font-bold text-slate-800 text-sm">{score}<span className="text-slate-400 font-normal text-xs">/100</span></span>
+          <span className="font-bold text-slate-800 text-sm">{score}<span className="text-slate-500 font-normal text-xs">/100</span></span>
           {passed
-            ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-            : <XCircle className="w-3.5 h-3.5 text-red-400" />}
+            ? <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+            : <XCircle className="w-3.5 h-3.5 text-red-600" />}
         </span>
       </div>
       <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -582,7 +584,7 @@ function ScoreBar({ label, score, threshold, icon: Icon, color }: {
           style={{ left: `${threshold}%` }}
         />
       </div>
-      <p className="text-xs text-slate-400 text-right">基準: {threshold}点</p>
+      <p className="text-xs text-slate-500 text-right">基準: {threshold}点</p>
     </div>
   )
 }
@@ -666,9 +668,9 @@ export default function ReturnCriteriaPage({
   const verdict = getVerdict(scores.composite)
 
   const VERDICT_CONFIG = {
-    cleared:     { label: '復帰可能', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-300', Icon: CheckCircle,    iconColor: 'text-emerald-600' },
-    conditional: { label: '条件付き復帰検討', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-300',   Icon: AlertTriangle, iconColor: 'text-amber-500' },
-    not_ready:   { label: '継続リハビリ推奨', color: 'text-red-700',     bg: 'bg-red-50 border-red-300',       Icon: XCircle,       iconColor: 'text-red-500' },
+    cleared:     { label: '復帰可能', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-300', Icon: CheckCircle,    iconColor: 'text-emerald-700' },
+    conditional: { label: '条件付き復帰検討', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-300',   Icon: AlertTriangle, iconColor: 'text-amber-700' },
+    not_ready:   { label: '継続リハビリ推奨', color: 'text-red-700',     bg: 'bg-red-50 border-red-300',       Icon: XCircle,       iconColor: 'text-red-600' },
   }
   const vc = VERDICT_CONFIG[verdict]
 
@@ -719,7 +721,7 @@ export default function ReturnCriteriaPage({
     return (
       <div className="p-8 text-center text-slate-500">
         患者が見つかりません
-        <Link href="/patients" className="block mt-2 text-teal-600 hover:underline">患者一覧へ</Link>
+        <Link href="/patients" className="block mt-2 text-teal-700 hover:underline">患者一覧へ</Link>
       </div>
     )
   }
@@ -733,7 +735,7 @@ export default function ReturnCriteriaPage({
           className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">
           <ArrowLeft className="w-4 h-4" />{patient.name}
         </Link>
-        <span className="text-slate-300">/</span>
+        <span className="text-slate-500">/</span>
         <span className="text-sm font-semibold text-slate-700">復帰基準テスト</span>
       </div>
 
@@ -744,7 +746,7 @@ export default function ReturnCriteriaPage({
             <p className="text-xs font-semibold text-slate-500 mb-1.5">
               対象部位
               {!AUTO_REGIONS.includes(patient.bodyRegion as AssessmentRegion) && (
-                <span className="ml-1 text-slate-400 font-normal">（登録部位からは自動判定できないため選択してください）</span>
+                <span className="ml-1 text-slate-500 font-normal">（登録部位からは自動判定できないため選択してください）</span>
               )}
             </p>
             <div className="flex gap-2 flex-wrap">
@@ -772,7 +774,7 @@ export default function ReturnCriteriaPage({
                   onClick={() => setAssessmentType(value)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
                     assessmentType === value
-                      ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                      ? 'bg-teal-700 text-white border-teal-700 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:border-teal-400'
                   }`}>
                   <Icon className="w-3.5 h-3.5" />{label}
@@ -1021,10 +1023,10 @@ export default function ReturnCriteriaPage({
                 <div key={i}>
                   <div className="flex items-start justify-between gap-3 mb-1.5">
                     <p className="text-xs font-medium text-slate-700">
-                      <span className="text-slate-400 mr-1">Q{i + 1}.</span>
+                      <span className="text-slate-500 mr-1">Q{i + 1}.</span>
                       {q.text}
                       {q.negative && (
-                        <span className="ml-1.5 text-xs bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-semibold">懸念</span>
+                        <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1 py-0.5 rounded font-semibold">懸念</span>
                       )}
                     </p>
                     <span className="text-sm font-bold text-purple-700 min-w-[1.5rem] text-right">{aclRsi[i]}</span>
@@ -1038,7 +1040,7 @@ export default function ReturnCriteriaPage({
                     }}
                     className="w-full accent-purple-600 h-1.5"
                   />
-                  <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+                  <div className="flex justify-between text-xs text-slate-500 mt-0.5">
                     <span>全くない (0)</span>
                     <span>完全にそう (10)</span>
                   </div>
@@ -1080,7 +1082,7 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-500 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
                         <label className="text-xs font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
@@ -1109,10 +1111,10 @@ export default function ReturnCriteriaPage({
                       <div className="text-center">
                         <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
-                          lsiVal === null ? 'text-slate-300'
-                            : lsiVal >= 90 ? 'text-emerald-600'
-                            : lsiVal >= 80 ? 'text-amber-500'
-                            : 'text-red-500'
+                          lsiVal === null ? 'text-slate-500'
+                            : lsiVal >= 90 ? 'text-emerald-700'
+                            : lsiVal >= 80 ? 'text-amber-700'
+                            : 'text-red-600'
                         }`}>{lsiVal !== null ? `${lsiVal}%` : '—'}</p>
                       </div>
                     </div>
@@ -1152,7 +1154,7 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-500 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
                         <label className="text-xs font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
@@ -1181,10 +1183,10 @@ export default function ReturnCriteriaPage({
                       <div className="text-center">
                         <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
-                          lsiVal === null ? 'text-slate-300'
-                            : lsiVal >= 90 ? 'text-emerald-600'
-                            : lsiVal >= 80 ? 'text-amber-500'
-                            : 'text-red-500'
+                          lsiVal === null ? 'text-slate-500'
+                            : lsiVal >= 90 ? 'text-emerald-700'
+                            : lsiVal >= 80 ? 'text-amber-700'
+                            : 'text-red-600'
                         }`}>{lsiVal !== null ? `${lsiVal}%` : '—'}</p>
                       </div>
                     </div>
@@ -1194,7 +1196,7 @@ export default function ReturnCriteriaPage({
 
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">Trendelenburg徴候</p>
-                <p className="text-xs text-slate-400 mb-2.5">片脚立位時に反対側の骨盤が下がる場合は陽性（中殿筋機能低下の指標）</p>
+                <p className="text-xs text-slate-500 mb-2.5">片脚立位時に反対側の骨盤が下がる場合は陽性（中殿筋機能低下の指標）</p>
                 <div className="flex gap-2">
                   {([
                     { value: 'negative', label: '陰性' },
@@ -1205,8 +1207,8 @@ export default function ReturnCriteriaPage({
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${
                         hipFunction.trendelenburg === opt.value
                           ? opt.value === 'positive'
-                            ? 'bg-red-500 text-white border-red-500'
-                            : 'bg-teal-600 text-white border-teal-600'
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-teal-700 text-white border-teal-700'
                           : 'bg-white text-slate-500 border-slate-200 hover:border-teal-400'
                       }`}>
                       {opt.label}
@@ -1247,7 +1249,7 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-500 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
                         <label className="text-xs font-semibold text-slate-500 block mb-1">患側 ({unit})</label>
@@ -1276,10 +1278,10 @@ export default function ReturnCriteriaPage({
                       <div className="text-center">
                         <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
-                          lsiVal === null ? 'text-slate-300'
-                            : lsiVal >= 90 ? 'text-emerald-600'
-                            : lsiVal >= 80 ? 'text-amber-500'
-                            : 'text-red-500'
+                          lsiVal === null ? 'text-slate-500'
+                            : lsiVal >= 90 ? 'text-emerald-700'
+                            : lsiVal >= 80 ? 'text-amber-700'
+                            : 'text-red-600'
                         }`}>{lsiVal !== null ? `${lsiVal}%` : '—'}</p>
                       </div>
                     </div>
@@ -1289,7 +1291,7 @@ export default function ReturnCriteriaPage({
 
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">肩甲骨ディスキネジス</p>
-                <p className="text-xs text-slate-400 mb-2.5">挙上・下制動作時に肩甲骨の異常な動き（浮き上がり等）が見られる場合は陽性</p>
+                <p className="text-xs text-slate-500 mb-2.5">挙上・下制動作時に肩甲骨の異常な動き（浮き上がり等）が見られる場合は陽性</p>
                 <div className="flex gap-2">
                   {([
                     { value: 'negative', label: '陰性' },
@@ -1300,8 +1302,8 @@ export default function ReturnCriteriaPage({
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${
                         shoulderFunction.scapularDyskinesis === opt.value
                           ? opt.value === 'positive'
-                            ? 'bg-red-500 text-white border-red-500'
-                            : 'bg-teal-600 text-white border-teal-600'
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-teal-700 text-white border-teal-700'
                           : 'bg-white text-slate-500 border-slate-200 hover:border-teal-400'
                       }`}>
                       {opt.label}
@@ -1343,7 +1345,7 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-500 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
                         <label className="text-xs font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
@@ -1372,10 +1374,10 @@ export default function ReturnCriteriaPage({
                       <div className="text-center">
                         <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
-                          lsiVal === null ? 'text-slate-300'
-                            : lsiVal >= 90 ? 'text-emerald-600'
-                            : lsiVal >= 80 ? 'text-amber-500'
-                            : 'text-red-500'
+                          lsiVal === null ? 'text-slate-500'
+                            : lsiVal >= 90 ? 'text-emerald-700'
+                            : lsiVal >= 80 ? 'text-amber-700'
+                            : 'text-red-600'
                         }`}>{lsiVal !== null ? `${lsiVal}%` : '—'}</p>
                       </div>
                     </div>
@@ -1404,7 +1406,7 @@ export default function ReturnCriteriaPage({
               </p>
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">サイドブリッジ（体幹側方保持）保持時間</p>
-                <p className="text-xs text-slate-400 mb-2.5">肘と足部のみで体幹を側方に持ち上げ、姿勢を保持できる時間</p>
+                <p className="text-xs text-slate-500 mb-2.5">肘と足部のみで体幹を側方に持ち上げ、姿勢を保持できる時間</p>
                 <div className="grid grid-cols-3 gap-2 items-end">
                   <div>
                     <label className="text-xs font-semibold text-slate-500 block mb-1">弱い側 (秒)</label>
@@ -1433,10 +1435,10 @@ export default function ReturnCriteriaPage({
                   <div className="text-center">
                     <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                     <p className={`text-lg font-bold ${
-                      !lumbarFunction.sideBridge.involved || !lumbarFunction.sideBridge.uninvolved ? 'text-slate-300'
-                        : scores.functional >= 90 ? 'text-emerald-600'
-                        : scores.functional >= 80 ? 'text-amber-500'
-                        : 'text-red-500'
+                      !lumbarFunction.sideBridge.involved || !lumbarFunction.sideBridge.uninvolved ? 'text-slate-500'
+                        : scores.functional >= 90 ? 'text-emerald-700'
+                        : scores.functional >= 80 ? 'text-amber-700'
+                        : 'text-red-600'
                     }`}>{lumbarFunction.sideBridge.involved && lumbarFunction.sideBridge.uninvolved ? `${scores.functional}%` : '—'}</p>
                   </div>
                 </div>
@@ -1462,7 +1464,7 @@ export default function ReturnCriteriaPage({
               </p>
               {LEFS_ACTIVITIES.map((activity, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
-                  <span className="text-xs text-slate-400 w-4 flex-shrink-0">{i + 1}</span>
+                  <span className="text-xs text-slate-500 w-4 flex-shrink-0">{i + 1}</span>
                   <span className="text-xs text-slate-700 flex-1">{activity}</span>
                   <div className="flex gap-1">
                     {LEFS_OPTIONS.map(opt => (
@@ -1475,8 +1477,8 @@ export default function ReturnCriteriaPage({
                         title={opt.label}
                         className={`w-6 h-6 rounded text-xs font-bold border transition-all ${
                           lefs[i] === opt.value
-                            ? 'bg-orange-500 text-white border-orange-500'
-                            : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300'
+                            ? 'bg-orange-700 text-white border-orange-700'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'
                         }`}>
                         {opt.value}
                       </button>
@@ -1484,7 +1486,7 @@ export default function ReturnCriteriaPage({
                   </div>
                 </div>
               ))}
-              <p className="text-xs text-slate-400 text-right pt-1">
+              <p className="text-xs text-slate-500 text-right pt-1">
                 合計: {lefs.reduce((s, v) => s + v, 0)}/80点
               </p>
             </div>
@@ -1508,7 +1510,7 @@ export default function ReturnCriteriaPage({
               </p>
               {SHOULDER_DAILY_ACTIVITIES.map((activity, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
-                  <span className="text-xs text-slate-400 w-4 flex-shrink-0">{i + 1}</span>
+                  <span className="text-xs text-slate-500 w-4 flex-shrink-0">{i + 1}</span>
                   <span className="text-xs text-slate-700 flex-1">{activity}</span>
                   <div className="flex gap-1">
                     {SHOULDER_DAILY_OPTIONS.map(opt => (
@@ -1521,8 +1523,8 @@ export default function ReturnCriteriaPage({
                         title={opt.label}
                         className={`w-6 h-6 rounded text-xs font-bold border transition-all ${
                           shoulderDaily[i] === opt.value
-                            ? 'bg-orange-500 text-white border-orange-500'
-                            : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300'
+                            ? 'bg-orange-700 text-white border-orange-700'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'
                         }`}>
                         {opt.value}
                       </button>
@@ -1556,7 +1558,7 @@ export default function ReturnCriteriaPage({
             </div>
             <div className="text-center py-2">
               <span className={`text-5xl font-black ${vc.color}`}>{scores.composite}</span>
-              <span className="text-lg text-slate-400 font-normal">/100</span>
+              <span className="text-lg text-slate-500 font-normal">/100</span>
             </div>
             <p className="text-xs text-center text-slate-500 mt-1">
               {assessmentType === 'sport' ? '競技' : '日常生活'}復帰スコア
@@ -1576,16 +1578,16 @@ export default function ReturnCriteriaPage({
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
             <ScoreBar label={scoreLabels.symptom} score={scores.symptom}
               threshold={assessmentType === 'sport' ? 85 : 75}
-              icon={Activity} color="text-blue-500" />
+              icon={Activity} color="text-blue-600" />
             <ScoreBar label={scoreLabels.psychological} score={scores.psychological}
               threshold={65}
-              icon={Brain} color="text-purple-500" />
+              icon={Brain} color="text-purple-600" />
             <ScoreBar label={scoreLabels.functional} score={scores.functional}
               threshold={assessmentType === 'sport' ? 90 : 80}
-              icon={Zap} color="text-teal-500" />
+              icon={Zap} color="text-teal-700" />
             <ScoreBar label={scoreLabels.daily} score={scores.daily}
               threshold={assessmentType === 'daily' ? 75 : 60}
-              icon={Home} color="text-orange-500" />
+              icon={Home} color="text-orange-700" />
           </div>
 
           {/* 保存ボタン */}
@@ -1593,14 +1595,14 @@ export default function ReturnCriteriaPage({
             className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold
               transition-all shadow-sm ${
                 saved
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-teal-600 text-white hover:bg-teal-700'
+                  ? 'bg-emerald-700 text-white'
+                  : 'bg-teal-700 text-white hover:bg-teal-800'
               }`}>
             {saved ? <><CheckCircle className="w-4 h-4" />保存しました</> : <><Save className="w-4 h-4" />この評価を保存</>}
           </button>
 
           {/* 注意書き */}
-          <p className="text-xs text-slate-400 leading-relaxed text-center">
+          <p className="text-xs text-slate-500 leading-relaxed text-center">
             本スコアは臨床判断の補助ツールです。<br />
             最終的な復帰判断は有資格の医療者が行ってください。
           </p>
@@ -1640,10 +1642,10 @@ export default function ReturnCriteriaPage({
                         <span>機能 <strong>{rec.scores.functional}</strong></span>
                         <span>日常 <strong>{rec.scores.daily}</strong></span>
                       </div>
-                      {rec.notes && <p className="text-xs text-slate-400 mt-1">{rec.notes}</p>}
+                      {rec.notes && <p className="text-xs text-slate-500 mt-1">{rec.notes}</p>}
                     </div>
                     <button onClick={() => handleDelete(rec.id)}
-                      className="text-slate-300 hover:text-red-400 transition-colors p-1 flex-shrink-0">
+                      className="text-slate-500 hover:text-red-400 transition-colors p-1 flex-shrink-0">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1692,12 +1694,12 @@ function Section({
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className={`text-lg font-black ${c.text}`}>{score}</p>
-            <p className="text-xs text-slate-400">/ 100点</p>
+            <p className="text-xs text-slate-500">/ 100点</p>
           </div>
           {passed
-            ? <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-            : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />}
-          {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            ? <CheckCircle className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+            : <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />}
+          {open ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
         </div>
       </button>
 

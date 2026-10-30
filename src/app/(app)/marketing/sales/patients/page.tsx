@@ -157,7 +157,7 @@ export default function PatientMovementPage() {
                     </div>
                   </div>
                   {g.phone && (
-                    <a href={`tel:${digits(g.phone)}`} className="rounded-md p-1.5 text-slate-400 hover:bg-teal-50 hover:text-teal-700" title={g.phone}>
+                    <a href={`tel:${digits(g.phone)}`} className="rounded-md p-1.5 text-slate-500 hover:bg-teal-50 hover:text-teal-700" title={g.phone}>
                       <Phone className="h-4 w-4" />
                     </a>
                   )}

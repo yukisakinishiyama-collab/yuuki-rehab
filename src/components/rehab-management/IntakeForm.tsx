@@ -123,7 +123,7 @@ function CheckboxGroup({
           onClick={() => toggle(opt)}
           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
             selected.includes(opt)
-              ? 'bg-teal-600 text-white border-teal-600'
+              ? 'bg-teal-700 text-white border-teal-700'
               : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
           }`}
         >
@@ -276,7 +276,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
               onClick={() => setTab(t.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                 tab === t.key
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -340,7 +340,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                     onClick={() => setForm(f => ({ ...f, firstTimeSymptoм: opt.value }))}
                     className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                       form.firstTimeSymptoм === opt.value
-                        ? 'bg-teal-600 text-white border-teal-600'
+                        ? 'bg-teal-700 text-white border-teal-700'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
                     }`}
                   >
@@ -403,7 +403,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
         {tab === 'flow' && (
           <div className="space-y-4">
             {selectedJoints.length === 0 && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-500">
                 先に「痛み部位」タブで痛みのある部位を選択してください。
               </p>
             )}
@@ -560,7 +560,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 type="button"
                 onClick={handleAnalyze}
                 disabled={analyzing || !form.chiefComplaint}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 {analyzing && (
                   <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -571,7 +571,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 {analyzing ? 'AI分析中...' : '🤖 AI分析を実行'}
               </button>
               {!form.chiefComplaint && (
-                <p className="text-xs text-gray-400">「基本情報」タブで主訴を入力してください</p>
+                <p className="text-xs text-gray-500">「基本情報」タブで主訴を入力してください</p>
               )}
             </div>
 
@@ -668,13 +668,13 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
 
             {/* 保存ボタン */}
             <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-              {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+              {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
               {!saved && <span />}
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={!form.chiefComplaint}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 💾 問診票を保存
               </button>
@@ -692,17 +692,17 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 const idx = keys.indexOf(tab)
                 if (idx < keys.length - 1) setTab(keys[idx + 1])
               }}
-              className="text-sm text-teal-600 hover:text-teal-800 font-medium"
+              className="text-sm text-teal-700 hover:text-teal-800 font-medium"
             >
               次へ →
             </button>
             <div className="flex items-center gap-3">
-              {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+              {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={!form.chiefComplaint}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 保存
               </button>

@@ -128,10 +128,10 @@ export default function JobsPage() {
                 <div className="flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
                   <span className="font-medium">{item.label}</span>
-                  <span className="ml-auto text-xs text-slate-400">{connected ? '接続済み' : item.hint}</span>
+                  <span className="ml-auto text-xs text-slate-500">{connected ? '接続済み' : item.hint}</span>
                 </div>
                 {detail ? (
-                  <p className={`mt-1 pl-4 text-xs ${detail.ok ? 'text-slate-500' : 'text-amber-600'}`}>{detail.note}</p>
+                  <p className={`mt-1 pl-4 text-xs ${detail.ok ? 'text-slate-500' : 'text-amber-700'}`}>{detail.note}</p>
                 ) : null}
               </li>
             )
@@ -210,11 +210,11 @@ export default function JobsPage() {
                     <span className={`rounded px-2 py-0.5 text-xs font-bold ${s.tone}`}>{s.label}</span>
                     <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">{CHANNEL_LABELS[job.channel]}</span>
                     <span className="font-medium">{job.theme}</span>
-                    <span className="text-xs text-slate-400">試行 {job.attempts.length}/{job.maxAttempts}</span>
+                    <span className="text-xs text-slate-500">試行 {job.attempts.length}/{job.maxAttempts}</span>
                   </div>
                   {job.actionReason && <p className="text-xs text-amber-800">▶ {job.actionReason}</p>}
                   {job.attempts.length > 0 && (
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-500">
                       最終試行: {job.attempts[job.attempts.length - 1].message}
                     </p>
                   )}

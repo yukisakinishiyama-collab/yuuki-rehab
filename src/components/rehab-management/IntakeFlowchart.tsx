@@ -72,7 +72,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
           <button
             type="button"
             onClick={handleRestart}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-gray-500 hover:text-gray-600"
           >
             ↺ 最初から
           </button>
@@ -94,7 +94,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
         <div className="space-y-3">
           <div>
             <p className="text-sm font-medium text-gray-800">{node.question}</p>
-            {node.hint && <p className="text-xs text-gray-400 mt-1">{node.hint}</p>}
+            {node.hint && <p className="text-xs text-gray-500 mt-1">{node.hint}</p>}
           </div>
           <div className="flex flex-wrap gap-2">
             {node.options.map(opt => (
@@ -112,7 +112,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
             <button
               type="button"
               onClick={handleBack}
-              className="text-xs text-teal-600 hover:text-teal-800 font-medium"
+              className="text-xs text-teal-700 hover:text-teal-800 font-medium"
             >
               ← 一つ前の質問に戻る
             </button>
@@ -164,7 +164,7 @@ function ResultCard({ node, onBack }: { node: FlowResultNode; onBack?: () => voi
         <button
           type="button"
           onClick={onBack}
-          className="text-xs text-teal-600 hover:text-teal-800 font-medium"
+          className="text-xs text-teal-700 hover:text-teal-800 font-medium"
         >
           ← 一つ前の質問に戻る
         </button>

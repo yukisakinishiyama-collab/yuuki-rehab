@@ -19,6 +19,9 @@ interface Zone {
   d: string
 }
 
+// 部位の種類ごとの色（図の塗り・枠）。チップやラベルの文字は、色の付いた地の上でも読めるよう ZONE_TEXT（slate-900）にする
+// （白い文字や、枠と同じ色の文字では、黄・オレンジ・緑などの地でコントラスト比が 1.6〜3.4 しかないため）
+const ZONE_TEXT = '#0f172a'
 const TYPE_COLORS: Record<ZoneType, { idle: string; hover: string; selected: string; stroke: string }> = {
   ligament:  { idle: 'rgba(245,158,11,0.2)',  hover: 'rgba(245,158,11,0.45)', selected: 'rgba(245,158,11,0.75)', stroke: '#b45309' },
   tendon:    { idle: 'rgba(249,115,22,0.2)',  hover: 'rgba(249,115,22,0.45)', selected: 'rgba(249,115,22,0.75)', stroke: '#c2410c' },
@@ -608,7 +611,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         <div className="h-7 flex items-center justify-center">
           {hoveredZone ? (
             <span className="text-xs font-medium px-2 py-0.5 rounded-full border"
-              style={{ background: TYPE_COLORS[hoveredZone.type].hover, borderColor: TYPE_COLORS[hoveredZone.type].stroke, color: TYPE_COLORS[hoveredZone.type].stroke }}>
+              style={{ background: TYPE_COLORS[hoveredZone.type].hover, borderColor: TYPE_COLORS[hoveredZone.type].stroke, color: ZONE_TEXT }}>
               {hoveredZone.label}（{TYPE_LABELS[hoveredZone.type]}）
             </span>
           ) : null}
@@ -657,7 +660,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
             const c = TYPE_COLORS[zone.type]
             return (
               <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border"
-                style={{ background: c.selected, borderColor: c.stroke, color: '#fff' }}>
+                style={{ background: c.selected, borderColor: c.stroke, color: ZONE_TEXT }}>
                 {zone.label}
                 {!readOnly && (
                   <button type="button" onClick={() => toggleZone(id)} className="opacity-80 hover:opacity-100 leading-none">×</button>
@@ -668,7 +671,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         </div>
       )}
 
-      {!readOnly && <p className="text-xs text-gray-400 px-1">部位をクリックして選択・解除できます</p>}
+      {!readOnly && <p className="text-xs text-gray-500 px-1">部位をクリックして選択・解除できます</p>}
     </div>
   )
 }

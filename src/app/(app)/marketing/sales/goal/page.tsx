@@ -144,7 +144,7 @@ function Fold({ title, sub, children, open }: { title: string; sub?: string; chi
           <span className="block text-[15px] font-bold text-slate-900">{title}</span>
           {sub && <span className="mt-0.5 block text-xs text-slate-500">{sub}</span>}
         </span>
-        <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+        <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">{children}</div>
     </details>
@@ -552,7 +552,7 @@ export default function GoalPage() {
               className="h-11 w-24 rounded-xl border border-slate-300 px-3 text-right text-sm"
             />
             <span className="text-sm text-slate-600">万円</span>
-            <button type="submit" className="h-11 rounded-full bg-slate-900 px-5 text-sm font-bold text-white">
+            <button type="submit" className="h-11 rounded-full bg-teal-700 px-5 text-sm font-bold text-white">
               決める
             </button>
           </form>
@@ -582,7 +582,7 @@ export default function GoalPage() {
       </div>
 
       {message && <p className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-700">{message}</p>}
-      {!loaded && <p className="text-sm text-slate-400">読み込み中…</p>}
+      {!loaded && <p className="text-sm text-slate-500">読み込み中…</p>}
       {loaded && !base && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
           まだNOAHの集計が届いていません。毎晩21時すぎに届くと、ここに道すじが出ます。
@@ -645,7 +645,7 @@ export default function GoalPage() {
                     {nextAction.href && (
                       <Link
                         href={nextAction.href}
-                        className="inline-flex h-11 items-center rounded-full bg-teal-600 px-5 text-sm font-bold text-white hover:bg-teal-700"
+                        className="inline-flex h-11 items-center rounded-full bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800"
                       >
                         {nextAction.link}を開く
                       </Link>
@@ -687,7 +687,7 @@ export default function GoalPage() {
                 <ul className="space-y-2 text-sm leading-relaxed text-slate-700">
                   {notes.map((n) => (
                     <li key={n.text} className="flex gap-2">
-                      <span className={n.tone === 'warn' ? 'text-amber-600' : 'text-teal-700'} aria-hidden>
+                      <span className={n.tone === 'warn' ? 'text-amber-700' : 'text-teal-700'} aria-hidden>
                         ●
                       </span>
                       <span className="min-w-0">{n.text}</span>
@@ -794,7 +794,7 @@ export default function GoalPage() {
                       <button
                         type="submit"
                         disabled={saving}
-                        className="h-11 rounded-full bg-slate-900 px-6 text-sm font-bold text-white disabled:opacity-50"
+                        className="h-11 rounded-full bg-teal-700 px-6 text-sm font-bold text-white disabled:opacity-50"
                       >
                         {saving ? '保存中…' : '保存'}
                       </button>
@@ -841,7 +841,7 @@ export default function GoalPage() {
                     <button
                       type="button"
                       onClick={() => setSim(req.balanced.input)}
-                      className="h-10 rounded-full bg-teal-600 px-4 text-sm font-bold text-white hover:bg-teal-700"
+                      className="h-10 rounded-full bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800"
                     >
                       そろって{fmt1(req.balanced.k)}倍（おすすめ）
                     </button>
@@ -981,7 +981,7 @@ export default function GoalPage() {
                     <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 sm:px-6 [&::-webkit-details-marker]:hidden">
                       <span
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-                          isNow ? 'bg-teal-600 text-white' : i < stageIdx ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-500'
+                          isNow ? 'bg-teal-700 text-white' : i < stageIdx ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-500'
                         }`}
                       >
                         {i + 1}
@@ -999,7 +999,7 @@ export default function GoalPage() {
                           月 {man(st.target)}円（+{man(st.add)}円）・{done}／{ACTIONS[st.key].length} 完了
                         </span>
                       </span>
-                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                     </summary>
                     <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">
                       <p className="text-xs leading-relaxed text-slate-500">目安：{st.measure}</p>
@@ -1023,7 +1023,7 @@ export default function GoalPage() {
                             />
                             <label
                               htmlFor={`act-${a.id}`}
-                              className={`min-w-0 flex-1 text-sm leading-relaxed ${checks.has(a.id) ? 'text-slate-400 line-through' : 'text-slate-700'}`}
+                              className={`min-w-0 flex-1 text-sm leading-relaxed ${checks.has(a.id) ? 'text-slate-500 line-through' : 'text-slate-700'}`}
                             >
                               {a.text}
                             </label>

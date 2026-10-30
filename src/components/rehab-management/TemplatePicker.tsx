@@ -22,7 +22,7 @@ export default function TemplatePicker({ categories, onSelect, label = '定型�
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="text-xs text-teal-600 hover:text-teal-800 font-medium whitespace-nowrap"
+        className="text-xs text-teal-700 hover:text-teal-800 font-medium whitespace-nowrap"
       >
         {open ? '✕ 定型文を閉じる' : `📋 ${label}`}
       </button>
@@ -37,7 +37,7 @@ export default function TemplatePicker({ categories, onSelect, label = '定型�
                 onClick={() => setActiveCat(cat.id)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                   activeCat === cat.id
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-teal-700 text-white'
                     : 'bg-white text-gray-600 border border-gray-200 hover:border-teal-300'
                 }`}
               >

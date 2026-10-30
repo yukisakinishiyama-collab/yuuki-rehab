@@ -47,7 +47,7 @@ function ItemsEditor({ items, onChange, placeholder }: { items: CostItem[]; onCh
             placeholder="0"
           />
           <span className="text-xs text-slate-500">円</span>
-          <button type="button" onClick={() => onChange(items.filter((x) => x.id !== it.id))} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="消す">
+          <button type="button" onClick={() => onChange(items.filter((x) => x.id !== it.id))} className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-600" title="消す">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -213,7 +213,7 @@ export default function ProfitPage() {
 
       {settings && (
         <div className="flex items-center gap-3">
-          <button type="button" onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-1 rounded-md bg-teal-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-1 rounded-md bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '経費の設定を保存'}
           </button>

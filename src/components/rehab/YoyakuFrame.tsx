@@ -127,11 +127,11 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             className="w-full h-full border-0"
           />
         ) : (
-          <p className="flex h-full items-center justify-center text-xs text-slate-400">予約管理を開いています…</p>
+          <p className="flex h-full items-center justify-center text-xs text-slate-500">予約管理を開いています…</p>
         )}
       </div>
 
-      <p className="text-xs text-slate-400 mt-2">
+      <p className="text-xs text-slate-500 mt-2">
         画面が表示されない・ログインがうまくいかない場合は「新しいタブで開く」をご利用ください。
       </p>
     </div>

@@ -291,7 +291,7 @@ export default function RichMenuPage() {
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 font-mono text-xs"
             placeholder="LINE 管理画面のメニュー画像の URL（line-scdn.net）"
           />
-          <button type="button" onClick={loadFromUrl} disabled={!!busy} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={loadFromUrl} disabled={!!busy} className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
             URL から読む
           </button>
           <label className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold hover:bg-slate-50">
@@ -324,7 +324,7 @@ export default function RichMenuPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm space-y-3">
         <h2 className="font-bold">3. LINE に登録する</h2>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={publish} disabled={!!busy || !base} className="rounded-md bg-emerald-600 px-4 py-2 font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={publish} disabled={!!busy || !base} className="rounded-md bg-emerald-700 px-4 py-2 font-bold text-white disabled:opacity-50">
             この画像で友だち全員に表示する
           </button>
           <button type="button" onClick={reset} disabled={!!busy} className="rounded-md border border-slate-300 px-4 py-2 font-bold hover:bg-slate-50 disabled:opacity-50">

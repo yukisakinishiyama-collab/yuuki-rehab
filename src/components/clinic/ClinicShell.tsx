@@ -462,7 +462,7 @@ function Covered() {
       <div className="mt-4 flex justify-center">
         <Link
           href="/dashboard"
-          className="inline-flex h-11 items-center rounded-full bg-slate-900 px-6 text-sm font-bold text-white hover:bg-slate-800"
+          className="inline-flex h-11 items-center rounded-full bg-teal-700 px-6 text-sm font-bold text-white hover:bg-teal-800"
         >
           今日へ
         </Link>

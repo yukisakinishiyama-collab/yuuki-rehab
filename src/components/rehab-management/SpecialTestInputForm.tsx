@@ -82,9 +82,9 @@ const RESULT_LABELS: Record<SpecialTestResult, string> = {
 }
 
 const RESULT_STYLES: Record<SpecialTestResult, string> = {
-  positive: 'bg-red-500 text-white',
-  negative: 'bg-green-500 text-white',
-  suspicious: 'bg-yellow-400 text-white',
+  positive: 'bg-red-600 text-white',
+  negative: 'bg-green-700 text-white',
+  suspicious: 'bg-yellow-400 text-yellow-950',
   unable: 'bg-gray-300 text-gray-700',
 }
 
@@ -200,7 +200,7 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
                 onClick={() => setForm(f => ({ ...f, testName: t }))}
                 className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   form.testName === t
-                    ? 'bg-teal-600 text-white border-teal-600'
+                    ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
                 }`}
               >
@@ -251,7 +251,7 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
                   onChange={v => setForm(f => ({ ...f, faberDistanceRight: v }))}
                   placeholder="例：15"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">cm</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">cm</span>
               </div>
             </div>
             <div>
@@ -263,7 +263,7 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
                   onChange={v => setForm(f => ({ ...f, faberDistanceLeft: v }))}
                   placeholder="例：18"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">cm</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">cm</span>
               </div>
             </div>
           </div>
@@ -294,12 +294,12 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
             rows={2}
             placeholder="例：股関節を深く曲げた時に痛みが出やすい状態です。今はその動きを無理に繰り返さず、痛みを増やさない範囲で整えていきます"
           />
-          <p className="text-xs text-gray-400 mt-1">※ 診断名の断定は避け、やさしい言葉で説明してください</p>
+          <p className="text-xs text-gray-500 mt-1">※ 診断名の断定は避け、やさしい言葉で説明してください</p>
         </div>
 
         <div className="flex items-center gap-3">
           <SaveButton onClick={handleSave} label="テスト結果を保存" />
-          {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+          {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
         </div>
       </CardContent>
     </Card>

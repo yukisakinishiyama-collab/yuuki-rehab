@@ -369,7 +369,7 @@ function ItemCard({
               setRegenOpen(false)
               setNewTheme('')
             }}
-            className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+            className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
           >
             {busy ? '作り直し中…（1〜3分）' : 'この枠を作り直す'}
           </button>
@@ -660,8 +660,9 @@ function AutopilotInner() {
               <button
                 key={p.weekStart}
                 type="button"
+                aria-pressed={p.weekStart === currentWeek}
                 onClick={() => setSelected(p.weekStart)}
-                className={`rounded-lg px-3 py-2 text-sm font-bold ${p.weekStart === currentWeek ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}
+                className={`rounded-lg px-3 py-2 text-sm font-bold ${p.weekStart === currentWeek ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}
               >
                 {weekLabel(p.weekStart)}
                 {pending > 0 && <span className="ml-1.5 rounded-full bg-amber-400 px-1.5 text-xs text-slate-900">{pending}</span>}

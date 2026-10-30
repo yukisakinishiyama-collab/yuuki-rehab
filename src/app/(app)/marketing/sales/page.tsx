@@ -110,11 +110,11 @@ function Card({ title, sub, children, action }: { title: string; sub?: string; c
 }
 
 function Delta({ now, before, unit, label }: { now: number; before: number | null; unit: '人' | '%' | 'pt'; label: string }) {
-  if (before === null) return <p className="mt-1 text-xs text-slate-400">比べる記録がありません</p>
+  if (before === null) return <p className="mt-1 text-xs text-slate-500">比べる記録がありません</p>
   let diff: number
   let text: string
   if (unit === '%') {
-    if (before <= 0) return <p className="mt-1 text-xs text-slate-400">比べる記録がありません</p>
+    if (before <= 0) return <p className="mt-1 text-xs text-slate-500">比べる記録がありません</p>
     diff = Math.round(((now - before) / before) * 100)
     text = `${diff > 0 ? '+' : ''}${diff}%`
   } else {
@@ -603,9 +603,9 @@ function Openings({ openings, draftDay }: { openings: OpeningDay[]; draftDay: Op
         const ratio = Math.round(freeRatio(d) * 100)
         return (
           <li key={d.date} className="grid grid-cols-[5.75rem_minmax(3rem,1fr)_auto] items-center gap-2 text-sm sm:gap-3">
-            <span className={weekdayOfDate(d.date) === 0 ? 'text-slate-400' : 'text-slate-700'}>{dateLabel(d.date)}</span>
+            <span className={weekdayOfDate(d.date) === 0 ? 'text-slate-500' : 'text-slate-700'}>{dateLabel(d.date)}</span>
             {d.closed || weekdayOfDate(d.date) === 0 ? (
-              <span className="col-span-2 text-xs text-slate-400">休診</span>
+              <span className="col-span-2 text-xs text-slate-500">休診</span>
             ) : (
               <>
                 <span className="h-2 overflow-hidden rounded-full bg-teal-100" aria-hidden>
@@ -753,12 +753,12 @@ export default function SalesPage() {
                   onClick={() => setSelected(m.month)}
                   className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
                     m.month === month.month
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-teal-700 text-white'
                       : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   {ym(m.month)}
-                  {!isComplete(m) && <span className="ml-1 text-xs font-medium opacity-70">途中</span>}
+                  {!isComplete(m) && <span className="ml-1 text-xs font-medium">途中</span>}
                 </button>
               ))}
             </div>

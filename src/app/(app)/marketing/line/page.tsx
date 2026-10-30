@@ -144,7 +144,7 @@ export default function LinePage() {
                   type="button"
                   onClick={() => patch(selected.userId, { handoff: !selected.handoff, needsAttention: '' })}
                   className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                    selected.handoff ? 'bg-emerald-600 text-white' : 'border border-red-300 bg-red-50 text-red-700'
+                    selected.handoff ? 'bg-emerald-700 text-white' : 'border border-red-300 bg-red-50 text-red-700'
                   }`}
                 >
                   {selected.handoff ? '対応終了（自動応答を再開）' : '人対応に切り替え（自動応答停止）'}
@@ -190,7 +190,7 @@ export default function LinePage() {
                     </div>
                   </div>
                 ))}
-                {selected.messages.length === 0 && <p className="text-xs text-slate-400">まだ会話がありません</p>}
+                {selected.messages.length === 0 && <p className="text-xs text-slate-500">まだ会話がありません</p>}
               </div>
 
               {/* シミュレーター入力（本番チャネル接続時はサーバー側で無効のため非表示） */}

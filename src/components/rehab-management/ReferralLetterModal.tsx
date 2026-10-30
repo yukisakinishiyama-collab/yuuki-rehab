@@ -375,7 +375,7 @@ ${printRef.current.innerHTML}
             {letterType !== 'patient' && <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-600">宛先情報</p>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">医療機関名 <span className="text-red-500">*</span></label>
+                <label className="block text-xs text-gray-500 mb-1">医療機関名 <span className="text-red-600">*</span></label>
                 <input
                   type="text"
                   value={destination.institution}
@@ -395,7 +395,7 @@ ${printRef.current.innerHTML}
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">担当医師名 <span className="text-red-500">*</span></label>
+                <label className="block text-xs text-gray-500 mb-1">担当医師名 <span className="text-red-600">*</span></label>
                 <input
                   type="text"
                   value={destination.doctor}
@@ -431,7 +431,7 @@ ${printRef.current.innerHTML}
               type="button"
               onClick={handleGenerate}
               disabled={generating || (letterType !== 'patient' && (!destination.institution || !destination.doctor))}
-              className="w-full py-2.5 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {generating ? (
                 <>
@@ -446,7 +446,7 @@ ${printRef.current.innerHTML}
               )}
             </button>
             {letterType !== 'patient' && (!destination.institution || !destination.doctor) ? (
-              <p className="text-xs text-gray-400 -mt-3">医療機関名と医師名を入力してください</p>
+              <p className="text-xs text-gray-500 -mt-3">医療機関名と医師名を入力してください</p>
             ) : null}
           </div>
 
@@ -536,7 +536,7 @@ ${printRef.current.innerHTML}
                   type="button"
                   onClick={handlePrint}
                   disabled={!generated && !content.course}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-700 text-white text-xs font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   印刷・PDF保存
@@ -556,7 +556,7 @@ ${printRef.current.innerHTML}
                   <PatientLetterPreview patient={patient} content={content} />
                 )}
               </div>
-              <p className="text-xs text-gray-400 mt-2 text-right">
+              <p className="text-xs text-gray-500 mt-2 text-right">
                 「印刷・PDF保存」でブラウザの印刷ダイアログが開きます
               </p>
             </div>

@@ -30,9 +30,9 @@ const KIND_STYLES: Record<CancellationKind, { chip: string; active: string; idle
   },
   same_day: {
     chip: 'bg-orange-100 text-orange-700',
-    active: 'bg-orange-500 border-orange-500 text-white',
+    active: 'bg-orange-700 border-orange-700 text-white',
     idle: 'bg-white border-gray-200 text-gray-600 hover:border-orange-300',
-    text: 'text-orange-600',
+    text: 'text-orange-700',
   },
   no_show: {
     chip: 'bg-red-100 text-red-700',
@@ -150,7 +150,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             {/* 分母はSOAPカルテの件数。来院実績そのものではないため、率ではなく実数で示す */}
             <div className="flex items-center gap-3 text-xs text-gray-500">
               <span>SOAPカルテ <strong className="text-gray-700 tabular-nums">{visitCount}</strong>件</span>
-              <span className="text-gray-300">|</span>
+              <span className="text-gray-500">|</span>
               <span>キャンセル <strong className="text-gray-700 tabular-nums">{summary.total}</strong>件</span>
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             {CANCELLATION_KINDS.map(k => (
               <div key={k} className="rounded-xl border border-gray-200 bg-white px-4 py-3">
                 <div className="text-xs font-medium text-gray-500">{CANCELLATION_SHORT_LABELS[k]}</div>
-                <div className={`text-3xl font-bold tabular-nums leading-tight ${summary[k] > 0 ? KIND_STYLES[k].text : 'text-gray-300'}`}>
+                <div className={`text-3xl font-bold tabular-nums leading-tight ${summary[k] > 0 ? KIND_STYLES[k].text : 'text-gray-500'}`}>
                   {summary[k]}<span className="text-sm font-medium ml-0.5">回</span>
                 </div>
               </div>
@@ -177,7 +177,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             <span>直近3ヶ月：<strong className="text-gray-700 tabular-nums">{summary.recent90}</strong>回</span>
             {summary.lastDate && <span>最終キャンセル：{summary.lastDate}</span>}
             {summary.excluded > 0 && (
-              <span className="text-gray-400">
+              <span className="text-gray-500">
                 （ほかにカウント対象外 <strong className="tabular-nums">{summary.excluded}</strong>件）
               </span>
             )}
@@ -217,7 +217,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                     }`}
                   >
                     <span className="block text-sm font-semibold">{CANCELLATION_LABELS[k]}</span>
-                    <span className={`block text-xs mt-0.5 ${selected ? 'opacity-90' : 'text-gray-400'}`}>
+                    <span className={`block text-xs mt-0.5 ${selected ? 'opacity-90' : 'text-gray-500'}`}>
                       {CANCELLATION_DESCRIPTIONS[k]}
                     </span>
                   </button>
@@ -236,7 +236,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                   onClick={() => setReason(reason === chip ? '' : chip)}
                   className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors ${
                     reason === chip
-                      ? 'bg-teal-600 text-white border-teal-600'
+                      ? 'bg-teal-700 text-white border-teal-700'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-700'
                   }`}
                 >
@@ -265,7 +265,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
       <Card>
         <CardHeader>
           <SectionTitle>キャンセル履歴（{counted.length}件）</SectionTitle>
-          <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
+          <ul className="text-xs text-gray-500 mt-1 space-y-0.5">
             <li>・区分（予約日前／当日／無断）を間違えたときは、左の区分ラベルを押すと直せます</li>
             <li>
               ・<strong className="text-gray-500">対象外にする</strong>
@@ -279,7 +279,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
         </CardHeader>
         <CardContent>
           {counted.length === 0 ? (
-            <p className="text-sm text-gray-400 py-6 text-center">
+            <p className="text-sm text-gray-500 py-6 text-center">
               {excluded.length > 0
                 ? `数える対象のキャンセルはありません（カウント対象外が${excluded.length}件あります）`
                 : 'キャンセル記録はありません'}
@@ -307,11 +307,11 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
               <span className="text-sm font-semibold text-gray-800">
                 カウント対象外（{excluded.length}件）
               </span>
-              <span className="ml-auto text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
+              <span className="ml-auto text-xs text-gray-500 group-hover:text-gray-600 transition-colors">
                 {showExcluded ? '閉じる' : '開く'}
               </span>
             </button>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               患者さんのキャンセル回数には数えていません。「戻す」で数える側へ戻せます。
             </p>
           </CardHeader>
@@ -372,10 +372,10 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
           <div className="text-xs text-gray-500 mt-0.5">
             {r.reason || '理由の記録なし'}
             {r.contactedDate && r.contactedDate !== r.appointmentDate && (
-              <span className="text-gray-400">（連絡日 {r.contactedDate}）</span>
+              <span className="text-gray-500">（連絡日 {r.contactedDate}）</span>
             )}
           </div>
-          {r.memo && <div className="text-xs text-gray-400 mt-0.5">{r.memo}</div>}
+          {r.memo && <div className="text-xs text-gray-500 mt-0.5">{r.memo}</div>}
 
           {editingKindId === r.id && !isExcluded && (
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
@@ -387,7 +387,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                   onClick={() => handleChangeKind(r, k)}
                   className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-colors ${
                     r.kind === k
-                      ? 'bg-teal-600 text-white border-teal-600'
+                      ? 'bg-teal-700 text-white border-teal-700'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
                   }`}
                 >
@@ -451,7 +451,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
           <button
             type="button"
             onClick={() => handleDelete(r)}
-            className="text-xs text-gray-400 hover:text-red-600 hover:border-red-200
+            className="text-xs text-gray-500 hover:text-red-600 hover:border-red-200
               border border-transparent rounded-md transition-colors px-2 py-1"
             aria-label={`${r.appointmentDate} のキャンセル記録を削除`}
           >

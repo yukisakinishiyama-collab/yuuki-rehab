@@ -147,14 +147,14 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
             onClick={() => setView(v)}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               view === v
-                ? 'bg-teal-600 text-white'
+                ? 'bg-teal-700 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {v === 'front' ? '前面' : '背面'}
           </button>
         ))}
-        <span className="text-xs text-gray-400 ml-1">
+        <span className="text-xs text-gray-500 ml-1">
           {readOnly ? '選択済み部位' : '痛い部位をタップ'}
         </span>
       </div>
@@ -181,13 +181,13 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
                 onHover={setHovered}
               />
             ))}
-            {/* ホバーラベル（この図は幅 200 を 160px で出す＝0.8倍。15 で 12px） */}
+            {/* ホバーラベル（この図は幅 200 を 160px で出す＝0.8倍。15 で 12px。色は灰色の地でも読める teal-700） */}
             {hoveredLabel && (
               <text
                 x={100} y={16}
                 textAnchor="middle"
                 fontSize={15}
-                fill="#0d9488"
+                fill="#0f766e"
                 fontWeight="bold"
               >
                 {hoveredLabel}
@@ -200,7 +200,7 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-500 mb-2">選択中の部位</p>
           {selectedLabels.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">なし</p>
+            <p className="text-xs text-gray-500 italic">なし</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {selectedLabels.map(label => (
@@ -217,7 +217,7 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
             <button
               type="button"
               onClick={() => onChange(selected.filter(id => !REGS.find(r => r.id === id && r.view === view)))}
-              className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+              className="mt-2 text-xs text-gray-500 hover:text-red-500 transition-colors"
             >
               この面の選択をクリア
             </button>

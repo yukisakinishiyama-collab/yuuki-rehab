@@ -117,7 +117,7 @@ export default function KeieiChatPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-black text-slate-900">
-            <Sparkles className="h-5 w-5 text-teal-600" />
+            <Sparkles className="h-5 w-5 text-teal-700" />
             経営相談（AI）
           </h1>
           <p className="text-xs text-slate-500">
@@ -149,7 +149,7 @@ export default function KeieiChatPage() {
 
       <div className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3">
         {messages === null ? (
-          <p className="text-sm text-slate-400">読み込み中…</p>
+          <p className="text-sm text-slate-500">読み込み中…</p>
         ) : messages.length === 0 ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">何でも聞いてください。たとえば：</p>
@@ -160,7 +160,7 @@ export default function KeieiChatPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               目標の金額は<Link href="/marketing/sales/goal" className="underline">月の目標への道すじ</Link>で入れたものを使います。
             </p>
           </div>
@@ -168,9 +168,9 @@ export default function KeieiChatPage() {
           <div className="space-y-3">
             {messages.map((m, i) => (
               <div key={`${m.at}-${i}`} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-900'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-900'}`}>
                   {m.text}
-                  <div className={`mt-1 text-xs ${m.role === 'user' ? 'text-teal-100' : 'text-slate-400'}`}>{timeLabel(m.at)}</div>
+                  <div className={`mt-1 text-xs ${m.role === 'user' ? 'text-teal-100' : 'text-slate-500'}`}>{timeLabel(m.at)}</div>
                 </div>
               </div>
             ))}
@@ -198,7 +198,7 @@ export default function KeieiChatPage() {
           className="min-h-[44px] flex-1 resize-y rounded-xl border border-slate-300 px-3 py-2 text-sm"
           disabled={busy || ai === false}
         />
-        <button type="submit" disabled={busy || !input.trim() || ai === false} className="inline-flex h-11 items-center gap-1 rounded-xl bg-teal-600 px-4 text-sm font-bold text-white disabled:opacity-50">
+        <button type="submit" disabled={busy || !input.trim() || ai === false} className="inline-flex h-11 items-center gap-1 rounded-xl bg-teal-700 px-4 text-sm font-bold text-white disabled:opacity-50">
           <Send className="h-4 w-4" />
           送る
         </button>

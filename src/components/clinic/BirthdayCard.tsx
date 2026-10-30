@@ -91,7 +91,7 @@ export default function BirthdayCard() {
             <textarea value={template} onChange={(e) => setTemplate(e.target.value)} rows={6} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </label>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void save()} disabled={!data || !!busy} className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+            <button type="button" onClick={() => void save()} disabled={!data || !!busy} className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
               文面を保存
             </button>
             <button type="button" onClick={sample} disabled={!data || !!busy} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">

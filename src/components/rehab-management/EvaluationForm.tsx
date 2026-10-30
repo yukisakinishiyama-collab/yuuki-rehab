@@ -193,10 +193,10 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
           {(['pain', 'chronic', 'function', 'redflag', 'notes'] as const).map(t => (
             <button key={t} type="button" onClick={() => setTab(t as typeof tab)}
               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                tab === t ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                tab === t ? 'bg-teal-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}>
               {t === 'pain' ? '痛み・症状' : t === 'chronic' ? '慢性痛スクリーニング' : t === 'function' ? 'ADL・スポーツ' : t === 'redflag' ? 'レッドフラッグ' : '備考'}
-              {t === 'chronic' && isChronicPain && <span className="ml-1 bg-orange-400 text-white rounded-full px-1 text-xs">!</span>}
+              {t === 'chronic' && isChronicPain && <span className="ml-1 bg-orange-700 text-white rounded-full px-1 text-xs">!</span>}
             </button>
           ))}
         </div>
@@ -255,8 +255,8 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       form.painDuration === k
                         ? k === 'chronic'
-                          ? 'bg-orange-500 text-white border-orange-500'
-                          : 'bg-teal-600 text-white border-teal-600'
+                          ? 'bg-orange-700 text-white border-orange-700'
+                          : 'bg-teal-700 text-white border-teal-700'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
                     }`}
                   >
@@ -265,7 +265,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
                 ))}
               </div>
               {isChronicPain && (
-                <p className="mt-1.5 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                <p className="mt-1.5 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                   慢性痛が疑われます。「慢性痛スクリーニング」タブで詳細を確認してください。
                 </p>
               )}
@@ -417,7 +417,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
         )}
 
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
-          {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+          {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
           <SaveButton onClick={handleSave} label="評価を保存" />
         </div>
       </CardContent>

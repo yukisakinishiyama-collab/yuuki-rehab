@@ -109,7 +109,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-teal-600" />
+          <Target className="w-4 h-4 text-teal-700" />
           <SectionTitle>目標と課題</SectionTitle>
         </div>
       </CardHeader>
@@ -153,13 +153,13 @@ export default function GoalsProblemsCard({ patient }: Props) {
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs
                     flex-shrink-0 transition-colors ${
                     g.achieved
-                      ? 'bg-teal-500 border-teal-500 text-white'
+                      ? 'bg-teal-700 border-teal-700 text-white'
                       : 'bg-white border-gray-300 text-transparent hover:border-teal-400'
                   }`}
                 >
                   ✓
                 </button>
-                <span className={`text-sm flex-1 ${g.achieved ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                <span className={`text-sm flex-1 ${g.achieved ? 'text-gray-500 line-through' : 'text-gray-700'}`}>
                   {g.label}
                 </span>
                 <button
@@ -188,7 +188,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
                 type="button"
                 onClick={addClinicalGoal}
                 disabled={!newGoalLabel.trim()}
-                className="h-9 px-3 rounded-lg bg-teal-600 text-white text-xs font-semibold
+                className="h-9 px-3 rounded-lg bg-teal-700 text-white text-xs font-semibold
                   hover:bg-teal-700 disabled:opacity-40 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -236,7 +236,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
                   className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors ${STATUS_STYLES[p.status]}`}
                 >
                   {p.label}
-                  <span className="ml-1.5 opacity-70">{PROBLEM_STATUS_LABELS[p.status]}</span>
+                  <span className="ml-1.5 font-normal">{PROBLEM_STATUS_LABELS[p.status]}</span>
                 </button>
                 <button
                   type="button"
@@ -249,7 +249,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
               </span>
             ))}
             {problems.length === 0 && (
-              <span className="text-xs text-gray-400">例: 太もも筋力の低下／着地の不安定さ／再受傷への不安</span>
+              <span className="text-xs text-gray-500">例: 太もも筋力の低下／着地の不安定さ／再受傷への不安</span>
             )}
           </div>
           <div className="flex items-center gap-1.5">
@@ -267,7 +267,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
               type="button"
               onClick={handleAddProblem}
               disabled={!newProblemLabel.trim()}
-              className="h-9 px-3 rounded-lg bg-teal-600 text-white text-xs font-semibold
+              className="h-9 px-3 rounded-lg bg-teal-700 text-white text-xs font-semibold
                 hover:bg-teal-700 disabled:opacity-40 transition-colors"
             >
               <Plus className="w-4 h-4" />

@@ -40,20 +40,24 @@ Tailwind の名前（`text-xs`・`slate-500` など）の中身は書きかえ�
 
 ### 色
 
-白い地の上で、文字が読める濃さ（コントラスト比 4.5 以上）にする。
+白い地の上で、文字が読める濃さ（コントラスト比 4.5 以上）にする。次は `npm run lint:design` でエラーになる。
 
 | してはいけないこと | かわりに |
 |---|---|
 | 灰色の文字・アイコンを `gray-400`・`slate-300` などで薄くする | `slate-500`（`gray-500`）以上。暗い地の上なら `text-white/70` など |
 | 色つきの文字を薄い色で書く（`text-teal-600`・`text-green-600`・`text-amber-500`・`text-red-500` など） | teal・emerald・green・cyan・sky・lime・yellow・amber・orange は 700 以上、red・blue・indigo・purple・violet・pink・rose・fuchsia は 600 以上。暗い地の上なら `text-teal-200` など |
 | 文字の色を色コードで書く（`text-[#0d9488]`） | Tailwind の名前で書く（`text-teal-700`） |
-| 図の文字（`<text fill="…">`、グラフの目盛り・数字の `fill`）・`style` の `color` に、薄い色コードを書く（`#0d9488`・`#f59e0b`・`#94a3b8`・`#fff` など） | 白い地で 4.5 以上の色だけ（灰色 `#64748b`、緑 `#0f766e`・`#047857`、茶 `#b45309`、赤 `#dc2626` など。どれも白い地で 4.5 以上）。線・塗り・点の色は明るくてよく、文字だけ濃くする |
+| 図の文字（`<text fill="…">`、グラフの目盛り・数字の `fill`）・`style` の `color` に、薄い色コードを書く（`#0d9488`・`#f59e0b`・`#94a3b8`・`#fff` など） | `eslint.config.mjs` の `READABLE_HEX` にある色だけ（灰色 `#64748b`、緑 `#0f766e`・`#047857`、茶 `#b45309`、赤 `#dc2626` など。どれも白い地で 4.5 以上）。線・塗り・点の色は明るくてよく、文字だけ濃くする |
 | 白い文字（`text-white`）を明るい地にのせる（`bg-teal-600`・`bg-red-500`・`bg-yellow-400` など） | 地を上と同じ濃さにする（`bg-teal-700`・`bg-red-600`）。黄色系は地を明るいまま、文字を濃くする（`bg-yellow-400 text-yellow-950`） |
 | 選んでいるもの・主ボタンを黒い塗りで示す（`bg-slate-900 text-white`・`bg-gray-800 text-white`） | `bg-teal-700 text-white`（主ボタンは `ui/button` の default）。画面に重ねる幕・お知らせの帯は `bg-slate-900/90` のように透明度を付ける |
 
-- 共通の枠・`ui/`・`Panel.tsx`・今日の画面はこの決まりを守っている。**カルテ・経営・集客の各画面の中には、薄い色の文字・明るい地の白い文字・黒い塗りの「選んでいる」がまだ残っている**（lint ではまだ止めていない）。その画面を直すときに、いっしょに合わせる
-- 図の文字の色を、線と同じ変数（`fill={color}`）で決めない。線の明るい色がそのまま文字になるため、文字用の濃い色を別に持つ
+- lint が見つけられないもの（気をつけて書く）
+  - 色を変数に入れて組み合わせるもの（`${tab.color} text-white` など）、`cn('bg-teal-600', 'text-white')` のように別々の文字に分けたもの、`hover:`・`disabled:` などの前置きつき
+  - 図の文字の色を変数で決めるもの（`fill={color}`）。線と同じ変数を文字に使うと、線の明るい色がそのまま文字になる。**文字用の濃い色を別に持つ**（例：カルテのゲージ `rehab-management/shared.tsx` の `ProgressGauge`、復帰基準のレーダー図。線は明るい色、数字は同じ色みの濃い色）
+  - 色の付いた地（チップ・札）の上の文字。地が半透明（`rgba(…, 0.75)` など）だと計算しにくいので、色の付いた地の上の文字は `#0f172a`（slate-900）か、同じ色の 800〜950 にする（例：カルテの関節の図のチップ）
+  - `opacity-70` などで薄くした文字。読める色でも、薄くすると 3 前後まで下がる。補足の文字は薄くせず、太さ（`font-medium`・`font-normal`）や大きさで分ける
 - 押せないボタン（`disabled`）や、外した行（取り消し線つき）が薄く見えるのはかまわない（わざと薄く見せているため）
+- 各画面に直接書いた teal の主ボタン・選んでいる札は、地の色をすべて `bg-teal-700`（なぞったとき `hover:bg-teal-800`）にそろえてある（`bg-teal-600` や黒の塗りに白い文字は lint で止まる）。全画面の主ボタン・選んでいる色を変えるときは、`ui/button.tsx` の `buttonVariants` と `ClinicShell.tsx` に加えて、次で出る所を1つずつ置きかえる（1か所では変わらない）：`grep -rn "bg-teal-700" "src/app/(app)" src/components/clinic src/components/rehab src/components/rehab-management`。teal ではない色で塗ったボタン（`bg-emerald-700`・`bg-blue-700`・`bg-violet-700`、区分の色の `bg-orange-700`・`bg-red-600` など）は、この grep には出ない。これらを主ボタンの色にそろえるかは、その画面を直すときに決める
 
 色の意味（全画面で同じ意味に使う）：
 

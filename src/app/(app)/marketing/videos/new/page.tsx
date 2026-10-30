@@ -102,7 +102,7 @@ export default function NewVideoPage() {
       {/* メタ情報 */}
       <div className="mt-4 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label className={labelCls}>タイトル<span className="text-rose-500">*</span></label>
+          <label className={labelCls}>タイトル<span className="text-rose-600">*</span></label>
           <input value={form.title} onChange={(e) => set('title', e.target.value)} className={`${inputCls} mt-1`} />
         </div>
         <div>

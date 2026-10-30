@@ -75,12 +75,12 @@ function TestInfoModal({ testName, onClose }: { testName: string; onClose: () =>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-gray-900">{testName}</h3>
-            <p className="text-xs text-teal-600 font-medium mt-0.5">🎯 {desc.target}</p>
+            <p className="text-xs text-teal-700 font-medium mt-0.5">🎯 {desc.target}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0 mt-0.5"
+            className="text-gray-500 hover:text-gray-600 text-xl leading-none flex-shrink-0 mt-0.5"
           >×</button>
         </div>
 
@@ -235,7 +235,7 @@ function SpecialTestPicker({
               key={`${v.joint}-${v.testName}`}
               className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border font-medium ${RESULT_COLORS[v.result]}`}
             >
-              <span className="text-gray-400 font-normal">{v.joint.replace('関節', '').replace('・手指', '')}</span>
+              <span className="text-gray-500 font-normal">{v.joint.replace('関節', '').replace('・手指', '')}</span>
               {v.testName.replace(/ test| sign/i, '')}
               <span className="font-bold">{v.result === 'positive' ? '+' : v.result === 'negative' ? '−' : v.result === 'suspicious' ? '±' : '?'}</span>
               <button
@@ -259,7 +259,7 @@ function SpecialTestPicker({
               onClick={() => setJoint(j)}
               className={`px-2.5 py-1 text-xs rounded-lg border transition-colors relative ${
                 joint === j
-                  ? 'bg-teal-600 text-white border-teal-600'
+                  ? 'bg-teal-700 text-white border-teal-700'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
               }`}
             >
@@ -292,7 +292,7 @@ function SpecialTestPicker({
                 type="button"
                 onClick={() => toggle(testName)}
                 className={`w-4 h-4 rounded border-2 flex-shrink-0 transition-colors ${
-                  selected ? 'bg-teal-600 border-teal-600' : 'border-gray-300'
+                  selected ? 'bg-teal-700 border-teal-700' : 'border-gray-300'
                 }`}
               >
                 {selected && <span className="text-white text-xs leading-none flex items-center justify-center">✓</span>}
@@ -303,7 +303,7 @@ function SpecialTestPicker({
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); setInfoTest(testName) }}
-                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-400 hover:text-teal-600 text-xs font-bold flex items-center justify-center flex-shrink-0 transition-colors"
+                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-500 hover:text-teal-600 text-xs font-bold flex items-center justify-center flex-shrink-0 transition-colors"
                   title="テスト方法を確認"
                 >
                   i
@@ -319,7 +319,7 @@ function SpecialTestPicker({
                       className={`px-2 py-0.5 rounded text-xs border transition-colors ${
                         entry.result === r
                           ? RESULT_COLORS[r]
-                          : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
                       }`}
                     >
                       {RESULT_LABELS[r]}
@@ -436,9 +436,9 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
 
   const tabs: { key: TabKey; label: string; color: string }[] = [
     { key: 'S', label: 'S：主観', color: 'bg-blue-600' },
-    { key: 'O', label: 'O：客観', color: 'bg-teal-600' },
+    { key: 'O', label: 'O：客観', color: 'bg-teal-700' },
     { key: 'A', label: 'A：評価', color: 'bg-purple-600' },
-    { key: 'P', label: 'P：計画', color: 'bg-orange-600' },
+    { key: 'P', label: 'P：計画', color: 'bg-orange-700' },
   ]
 
   return (
@@ -487,7 +487,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 />
               </div>
               {form.complaints.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   部位を追加すると、それぞれのNRS・症状を個別に記録できます
                 </p>
               )}
@@ -638,7 +638,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                     onClick={() => setForm(f => ({ ...f, currentPhase: p }))}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                       form.currentPhase === p
-                        ? 'bg-teal-600 text-white border-teal-600'
+                        ? 'bg-teal-700 text-white border-teal-700'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
                     }`}
                   >
@@ -713,7 +713,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                   )}
                   {next && (
                     <button type="button" onClick={() => setActiveTab(next)}
-                      className="px-3 py-1.5 text-sm text-teal-600 border border-teal-300 rounded-lg hover:bg-teal-50">
+                      className="px-3 py-1.5 text-sm text-teal-700 border border-teal-300 rounded-lg hover:bg-teal-50">
                       次へ →
                     </button>
                   )}
@@ -722,7 +722,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
             })}
           </div>
           <div className="flex items-center gap-3">
-            {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+            {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
             <SaveButton onClick={handleSave} label="カルテを保存" />
           </div>
         </div>

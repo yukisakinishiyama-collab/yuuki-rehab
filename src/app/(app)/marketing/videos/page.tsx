@@ -215,7 +215,7 @@ export default function VideosPage() {
                   {v.url ? (
                     <video src={v.url} controls preload="metadata" poster={v.thumbUrl} className="h-full w-full object-contain" />
                   ) : (
-                    <div className="flex h-full items-center justify-center px-4 text-center text-xs text-slate-400">
+                    <div className="flex h-full items-center justify-center px-4 text-center text-xs text-white/70">
                       {v.ai?.status === 'generating'
                         ? 'AIが作成中です（1〜3分ほど）'
                         : v.ai?.status === 'failed'

@@ -25,7 +25,7 @@ function DeltaCell({ def, d }: { def: MetricDef; d: Delta }) {
   return (
     <td className={`px-2 py-1.5 text-right tabular-nums ${color}`}>
       <div className="font-bold">{formatChange(def, d)}</div>
-      {d.before !== null && <div className="text-xs text-slate-400">{formatValue(def, d.before)}</div>}
+      {d.before !== null && <div className="text-xs text-slate-500">{formatValue(def, d.before)}</div>}
     </td>
   )
 }

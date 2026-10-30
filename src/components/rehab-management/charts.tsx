@@ -200,7 +200,7 @@ export function AdherenceChart({ data }: { data: { date: string; rate: number }[
 // ── Empty状態 ──
 function EmptyChart({ label }: { label: string }) {
   return (
-    <div className="h-[160px] flex items-center justify-center text-gray-400 text-sm">
+    <div className="h-[160px] flex items-center justify-center text-gray-500 text-sm">
       {label}
     </div>
   )
