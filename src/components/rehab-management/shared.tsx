@@ -1,11 +1,22 @@
 'use client'
 // ──────────────────────────────────────────────
-// 共通UIコンポーネント（リハビリ管理専用）
+// 共通UIコンポーネント（カルテの入力画面用：SOAP・評価・問診・キャンセルなど）
+//
+// 見た目は src/components/ui/ と同じ決まり（DESIGN_DECISIONS.md「院内アプリの見た目の決まり」）。
+// カードの枠は ui/card の cardSurface、保存ボタンの色は ui/button の buttonVariants をそのまま使う
+// （色や枠を変えるときは ui/ の1か所を直せば、ここの SaveButton・Card を使う画面にも同じように効く。
+//   各画面に直接書いたボタン・カードは変わらない。DESIGN_DECISIONS.md「1か所では変わらないもの」）
 // ──────────────────────────────────────────────
 import type { ReactNode } from 'react'
 import type { RiskLevel, RehabPhase } from '@/types/patient'
 import { PHASE_SHORT_LABELS, RISK_LABELS } from '@/types/patient'
 import { cn } from '@/lib/utils'
+import { buttonVariants } from '@/components/ui/button'
+import { cardSurface } from '@/components/ui/card'
+
+/** 入力欄・文章欄の見た目（スマホで 16px になるのは globals.css の「院内アプリの入力欄」が受け持つ） */
+const fieldClass =
+  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-1 disabled:opacity-50'
 
 // ── ProgressGauge（SVG円形ゲージ）──
 export function ProgressGauge({ score, size = 120 }: { score: number; size?: number }) {
@@ -148,7 +159,7 @@ export function NRSInput({
 // ── Card ──
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('rounded-xl border border-gray-200 bg-white shadow-sm', className)}>
+    <div className={cn(cardSurface, className)}>
       {children}
     </div>
   )
@@ -200,7 +211,7 @@ export function Textarea({
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="flex w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-1 disabled:opacity-50 resize-none"
+      className={cn(fieldClass, 'flex resize-none')}
     />
   )
 }
@@ -226,7 +237,8 @@ export function Input({
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        'flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-1 disabled:opacity-50',
+        fieldClass,
+        'flex h-10',
         className
       )}
     />
@@ -304,7 +316,7 @@ export function SaveButton({
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="inline-flex items-center gap-2 h-10 px-5 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50 disabled:pointer-events-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+      className={cn(buttonVariants(), 'px-5')}
     >
       {loading && (
         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

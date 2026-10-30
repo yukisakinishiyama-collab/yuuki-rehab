@@ -58,16 +58,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         type="button"
         onClick={handlePushSync}
         disabled={syncing}
-        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-white/70 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
+        className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-white/70 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50 lg:min-h-0"
       >
         <CloudUpload className="h-4 w-4" aria-hidden />
         {syncing ? '同期中…' : 'カルテをクラウドへ保存'}
       </button>
-      {syncMessage && <p className="px-3 text-[11px] text-teal-200">{syncMessage}</p>}
+      {syncMessage && <p role="status" className="px-3 text-xs text-teal-200">{syncMessage}</p>}
       <button
         type="button"
         onClick={() => setShowQR(true)}
-        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+        className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-white/70 transition-colors hover:bg-white/5 hover:text-white lg:min-h-0"
       >
         <Smartphone className="h-4 w-4" aria-hidden />
         スマホで開く（QR）

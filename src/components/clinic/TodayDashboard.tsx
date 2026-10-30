@@ -8,11 +8,14 @@
  * - 昨日の締め（NOAHの来院数・金額）と次の一手 … 経営メニューを隠しコマンドで開いているときだけ
  * - 気にかけたい患者さん（しばらく記録がない・離脱リスクが高い）と最近ひらいたカルテ
  * - 承認を待っている投稿
+ *
+ * カードはすべて Panel（./Panel.tsx）で、見出し・余白・見出しの右のボタンの置き方をそろえている。
+ * スマホでは上から「承認待ちのお知らせ → 今日の予約 → キャンセル → （昨日の締め）→ カルテ」の順に並ぶ。
  */
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { ChevronRight, Search, UserPlus } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { ChartColumn, ChevronRight, ClipboardList, Search, Send, UserPlus } from 'lucide-react'
 import YoyakuTodayCard from '@/components/rehab/YoyakuTodayCard'
 import YoyakuCancelSyncCard from '@/components/rehab-management/YoyakuCancelSyncCard'
 import { getCancellations, getPatients, getSOAPNotes, initPatientStore } from '@/lib/patient-store'
@@ -24,29 +27,9 @@ import type { OpeningDay } from '@/lib/marketing/autopilot-planner'
 import type { WeeklyProposal } from '@/lib/marketing/autopilot-types'
 import type { Patient } from '@/types/patient'
 import { useKeieiOpen } from '@/lib/clinic/keiei-mode'
-
-// ── 小さな部品 ─────────────────────────────────────────
-
-function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-black text-slate-900">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function MoreLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className="inline-flex items-center gap-0.5 text-xs font-bold text-teal-800 hover:underline">
-      {children}
-      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-    </Link>
-  )
-}
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { MoreLink, Panel } from './Panel'
 
 function todayLabel(): string {
   try {
@@ -86,35 +69,39 @@ function SalesPanel() {
 
   const s = state.kind === 'ok' ? state.data.summary : null
   return (
-    <Panel title={s ? `${dateLabel(s.date)}の締め` : '昨日の締め（NOAH）'} action={<MoreLink href="/marketing/sales">経営を見る</MoreLink>}>
-      {state.kind === 'loading' && <p className="text-sm text-slate-400">読み込み中…</p>}
-      {state.kind === 'denied' && <p className="text-sm text-slate-500">売上は院長のログインで表示されます。</p>}
-      {state.kind === 'error' && <p className="text-sm text-slate-500">集計を読み込めませんでした。</p>}
+    <Panel
+      title={s ? `${dateLabel(s.date)}の締め` : '昨日の締め（NOAH）'}
+      icon={ChartColumn}
+      action={<MoreLink href="/marketing/sales">経営を見る</MoreLink>}
+    >
+      {state.kind === 'loading' && <p className="text-sm text-slate-500">読み込み中…</p>}
+      {state.kind === 'denied' && <p className="text-sm text-slate-600">売上は院長のログインで表示されます。</p>}
+      {state.kind === 'error' && <p className="text-sm text-slate-600">集計を読み込めませんでした。</p>}
       {state.kind === 'ok' && !s && (
-        <p className="text-sm text-slate-500">まだ NOAH の集計が届いていません（毎晩21時すぎに届きます）。</p>
+        <p className="text-sm text-slate-600">まだ NOAH の集計が届いていません（毎晩21時すぎに届きます）。</p>
       )}
       {s && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
             <div>
-              <p className="text-xs font-bold text-slate-500">来院</p>
-              <p className="text-3xl font-black text-slate-900">{s.today ? people(s.today.visits) : '—'}</p>
+              <p className="text-xs font-bold text-slate-600">来院</p>
+              <p className="text-3xl font-black tabular-nums text-slate-900">{s.today ? people(s.today.visits) : '—'}</p>
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500">金額</p>
-              <p className="text-xl font-black text-slate-900">{s.today ? yen(s.today.sales) : '—'}</p>
+              <p className="text-xs font-bold text-slate-600">金額</p>
+              <p className="text-xl font-black tabular-nums text-slate-900">{s.today ? yen(s.today.sales) : '—'}</p>
             </div>
           </div>
           {s.today && s.weekdayAvg !== null && (
-            <p className="text-xs text-slate-500">いつもの同じ曜日は平均{people(s.weekdayAvg)}</p>
+            <p className="text-xs text-slate-600">いつもの同じ曜日は平均{people(s.weekdayAvg)}</p>
           )}
-          <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <p>
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <p className="tabular-nums">
               今月 {Number(s.mtd.to.slice(8, 10))}日まで：<span className="font-bold">{people(s.mtd.visits)}</span>・
               <span className="font-bold">{yen(s.mtd.sales)}</span>
             </p>
             {s.prev && (
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs tabular-nums text-slate-600">
                 先月の同じ時期：{people(s.prev.visits)}・{yen(s.prev.sales)}
               </p>
             )}
@@ -123,11 +110,11 @@ function SalesPanel() {
       )}
       {state.kind === 'ok' && (state.data.tips.length > 0 || state.data.next) && (
         <div className="mt-4 border-t border-slate-100 pt-3">
-          <p className="mb-1.5 text-xs font-black text-slate-700">次の一手</p>
+          <p className="mb-1.5 text-sm font-bold text-slate-800">次の一手</p>
           <ul className="space-y-1.5 text-sm text-slate-700">
             {state.data.next && (
               <li className="flex gap-2">
-                <span className="text-teal-700" aria-hidden>●</span>
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-700" aria-hidden />
                 <span className="min-w-0">
                   {dateLabel(state.data.next.date)}の空き：午前{state.data.next.am}・午後{state.data.next.pm}枠
                   {state.data.draftDay?.date === state.data.next.date && '（空き多め。夜に投稿の下書きを作ります）'}
@@ -136,7 +123,7 @@ function SalesPanel() {
             )}
             {state.data.tips.map((t) => (
               <li key={t} className="flex gap-2">
-                <span className="text-teal-700" aria-hidden>●</span>
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-700" aria-hidden />
                 <span className="min-w-0">{t}</span>
               </li>
             ))}
@@ -170,10 +157,16 @@ function PostsPanel() {
   return (
     <Link
       href={`/marketing/autopilot?week=${pending.week}`}
-      className="block rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
+      className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm transition-colors hover:bg-amber-100"
     >
-      <p className="font-black">投稿の案が {pending.count} 本、承認を待っています</p>
-      <p className="mt-1 text-sm">内容を見て承認すると、予定の時刻に投稿されます →</p>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800" aria-hidden>
+        <Send className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold">投稿の案が {pending.count} 本、承認を待っています</span>
+        <span className="mt-0.5 block text-sm text-amber-900">内容を見て承認すると、予定の時刻に投稿されます</span>
+      </span>
+      <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
     </Link>
   )
 }
@@ -259,7 +252,7 @@ function CopyFollowUp({ name }: { name: string }) {
       <button
         type="button"
         onClick={copy}
-        className="inline-flex h-11 shrink-0 items-center rounded-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:h-8"
+        className="inline-flex h-11 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 lg:h-8"
         aria-label={`${name}様への声かけの文を写す`}
       >
         {done ? '写しました' : '声かけ文'}
@@ -271,6 +264,13 @@ function CopyFollowUp({ name }: { name: string }) {
     </>
   )
 }
+
+/** 数字のタイル。気にかけたい数が 0 より大きいときだけ色を付ける（色だけに頼らず、数字と言葉でも分かる） */
+const STAT_TONE = {
+  plain: 'bg-slate-50 text-slate-900',
+  watch: 'bg-amber-50 text-amber-950 ring-1 ring-amber-200',
+  alert: 'bg-red-50 text-red-900 ring-1 ring-red-200',
+} as const
 
 function KartePanel() {
   const [data, setData] = useState<{ rows: KarteRow[]; recent: KarteRow[] } | null>(null)
@@ -285,39 +285,43 @@ function KartePanel() {
     .filter((r) => r.visits > 0 && (r.days >= 14 || r.risk === 'high'))
     .sort((a, b) => b.days - a.days)
   const recent = data?.recent ?? []
+  const gapCount = active.filter((r) => r.visits > 0 && r.days >= 14).length
+  const highCount = active.filter((r) => r.risk === 'high').length
 
   return (
-    <Panel title="カルテ" action={<MoreLink href="/patients">カルテ一覧</MoreLink>}>
+    <Panel title="カルテ" icon={ClipboardList} action={<MoreLink href="/patients">カルテ一覧</MoreLink>}>
       {!data ? (
-        <p className="text-sm text-slate-400">読み込み中…</p>
+        <p className="text-sm text-slate-500">読み込み中…</p>
       ) : (
         <div className="space-y-4">
           <dl className="grid grid-cols-3 gap-2 text-center">
             {[
-              { label: '通院中', value: active.length },
-              { label: '2週間以上空いた方', value: active.filter((r) => r.visits > 0 && r.days >= 14).length },
-              { label: '離脱リスク高', value: active.filter((r) => r.risk === 'high').length },
+              { label: '通院中', value: active.length, tone: STAT_TONE.plain },
+              { label: '2週間以上空いた方', value: gapCount, tone: gapCount > 0 ? STAT_TONE.watch : STAT_TONE.plain },
+              { label: '離脱リスク高', value: highCount, tone: highCount > 0 ? STAT_TONE.alert : STAT_TONE.plain },
             ].map((x) => (
-              <div key={x.label} className="rounded-xl bg-slate-50 px-2 py-2">
-                <dt className="text-[11px] font-bold leading-tight text-slate-500">{x.label}</dt>
-                <dd className="mt-0.5 text-xl font-black text-slate-900">{x.value}</dd>
+              <div key={x.label} className={`flex flex-col-reverse justify-end rounded-lg px-2 py-2 ${x.tone}`}>
+                <dt className="text-xs font-bold leading-tight">{x.label}</dt>
+                <dd className="mb-0.5 text-2xl font-black tabular-nums">{x.value}</dd>
               </div>
             ))}
           </dl>
 
           {watch.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-black text-slate-700">気にかけたい方（しばらく記録がない・離脱リスクが高い）</p>
-              <p className="mb-1.5 text-[11px] text-slate-500">「声かけ文」で、LINEや電話の前に使えるていねいな文を写せます（送るのはご自身で）。</p>
+              <p className="text-sm font-bold text-slate-800">気にかけたい方</p>
+              <p className="mb-1.5 text-xs text-slate-600">
+                しばらく記録がない・離脱リスクが高い方。「声かけ文」で、LINEや電話の前に使えるていねいな文を写せます（送るのはご自身で）。
+              </p>
               <ul className="divide-y divide-slate-100">
                 {watch.slice(0, 5).map((r) => (
                   <li key={r.patient.id} className="flex items-center gap-2">
                     <Link
                       href={`/patients/${r.patient.id}`}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-3 py-2 hover:bg-slate-50"
+                      className="flex min-h-12 min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-0.5 rounded-lg py-2 hover:bg-slate-50"
                     >
-                      <span className="min-w-0 truncate text-sm font-bold text-slate-800">{r.patient.name}</span>
-                      <span className="shrink-0 text-xs text-slate-500">
+                      <span className="min-w-0 break-keep text-base font-bold text-slate-900 wrap-anywhere">{r.patient.name}</span>
+                      <span className="shrink-0 text-xs text-slate-600">
                         {r.days >= 999 ? '記録なし' : `最後の記録から${r.days}日`}
                         {r.risk === 'high' && <span className="ml-1.5 rounded bg-red-50 px-1.5 py-0.5 font-bold text-red-700">リスク高</span>}
                       </span>
@@ -331,13 +335,13 @@ function KartePanel() {
 
           {recent.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-black text-slate-700">最近ひらいたカルテ</p>
-              <ul className="flex flex-wrap gap-1.5">
+              <p className="mb-1.5 text-sm font-bold text-slate-800">最近ひらいたカルテ</p>
+              <ul className="flex flex-wrap gap-2">
                 {recent.map((r) => (
                   <li key={r.patient.id}>
                     <Link
                       href={`/patients/${r.patient.id}`}
-                      className="block rounded-full bg-white px-3 py-1.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                      className="flex min-h-10 items-center rounded-full bg-white px-3.5 text-sm font-bold text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 lg:min-h-8"
                     >
                       {r.patient.name}
                     </Link>
@@ -349,7 +353,7 @@ function KartePanel() {
 
           <Link
             href="/patients/new"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:border-teal-400 hover:text-teal-800"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-bold text-slate-800 hover:border-teal-600 hover:text-teal-800"
           >
             <UserPlus className="h-4 w-4" aria-hidden />
             新しい患者さんを登録
@@ -377,26 +381,28 @@ export default function TodayDashboard() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-teal-700" suppressHydrationWarning>
+          <p className="text-base font-bold text-teal-800" suppressHydrationWarning>
             {todayLabel()}
           </p>
-          <h1 className="hidden text-2xl font-black text-slate-900 lg:block">今日</h1>
+          {/* スマホでは上の見出し（共通の枠）に「今日」と出ているので、ここは読み上げ用だけにする */}
+          <h1 className="sr-only lg:not-sr-only lg:text-2xl lg:font-black lg:text-slate-900">今日</h1>
         </div>
         <form onSubmit={search} className="flex w-full max-w-md items-center gap-2 sm:w-auto" role="search">
           <label htmlFor="today-search" className="sr-only">
             カルテを探す
           </label>
           <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden />
+            {/* スマホでは 16px になる（globals.css の「院内アプリの入力欄」。iPhone で押したときに画面が拡大されないように） */}
             <input
               id="today-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="カルテを探す（お名前・カナ）"
-              className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30 sm:w-72"
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm placeholder:text-slate-500 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/30 sm:w-72"
             />
           </div>
-          <button type="submit" className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white hover:bg-slate-800">
+          <button type="submit" className={cn(buttonVariants(), 'h-11 shrink-0 rounded-lg font-bold')}>
             探す
           </button>
         </form>
