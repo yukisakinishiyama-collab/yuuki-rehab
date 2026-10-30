@@ -131,7 +131,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
         )}
       </div>
 
-      <p className="text-[11px] text-slate-400 mt-2">
+      <p className="text-xs text-slate-400 mt-2">
         画面が表示されない・ログインがうまくいかない場合は「新しいタブで開く」をご利用ください。
       </p>
     </div>

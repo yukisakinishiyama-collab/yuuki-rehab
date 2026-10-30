@@ -248,7 +248,7 @@ function LinkMaker() {
               試しに開く
             </a>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
             試しに開くと、押した数に1回入ります。予約までは進めないでください。
           </p>
         </div>
@@ -271,7 +271,7 @@ function LinkMaker() {
               <li key={h.url} className="flex items-center justify-between gap-3 py-2">
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-slate-800">{h.label}</span>
-                  <span className="block truncate font-mono text-[11px] text-slate-400">{h.url}</span>
+                  <span className="block truncate font-mono text-xs text-slate-400">{h.url}</span>
                 </span>
                 <button
                   type="button"

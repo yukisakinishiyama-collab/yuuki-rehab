@@ -144,7 +144,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
               {isPatientRegion && (
-                <span className={`text-[10px] px-1 rounded ${activeRegion === tab.id ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-700'}`}>主</span>
+                <span className={`text-xs px-1 rounded ${activeRegion === tab.id ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-700'}`}>主</span>
               )}
             </button>
           )
@@ -170,7 +170,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                 }`}
               >
                 <div className="font-bold text-sm">{def.shortName}</div>
-                <div className={`text-[11px] mt-0.5 ${selectedScoreId === sid ? 'text-teal-100' : 'text-gray-400'}`}>
+                <div className={`text-xs mt-0.5 ${selectedScoreId === sid ? 'text-teal-100' : 'text-gray-400'}`}>
                   {cnt > 0 ? `${cnt}回記録済み` : '未記録'}
                 </div>
               </button>
@@ -460,12 +460,12 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                   const c = rec.interpretationColor
                   return (
                     <div key={rec.id} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[9px] text-gray-400 font-bold">{rec.totalScore}</span>
+                      <span className="text-xs text-gray-400 font-bold">{rec.totalScore}</span>
                       <div className="w-full rounded-t-sm" style={{
                         height: `${Math.max(4, effPct * 0.5)}px`,
                         backgroundColor: c === 'green' ? '#10b981' : c === 'yellow' ? '#f59e0b' : c === 'orange' ? '#f97316' : '#ef4444'
                       }} />
-                      <span className="text-[9px] text-gray-400 truncate w-full text-center">
+                      <span className="text-xs text-gray-400 truncate w-full text-center">
                         {rec.scoreDate.slice(5)}
                       </span>
                     </div>

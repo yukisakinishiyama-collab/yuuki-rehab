@@ -257,7 +257,7 @@ export default function PatientsPage() {
                   <User className="w-3.5 h-3.5 text-teal-600" />
                 </span>
                 <span className="text-xs font-medium text-gray-700">{p.name}</span>
-                <span className="text-[10px] text-gray-400">{BODY_REGION_LABELS[p.bodyRegion]}</span>
+                <span className="text-xs text-gray-400">{BODY_REGION_LABELS[p.bodyRegion]}</span>
               </Link>
             ))}
           </div>
@@ -433,12 +433,12 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
             {/* 生年月日未入力の患者では年齢を表示しない（NaN歳の防止） */}
             {Number.isFinite(age) && <span className="text-sm text-gray-400">{age}歳</span>}
             {bday && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-[11px] font-bold text-pink-700">
+              <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-xs font-bold text-pink-700">
                 🎂 {bday}
               </span>
             )}
             {lineLinked && (
-              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700" title="公式LINEと結びついています">
+              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700" title="公式LINEと結びついています">
                 LINE
               </span>
             )}
@@ -452,7 +452,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
               <span
                 title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
                   cancelSummary.no_show > 0
                     ? 'bg-red-50 text-red-700 border-red-200'
                     : 'bg-orange-50 text-orange-700 border-orange-200',

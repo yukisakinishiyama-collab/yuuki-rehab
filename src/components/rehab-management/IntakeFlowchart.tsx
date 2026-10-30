@@ -83,7 +83,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
       {path.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-3">
           {path.map((p, i) => (
-            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+            <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
               {p.answer}
             </span>
           ))}

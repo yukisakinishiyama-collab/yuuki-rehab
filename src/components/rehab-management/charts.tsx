@@ -15,8 +15,8 @@ export function PainChart({ data }: { data: { date: string; nrs: number }[] }) {
     <ResponsiveContainer width="100%" height={200}>
       <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-        <YAxis domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} tick={{ fontSize: 11 }} />
+        <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={d => d.slice(5)} />
+        <YAxis domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} tick={{ fontSize: 12 }} />
         <Tooltip
           formatter={(v) => [`NRS: ${v}`, '痛み']}
           contentStyle={{ fontSize: 12, borderRadius: 8 }}
@@ -26,7 +26,7 @@ export function PainChart({ data }: { data: { date: string; nrs: number }[] }) {
           strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }}
           activeDot={{ r: 6 }}
         />
-        <ReferenceLine y={4} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: '中程度', fontSize: 10 }} />
+        <ReferenceLine y={4} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: '中程度', fontSize: 12 }} />
       </LineChart>
     </ResponsiveContainer>
   )
@@ -39,8 +39,8 @@ export function ImprovementChart({ data }: { data: { date: string; score: number
     <ResponsiveContainer width="100%" height={200}>
       <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+        <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={d => d.slice(5)} />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
         <Tooltip
           formatter={(v) => [`${v}点`, '改善スコア']}
           contentStyle={{ fontSize: 12, borderRadius: 8 }}
@@ -70,8 +70,8 @@ export function ROMChart({
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-        <YAxis tick={{ fontSize: 11 }} unit="°" />
+        <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={d => d.slice(5)} />
+        <YAxis tick={{ fontSize: 12 }} unit="°" />
         <Tooltip
           contentStyle={{ fontSize: 12, borderRadius: 8 }}
           formatter={(v, name) => [`${v}°`, name === 'active' ? '自動ROM' : '他動ROM']}
@@ -79,7 +79,7 @@ export function ROMChart({
         {normalValue && (
           <ReferenceLine
             y={normalValue} stroke="#93C5FD" strokeDasharray="4 2"
-            label={{ value: `正常値 ${normalValue}°`, fontSize: 10, fill: '#6B7280' }}
+            label={{ value: `正常値 ${normalValue}°`, fontSize: 12, fill: '#6B7280' }}
           />
         )}
         <Line type="monotone" dataKey="active" stroke="#0d9488" strokeWidth={2.5}
@@ -102,8 +102,8 @@ export function StrengthChart({
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-        <YAxis tick={{ fontSize: 11 }} />
+        <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={d => d.slice(5)} />
+        <YAxis tick={{ fontSize: 12 }} />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
         <Bar dataKey="value" name="患側" fill="#0d9488" radius={[4, 4, 0, 0]} />
         <Bar dataKey="contralateral" name="健側" fill="#D1FAE5" radius={[4, 4, 0, 0]} />
@@ -125,8 +125,8 @@ export function ROMRadarChart({ data }: { data: RadarDataItem[] }) {
     <ResponsiveContainer width="100%" height={250}>
       <RadarChart data={data}>
         <PolarGrid stroke="#E5E7EB" />
-        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
-        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 9 }} />
+        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
+        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 12 }} />
         <Radar name="現在値" dataKey="value" stroke="#0d9488" fill="#0d9488" fillOpacity={0.3} />
       </RadarChart>
     </ResponsiveContainer>
@@ -186,8 +186,8 @@ export function AdherenceChart({ data }: { data: { date: string; rate: number }[
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+        <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={d => d.slice(5)} />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} unit="%" />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }}
           formatter={(v) => [`${v}%`, '実施率']} />
         <Bar dataKey="rate" name="実施率" fill="#6EE7B7" radius={[4, 4, 0, 0]} />

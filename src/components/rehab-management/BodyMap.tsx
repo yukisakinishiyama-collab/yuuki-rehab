@@ -181,12 +181,12 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
                 onHover={setHovered}
               />
             ))}
-            {/* ホバーラベル */}
+            {/* ホバーラベル（この図は幅 200 を 160px で出す＝0.8倍。15 で 12px） */}
             {hoveredLabel && (
               <text
-                x={100} y={14}
+                x={100} y={16}
                 textAnchor="middle"
-                fontSize={9}
+                fontSize={15}
                 fill="#0d9488"
                 fontWeight="bold"
               >

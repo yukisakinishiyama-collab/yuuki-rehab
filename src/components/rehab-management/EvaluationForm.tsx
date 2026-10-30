@@ -196,7 +196,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
                 tab === t ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}>
               {t === 'pain' ? '痛み・症状' : t === 'chronic' ? '慢性痛スクリーニング' : t === 'function' ? 'ADL・スポーツ' : t === 'redflag' ? 'レッドフラッグ' : '備考'}
-              {t === 'chronic' && isChronicPain && <span className="ml-1 bg-orange-400 text-white rounded-full px-1 text-[9px]">!</span>}
+              {t === 'chronic' && isChronicPain && <span className="ml-1 bg-orange-400 text-white rounded-full px-1 text-xs">!</span>}
             </button>
           ))}
         </div>

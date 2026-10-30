@@ -265,7 +265,7 @@ function SpecialTestPicker({
             >
               {j}
               {count > 0 && (
-                <span className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
+                <span className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-xs font-bold ${
                   joint === j ? 'bg-white text-teal-700' : 'bg-teal-100 text-teal-700'
                 }`}>{count}</span>
               )}
@@ -295,7 +295,7 @@ function SpecialTestPicker({
                   selected ? 'bg-teal-600 border-teal-600' : 'border-gray-300'
                 }`}
               >
-                {selected && <span className="text-white text-[10px] leading-none flex items-center justify-center">✓</span>}
+                {selected && <span className="text-white text-xs leading-none flex items-center justify-center">✓</span>}
               </button>
               <span className={`flex-1 ${selected ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>{testName}</span>
               {/* ℹ 説明ボタン */}
@@ -303,7 +303,7 @@ function SpecialTestPicker({
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); setInfoTest(testName) }}
-                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-400 hover:text-teal-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors"
+                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-400 hover:text-teal-600 text-xs font-bold flex items-center justify-center flex-shrink-0 transition-colors"
                   title="テスト方法を確認"
                 >
                   i
@@ -316,7 +316,7 @@ function SpecialTestPicker({
                       key={r}
                       type="button"
                       onClick={() => setResult(testName, r)}
-                      className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${
+                      className={`px-2 py-0.5 rounded text-xs border transition-colors ${
                         entry.result === r
                           ? RESULT_COLORS[r]
                           : 'border-gray-200 text-gray-400 hover:border-gray-300'

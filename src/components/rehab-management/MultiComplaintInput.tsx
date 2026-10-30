@@ -62,7 +62,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
         <div key={c.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
           {/* カードヘッダー */}
           <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-            <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+            <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
               {idx + 1}
             </span>
             <span className="text-xs font-semibold text-gray-600 flex-1">
@@ -82,7 +82,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
             {/* 部位・患側 */}
             <div className="flex gap-2 flex-wrap">
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold text-gray-400 mb-1">部位</p>
+                <p className="text-xs font-semibold text-gray-400 mb-1">部位</p>
                 <div className="flex flex-wrap gap-1">
                   {BODY_REGIONS.map(r => (
                     <button
@@ -101,7 +101,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
                 </div>
               </div>
               <div className="flex-shrink-0">
-                <p className="text-[10px] font-semibold text-gray-400 mb-1">患側</p>
+                <p className="text-xs font-semibold text-gray-400 mb-1">患側</p>
                 <div className="flex gap-1">
                   {(['right', 'left', 'bilateral'] as Side[]).map(s => (
                     <button
@@ -123,7 +123,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
 
             {/* 病名・診断名（任意） */}
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 mb-1">診断名・疾患名（任意）</p>
+              <p className="text-xs font-semibold text-gray-400 mb-1">診断名・疾患名（任意）</p>
               <input
                 type="text"
                 value={c.diagnosisLabel}
@@ -136,7 +136,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
 
             {/* NRS */}
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 mb-1">
+              <p className="text-xs font-semibold text-gray-400 mb-1">
                 痛みの強さ（NRS）
                 <span className={`ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${NRS_COLORS(c.nrs)}`}>
                   {c.nrs}
@@ -159,14 +159,14 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
                 ))}
               </div>
               <div className="flex justify-between mt-0.5 px-0.5">
-                <span className="text-[10px] text-gray-400">痛みなし</span>
-                <span className="text-[10px] text-gray-400">最大の痛み</span>
+                <span className="text-xs text-gray-400">痛みなし</span>
+                <span className="text-xs text-gray-400">最大の痛み</span>
               </div>
             </div>
 
             {/* 症状チェック */}
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 mb-1.5">症状</p>
+              <p className="text-xs font-semibold text-gray-400 mb-1.5">症状</p>
               <div className="flex flex-wrap gap-1.5">
                 {COMPLAINT_SYMPTOMS.map(sym => {
                   const active = c.symptoms.includes(sym)

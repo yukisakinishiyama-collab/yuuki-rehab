@@ -217,7 +217,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                     }`}
                   >
                     <span className="block text-sm font-semibold">{CANCELLATION_LABELS[k]}</span>
-                    <span className={`block text-[11px] mt-0.5 ${selected ? 'opacity-90' : 'text-gray-400'}`}>
+                    <span className={`block text-xs mt-0.5 ${selected ? 'opacity-90' : 'text-gray-400'}`}>
                       {CANCELLATION_DESCRIPTIONS[k]}
                     </span>
                   </button>
@@ -357,14 +357,14 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             </span>
             {r.sourceReservationNo && (
               <span
-                className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-200"
+                className="text-xs px-1.5 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-200"
                 title={`予約番号 ${r.sourceReservationNo}`}
               >
                 予約システムから
               </span>
             )}
             {r.excludedAs && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+              <span className="text-xs px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
                 {CANCELLATION_EXCLUSION_LABELS[r.excludedAs]}
               </span>
             )}
@@ -379,13 +379,13 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
 
           {editingKindId === r.id && !isExcluded && (
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              <span className="text-[11px] text-gray-500">区分を直す</span>
+              <span className="text-xs text-gray-500">区分を直す</span>
               {CANCELLATION_KINDS.map(k => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => handleChangeKind(r, k)}
-                  className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
+                  className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-colors ${
                     r.kind === k
                       ? 'bg-teal-600 text-white border-teal-600'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
@@ -399,7 +399,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
 
           {excludingId === r.id && (
             <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <p className="text-[11px] text-amber-800 mb-1.5">
+              <p className="text-xs text-amber-800 mb-1.5">
                 患者さんの回数から外します。理由を選んでください
               </p>
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -409,7 +409,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                     type="button"
                     onClick={() => handleSetExclusion(r, key)}
                     title={CANCELLATION_EXCLUSION_DESCRIPTIONS[key]}
-                    className="px-3 py-1.5 text-[11px] rounded-full border font-medium bg-white
+                    className="px-3 py-1.5 text-xs rounded-full border font-medium bg-white
                       text-amber-800 border-amber-300 hover:bg-amber-100 transition-colors"
                   >
                     {CANCELLATION_EXCLUSION_LABELS[key]}
@@ -418,7 +418,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                 <button
                   type="button"
                   onClick={() => setExcludingId(null)}
-                  className="px-3 py-1.5 text-[11px] rounded-full border border-transparent
+                  className="px-3 py-1.5 text-xs rounded-full border border-transparent
                     text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   やめる

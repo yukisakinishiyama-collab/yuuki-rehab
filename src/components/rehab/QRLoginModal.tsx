@@ -198,7 +198,7 @@ export default function QRLoginModal({ onClose }: Props) {
                 '30分以内にスキャンしてください',
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                  <span className="w-4 h-4 rounded-full bg-[#0d9488] text-white flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
+                  <span className="w-4 h-4 rounded-full bg-[#0d9488] text-white flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
                     {i + 1}
                   </span>
                   {step}

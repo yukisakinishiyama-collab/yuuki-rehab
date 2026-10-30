@@ -222,14 +222,14 @@ function DailyChart({ month, measure }: { month: NoahMonth; measure: 'v' | 's' }
             <CartesianGrid vertical={false} stroke={GRID} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: AXIS }}
+              tick={{ fontSize: 12, fill: AXIS }}
               tickLine={false}
               axisLine={{ stroke: GRID }}
               interval="preserveStartEnd"
               minTickGap={4}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: AXIS }}
+              tick={{ fontSize: 12, fill: AXIS }}
               tickLine={false}
               axisLine={false}
               width={44}
@@ -337,8 +337,8 @@ function MonthlyCharts({ months }: { months: NoahMonth[] }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 18, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={GRID} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
-            <YAxis tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={44} tickFormatter={tick} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
+            <YAxis tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={44} tickFormatter={tick} />
             <Tooltip
               cursor={{ fill: 'rgba(148,163,184,0.12)' }}
               content={({ active, payload }) => {
@@ -360,7 +360,7 @@ function MonthlyCharts({ months }: { months: NoahMonth[] }) {
                 dataKey={key}
                 position="top"
                 formatter={(v: unknown) => (rows.length <= 6 ? tick(Number(v)) : '')}
-                style={{ fontSize: 11, fill: '#334155' }}
+                style={{ fontSize: 12, fill: '#334155' }}
               />
             </Bar>
           </BarChart>
@@ -395,7 +395,7 @@ function WeekdayChart({ weekdays }: { weekdays: ApiData['weekdays'] }) {
         <BarChart data={rows} margin={{ top: 20, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={GRID} />
           <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
-          <YAxis tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          <YAxis tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
           <Tooltip
             cursor={{ fill: 'rgba(148,163,184,0.12)' }}
             content={({ active, payload }) => {
@@ -420,7 +420,7 @@ function WeekdayChart({ weekdays }: { weekdays: ApiData['weekdays'] }) {
             }}
           />
           <Bar dataKey="value" fill={SERIES} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
-            <LabelList dataKey="value" position="top" style={{ fontSize: 11, fill: '#334155' }} />
+            <LabelList dataKey="value" position="top" style={{ fontSize: 12, fill: '#334155' }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -470,12 +470,12 @@ function ItemsChart({ month }: { month: NoahMonth }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 72, bottom: 0, left: 0 }}>
           <CartesianGrid horizontal={false} stroke={GRID} />
-          <XAxis type="number" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} tickFormatter={man} />
+          <XAxis type="number" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} tickFormatter={man} />
           <YAxis
             type="category"
             dataKey="name"
             width={118}
-            tick={{ fontSize: 11, fill: '#334155' }}
+            tick={{ fontSize: 12, fill: '#334155' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(s: string) => (s.length > 10 ? `${s.slice(0, 10)}…` : s)}
@@ -506,7 +506,7 @@ function ItemsChart({ month }: { month: NoahMonth }) {
               dataKey="amount"
               position="right"
               formatter={(v: unknown) => fmtYen(Number(v))}
-              style={{ fontSize: 11, fill: '#334155' }}
+              style={{ fontSize: 12, fill: '#334155' }}
             />
           </Bar>
         </BarChart>
@@ -542,12 +542,12 @@ function RankChart({ rank }: { rank: NoahMonth['rank'] }) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={GRID} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
             <YAxis
               reversed
               domain={[1, bottom]}
               ticks={ticks}
-              tick={{ fontSize: 11, fill: AXIS }}
+              tick={{ fontSize: 12, fill: AXIS }}
               tickLine={false}
               axisLine={false}
               width={36}

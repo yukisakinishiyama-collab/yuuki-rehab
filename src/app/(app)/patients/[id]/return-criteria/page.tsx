@@ -420,7 +420,8 @@ const LYSHOLM_FIELDS: {
 function RadarChart({ scores }: {
   scores: { symptom: number; psychological: number; functional: number; daily: number }
 }) {
-  const cx = 150, cy = 150, r = 110
+  // 文字は 13（スマホの幅 360px 以上で 12px 以上に見える大きさ）。文字が図の外にはみ出さないよう、円は少し小さめ（r = 95）
+  const cx = 150, cy = 150, r = 95
   const axes = [
     { label: '症状\n評価', angle: -90 },
     { label: '心理的\n準備度', angle: -18 },
@@ -498,8 +499,8 @@ function RadarChart({ scores }: {
       {dataPoints.map((p, i) => (
         <text key={i}
           x={p.x + (p.x > cx + 2 ? 8 : p.x < cx - 2 ? -8 : 0)}
-          y={p.y + (p.y > cy + 2 ? 12 : p.y < cy - 2 ? -6 : 4)}
-          fontSize="11"
+          y={p.y + (p.y > cy + 2 ? 14 : p.y < cy - 2 ? -7 : 5)}
+          fontSize="13"
           fontWeight="700"
           fill={color}
           textAnchor={p.x > cx + 2 ? 'start' : p.x < cx - 2 ? 'end' : 'middle'}
@@ -516,14 +517,14 @@ function RadarChart({ scores }: {
           <text key={i}
             x={end.x}
             y={end.y}
-            fontSize="10"
+            fontSize="13"
             fill="#475569"
             fontWeight="600"
             textAnchor={end.x > cx + 5 ? 'start' : end.x < cx - 5 ? 'end' : 'middle'}
           >
             {lines.map((line, j) => (
               <tspan key={j} x={end.x}
-                dy={j === 0 ? 0 : 13}
+                dy={j === 0 ? 0 : 16}
                 textAnchor={end.x > cx + 5 ? 'start' : end.x < cx - 5 ? 'end' : 'middle'}
               >
                 {line}
@@ -536,7 +537,7 @@ function RadarChart({ scores }: {
       {/* グリッドレベル表示 */}
       {gridLevels.map(level => (
         <text key={level} x={cx + 3} y={cy - (level / 100) * r - 2}
-          fontSize="8" fill="#94a3b8">{level}</text>
+          fontSize="13" fill="#64748b">{level}</text>
       ))}
     </svg>
   )
@@ -581,7 +582,7 @@ function ScoreBar({ label, score, threshold, icon: Icon, color }: {
           style={{ left: `${threshold}%` }}
         />
       </div>
-      <p className="text-[10px] text-slate-400 text-right">基準: {threshold}点</p>
+      <p className="text-xs text-slate-400 text-right">基準: {threshold}点</p>
     </div>
   )
 }
@@ -1023,7 +1024,7 @@ export default function ReturnCriteriaPage({
                       <span className="text-slate-400 mr-1">Q{i + 1}.</span>
                       {q.text}
                       {q.negative && (
-                        <span className="ml-1.5 text-[9px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-semibold">懸念</span>
+                        <span className="ml-1.5 text-xs bg-orange-100 text-orange-600 px-1 py-0.5 rounded font-semibold">懸念</span>
                       )}
                     </p>
                     <span className="text-sm font-bold text-purple-700 min-w-[1.5rem] text-right">{aclRsi[i]}</span>
@@ -1037,7 +1038,7 @@ export default function ReturnCriteriaPage({
                     }}
                     className="w-full accent-purple-600 h-1.5"
                   />
-                  <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                  <div className="flex justify-between text-xs text-slate-400 mt-0.5">
                     <span>全くない (0)</span>
                     <span>完全にそう (10)</span>
                   </div>
@@ -1079,10 +1080,10 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-[10px] text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.involved || ''}
                           onChange={e => setHopTests(d => ({
@@ -1094,7 +1095,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.uninvolved || ''}
                           onChange={e => setHopTests(d => ({
@@ -1106,7 +1107,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-slate-500 mb-1">LSI</p>
+                        <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
                           lsiVal === null ? 'text-slate-300'
                             : lsiVal >= 90 ? 'text-emerald-600'
@@ -1151,10 +1152,10 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-[10px] text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.involved || ''}
                           onChange={e => setHipFunction(d => ({
@@ -1166,7 +1167,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.uninvolved || ''}
                           onChange={e => setHipFunction(d => ({
@@ -1178,7 +1179,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-slate-500 mb-1">LSI</p>
+                        <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
                           lsiVal === null ? 'text-slate-300'
                             : lsiVal >= 90 ? 'text-emerald-600'
@@ -1193,7 +1194,7 @@ export default function ReturnCriteriaPage({
 
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">Trendelenburg徴候</p>
-                <p className="text-[10px] text-slate-400 mb-2.5">片脚立位時に反対側の骨盤が下がる場合は陽性（中殿筋機能低下の指標）</p>
+                <p className="text-xs text-slate-400 mb-2.5">片脚立位時に反対側の骨盤が下がる場合は陽性（中殿筋機能低下の指標）</p>
                 <div className="flex gap-2">
                   {([
                     { value: 'negative', label: '陰性' },
@@ -1246,10 +1247,10 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-[10px] text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">患側 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">患側 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.involved || ''}
                           onChange={e => setShoulderFunction(d => ({
@@ -1261,7 +1262,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">健側 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">健側 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.uninvolved || ''}
                           onChange={e => setShoulderFunction(d => ({
@@ -1273,7 +1274,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-slate-500 mb-1">LSI</p>
+                        <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
                           lsiVal === null ? 'text-slate-300'
                             : lsiVal >= 90 ? 'text-emerald-600'
@@ -1288,7 +1289,7 @@ export default function ReturnCriteriaPage({
 
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">肩甲骨ディスキネジス</p>
-                <p className="text-[10px] text-slate-400 mb-2.5">挙上・下制動作時に肩甲骨の異常な動き（浮き上がり等）が見られる場合は陽性</p>
+                <p className="text-xs text-slate-400 mb-2.5">挙上・下制動作時に肩甲骨の異常な動き（浮き上がり等）が見られる場合は陽性</p>
                 <div className="flex gap-2">
                   {([
                     { value: 'negative', label: '陰性' },
@@ -1342,10 +1343,10 @@ export default function ReturnCriteriaPage({
                 return (
                   <div key={key} className="border border-slate-100 rounded-xl p-3">
                     <p className="text-xs font-semibold text-slate-700 mb-0.5">{label}</p>
-                    <p className="text-[10px] text-slate-400 mb-2.5">{desc}</p>
+                    <p className="text-xs text-slate-400 mb-2.5">{desc}</p>
                     <div className="grid grid-cols-3 gap-2 items-end">
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">患肢 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.involved || ''}
                           onChange={e => setAnkleFunction(d => ({
@@ -1357,7 +1358,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">健肢 ({unit})</label>
                         <input type="number" min="0" step="0.1"
                           value={test.uninvolved || ''}
                           onChange={e => setAnkleFunction(d => ({
@@ -1369,7 +1370,7 @@ export default function ReturnCriteriaPage({
                         />
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-slate-500 mb-1">LSI</p>
+                        <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                         <p className={`text-lg font-bold ${
                           lsiVal === null ? 'text-slate-300'
                             : lsiVal >= 90 ? 'text-emerald-600'
@@ -1403,10 +1404,10 @@ export default function ReturnCriteriaPage({
               </p>
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">サイドブリッジ（体幹側方保持）保持時間</p>
-                <p className="text-[10px] text-slate-400 mb-2.5">肘と足部のみで体幹を側方に持ち上げ、姿勢を保持できる時間</p>
+                <p className="text-xs text-slate-400 mb-2.5">肘と足部のみで体幹を側方に持ち上げ、姿勢を保持できる時間</p>
                 <div className="grid grid-cols-3 gap-2 items-end">
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-500 block mb-1">弱い側 (秒)</label>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">弱い側 (秒)</label>
                     <input type="number" min="0" step="0.1"
                       value={lumbarFunction.sideBridge.involved || ''}
                       onChange={e => setLumbarFunction(d => ({
@@ -1418,7 +1419,7 @@ export default function ReturnCriteriaPage({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-500 block mb-1">健側 (秒)</label>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">健側 (秒)</label>
                     <input type="number" min="0" step="0.1"
                       value={lumbarFunction.sideBridge.uninvolved || ''}
                       onChange={e => setLumbarFunction(d => ({
@@ -1430,7 +1431,7 @@ export default function ReturnCriteriaPage({
                     />
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] font-semibold text-slate-500 mb-1">LSI</p>
+                    <p className="text-xs font-semibold text-slate-500 mb-1">LSI</p>
                     <p className={`text-lg font-bold ${
                       !lumbarFunction.sideBridge.involved || !lumbarFunction.sideBridge.uninvolved ? 'text-slate-300'
                         : scores.functional >= 90 ? 'text-emerald-600'
@@ -1461,7 +1462,7 @@ export default function ReturnCriteriaPage({
               </p>
               {LEFS_ACTIVITIES.map((activity, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
-                  <span className="text-[10px] text-slate-400 w-4 flex-shrink-0">{i + 1}</span>
+                  <span className="text-xs text-slate-400 w-4 flex-shrink-0">{i + 1}</span>
                   <span className="text-xs text-slate-700 flex-1">{activity}</span>
                   <div className="flex gap-1">
                     {LEFS_OPTIONS.map(opt => (
@@ -1472,7 +1473,7 @@ export default function ReturnCriteriaPage({
                           setLefs(next)
                         }}
                         title={opt.label}
-                        className={`w-6 h-6 rounded text-[10px] font-bold border transition-all ${
+                        className={`w-6 h-6 rounded text-xs font-bold border transition-all ${
                           lefs[i] === opt.value
                             ? 'bg-orange-500 text-white border-orange-500'
                             : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300'
@@ -1483,7 +1484,7 @@ export default function ReturnCriteriaPage({
                   </div>
                 </div>
               ))}
-              <p className="text-[10px] text-slate-400 text-right pt-1">
+              <p className="text-xs text-slate-400 text-right pt-1">
                 合計: {lefs.reduce((s, v) => s + v, 0)}/80点
               </p>
             </div>
@@ -1507,7 +1508,7 @@ export default function ReturnCriteriaPage({
               </p>
               {SHOULDER_DAILY_ACTIVITIES.map((activity, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
-                  <span className="text-[10px] text-slate-400 w-4 flex-shrink-0">{i + 1}</span>
+                  <span className="text-xs text-slate-400 w-4 flex-shrink-0">{i + 1}</span>
                   <span className="text-xs text-slate-700 flex-1">{activity}</span>
                   <div className="flex gap-1">
                     {SHOULDER_DAILY_OPTIONS.map(opt => (
@@ -1518,7 +1519,7 @@ export default function ReturnCriteriaPage({
                           setShoulderDaily(next)
                         }}
                         title={opt.label}
-                        className={`w-6 h-6 rounded text-[10px] font-bold border transition-all ${
+                        className={`w-6 h-6 rounded text-xs font-bold border transition-all ${
                           shoulderDaily[i] === opt.value
                             ? 'bg-orange-500 text-white border-orange-500'
                             : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300'
@@ -1557,7 +1558,7 @@ export default function ReturnCriteriaPage({
               <span className={`text-5xl font-black ${vc.color}`}>{scores.composite}</span>
               <span className="text-lg text-slate-400 font-normal">/100</span>
             </div>
-            <p className="text-[11px] text-center text-slate-500 mt-1">
+            <p className="text-xs text-center text-slate-500 mt-1">
               {assessmentType === 'sport' ? '競技' : '日常生活'}復帰スコア
               {verdict === 'cleared'     && '（80点以上: 復帰可能）'}
               {verdict === 'conditional' && '（65-79点: 条件付き検討）'}
@@ -1599,7 +1600,7 @@ export default function ReturnCriteriaPage({
           </button>
 
           {/* 注意書き */}
-          <p className="text-[10px] text-slate-400 leading-relaxed text-center">
+          <p className="text-xs text-slate-400 leading-relaxed text-center">
             本スコアは臨床判断の補助ツールです。<br />
             最終的な復帰判断は有資格の医療者が行ってください。
           </p>
@@ -1625,10 +1626,10 @@ export default function ReturnCriteriaPage({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-bold text-slate-700">{rec.assessmentDate}</span>
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
                           {rec.type === 'sport' ? '競技復帰' : '日常生活復帰'}
                         </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${vc2.bg} ${vc2.color}`}>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${vc2.bg} ${vc2.color}`}>
                           {vc2.label}
                         </span>
                       </div>
@@ -1686,12 +1687,12 @@ function Section({
         className={`w-full flex items-center justify-between p-4 ${c.bg} hover:opacity-90 transition-opacity`}>
         <div className="text-left">
           <p className={`text-sm font-bold ${c.text}`}>{title}</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">{subtitle}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className={`text-lg font-black ${c.text}`}>{score}</p>
-            <p className="text-[9px] text-slate-400">/ 100点</p>
+            <p className="text-xs text-slate-400">/ 100点</p>
           </div>
           {passed
             ? <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />

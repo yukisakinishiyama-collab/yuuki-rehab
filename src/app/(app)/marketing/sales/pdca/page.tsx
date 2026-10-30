@@ -71,7 +71,7 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
     <label className="block min-w-0">
       <span className="text-xs font-bold text-slate-600">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-slate-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
     </label>
   )
 }
@@ -106,7 +106,7 @@ function Steps({ status, hasLogs }: { status: PdcaStatus; hasLogs: boolean }) {
       {(['P', 'D', 'C', 'A'] as const).map((l, i) => (
         <span
           key={l}
-          className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-black ${
+          className={`flex h-5 w-5 items-center justify-center rounded text-xs font-black ${
             i < at ? 'bg-slate-200 text-slate-500' : i === at ? 'bg-slate-900 text-white' : 'border border-slate-200 text-slate-400'
           }`}
         >
@@ -535,12 +535,12 @@ function ItemCard({
                 ] as const
               ).map(([label, v]) => (
                 <div key={label} className="rounded-xl bg-slate-50 px-3 py-2">
-                  <dt className="text-[11px] text-slate-500">{label}</dt>
+                  <dt className="text-xs text-slate-500">{label}</dt>
                   <dd className="font-bold tabular-nums text-slate-900">{v}</dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
               {c.phase === 'before'
                 ? `${item.start}から数えはじめます。`
                 : `${c.totalDays}日のうち${c.elapsedDays}日目。数字のもと：${def.source}。始める前の同じ日数＝${c.baselineRange.from}〜${c.baselineRange.to}。`}
@@ -823,11 +823,11 @@ export default function PdcaPage() {
               <Sparkles className="h-4 w-4" aria-hidden />
               {consulting ? '考えています…' : data?.ai ? 'AIに相談して計画をつくる' : '計画の下書きをつくる'}
             </button>
-            {data?.ai && <span className="text-[11px] text-white/50">AIに相談すると、1回 数円〜10円ほどかかります</span>}
+            {data?.ai && <span className="text-xs text-white/50">AIに相談すると、1回 数円〜10円ほどかかります</span>}
           </div>
           {data && (
             <div className="mt-4 border-t border-white/10 pt-3">
-              <p className="text-[11px] text-white/60">ひな形から作る（AIを使わない・無料）</p>
+              <p className="text-xs text-white/60">ひな形から作る（AIを使わない・無料）</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {data.templates.map((t) => (
                   <button

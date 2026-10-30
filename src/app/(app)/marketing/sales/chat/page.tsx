@@ -140,7 +140,7 @@ export default function KeieiChatPage() {
       </div>
 
       {showContext && (
-        <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700">{context || '（読み込み中…）'}</pre>
+        <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">{context || '（読み込み中…）'}</pre>
       )}
 
       {ai === false && (
@@ -160,7 +160,7 @@ export default function KeieiChatPage() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-400">
               目標の金額は<Link href="/marketing/sales/goal" className="underline">月の目標への道すじ</Link>で入れたものを使います。
             </p>
           </div>
@@ -170,7 +170,7 @@ export default function KeieiChatPage() {
               <div key={`${m.at}-${i}`} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-900'}`}>
                   {m.text}
-                  <div className={`mt-1 text-[10px] ${m.role === 'user' ? 'text-teal-100' : 'text-slate-400'}`}>{timeLabel(m.at)}</div>
+                  <div className={`mt-1 text-xs ${m.role === 'user' ? 'text-teal-100' : 'text-slate-400'}`}>{timeLabel(m.at)}</div>
                 </div>
               </div>
             ))}

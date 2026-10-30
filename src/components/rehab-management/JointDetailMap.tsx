@@ -596,7 +596,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         {(Object.entries(TYPE_LABELS) as [ZoneType, string][])
           .filter(([type]) => zones.some(z => z.type === type))
           .map(([type, label]) => (
-            <span key={type} className="flex items-center gap-1 text-[10px] text-gray-500">
+            <span key={type} className="flex items-center gap-1 text-xs text-gray-500">
               <span className="inline-block w-3 h-3 rounded-full border" style={{ background: TYPE_COLORS[type].selected, borderColor: TYPE_COLORS[type].stroke }} />
               {label}
             </span>
@@ -668,7 +668,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         </div>
       )}
 
-      {!readOnly && <p className="text-[10px] text-gray-400 px-1">部位をクリックして選択・解除できます</p>}
+      {!readOnly && <p className="text-xs text-gray-400 px-1">部位をクリックして選択・解除できます</p>}
     </div>
   )
 }

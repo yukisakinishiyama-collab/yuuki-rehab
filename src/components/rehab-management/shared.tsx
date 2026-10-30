@@ -26,7 +26,7 @@ export function ProgressGauge({ score, size = 120 }: { score: number; size?: num
   const circumference = 2 * Math.PI * r
   const progress = Math.max(0, Math.min(100, score))
   const dashOffset = circumference * (1 - progress / 100)
-  const color = progress >= 70 ? '#0d9488' : progress >= 40 ? '#f59e0b' : '#94a3b8'
+  const color = progress >= 70 ? '#0d9488' : progress >= 40 ? '#f59e0b' : '#64748b'
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -45,7 +45,7 @@ export function ProgressGauge({ score, size = 120 }: { score: number; size?: num
         {progress}
       </text>
       <text x={cx} y={cy + size * 0.2} textAnchor="middle"
-        fontSize={size * 0.1} fill="#94a3b8">
+        fontSize={Math.max(12, size * 0.1)} fill="#64748b">
         / 100
       </text>
     </svg>
@@ -73,7 +73,7 @@ export function PhaseStepper({ currentPhase }: { currentPhase: RehabPhase }) {
                   {isCompleted ? '✓' : phase}
                 </div>
                 {isCurrent && (
-                  <span className="text-[9px] text-teal-600 font-semibold mt-1 whitespace-nowrap">現在</span>
+                  <span className="text-xs text-teal-600 font-semibold mt-1 whitespace-nowrap">現在</span>
                 )}
               </div>
               {idx < phases.length - 1 && (

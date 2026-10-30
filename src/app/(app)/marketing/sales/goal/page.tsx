@@ -215,7 +215,7 @@ function Stepper({
           <Plus className="h-4 w-4" aria-hidden />
         </button>
       </div>
-      {hint && <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>}
+      {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
     </div>
   )
 }
@@ -296,9 +296,9 @@ function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
             <YAxis
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 12, fill: '#64748b' }}
               tickLine={false}
               axisLine={false}
               width={44}
@@ -324,7 +324,7 @@ function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
               y={goal}
               stroke="#b45309"
               strokeDasharray="5 3"
-              label={{ value: `目標 ${man(goal)}`, position: 'insideTopRight', fontSize: 11, fill: '#b45309' }}
+              label={{ value: `目標 ${man(goal)}`, position: 'insideTopRight', fontSize: 12, fill: '#b45309' }}
             />
             <Bar dataKey="noah" stackId="s" fill={BLUE} maxBarSize={28} isAnimationActive={false} />
             <Bar dataKey="extra" stackId="s" fill={TEAL} maxBarSize={28} isAnimationActive={false} />
@@ -332,7 +332,7 @@ function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         <Legend color={BLUE} label="実績（NOAH）" />
         <Legend color={TEAL} label="実績（その他の収入）" />
         <Legend color={MUTED} label="今月の見込み（予測）" />
@@ -367,7 +367,7 @@ function Breakdown({ base, extraAmount }: { base: Baseline; extraAmount: number 
             </p>
             <p className="mt-1 text-lg font-black tabular-nums text-slate-900">{man(p.sales)}円</p>
             {p.key !== 'extra' && (
-              <p className="text-[11px] tabular-nums text-slate-500">
+              <p className="text-xs tabular-nums text-slate-500">
                 {fmt(p.visits)}回・1回 {p.visits > 0 ? yen(p.perVisit) : '—'}
               </p>
             )}
@@ -625,12 +625,12 @@ export default function GoalPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-bold text-slate-500">1日の来院（実績）</p>
                   <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{fmt1(base.perDaySoFar)}人</p>
-                  <p className="text-[11px] text-slate-500">最多の日 {fmt(base.maxDayVisits)}人</p>
+                  <p className="text-xs text-slate-500">最多の日 {fmt(base.maxDayVisits)}人</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-bold text-slate-500">1回あたり（実績）</p>
                   <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{yen(base.perVisit)}</p>
-                  <p className="text-[11px] text-slate-500">NOAHの分</p>
+                  <p className="text-xs text-slate-500">NOAHの分</p>
                 </div>
               </div>
 
@@ -708,7 +708,7 @@ export default function GoalPage() {
                           <span className="min-w-0 truncate text-slate-800">{name}</span>
                           <span className="shrink-0 text-right">
                             <span className="font-bold text-slate-900">{yen(total)}</span>
-                            <span className="block text-[11px] text-slate-500">
+                            <span className="block text-xs text-slate-500">
                               {fmt(count)}点・単価{yen(price)}
                             </span>
                           </span>
@@ -739,7 +739,7 @@ export default function GoalPage() {
                           ] as const
                         ).map(([label, v, sign]) => (
                           <div key={label} className="rounded-xl bg-slate-50 px-3 py-2">
-                            <dt className="text-[11px] text-slate-500">{label}</dt>
+                            <dt className="text-xs text-slate-500">{label}</dt>
                             <dd className="font-bold tabular-nums">
                               {sign}
                               {yen(v)}
@@ -957,7 +957,7 @@ export default function GoalPage() {
                     hint="サブスクなど（アルファノート）"
                   />
                 </div>
-                <p className="mt-4 text-[11px] text-slate-500">保険の1回あたり（{yen(input.insUnit)}）は決まった料金なので動かしません。</p>
+                <p className="mt-4 text-xs text-slate-500">保険の1回あたり（{yen(input.insUnit)}）は決まった料金なので動かしません。</p>
               </Fold>
             </div>
           )}
@@ -990,7 +990,7 @@ export default function GoalPage() {
                         <span className="block text-[15px] font-bold text-slate-900">
                           {STAGE_SHORT[st.key]}
                           {isNow && (
-                            <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 align-middle text-[11px] font-bold text-teal-700">
+                            <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 align-middle text-xs font-bold text-teal-700">
                               いまの段階
                             </span>
                           )}

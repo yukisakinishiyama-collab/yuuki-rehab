@@ -106,7 +106,7 @@ export default function KarteLinkCard() {
             </button>
             {resendState && <span className="text-slate-600">{resendState}</span>}
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-500">
+          <p className="text-xs leading-relaxed text-slate-500">
             受付では、友だち追加のあとに「メニューのカルテ連携から、お名前と電話番号を入れてください」とご案内ください。
             ご家族のカルテは、その方のお名前と院に登録している電話番号で結びつけられます。
           </p>
@@ -114,7 +114,7 @@ export default function KarteLinkCard() {
         {url && (
           <div className="flex flex-col items-center gap-1">
             <QRCodeCanvas value={url} size={128} marginSize={1} level="M" />
-            <span className="text-[11px] text-slate-500">LINEのカメラで読める</span>
+            <span className="text-xs text-slate-500">LINEのカメラで読める</span>
           </div>
         )}
       </div>
