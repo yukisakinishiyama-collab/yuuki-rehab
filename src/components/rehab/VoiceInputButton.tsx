@@ -135,7 +135,7 @@ export default function VoiceInputButton({ onText, onInterim, size = 'md', class
       onClick={toggle}
       aria-pressed={listening}
       title={listening ? '音声入力を停止' : '音声で入力（日本語）'}
-      className={`inline-flex items-center gap-1.5 rounded-lg border font-medium transition-colors flex-shrink-0 ${dims} ${
+      className={`inline-flex items-center gap-1.5 rounded-lg border font-medium transition-colors flex-shrink-0 max-lg:min-h-10 ${dims} ${
         listening
           ? 'bg-red-50 border-red-300 text-red-600'
           : 'bg-white border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700'

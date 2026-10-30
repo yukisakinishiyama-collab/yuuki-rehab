@@ -63,7 +63,7 @@ export default function MarketingDashboard() {
         <h1 className="text-2xl font-bold">集客のまとめ</h1>
         <Link
           href="/marketing/compose"
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
         >
           ＋ 投稿を作る
         </Link>

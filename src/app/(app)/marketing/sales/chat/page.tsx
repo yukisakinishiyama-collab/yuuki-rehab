@@ -125,14 +125,14 @@ export default function KeieiChatPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <button type="button" onClick={() => setShowContext((v) => !v)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={() => setShowContext((v) => !v)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 max-lg:min-h-10">
             {showContext ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             AIに渡している数字
           </button>
-          <button type="button" onClick={() => void load()} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50" title="数字を取り直す">
+          <button type="button" onClick={() => void load()} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 max-lg:min-h-10 max-lg:justify-center max-lg:min-w-10" title="数字を取り直す">
             <RefreshCcw className="h-3.5 w-3.5" />
           </button>
-          <button type="button" onClick={clear} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={clear} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 max-lg:min-h-10">
             <Trash2 className="h-3.5 w-3.5" />
             新しく始める
           </button>
@@ -155,7 +155,7 @@ export default function KeieiChatPage() {
             <p className="text-sm text-slate-600">何でも聞いてください。たとえば：</p>
             <div className="flex flex-wrap gap-2">
               {STARTERS.map((s) => (
-                <button key={s} type="button" onClick={() => void send(s)} disabled={busy || ai === false} className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-left text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-50">
+                <button key={s} type="button" onClick={() => void send(s)} disabled={busy || ai === false} className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-left text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-50 max-lg:min-h-10">
                   {s}
                 </button>
               ))}

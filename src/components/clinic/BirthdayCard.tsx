@@ -75,7 +75,7 @@ export default function BirthdayCard() {
           <Cake className="h-4 w-4 text-pink-600" />
           誕生日のご挨拶（カルテ連携した方へ、誕生日の朝9時ごろに自動で1通）
         </h2>
-        <label className="inline-flex items-center gap-2 text-xs font-bold">
+        <label className="inline-flex items-center gap-2 text-xs font-bold max-lg:min-h-10">
           <input type="checkbox" checked={enabled} disabled={!data || !!busy} onChange={(e) => void save({ enabled: e.target.checked })} />
           {enabled ? '送る（オン）' : '送らない（オフ）'}
         </label>
@@ -91,15 +91,15 @@ export default function BirthdayCard() {
             <textarea value={template} onChange={(e) => setTemplate(e.target.value)} rows={6} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </label>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void save()} disabled={!data || !!busy} className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+            <button type="button" onClick={() => void save()} disabled={!data || !!busy} className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 max-lg:min-h-10">
               文面を保存
             </button>
-            <button type="button" onClick={sample} disabled={!data || !!busy} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            <button type="button" onClick={sample} disabled={!data || !!busy} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10">
               <Send className="h-3.5 w-3.5" />
               院長のLINEに見本を送る
             </button>
             {data && template !== data.defaultTemplate && (
-              <button type="button" onClick={() => setTemplate(data.defaultTemplate)} className="text-xs text-slate-500 underline">
+              <button type="button" onClick={() => setTemplate(data.defaultTemplate)} className="text-xs text-slate-500 underline max-lg:min-h-10">
                 最初の文面に戻す
               </button>
             )}

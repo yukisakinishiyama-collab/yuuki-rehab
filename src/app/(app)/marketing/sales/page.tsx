@@ -721,7 +721,7 @@ export default function SalesPage() {
           type="button"
           onClick={refreshNow}
           disabled={busy}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10"
         >
           {busy ? '読み込み中…' : '最新にする'}
         </button>
@@ -751,7 +751,7 @@ export default function SalesPage() {
                   type="button"
                     aria-pressed={m.month === month.month}
                   onClick={() => setSelected(m.month)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
+                  className={`rounded-lg px-3 py-1.5 text-sm font-bold max-lg:min-h-10 ${
                     m.month === month.month
                       ? 'bg-teal-700 text-white'
                       : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
@@ -839,7 +839,7 @@ export default function SalesPage() {
             title="日別の来院数（延べ）"
             sub={`${ym(month.month)}${isComplete(month) ? '' : `（${lastDay}日まで）`}・区分はNOAHの金額分析のとおり`}
             action={
-              <button type="button" onClick={() => setShowTable((v) => !v)} className="text-xs font-bold text-teal-800 underline">
+              <button type="button" onClick={() => setShowTable((v) => !v)} className="text-xs font-bold text-teal-800 underline max-lg:min-h-10">
                 {showTable ? '表を閉じる' : '表で見る'}
               </button>
             }

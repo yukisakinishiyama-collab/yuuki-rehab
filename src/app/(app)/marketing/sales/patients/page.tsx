@@ -161,7 +161,7 @@ export default function PatientMovementPage() {
                       <Phone className="h-4 w-4" />
                     </a>
                   )}
-                  <Link href={`/patients/${g.id}`} className="inline-flex items-center gap-0.5 rounded-md bg-teal-50 px-2 py-1 text-xs font-bold text-teal-700 hover:bg-teal-100">
+                  <Link href={`/patients/${g.id}`} className="inline-flex items-center gap-0.5 rounded-md bg-teal-50 px-2 py-1 text-xs font-bold text-teal-700 hover:bg-teal-100 max-lg:min-h-10">
                     カルテ
                     <ChevronRight className="h-3 w-3" />
                   </Link>

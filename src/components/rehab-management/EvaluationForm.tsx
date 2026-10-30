@@ -192,7 +192,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
         <div className="flex gap-1 mt-3 flex-wrap">
           {(['pain', 'chronic', 'function', 'redflag', 'notes'] as const).map(t => (
             <button key={t} type="button" onClick={() => setTab(t as typeof tab)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors max-lg:min-h-10 ${
                 tab === t ? 'bg-teal-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}>
               {t === 'pain' ? '痛み・症状' : t === 'chronic' ? '慢性痛スクリーニング' : t === 'function' ? 'ADL・スポーツ' : t === 'redflag' ? 'レッドフラッグ' : '備考'}
@@ -252,7 +252,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
                     key={k}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, painDuration: k }))}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors max-lg:min-h-10 ${
                       form.painDuration === k
                         ? k === 'chronic'
                           ? 'bg-orange-700 text-white border-orange-700'

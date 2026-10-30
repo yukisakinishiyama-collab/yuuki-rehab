@@ -135,7 +135,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
             <button
               key={tab.id}
               onClick={() => setActiveRegion(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all max-lg:min-h-10 ${
                 activeRegion === tab.id
                   ? 'bg-teal-700 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:border-teal-300 hover:text-teal-700'
@@ -194,7 +194,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                     {scoreDef.higherIsBetter ? '↑高いほど良好' : '↓低いほど良好'} · 最大{scoreDef.maxScore}{scoreDef.unit} · 出典：{scoreDef.reference}
                   </p>
                 </div>
-                <button onClick={() => setShowInfo(v => !v)} className="text-gray-500 hover:text-teal-600 transition-colors">
+                <button onClick={() => setShowInfo(v => !v)} className="text-gray-500 hover:text-teal-600 transition-colors max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10">
                   <Info className="w-4 h-4" />
                 </button>
               </div>
@@ -232,7 +232,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                         {item.type === 'radio' && item.options && (
                           <div className="space-y-1.5">
                             {item.options.map(opt => (
-                              <label key={opt.value} className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all ${
+                              <label key={opt.value} className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all max-lg:min-h-10 ${
                                 answers[item.id] === opt.value
                                   ? 'bg-teal-50 border-teal-300 shadow-sm'
                                   : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
@@ -420,7 +420,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={e => { e.stopPropagation(); handleDelete(rec.id) }}
-                        className="p-1 text-gray-500 hover:text-red-500 transition-colors rounded"
+                        className="p-1 text-gray-500 hover:text-red-500 transition-colors rounded max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

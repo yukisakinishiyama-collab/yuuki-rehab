@@ -22,7 +22,7 @@ export default function TemplatePicker({ categories, onSelect, label = '定型�
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="text-xs text-teal-700 hover:text-teal-800 font-medium whitespace-nowrap"
+        className="text-xs text-teal-700 hover:text-teal-800 font-medium whitespace-nowrap max-lg:min-h-10"
       >
         {open ? '✕ 定型文を閉じる' : `📋 ${label}`}
       </button>
@@ -35,7 +35,7 @@ export default function TemplatePicker({ categories, onSelect, label = '定型�
                 key={cat.id}
                 type="button"
                 onClick={() => setActiveCat(cat.id)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors max-lg:min-h-10 ${
                   activeCat === cat.id
                     ? 'bg-teal-700 text-white'
                     : 'bg-white text-gray-600 border border-gray-200 hover:border-teal-300'
@@ -51,7 +51,7 @@ export default function TemplatePicker({ categories, onSelect, label = '定型�
                 key={i}
                 type="button"
                 onClick={() => { onSelect(t); setOpen(false) }}
-                className="block w-full text-left text-xs text-gray-700 bg-white border border-gray-100 rounded-lg px-3 py-2 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                className="block w-full text-left text-xs text-gray-700 bg-white border border-gray-100 rounded-lg px-3 py-2 hover:border-teal-300 hover:bg-teal-50 transition-colors max-lg:min-h-10"
               >
                 {t}
               </button>

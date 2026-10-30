@@ -529,7 +529,7 @@ export default function GoalPage() {
           <button
             type="button"
             onClick={() => setEditGoal(String(goal / 10_000))}
-            className="h-9 rounded-full px-3 text-sm font-bold text-teal-700 hover:bg-teal-50"
+            className="h-9 rounded-full px-3 text-sm font-bold text-teal-700 hover:bg-teal-50 max-lg:h-10"
           >
             目標を変える
           </button>
@@ -757,7 +757,7 @@ export default function GoalPage() {
                           overlap: String(extraNow?.overlap ?? ''),
                         })
                       }
-                      className={`${pill} mt-3`}
+                      className={` max-lg:min-h-10${pill} mt-3`}
                     >
                       {extraNow ? '直す' : '入れる'}
                     </button>
@@ -1023,14 +1023,14 @@ export default function GoalPage() {
                             />
                             <label
                               htmlFor={`act-${a.id}`}
-                              className={`min-w-0 flex-1 text-sm leading-relaxed ${checks.has(a.id) ? 'text-slate-500 line-through' : 'text-slate-700'}`}
+                              className={`min-w-0 flex-1 text-sm leading-relaxed max-lg:min-h-10 ${checks.has(a.id) ? 'text-slate-500 line-through' : 'text-slate-700'}`}
                             >
                               {a.text}
                             </label>
                             {a.href && (
                               <Link
                                 href={a.href}
-                                className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                                className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
                               >
                                 {a.link}
                               </Link>

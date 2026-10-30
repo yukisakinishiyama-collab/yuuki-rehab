@@ -72,7 +72,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
           <button
             type="button"
             onClick={handleRestart}
-            className="text-xs text-gray-500 hover:text-gray-600"
+            className="text-xs text-gray-500 hover:text-gray-600 max-lg:min-h-10"
           >
             ↺ 最初から
           </button>
@@ -102,7 +102,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
                 key={opt.label}
                 type="button"
                 onClick={() => handleAnswer(node.question, opt.label, opt.next)}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-teal-400 hover:bg-teal-50 transition-colors max-lg:min-h-10"
               >
                 {opt.label}
               </button>
@@ -112,7 +112,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
             <button
               type="button"
               onClick={handleBack}
-              className="text-xs text-teal-700 hover:text-teal-800 font-medium"
+              className="text-xs text-teal-700 hover:text-teal-800 font-medium max-lg:min-h-10"
             >
               ← 一つ前の質問に戻る
             </button>
@@ -164,7 +164,7 @@ function ResultCard({ node, onBack }: { node: FlowResultNode; onBack?: () => voi
         <button
           type="button"
           onClick={onBack}
-          className="text-xs text-teal-700 hover:text-teal-800 font-medium"
+          className="text-xs text-teal-700 hover:text-teal-800 font-medium max-lg:min-h-10"
         >
           ← 一つ前の質問に戻る
         </button>

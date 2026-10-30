@@ -73,7 +73,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
             <button
               type="button"
               onClick={() => remove(c.id)}
-              className="text-gray-500 hover:text-red-400 transition-colors text-lg leading-none"
+              className="text-gray-500 hover:text-red-400 transition-colors text-lg leading-none max-lg:min-h-10"
               title="削除"
             >×</button>
           </div>
@@ -89,7 +89,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
                       key={r}
                       type="button"
                       onClick={() => update(c.id, { bodyRegion: r })}
-                      className={`px-2 py-0.5 text-xs rounded-lg border transition-colors ${
+                      className={`px-2 py-0.5 text-xs rounded-lg border transition-colors max-lg:min-h-10 ${
                         c.bodyRegion === r
                           ? 'bg-teal-700 text-white border-teal-700'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
@@ -108,7 +108,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
                       key={s}
                       type="button"
                       onClick={() => update(c.id, { side: s })}
-                      className={`px-2.5 py-0.5 text-xs rounded-lg border transition-colors ${
+                      className={`px-2.5 py-0.5 text-xs rounded-lg border transition-colors max-lg:min-h-10 ${
                         c.side === s
                           ? 'bg-teal-700 text-white border-teal-700'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
@@ -148,7 +148,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
                     key={i}
                     type="button"
                     onClick={() => update(c.id, { nrs: i })}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors max-lg:min-h-10 ${
                       c.nrs === i
                         ? NRS_COLORS(i)
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -175,7 +175,7 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
                       key={sym}
                       type="button"
                       onClick={() => toggleSymptom(c.id, sym)}
-                      className={`px-2.5 py-1 text-xs rounded-full border transition-colors font-medium ${
+                      className={`px-2.5 py-1 text-xs rounded-full border transition-colors font-medium max-lg:min-h-10 ${
                         active
                           ? 'bg-teal-100 text-teal-800 border-teal-300'
                           : 'bg-white text-gray-500 border-gray-200 hover:border-teal-200'

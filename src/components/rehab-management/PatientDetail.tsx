@@ -251,7 +251,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
               type="button"
               onClick={handleSave}
               disabled={!content.trim()}
-              className="px-4 py-1.5 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-1.5 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
             >
               保存
             </button>
@@ -281,7 +281,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                   <button
                     type="button"
                     onClick={() => toggleMonth(ym)}
-                    className="flex items-center gap-2 flex-1 text-left"
+                    className="flex items-center gap-2 flex-1 text-left max-lg:min-h-10"
                   >
                     <span className="text-sm font-bold text-teal-700">{formatMonthLabel(ym)}</span>
                     {monthMemos.length > 0 && (
@@ -301,7 +301,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                     onClick={() => printMonthlyChart(patient, monthMemos, monthTests, ym)}
                     className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-teal-600
                       border border-gray-200 hover:border-teal-300 rounded-lg px-2.5 py-1
-                      transition-colors bg-white"
+                      transition-colors bg-white max-lg:min-h-10"
                     title="この月をカルテとして印刷"
                   >
                     🖨️ カルテ印刷
@@ -431,7 +431,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
             type="button"
             onClick={onReferral}
             title="この経過から紹介状・報告書を作成"
-            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
           >
             📄 紹介状
           </button>
@@ -639,7 +639,7 @@ function IntakeCard({
               type="button"
               onClick={onReferral}
               title="紹介状・報告書を作成"
-              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
             >
               📄 紹介状
             </button>
@@ -842,7 +842,7 @@ export default function PatientDetail({ patient }: Props) {
                     type="button"
                     onClick={() => setActiveTab('cancel')}
                     title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-colors max-lg:min-h-10 ${
                       cancelSummary.no_show > 0
                         ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
                         : 'border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
@@ -894,26 +894,26 @@ export default function PatientDetail({ patient }: Props) {
             <button
               type="button"
               onClick={() => setActiveTab('soap')}
-              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-800"
+              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-800 max-lg:min-h-10"
             >
               今日のSOAPを書く
             </button>
             <button
               type="button"
               onClick={() => setShowReferralModal(true)}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10"
             >
               紹介状・報告書
             </button>
             <Link
               href={`/patients/${patient.id}/return-criteria`}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
             >
               復帰基準テスト
             </Link>
             <Link
               href={`/patients/${patient.id}/outcome-scores`}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
             >
               アウトカム評価
             </Link>
@@ -1102,7 +1102,7 @@ export default function PatientDetail({ patient }: Props) {
                 type="button"
                 aria-pressed={evalTab === t.key}
                 onClick={() => setEvalTab(t.key)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors max-lg:min-h-10 ${
                   evalTab === t.key ? 'bg-teal-700 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -1328,7 +1328,7 @@ export default function PatientDetail({ patient }: Props) {
                   </div>
                   <Link
                     href={`/patients/${patient.id}/outcome-scores`}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white text-xs font-semibold rounded-lg hover:bg-teal-800 transition-colors whitespace-nowrap flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white text-xs font-semibold rounded-lg hover:bg-teal-800 transition-colors whitespace-nowrap flex-shrink-0 max-lg:min-h-10"
                   >
                     スコア入力 →
                   </Link>
@@ -1343,7 +1343,7 @@ export default function PatientDetail({ patient }: Props) {
                   <SectionTitle>🏆 機能評価・競技復帰テスト</SectionTitle>
                   <Link
                     href={`/patients/${patient.id}/return-criteria`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-semibold rounded-lg hover:bg-emerald-800 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-semibold rounded-lg hover:bg-emerald-800 transition-colors whitespace-nowrap max-lg:min-h-10"
                   >
                     評価ページへ →
                   </Link>
@@ -1365,7 +1365,7 @@ export default function PatientDetail({ patient }: Props) {
                     </p>
                     <Link
                       href={`/patients/${patient.id}/return-criteria`}
-                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg hover:bg-emerald-800 transition-colors"
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg hover:bg-emerald-800 transition-colors max-lg:min-h-10"
                     >
                       🏆 復帰基準テストを実施する
                     </Link>

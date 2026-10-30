@@ -258,7 +258,7 @@ export function ToggleSwitch({
   onChange: (v: boolean) => void
 }) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer">
+    <label className="flex items-center gap-3 cursor-pointer max-lg:min-h-10">
       <button
         type="button"
         role="switch"

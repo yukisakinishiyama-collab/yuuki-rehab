@@ -321,7 +321,7 @@ function ComposeInner() {
                   key={channel}
                   type="button"
                   onClick={() => setChannels((prev) => (on ? prev.filter((c) => c !== channel) : [...prev, channel]))}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium max-lg:min-h-10 ${
                     on ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-300 bg-white text-slate-600'
                   }`}
                 >
@@ -332,7 +332,7 @@ function ComposeInner() {
           </div>
         </div>
 
-        <button type="button" onClick={() => setShowDetail(!showDetail)} className="text-sm font-medium text-teal-700">
+        <button type="button" onClick={() => setShowDetail(!showDetail)} className="text-sm font-medium text-teal-700 max-lg:min-h-10">
           {showDetail ? '▲ 詳細設定を閉じる' : '▼ 詳細設定（対象者・根拠・CTA・トーンなど）'}
         </button>
         {showDetail && (
@@ -408,7 +408,7 @@ function ComposeInner() {
                 key={v.id}
                 type="button"
                 onClick={() => setActiveTab(v.id)}
-                className={`rounded-t-lg px-3 py-1.5 text-sm font-medium ${
+                className={`rounded-t-lg px-3 py-1.5 text-sm font-medium max-lg:min-h-10 ${
                   activeVariant?.id === v.id ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -485,7 +485,7 @@ function ComposeInner() {
                           type="button"
                           onClick={() => makeImage(project)}
                           disabled={imageBusy || busy}
-                          className="rounded-lg border border-sky-400 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 disabled:opacity-50"
+                          className="rounded-lg border border-sky-400 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 disabled:opacity-50 max-lg:min-h-10"
                         >
                           {imageBusy ? '画像を作成中…' : activeVariant.content.image ? 'AI画像を作り直す' : 'AI画像を作る'}
                         </button>
@@ -494,7 +494,7 @@ function ComposeInner() {
                             type="button"
                             onClick={() => removeImage(project)}
                             disabled={imageBusy}
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 disabled:opacity-50"
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 max-lg:min-h-10"
                           >
                             テンプレ画像にする
                           </button>
@@ -564,11 +564,11 @@ function ComposeInner() {
 
               {/* アクション */}
               <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                <button type="button" onClick={() => recheck(activeVariant)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold">
+                <button type="button" onClick={() => recheck(activeVariant)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold max-lg:min-h-10">
                   表現を再チェック
                 </button>
                 {activeVariant.status === 'draft' && (
-                  <button type="button" onClick={() => doTransition(activeVariant, 'review')} className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">
+                  <button type="button" onClick={() => doTransition(activeVariant, 'review')} className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 max-lg:min-h-10">
                     承認申請
                   </button>
                 )}
@@ -578,7 +578,7 @@ function ComposeInner() {
                     onClick={() => doTransition(activeVariant, 'approved')}
                     disabled={imageBusy}
                     title={imageBusy ? '画像を作っている間は承認できません' : ''}
-                    className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800 disabled:opacity-50"
+                    className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800 disabled:opacity-50 max-lg:min-h-10"
                   >
                     承認する
                   </button>
@@ -589,7 +589,7 @@ function ComposeInner() {
                     onClick={() => doTransition(activeVariant, 'scheduled')}
                     disabled={imageBusy}
                     title={imageBusy ? '画像を作っている間は予約できません' : ''}
-                    className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50 max-lg:min-h-10"
                   >
                     承認して予約する
                   </button>
@@ -602,7 +602,7 @@ function ComposeInner() {
                         doTransition(activeVariant, 'published')
                       }
                     }}
-                    className="rounded-lg border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"
+                    className="rounded-lg border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 max-lg:min-h-10"
                   >
                     公開済みにする
                   </button>
@@ -613,7 +613,7 @@ function ComposeInner() {
                 <button
                   type="button"
                   onClick={() => navigator.clipboard.writeText(`${activeVariant.content.body}\n\n${activeVariant.content.hashtags.join(' ')}`)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold max-lg:min-h-10"
                 >
                   本文をコピー
                 </button>
@@ -621,7 +621,7 @@ function ComposeInner() {
                   href={postImageUrl(activeVariant.content, activeVariant.channel, project.theme)}
                   target="_blank"
                   rel="noopener"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
                 >
                   {usesAiImage(activeVariant.channel) ? '画像を開く（保存用）' : 'テンプレ画像を作る'}
                 </a>

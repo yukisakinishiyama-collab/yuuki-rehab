@@ -208,7 +208,7 @@ export default function ROMInputForm({ patientId, onSaved }: Props) {
                 key={t.movement}
                 type="button"
                 onClick={() => applyTemplate(t)}
-                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors max-lg:min-h-10 ${
                   form.movement === t.movement
                     ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
@@ -277,7 +277,7 @@ export default function ROMInputForm({ patientId, onSaved }: Props) {
           <FormLabel>単位</FormLabel>
           <div className="flex gap-4">
             {(['deg', 'cm'] as const).map(u => (
-              <label key={u} className="flex items-center gap-1.5 cursor-pointer">
+              <label key={u} className="flex items-center gap-1.5 cursor-pointer max-lg:min-h-10">
                 <input type="radio" value={u} checked={form.unit === u}
                   onChange={() => setForm(f => ({ ...f, unit: u }))}
                   className="accent-teal-600" />

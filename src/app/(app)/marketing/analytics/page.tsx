@@ -133,7 +133,7 @@ function InstagramFollowers() {
             placeholder="今日のフォロワー数（例: 912）"
             className="w-48 rounded-lg border border-slate-300 p-2 text-sm"
           />
-          <button type="button" onClick={save} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white">
+          <button type="button" onClick={save} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white max-lg:min-h-10">
             記録する
           </button>
           {message && <span className="text-sm text-slate-600">{message}</span>}
@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
               key={d}
               type="button"
               onClick={() => setDays(d)}
-              className={`rounded-full border px-3 py-1 text-sm font-medium ${
+              className={`rounded-full border px-3 py-1 text-sm font-medium max-lg:min-h-10 ${
                 days === d ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-300 text-slate-600'
               }`}
             >

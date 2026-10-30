@@ -485,7 +485,7 @@ function StoryMaker() {
                 ひとこと（40文字まで・空でもよい）
                 <input className={input} value={note} maxLength={40} placeholder="例：夕方は空きがあります" onChange={(e) => { setNote(e.target.value); setDirty(true) }} />
               </label>
-              <label className="flex items-center gap-2 text-xs text-slate-600">
+              <label className="flex items-center gap-2 text-xs text-slate-600 max-lg:min-h-10">
                 <input type="checkbox" checked={showRemaining} onChange={(e) => { setShowRemaining(e.target.checked); setDirty(true) }} />
                 残り枠の数を出す（外すと「空きあり・あと少し」だけ）
               </label>
@@ -503,7 +503,7 @@ function StoryMaker() {
                           type="button"
                           onClick={() => toggleSlot(key)}
                           aria-pressed={!off}
-                          className={`rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${off ? 'border-slate-200 bg-slate-100 text-slate-500 line-through' : 'border-teal-300 bg-teal-50 text-teal-800'}`}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums max-lg:min-h-10 ${off ? 'border-slate-200 bg-slate-100 text-slate-500 line-through' : 'border-teal-300 bg-teal-50 text-teal-800'}`}
                         >
                           {s.time}（{s.remaining}）
                         </button>

@@ -198,7 +198,7 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
                 key={t}
                 type="button"
                 onClick={() => setForm(f => ({ ...f, testName: t }))}
-                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors max-lg:min-h-10 ${
                   form.testName === t
                     ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
@@ -226,7 +226,7 @@ export default function SpecialTestInputForm({ patientId, onSaved }: Props) {
                     key={r}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, [key]: r }))}
-                    className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                    className={`px-2 py-0.5 text-xs rounded-full transition-colors max-lg:min-h-10 ${
                       form[key] === r
                         ? RESULT_STYLES[r]
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'

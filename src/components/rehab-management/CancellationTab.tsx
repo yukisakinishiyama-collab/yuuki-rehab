@@ -234,7 +234,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                   key={chip}
                   type="button"
                   onClick={() => setReason(reason === chip ? '' : chip)}
-                  className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors ${
+                  className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors max-lg:min-h-10 ${
                     reason === chip
                       ? 'bg-teal-700 text-white border-teal-700'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-700'
@@ -302,7 +302,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
               type="button"
               onClick={() => setShowExcluded(v => !v)}
               aria-expanded={showExcluded}
-              className="w-full flex items-center gap-2 text-left group"
+              className="w-full flex items-center gap-2 text-left group max-lg:min-h-10"
             >
               <span className="text-sm font-semibold text-gray-800">
                 カウント対象外（{excluded.length}件）
@@ -343,7 +343,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             onClick={() => setEditingKindId(editingKindId === r.id ? null : r.id)}
             title="区分を直す"
             className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-              hover:ring-2 hover:ring-teal-300 transition-shadow ${KIND_STYLES[r.kind].chip}`}
+              hover:ring-2 hover:ring-teal-300 transition-shadow max-lg:min-h-10 ${KIND_STYLES[r.kind].chip}`}
           >
             {CANCELLATION_SHORT_LABELS[r.kind]}
           </button>
@@ -385,7 +385,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                   key={k}
                   type="button"
                   onClick={() => handleChangeKind(r, k)}
-                  className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-colors ${
+                  className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-colors max-lg:min-h-10 ${
                     r.kind === k
                       ? 'bg-teal-700 text-white border-teal-700'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
@@ -410,7 +410,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                     onClick={() => handleSetExclusion(r, key)}
                     title={CANCELLATION_EXCLUSION_DESCRIPTIONS[key]}
                     className="px-3 py-1.5 text-xs rounded-full border font-medium bg-white
-                      text-amber-800 border-amber-300 hover:bg-amber-100 transition-colors"
+                      text-amber-800 border-amber-300 hover:bg-amber-100 transition-colors max-lg:min-h-10"
                   >
                     {CANCELLATION_EXCLUSION_LABELS[key]}
                   </button>
@@ -419,7 +419,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
                   type="button"
                   onClick={() => setExcludingId(null)}
                   className="px-3 py-1.5 text-xs rounded-full border border-transparent
-                    text-gray-500 hover:text-gray-700 transition-colors"
+                    text-gray-500 hover:text-gray-700 transition-colors max-lg:min-h-10"
                 >
                   やめる
                 </button>
@@ -434,7 +434,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
               type="button"
               onClick={() => handleSetExclusion(r, null)}
               className="text-xs text-gray-500 hover:text-teal-700 border border-gray-200
-                hover:border-teal-300 rounded-md transition-colors px-2 py-1"
+                hover:border-teal-300 rounded-md transition-colors px-2 py-1 max-lg:min-h-10"
             >
               戻す
             </button>
@@ -443,7 +443,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
               type="button"
               onClick={() => setExcludingId(excludingId === r.id ? null : r.id)}
               className="text-xs text-gray-500 hover:text-amber-700 border border-gray-200
-                hover:border-amber-300 rounded-md transition-colors px-2 py-1"
+                hover:border-amber-300 rounded-md transition-colors px-2 py-1 max-lg:min-h-10"
             >
               対象外にする
             </button>
@@ -452,7 +452,7 @@ export default function CancellationTab({ patientId, records, visitCount, onUpda
             type="button"
             onClick={() => handleDelete(r)}
             className="text-xs text-gray-500 hover:text-red-600 hover:border-red-200
-              border border-transparent rounded-md transition-colors px-2 py-1"
+              border border-transparent rounded-md transition-colors px-2 py-1 max-lg:min-h-10"
             aria-label={`${r.appointmentDate} のキャンセル記録を削除`}
           >
             削除

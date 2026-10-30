@@ -179,7 +179,7 @@ export default function StrengthInputForm({ patientId, onSaved }: Props) {
                 key={t.movement}
                 type="button"
                 onClick={() => applyTemplate(t)}
-                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors max-lg:min-h-10 ${
                   form.movement === t.movement
                     ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'

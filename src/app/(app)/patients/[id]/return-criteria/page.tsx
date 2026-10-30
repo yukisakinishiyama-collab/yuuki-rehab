@@ -753,7 +753,7 @@ export default function ReturnCriteriaPage({
               {(Object.entries(REGION_LABELS) as [AssessmentRegion, string][]).map(([value, label]) => (
                 <button key={value}
                   onClick={() => setRegion(value)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all max-lg:min-h-10 ${
                     region === value
                       ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'
@@ -772,7 +772,7 @@ export default function ReturnCriteriaPage({
               ] as const).map(({ value, label, Icon }) => (
                 <button key={value}
                   onClick={() => setAssessmentType(value)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all max-lg:min-h-10 ${
                     assessmentType === value
                       ? 'bg-teal-700 text-white border-teal-700 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:border-teal-400'
@@ -815,7 +815,7 @@ export default function ReturnCriteriaPage({
                   <div className="space-y-1">
                     {options.map(opt => (
                       <label key={opt.score}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm max-lg:min-h-10
                           ${lysholm[key] === opt.score
                             ? 'bg-blue-50 text-blue-800 font-medium'
                             : 'hover:bg-slate-50 text-slate-600'}`}
@@ -856,7 +856,7 @@ export default function ReturnCriteriaPage({
                   <div className="space-y-1">
                     {options.map(opt => (
                       <label key={opt.score}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm max-lg:min-h-10
                           ${hipSymptom[key] === opt.score
                             ? 'bg-blue-50 text-blue-800 font-medium'
                             : 'hover:bg-slate-50 text-slate-600'}`}
@@ -897,7 +897,7 @@ export default function ReturnCriteriaPage({
                   <div className="space-y-1">
                     {options.map(opt => (
                       <label key={opt.score}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm max-lg:min-h-10
                           ${shoulderSymptom[key] === opt.score
                             ? 'bg-blue-50 text-blue-800 font-medium'
                             : 'hover:bg-slate-50 text-slate-600'}`}
@@ -938,7 +938,7 @@ export default function ReturnCriteriaPage({
                   <div className="space-y-1">
                     {options.map(opt => (
                       <label key={opt.score}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm max-lg:min-h-10
                           ${ankleSymptom[key] === opt.score
                             ? 'bg-blue-50 text-blue-800 font-medium'
                             : 'hover:bg-slate-50 text-slate-600'}`}
@@ -979,7 +979,7 @@ export default function ReturnCriteriaPage({
                   <div className="space-y-1">
                     {options.map(opt => (
                       <label key={opt.score}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-sm max-lg:min-h-10
                           ${lumbarSymptom[key] === opt.score
                             ? 'bg-blue-50 text-blue-800 font-medium'
                             : 'hover:bg-slate-50 text-slate-600'}`}
@@ -1204,7 +1204,7 @@ export default function ReturnCriteriaPage({
                   ] as const).map(opt => (
                     <button key={opt.value}
                       onClick={() => setHipFunction(d => ({ ...d, trendelenburg: opt.value }))}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all max-lg:min-h-10 ${
                         hipFunction.trendelenburg === opt.value
                           ? opt.value === 'positive'
                             ? 'bg-red-600 text-white border-red-600'
@@ -1299,7 +1299,7 @@ export default function ReturnCriteriaPage({
                   ] as const).map(opt => (
                     <button key={opt.value}
                       onClick={() => setShoulderFunction(d => ({ ...d, scapularDyskinesis: opt.value }))}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all max-lg:min-h-10 ${
                         shoulderFunction.scapularDyskinesis === opt.value
                           ? opt.value === 'positive'
                             ? 'bg-red-600 text-white border-red-600'
@@ -1463,10 +1463,11 @@ export default function ReturnCriteriaPage({
                 各活動に対して、現在の能力レベルを選択してください
               </p>
               {LEFS_ACTIVITIES.map((activity, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
+                <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 max-lg:flex-wrap max-lg:gap-y-2">
                   <span className="text-xs text-slate-500 w-4 flex-shrink-0">{i + 1}</span>
                   <span className="text-xs text-slate-700 flex-1">{activity}</span>
-                  <div className="flex gap-1">
+                  {/* 指で押す幅では、点数のボタンを項目名の下の行に出して 40px にする（1行に並べると項目名が読めなくなるため） */}
+                  <div className="flex gap-1 max-lg:basis-full max-lg:justify-end max-lg:gap-2">
                     {LEFS_OPTIONS.map(opt => (
                       <button key={opt.value}
                         onClick={() => {
@@ -1475,7 +1476,7 @@ export default function ReturnCriteriaPage({
                           setLefs(next)
                         }}
                         title={opt.label}
-                        className={`w-6 h-6 rounded text-xs font-bold border transition-all ${
+                        className={`w-6 h-6 rounded text-xs font-bold border transition-all max-lg:h-10 max-lg:w-10 max-lg:text-sm ${
                           lefs[i] === opt.value
                             ? 'bg-orange-700 text-white border-orange-700'
                             : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'
@@ -1509,10 +1510,11 @@ export default function ReturnCriteriaPage({
                 各活動・症状について、現在の状態を選択してください
               </p>
               {SHOULDER_DAILY_ACTIVITIES.map((activity, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
+                <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 max-lg:flex-wrap max-lg:gap-y-2">
                   <span className="text-xs text-slate-500 w-4 flex-shrink-0">{i + 1}</span>
                   <span className="text-xs text-slate-700 flex-1">{activity}</span>
-                  <div className="flex gap-1">
+                  {/* 指で押す幅では、点数のボタンを項目名の下の行に出して 40px にする（1行に並べると項目名が読めなくなるため） */}
+                  <div className="flex gap-1 max-lg:basis-full max-lg:justify-end max-lg:gap-2">
                     {SHOULDER_DAILY_OPTIONS.map(opt => (
                       <button key={opt.value}
                         onClick={() => {
@@ -1521,7 +1523,7 @@ export default function ReturnCriteriaPage({
                           setShoulderDaily(next)
                         }}
                         title={opt.label}
-                        className={`w-6 h-6 rounded text-xs font-bold border transition-all ${
+                        className={`w-6 h-6 rounded text-xs font-bold border transition-all max-lg:h-10 max-lg:w-10 max-lg:text-sm ${
                           shoulderDaily[i] === opt.value
                             ? 'bg-orange-700 text-white border-orange-700'
                             : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'
@@ -1614,7 +1616,7 @@ export default function ReturnCriteriaPage({
         <div className="mt-6">
           <button
             onClick={() => setShowHistory(v => !v)}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800 mb-3">
+            className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800 mb-3 max-lg:min-h-10">
             {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             評価履歴 ({history.length}件)
           </button>
@@ -1645,7 +1647,7 @@ export default function ReturnCriteriaPage({
                       {rec.notes && <p className="text-xs text-slate-500 mt-1">{rec.notes}</p>}
                     </div>
                     <button onClick={() => handleDelete(rec.id)}
-                      className="text-slate-500 hover:text-red-400 transition-colors p-1 flex-shrink-0">
+                      className="text-slate-500 hover:text-red-400 transition-colors p-1 flex-shrink-0 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>

@@ -105,7 +105,7 @@ export default function JobsPage() {
           </span>
         )}
         {isAdmin ? (
-          <button type="button" onClick={runNow} disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={runNow} disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 max-lg:min-h-10">
             期限のきたジョブを今すぐ実行
           </button>
         ) : (
@@ -142,7 +142,7 @@ export default function JobsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-bold">Instagramの自動投稿</span>
             {isAdmin && conn?.instagramOAuth?.ready ? (
-              <a href="/api/marketing/instagram/connect" className="rounded-lg bg-pink-700 px-4 py-2 text-sm font-bold text-white">
+              <a href="/api/marketing/instagram/connect" className="rounded-lg bg-pink-700 px-4 py-2 text-sm font-bold text-white max-lg:min-h-10 max-lg:inline-flex max-lg:items-center">
                 {conn?.connections?.instagram ? 'Instagramとつなぎ直す' : 'Instagramとつなぐ'}
               </a>
             ) : null}
@@ -165,7 +165,7 @@ export default function JobsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-bold">Googleの自動投稿</span>
             {isAdmin && conn?.googleOAuth?.ready ? (
-              <a href="/api/marketing/google/connect" className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">
+              <a href="/api/marketing/google/connect" className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white max-lg:min-h-10 max-lg:inline-flex max-lg:items-center">
                 {conn?.connections?.googleBusiness ? 'Googleとつなぎ直す' : 'Googleとつなぐ'}
               </a>
             ) : null}
@@ -224,7 +224,7 @@ export default function JobsPage() {
                         <button
                           type="button"
                           onClick={() => navigator.clipboard.writeText(`${job.content.body}\n\n${(job.content.hashtags ?? []).join(' ')}`)}
-                          className="rounded border border-slate-300 px-2 py-1 text-xs font-bold"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs font-bold max-lg:min-h-10"
                         >
                           本文をコピー
                         </button>
@@ -235,7 +235,7 @@ export default function JobsPage() {
                               const url = window.prompt('投稿したURLがあれば入力してください（空欄でもOK）') ?? undefined
                               patchJob(job.id, { action: 'manual_complete', publishedUrl: url || undefined })
                             }}
-                            className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800"
+                            className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800 max-lg:min-h-10"
                           >
                             手動投稿を完了にする
                           </button>
@@ -243,7 +243,7 @@ export default function JobsPage() {
                       </>
                     )}
                     {isAdmin && job.status === 'failed' && (
-                      <button type="button" onClick={() => patchJob(job.id, { action: 'retry' })} className="rounded border border-blue-400 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800">
+                      <button type="button" onClick={() => patchJob(job.id, { action: 'retry' })} className="rounded border border-blue-400 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800 max-lg:min-h-10">
                         再実行
                       </button>
                     )}
@@ -255,11 +255,11 @@ export default function JobsPage() {
                             const at = window.prompt('新しい公開日時（例: 2026-07-20T10:00）', job.scheduledAt)
                             if (at) patchJob(job.id, { action: 'reschedule', scheduledAt: at })
                           }}
-                          className="rounded border border-slate-300 px-2 py-1 text-xs font-bold"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs font-bold max-lg:min-h-10"
                         >
                           日時変更
                         </button>
-                        <button type="button" onClick={() => patchJob(job.id, { action: 'cancel' })} className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
+                        <button type="button" onClick={() => patchJob(job.id, { action: 'cancel' })} className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-700 max-lg:min-h-10">
                           取消
                         </button>
                       </>

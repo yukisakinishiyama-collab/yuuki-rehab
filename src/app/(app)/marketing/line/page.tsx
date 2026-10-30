@@ -82,7 +82,7 @@ export default function LinePage() {
           <ul className="mt-1 space-y-0.5 text-red-700">
             {attention.map((c) => (
               <li key={c.userId}>
-                <button type="button" className="underline" onClick={() => setSelectedId(c.userId)}>
+                <button type="button" className="underline max-lg:min-h-10" onClick={() => setSelectedId(c.userId)}>
                   {c.displayName}
                 </button>
                 ：{c.needsAttention}
@@ -104,7 +104,7 @@ export default function LinePage() {
               <button
                 type="button"
                 onClick={() => simulate({ kind: 'follow' }, `demo${Date.now() % 1000}`)}
-                className="rounded bg-teal-700 px-2 py-1 text-xs font-bold text-white"
+                className="rounded bg-teal-700 px-2 py-1 text-xs font-bold text-white max-lg:min-h-10"
               >
                 ＋友だち追加を試す
               </button>
@@ -116,7 +116,7 @@ export default function LinePage() {
                 <button
                   type="button"
                   onClick={() => setSelectedId(c.userId)}
-                  className={`w-full rounded-lg border p-2 text-left text-sm ${
+                  className={`w-full rounded-lg border p-2 text-left text-sm max-lg:min-h-10 ${
                     selectedId === c.userId ? 'border-teal-600 bg-teal-50' : 'border-slate-200'
                   }`}
                 >
@@ -143,14 +143,14 @@ export default function LinePage() {
                 <button
                   type="button"
                   onClick={() => patch(selected.userId, { handoff: !selected.handoff, needsAttention: '' })}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold max-lg:min-h-10 ${
                     selected.handoff ? 'bg-emerald-700 text-white' : 'border border-red-300 bg-red-50 text-red-700'
                   }`}
                 >
                   {selected.handoff ? '対応終了（自動応答を再開）' : '人対応に切り替え（自動応答停止）'}
                 </button>
                 {selected.needsAttention && (
-                  <button type="button" onClick={() => patch(selected.userId, { needsAttention: '' })} className="rounded bg-slate-100 px-2 py-1 text-xs">
+                  <button type="button" onClick={() => patch(selected.userId, { needsAttention: '' })} className="rounded bg-slate-100 px-2 py-1 text-xs max-lg:min-h-10">
                     要対応を解除
                   </button>
                 )}
@@ -167,7 +167,7 @@ export default function LinePage() {
                       onClick={() =>
                         patch(selected.userId, { tags: on ? selected.tags.filter((t) => t !== tag) : [...selected.tags, tag] })
                       }
-                      className={`rounded-full border px-2 py-0.5 text-xs ${
+                      className={`rounded-full border px-2 py-0.5 text-xs max-lg:min-h-10 ${
                         on ? 'border-teal-600 bg-teal-50 font-bold text-teal-800' : 'border-slate-200 text-slate-500'
                       }`}
                     >
@@ -201,7 +201,7 @@ export default function LinePage() {
                     <div className="flex flex-wrap gap-1.5">
                       {simButtons.map((b, i) =>
                         b.url ? (
-                          <a key={i} href={b.url} target="_blank" rel="noopener" className="rounded-full border border-sky-300 bg-white px-2.5 py-1 text-xs text-sky-700">
+                          <a key={i} href={b.url} target="_blank" rel="noopener" className="rounded-full border border-sky-300 bg-white px-2.5 py-1 text-xs text-sky-700 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center">
                             🔗 {b.label}
                           </a>
                         ) : (
@@ -210,7 +210,7 @@ export default function LinePage() {
                             type="button"
                             disabled={busy}
                             onClick={() => simulate({ kind: 'postback', data: b.data, text: b.label })}
-                            className="rounded-full border border-teal-400 bg-white px-2.5 py-1 text-xs font-bold text-teal-800"
+                            className="rounded-full border border-teal-400 bg-white px-2.5 py-1 text-xs font-bold text-teal-800 max-lg:min-h-10"
                           >
                             {b.label}
                           </button>
@@ -232,7 +232,7 @@ export default function LinePage() {
                         simulate({ kind: 'text', text: simText })
                         setSimText('')
                       }}
-                      className="whitespace-nowrap rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                      className="whitespace-nowrap rounded-lg bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50 max-lg:min-h-10"
                     >
                       送信
                     </button>

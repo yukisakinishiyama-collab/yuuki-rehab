@@ -145,7 +145,7 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
             key={v}
             type="button"
             onClick={() => setView(v)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors max-lg:min-h-10 ${
               view === v
                 ? 'bg-teal-700 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -217,7 +217,7 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
             <button
               type="button"
               onClick={() => onChange(selected.filter(id => !REGS.find(r => r.id === id && r.view === view)))}
-              className="mt-2 text-xs text-gray-500 hover:text-red-500 transition-colors"
+              className="mt-2 text-xs text-gray-500 hover:text-red-500 transition-colors max-lg:min-h-10"
             >
               この面の選択をクリア
             </button>

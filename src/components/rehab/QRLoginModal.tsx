@@ -80,7 +80,7 @@ export default function QRLoginModal({ onClose }: Props) {
             <Smartphone className="w-5 h-5" />
             <span className="font-semibold">スマートフォンでアクセス</span>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -169,7 +169,7 @@ export default function QRLoginModal({ onClose }: Props) {
                 {ngrokUrl && (
                   <button
                     onClick={() => { setNgrokUrl(''); localStorage.removeItem('rehabNgrokUrl') }}
-                    className="text-xs text-red-600 hover:text-red-700"
+                    className="text-xs text-red-600 hover:text-red-700 max-lg:min-h-10"
                   >
                     クリア（ローカルIPに戻す）
                   </button>

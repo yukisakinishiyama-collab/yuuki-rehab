@@ -121,7 +121,7 @@ function CheckboxGroup({
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors max-lg:min-h-10 ${
             selected.includes(opt)
               ? 'bg-teal-700 text-white border-teal-700'
               : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
@@ -274,7 +274,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors max-lg:min-h-10 ${
                 tab === t.key
                   ? 'bg-teal-700 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -338,7 +338,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                     key={String(opt.value)}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, firstTimeSymptoм: opt.value }))}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors max-lg:min-h-10 ${
                       form.firstTimeSymptoм === opt.value
                         ? 'bg-teal-700 text-white border-teal-700'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
@@ -560,7 +560,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 type="button"
                 onClick={handleAnalyze}
                 disabled={analyzing || !form.chiefComplaint}
-                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2 max-lg:min-h-10"
               >
                 {analyzing && (
                   <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -674,7 +674,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 type="button"
                 onClick={handleSave}
                 disabled={!form.chiefComplaint}
-                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
               >
                 💾 問診票を保存
               </button>
@@ -692,7 +692,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 const idx = keys.indexOf(tab)
                 if (idx < keys.length - 1) setTab(keys[idx + 1])
               }}
-              className="text-sm text-teal-700 hover:text-teal-800 font-medium"
+              className="text-sm text-teal-700 hover:text-teal-800 font-medium max-lg:min-h-10"
             >
               次へ →
             </button>
@@ -702,7 +702,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 type="button"
                 onClick={handleSave}
                 disabled={!form.chiefComplaint}
-                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
               >
                 保存
               </button>

@@ -335,7 +335,7 @@ ${printRef.current.innerHTML}
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors max-lg:h-10 max-lg:w-10"
           >
             <X className="w-4 h-4" />
           </button>
@@ -536,7 +536,7 @@ ${printRef.current.innerHTML}
                   type="button"
                   onClick={handlePrint}
                   disabled={!generated && !content.course}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-700 text-white text-xs font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-700 text-white text-xs font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   印刷・PDF保存

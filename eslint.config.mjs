@@ -60,6 +60,26 @@ const LIGHT_BG =
 const WHITE_ON_LIGHT_MESSAGE =
   "白い文字をのせる地の色が明るすぎて読めません（コントラスト比 4.5 未満）。teal・green などは 700、red・blue などは 600 以上にするか、黄色系なら文字を濃い色（text-amber-950 など）にしてください。";
 
+/**
+ * 押す所の大きさ（指で押す幅＝1024px未満で 40px 以上）。
+ * 上下の余白が 8px 以下（p-1・py-1.5・py-2 など）のボタンで、40px 以上の高さ（min-h-10・h-11・max-lg:min-h-10 など）を書いていないもの。
+ * ふだんは見えないボタン（opacity-0）と読み上げ用（sr-only）は対象外
+ */
+const SMALL_PAD = "/(?:^|\\s)py?-(?:0|0\\.5|1|1\\.5|2)(?:\\s|$)/";
+const TALL_OR_EXEMPT =
+  "/(?:^|\\s)(?:max-lg:)?(?:min-h|h|size)-(?:1[0-9]|[2-9][0-9])(?:\\s|$)|(?:^|\\s)(?:opacity-0|sr-only)(?:\\s|$)/";
+/** ボタンの形のリンク（角丸＋地の色・枠）で、上下の余白が 8px 以下のもの */
+const SMALL_BUTTON_LINK =
+  "/^(?=[\\s\\S]*(?:^|\\s)rounded)(?=[\\s\\S]*(?:^|\\s)(?:bg|border|ring)(?:-|\\s|$))(?=[\\s\\S]*(?:^|\\s)py?-(?:0|0\\.5|1|1\\.5|2)(?:\\s|$))/";
+const SMALL_TAP_MESSAGE =
+  "スマホ（下のタブが出る幅）で押しにくい小さなボタンです（高さ 40px 未満）。クラスに max-lg:min-h-10 を足してください（DESIGN_DECISIONS.md「押す場所の大きさ」）。";
+const CLASS_OF = (tag) => `JSXOpeningElement[name.name=${tag}] > JSXAttribute[name.name='className']`;
+/** ラジオ・チェックを中に包んだ <label>（行ごと押せる選択肢）。その <label> に 40px 以上の高さを書く */
+const CHOICE_LABEL =
+  "JSXElement[openingElement.name.name='label']:has(JSXAttribute[name.name='type'] > Literal[value=/^(?:radio|checkbox)$/])";
+const SMALL_CHOICE_MESSAGE =
+  "スマホ（下のタブが出る幅）で押しにくい選択肢です（ラジオ・チェックの行の高さが 40px 未満）。包んでいる <label> のクラスに max-lg:min-h-10 を足してください（DESIGN_DECISIONS.md「押す場所の大きさ」）。";
+
 const clinicLook = (selector, message) => [
   { selector: `Literal[value=${selector}]`, message },
   { selector: `TemplateElement[value.raw=${selector}]`, message },
@@ -104,6 +124,27 @@ const eslintConfig = defineConfig([
         {
           selector: `JSXAttribute[name.name='style'] > JSXExpressionContainer > ObjectExpression > Property[key.name='color'] > Literal[value=${HEX}]:not([value=${READABLE_HEX}])`,
           message: HEX_TEXT_MESSAGE,
+        },
+        // 押す所の大きさ（<button>・ボタンの形の <Link>・<a>）
+        { selector: `${CLASS_OF("'button'")} > Literal[value=${SMALL_PAD}]:not([value=${TALL_OR_EXEMPT}])`, message: SMALL_TAP_MESSAGE },
+        {
+          selector: `${CLASS_OF("'button'")} > JSXExpressionContainer > TemplateLiteral:has(TemplateElement[value.raw=${SMALL_PAD}]):not(:has(TemplateElement[value.raw=${TALL_OR_EXEMPT}]))`,
+          message: SMALL_TAP_MESSAGE,
+        },
+        {
+          selector: `${CLASS_OF("'button'")} > JSXExpressionContainer > CallExpression[callee.name='cn']:has(Literal[value=${SMALL_PAD}]):not(:has(Literal[value=${TALL_OR_EXEMPT}]))`,
+          message: SMALL_TAP_MESSAGE,
+        },
+        { selector: `${CLASS_OF("/^(?:Link|a)$/")} > Literal[value=${SMALL_BUTTON_LINK}]:not([value=${TALL_OR_EXEMPT}])`, message: SMALL_TAP_MESSAGE },
+        // 押す所の大きさ（ラジオ・チェックを包んだ <label>。クラスがないもの・文字のクラス・テンプレートのクラス）
+        { selector: `${CHOICE_LABEL} > JSXOpeningElement:not(:has(JSXAttribute[name.name='className']))`, message: SMALL_CHOICE_MESSAGE },
+        {
+          selector: `${CHOICE_LABEL} > JSXOpeningElement > JSXAttribute[name.name='className'] > Literal:not([value=${TALL_OR_EXEMPT}])`,
+          message: SMALL_CHOICE_MESSAGE,
+        },
+        {
+          selector: `${CHOICE_LABEL} > JSXOpeningElement > JSXAttribute[name.name='className'] > JSXExpressionContainer > TemplateLiteral:not(:has(TemplateElement[value.raw=${TALL_OR_EXEMPT}]))`,
+          message: SMALL_CHOICE_MESSAGE,
         },
       ],
     },

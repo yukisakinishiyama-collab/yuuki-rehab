@@ -144,7 +144,7 @@ function DraftEditor({
         <p className="text-xs font-bold text-teal-700">
           計画の下書き（{state.ai ? 'AIに相談' : 'ひな形'}）— 直してから始めてください
         </p>
-        <button type="button" onClick={onCancel} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="下書きを閉じる">
+        <button type="button" onClick={onCancel} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 max-lg:h-10 max-lg:w-10" aria-label="下書きを閉じる">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -427,7 +427,7 @@ function ItemCard({
               </dd>
             </div>
             <div>
-              <button type="button" onClick={() => setEditing(true)} className="h-9 text-sm font-bold text-teal-700">
+              <button type="button" onClick={() => setEditing(true)} className="h-9 text-sm font-bold text-teal-700 max-lg:h-10">
                 計画を直す
               </button>
             </div>
@@ -450,7 +450,7 @@ function ItemCard({
                 }
                 className="mt-0.5 h-5 w-5 shrink-0 accent-teal-600"
               />
-              <label htmlFor={`a-${item.id}-${a.id}`} className={`min-w-0 flex-1 text-sm leading-relaxed ${a.done ? 'text-slate-500 line-through' : 'text-slate-700'}`}>
+              <label htmlFor={`a-${item.id}-${a.id}`} className={`min-w-0 flex-1 text-sm leading-relaxed max-lg:min-h-10 ${a.done ? 'text-slate-500 line-through' : 'text-slate-700'}`}>
                 {a.text}
               </label>
             </li>
@@ -465,7 +465,7 @@ function ItemCard({
           }}
         >
           <input className={`${input} mt-0`} placeholder="やることを足す" value={newAction} maxLength={200} onChange={(e) => setNewAction(e.target.value)} />
-          <button type="submit" className={`${pill} shrink-0`} disabled={!newAction.trim()}>
+          <button type="submit" className={` max-lg:min-h-10${pill} shrink-0`} disabled={!newAction.trim()}>
             足す
           </button>
         </form>
@@ -496,7 +496,7 @@ function ItemCard({
                 onChange={(e) => setManualValue(e.target.value)}
                 aria-label="数を記録"
               />
-              <button type="button" className={`${pill} shrink-0`} onClick={() => void addManual()} disabled={!manualValue.trim()}>
+              <button type="button" className={` max-lg:min-h-10${pill} shrink-0`} onClick={() => void addManual()} disabled={!manualValue.trim()}>
                 数を記録
               </button>
             </div>
@@ -604,15 +604,15 @@ function ItemCard({
           {confirmDelete ? (
             <span className="flex items-center gap-2 text-xs text-slate-600">
               この施策を消しますか？
-              <button type="button" className="h-9 rounded-full bg-red-600 px-3 font-bold text-white" onClick={() => void onDelete()}>
+              <button type="button" className="h-9 rounded-full bg-red-600 px-3 font-bold text-white max-lg:h-10" onClick={() => void onDelete()}>
                 消す
               </button>
-              <button type="button" className="h-9 px-2 font-bold text-slate-500" onClick={() => setConfirmDelete(false)}>
+              <button type="button" className="h-9 px-2 font-bold text-slate-500 max-lg:h-10" onClick={() => setConfirmDelete(false)}>
                 やめる
               </button>
             </span>
           ) : (
-            <button type="button" className="inline-flex h-9 items-center gap-1 text-xs font-bold text-slate-500 hover:text-red-600" onClick={() => setConfirmDelete(true)}>
+            <button type="button" className="inline-flex h-9 items-center gap-1 text-xs font-bold text-slate-500 hover:text-red-600 max-lg:h-10" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
               消す
             </button>
@@ -836,7 +836,7 @@ export default function PdcaPage() {
                     type="button"
                     disabled={consulting}
                     onClick={() => void consult({ templateId: t.id, concernText: '' })}
-                    className="h-9 rounded-full bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 disabled:opacity-50"
+                    className="h-9 rounded-full bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 disabled:opacity-50 max-lg:h-10"
                   >
                     {t.label}
                   </button>

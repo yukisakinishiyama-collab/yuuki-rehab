@@ -69,7 +69,7 @@ export default function NewPatientPage() {
       <div>
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors max-lg:min-h-10"
         >
           <ArrowLeft className="w-4 h-4" />
           戻る

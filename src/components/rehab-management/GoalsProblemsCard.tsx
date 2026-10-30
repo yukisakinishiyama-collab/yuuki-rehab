@@ -151,7 +151,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
                   onClick={() => toggleClinicalGoal(g.id)}
                   aria-pressed={g.achieved}
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs
-                    flex-shrink-0 transition-colors ${
+                    flex-shrink-0 transition-colors max-lg:h-10 max-lg:w-10 ${
                     g.achieved
                       ? 'bg-teal-700 border-teal-700 text-white'
                       : 'bg-white border-gray-300 text-transparent hover:border-teal-400'
@@ -189,7 +189,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
                 onClick={addClinicalGoal}
                 disabled={!newGoalLabel.trim()}
                 className="h-9 px-3 rounded-lg bg-teal-700 text-white text-xs font-semibold
-                  hover:bg-teal-700 disabled:opacity-40 transition-colors"
+                  hover:bg-teal-700 disabled:opacity-40 transition-colors max-lg:h-10"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -233,7 +233,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
                   type="button"
                   onClick={() => cycleProblem(p)}
                   title={`${PROBLEM_STATUS_LABELS[p.status]}（タップで切替）`}
-                  className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors ${STATUS_STYLES[p.status]}`}
+                  className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors max-lg:min-h-10 ${STATUS_STYLES[p.status]}`}
                 >
                   {p.label}
                   <span className="ml-1.5 font-normal">{PROBLEM_STATUS_LABELS[p.status]}</span>
@@ -268,7 +268,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
               onClick={handleAddProblem}
               disabled={!newProblemLabel.trim()}
               className="h-9 px-3 rounded-lg bg-teal-700 text-white text-xs font-semibold
-                hover:bg-teal-700 disabled:opacity-40 transition-colors"
+                hover:bg-teal-700 disabled:opacity-40 transition-colors max-lg:h-10"
             >
               <Plus className="w-4 h-4" />
             </button>

@@ -87,7 +87,7 @@ export default function KarteLinkCard() {
               <button
                 type="button"
                 onClick={() => navigator.clipboard?.writeText(url)}
-                className="mt-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold hover:bg-slate-100"
+                className="mt-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold hover:bg-slate-100 max-lg:min-h-10"
               >
                 コピー
               </button>
@@ -100,7 +100,7 @@ export default function KarteLinkCard() {
               type="button"
               onClick={resend}
               disabled={pendingNotice === 0 || resendState === '送っています…'}
-              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10"
             >
               連携のお知らせを送り直す（未確認 {pendingNotice}人）
             </button>

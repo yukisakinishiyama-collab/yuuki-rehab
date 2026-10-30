@@ -663,7 +663,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
                 style={{ background: c.selected, borderColor: c.stroke, color: ZONE_TEXT }}>
                 {zone.label}
                 {!readOnly && (
-                  <button type="button" onClick={() => toggleZone(id)} className="opacity-80 hover:opacity-100 leading-none">×</button>
+                  <button type="button" onClick={() => toggleZone(id)} className="opacity-80 hover:opacity-100 leading-none max-lg:min-h-10 max-lg:min-w-10" aria-label={`${zone.label}を外す`}>×</button>
                 )}
               </span>
             )

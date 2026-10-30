@@ -123,7 +123,7 @@ export default function VideosPage() {
         </div>
         <Link
           href="/marketing/videos/new"
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
         >
           ＋ 動画を登録
         </Link>
@@ -143,7 +143,7 @@ export default function VideosPage() {
             <button
               onClick={startAi}
               disabled={aiBusy || generating}
-              className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white hover:bg-violet-800 disabled:opacity-50"
+              className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white hover:bg-violet-800 disabled:opacity-50 max-lg:min-h-10"
             >
               {aiBusy ? '作成中…（1〜3分）' : generating ? '作成中です…' : 'いま1本作る'}
             </button>

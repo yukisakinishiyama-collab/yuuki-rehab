@@ -109,10 +109,10 @@ export default function MonthlyReportPage() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={() => void load()} className="rounded-md border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50" title="読み直す">
+          <button type="button" onClick={() => void load()} className="rounded-md border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10" title="読み直す">
             <RefreshCcw className="h-4 w-4" />
           </button>
-          <button type="button" onClick={copy} disabled={!report} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <button type="button" onClick={copy} disabled={!report} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10">
             <Copy className="h-3.5 w-3.5" />
             {copied ? 'コピーしました' : '文にしてコピー'}
           </button>

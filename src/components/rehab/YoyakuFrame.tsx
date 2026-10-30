@@ -101,7 +101,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             href={RESERVATION_PATIENT_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 max-lg:min-h-10"
           >
             <ExternalLink size={13} />
             患者用予約ページ
@@ -110,7 +110,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             href={openUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-800"
+            className="flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-800 max-lg:min-h-10"
           >
             <ExternalLink size={13} />
             新しいタブで開く

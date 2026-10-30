@@ -211,7 +211,7 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter('birthday')}
                 title={`${BIRTHDAY_SOON_DAYS}日以内に誕生日の方`}
-                className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100"
+                className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100 max-lg:min-h-10"
               >
                 🎂 誕生日が近い {birthdaySoonCount}名
               </button>
@@ -221,7 +221,7 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter('line')}
                 title="公式LINEと結びついている方"
-                className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100"
+                className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 max-lg:min-h-10"
               >
                 LINE連携済み {lineLinkedCount}名
               </button>
@@ -251,7 +251,7 @@ export default function PatientsPage() {
                 key={p.id}
                 href={`/patients/${p.id}`}
                 className="flex items-center gap-2 flex-shrink-0 bg-white border border-gray-200
-                  rounded-full pl-1.5 pr-3 py-1.5 hover:border-teal-300 hover:shadow-sm transition-all"
+                  rounded-full pl-1.5 pr-3 py-1.5 hover:border-teal-300 hover:shadow-sm transition-all max-lg:min-h-10"
               >
                 <span className="w-6 h-6 bg-teal-50 rounded-full flex items-center justify-center">
                   <User className="w-3.5 h-3.5 text-teal-700" />
@@ -284,7 +284,7 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter(opt.value)}
                 className={cn(
-                  'px-3 py-1.5 text-xs rounded-full border font-medium transition-colors',
+                  'px-3 py-1.5 text-xs rounded-full border font-medium transition-colors max-lg:min-h-10',
                   filter === opt.value
                     ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-700'
@@ -320,7 +320,7 @@ export default function PatientsPage() {
           <Link href="/patients/new" className={cn(buttonVariants({ size: 'sm' }), 'bg-amber-700 hover:bg-amber-800')}>
             この方のカルテを作る
           </Link>
-          <button type="button" onClick={() => setKarteMiss('')} className="ml-auto text-xs text-amber-700 underline">
+          <button type="button" onClick={() => setKarteMiss('')} className="ml-auto text-xs text-amber-700 underline max-lg:min-h-10">
             閉じる
           </button>
         </div>
@@ -490,7 +490,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
           type="button"
           onClick={e => { e.stopPropagation(); onTogglePin() }}
           className={cn(
-            'p-1.5 rounded-lg transition-colors flex-shrink-0',
+            'p-1.5 rounded-lg transition-colors flex-shrink-0 max-lg:min-h-10',
             pinned
               ? 'text-teal-700 hover:text-teal-800 hover:bg-teal-50'
               : 'text-gray-500 hover:text-teal-500 hover:bg-gray-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
