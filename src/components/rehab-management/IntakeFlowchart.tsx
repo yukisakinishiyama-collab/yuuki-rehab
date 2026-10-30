@@ -72,7 +72,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
           <button
             type="button"
             onClick={handleRestart}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-gray-500 hover:text-gray-600 max-lg:min-h-10"
           >
             ↺ 最初から
           </button>
@@ -83,7 +83,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
       {path.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-3">
           {path.map((p, i) => (
-            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+            <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
               {p.answer}
             </span>
           ))}
@@ -94,7 +94,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
         <div className="space-y-3">
           <div>
             <p className="text-sm font-medium text-gray-800">{node.question}</p>
-            {node.hint && <p className="text-xs text-gray-400 mt-1">{node.hint}</p>}
+            {node.hint && <p className="text-xs text-gray-500 mt-1">{node.hint}</p>}
           </div>
           <div className="flex flex-wrap gap-2">
             {node.options.map(opt => (
@@ -102,7 +102,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
                 key={opt.label}
                 type="button"
                 onClick={() => handleAnswer(node.question, opt.label, opt.next)}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-teal-400 hover:bg-teal-50 transition-colors max-lg:min-h-10"
               >
                 {opt.label}
               </button>
@@ -112,7 +112,7 @@ export default function IntakeFlowchart({ joint, onComplete }: Props) {
             <button
               type="button"
               onClick={handleBack}
-              className="text-xs text-teal-600 hover:text-teal-800 font-medium"
+              className="text-xs text-teal-700 hover:text-teal-800 font-medium max-lg:min-h-10"
             >
               ← 一つ前の質問に戻る
             </button>
@@ -164,7 +164,7 @@ function ResultCard({ node, onBack }: { node: FlowResultNode; onBack?: () => voi
         <button
           type="button"
           onClick={onBack}
-          className="text-xs text-teal-600 hover:text-teal-800 font-medium"
+          className="text-xs text-teal-700 hover:text-teal-800 font-medium max-lg:min-h-10"
         >
           ← 一つ前の質問に戻る
         </button>

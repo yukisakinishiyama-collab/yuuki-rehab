@@ -119,11 +119,11 @@ function VariantPreview({
             type="button"
             disabled={busy}
             onClick={() => onSave({ hook, body, hashtags: tags.split(/\s+/).filter(Boolean) })}
-            className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 max-lg:min-h-10"
           >
             保存して表現チェック
           </button>
-          <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold max-lg:min-h-10">
             やめる
           </button>
         </div>
@@ -258,7 +258,7 @@ function ItemCard({
                   setTab(v.id)
                   setEditing(false)
                 }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold max-lg:min-h-10 ${
                   v.id === variant.id ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600'
                 } ${excluded.has(v.channel) ? 'line-through opacity-60' : ''}`}
               >
@@ -283,14 +283,14 @@ function ItemCard({
           </div>
           {editable && !editing && (
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
-              <button type="button" onClick={() => setEditing(true)} className="rounded border border-slate-300 px-2 py-1 font-bold">
+              <button type="button" onClick={() => setEditing(true)} className="rounded border border-slate-300 px-2 py-1 font-bold max-lg:min-h-10">
                 この文章を直す
               </button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => act({ action: 'toggle_channel', itemId: item.id, channel: variant.channel, exclude: !excluded.has(variant.channel) })}
-                className="rounded border border-slate-300 px-2 py-1 font-bold"
+                className="rounded border border-slate-300 px-2 py-1 font-bold max-lg:min-h-10"
               >
                 {excluded.has(variant.channel) ? `${channelShort(variant.channel)}にも出す` : `${channelShort(variant.channel)}には出さない`}
               </button>
@@ -299,7 +299,7 @@ function ItemCard({
                   type="button"
                   disabled={busy}
                   onClick={() => act({ action: 'regenerate_image', itemId: item.id })}
-                  className="rounded border border-sky-300 bg-sky-50 px-2 py-1 font-bold text-sky-800 disabled:opacity-50"
+                  className="rounded border border-sky-300 bg-sky-50 px-2 py-1 font-bold text-sky-800 disabled:opacity-50 max-lg:min-h-10"
                 >
                   {variant.content.image ? '画像を作り直す' : '画像を作る（AI）'}
                 </button>
@@ -309,7 +309,7 @@ function ItemCard({
                   type="button"
                   disabled={busy}
                   onClick={() => act({ action: 'remove_image', itemId: item.id })}
-                  className="rounded border border-slate-300 px-2 py-1 font-bold text-slate-600"
+                  className="rounded border border-slate-300 px-2 py-1 font-bold text-slate-600 max-lg:min-h-10"
                 >
                   テンプレ画像にする
                 </button>
@@ -332,22 +332,22 @@ function ItemCard({
           </button>
         )}
         {item.status === 'approved' && isAdmin && (
-          <button type="button" disabled={busy} onClick={() => act({ action: 'unapprove_item', itemId: item.id })} className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+          <button type="button" disabled={busy} onClick={() => act({ action: 'unapprove_item', itemId: item.id })} className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 max-lg:min-h-10">
             承認を取り消す
           </button>
         )}
         {editable && isAdmin && (
-          <button type="button" disabled={busy} onClick={() => act({ action: 'skip_item', itemId: item.id })} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-600">
+          <button type="button" disabled={busy} onClick={() => act({ action: 'skip_item', itemId: item.id })} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 max-lg:min-h-10">
             見送る
           </button>
         )}
         {item.status === 'skipped' && isAdmin && (
-          <button type="button" disabled={busy} onClick={() => act({ action: 'restore_item', itemId: item.id })} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold">
+          <button type="button" disabled={busy} onClick={() => act({ action: 'restore_item', itemId: item.id })} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold max-lg:min-h-10">
             承認待ちに戻す
           </button>
         )}
         {editable && (
-          <button type="button" disabled={busy} onClick={() => setRegenOpen((v) => !v)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-600">
+          <button type="button" disabled={busy} onClick={() => setRegenOpen((v) => !v)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 max-lg:min-h-10">
             作り直す
           </button>
         )}
@@ -369,7 +369,7 @@ function ItemCard({
               setRegenOpen(false)
               setNewTheme('')
             }}
-            className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+            className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50 max-lg:min-h-10"
           >
             {busy ? '作り直し中…（1〜3分）' : 'この枠を作り直す'}
           </button>
@@ -418,7 +418,7 @@ function SettingsPanel({
   const disabled = !isAdmin
   return (
     <div className="space-y-4 text-sm">
-      <label className="flex items-center gap-2 font-bold">
+      <label className="flex items-center gap-2 font-bold max-lg:min-h-10">
         <input type="checkbox" checked={s.enabled} disabled={disabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} className="h-5 w-5" />
         毎週、自動で投稿案を作る（日曜 {s.generateHour}時ごろ → 院長のLINEへお知らせ）
       </label>
@@ -483,15 +483,15 @@ function SettingsPanel({
       </div>
 
       <div className="space-y-2">
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 max-lg:min-h-10">
           <input type="checkbox" checked={s.google} disabled={disabled} onChange={(e) => setS({ ...s, google: e.target.checked })} className="h-5 w-5" />
           同じテーマでGoogleビジネスプロフィールにも投稿する
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 max-lg:min-h-10">
           <input type="checkbox" checked={s.availabilityPost} disabled={disabled || !s.google} onChange={(e) => setS({ ...s, availabilityPost: e.target.checked })} className="h-5 w-5" />
           週のはじめに「今週の予約の空き状況」をGoogleに投稿する（予約システムの空き枠から自動作成）
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 max-lg:min-h-10">
           <input
             type="checkbox"
             checked={s.availabilityStory}
@@ -517,13 +517,13 @@ function SettingsPanel({
         <span className="text-xs text-slate-500">次の下書きの1本目のテーマになります（患者さんのお名前・症状などの個人情報は書かないでください）。使ったら空に戻ります。</span>
       </label>
 
-      <label className="flex items-center gap-2 text-xs text-slate-600">
+      <label className="flex items-center gap-2 text-xs text-slate-600 max-lg:min-h-10">
         <input type="checkbox" checked={syncProfile} disabled={disabled} onChange={(e) => setSyncProfile(e.target.checked)} />
         「基本設定」の院情報（この端末に保存したもの）を自動下書きにも使う
       </label>
 
       {isAdmin ? (
-        <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-teal-700 px-5 py-2 font-bold text-white disabled:opacity-50">
+        <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-teal-700 px-5 py-2 font-bold text-white disabled:opacity-50 max-lg:min-h-10">
           {saving ? '保存中…' : '設定を保存'}
         </button>
       ) : (
@@ -660,8 +660,9 @@ function AutopilotInner() {
               <button
                 key={p.weekStart}
                 type="button"
+                aria-pressed={p.weekStart === currentWeek}
                 onClick={() => setSelected(p.weekStart)}
-                className={`rounded-lg px-3 py-2 text-sm font-bold ${p.weekStart === currentWeek ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}
+                className={`rounded-lg px-3 py-2 text-sm font-bold max-lg:min-h-10 ${p.weekStart === currentWeek ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}
               >
                 {weekLabel(p.weekStart)}
                 {pending > 0 && <span className="ml-1.5 rounded-full bg-amber-400 px-1.5 text-xs text-slate-900">{pending}</span>}
@@ -726,14 +727,14 @@ function AutopilotInner() {
 
       <div className="flex flex-wrap gap-2">
         {isAdmin && (
-          <button type="button" onClick={generateNow} disabled={busy} className="rounded-lg border border-teal-700 px-4 py-2 text-sm font-bold text-teal-800 disabled:opacity-50">
+          <button type="button" onClick={generateNow} disabled={busy} className="rounded-lg border border-teal-700 px-4 py-2 text-sm font-bold text-teal-800 disabled:opacity-50 max-lg:min-h-10">
             今すぐ投稿案を作る
           </button>
         )}
-        <button type="button" onClick={() => setShowSettings((v) => !v)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">
+        <button type="button" onClick={() => setShowSettings((v) => !v)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold max-lg:min-h-10">
           {showSettings ? '設定を閉じる' : '設定（本数・曜日・媒体・院長メモ）'}
         </button>
-        <Link href="/marketing/jobs" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">
+        <Link href="/marketing/jobs" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold max-lg:min-h-10 max-lg:inline-flex max-lg:items-center">
           投稿の予定と結果
         </Link>
       </div>

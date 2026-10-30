@@ -1,11 +1,22 @@
 'use client'
 // ──────────────────────────────────────────────
-// 共通UIコンポーネント（リハビリ管理専用）
+// 共通UIコンポーネント（カルテの入力画面用：SOAP・評価・問診・キャンセルなど）
+//
+// 見た目は src/components/ui/ と同じ決まり（DESIGN_DECISIONS.md「院内アプリの見た目の決まり」）。
+// カードの枠は ui/card の cardSurface、保存ボタンの色は ui/button の buttonVariants をそのまま使う
+// （色や枠を変えるときは ui/ の1か所を直せば、ここの SaveButton・Card を使う画面にも同じように効く。
+//   各画面に直接書いたボタン・カードは変わらない。DESIGN_DECISIONS.md「1か所では変わらないもの」）
 // ──────────────────────────────────────────────
 import type { ReactNode } from 'react'
 import type { RiskLevel, RehabPhase } from '@/types/patient'
 import { PHASE_SHORT_LABELS, RISK_LABELS } from '@/types/patient'
 import { cn } from '@/lib/utils'
+import { buttonVariants } from '@/components/ui/button'
+import { cardSurface } from '@/components/ui/card'
+
+/** 入力欄・文章欄の見た目（スマホで 16px になるのは globals.css の「院内アプリの入力欄」が受け持つ） */
+const fieldClass =
+  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-1 disabled:opacity-50'
 
 // ── ProgressGauge（SVG円形ゲージ）──
 export function ProgressGauge({ score, size = 120 }: { score: number; size?: number }) {
@@ -15,7 +26,9 @@ export function ProgressGauge({ score, size = 120 }: { score: number; size?: num
   const circumference = 2 * Math.PI * r
   const progress = Math.max(0, Math.min(100, score))
   const dashOffset = circumference * (1 - progress / 100)
-  const color = progress >= 70 ? '#0d9488' : progress >= 40 ? '#f59e0b' : '#94a3b8'
+  // 線（輪）は明るい色、まん中の数字は同じ色みの濃い色（白い地で読めるコントラスト比 4.5 以上）
+  const color = progress >= 70 ? '#0d9488' : progress >= 40 ? '#f59e0b' : '#64748b'
+  const textColor = progress >= 70 ? '#0f766e' : progress >= 40 ? '#b45309' : '#64748b'
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -30,11 +43,11 @@ export function ProgressGauge({ score, size = 120 }: { score: number; size?: num
         style={{ transition: 'stroke-dashoffset 0.6s ease' }}
       />
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-        fontSize={size * 0.22} fontWeight="700" fill={color}>
+        fontSize={size * 0.22} fontWeight="700" fill={textColor}>
         {progress}
       </text>
       <text x={cx} y={cy + size * 0.2} textAnchor="middle"
-        fontSize={size * 0.1} fill="#94a3b8">
+        fontSize={Math.max(12, size * 0.1)} fill="#64748b">
         / 100
       </text>
     </svg>
@@ -55,14 +68,14 @@ export function PhaseStepper({ currentPhase }: { currentPhase: RehabPhase }) {
               <div className="flex flex-col items-center">
                 <div className={cn(
                   'w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors',
-                  isCompleted ? 'bg-teal-600 border-teal-600 text-white' :
-                  isCurrent   ? 'bg-teal-600 border-teal-600 text-white ring-2 ring-teal-200 ring-offset-1' :
-                                'bg-white border-gray-200 text-gray-400'
+                  isCompleted ? 'bg-teal-700 border-teal-700 text-white' :
+                  isCurrent   ? 'bg-teal-700 border-teal-700 text-white ring-2 ring-teal-200 ring-offset-1' :
+                                'bg-white border-gray-200 text-gray-500'
                 )}>
                   {isCompleted ? '✓' : phase}
                 </div>
                 {isCurrent && (
-                  <span className="text-[9px] text-teal-600 font-semibold mt-1 whitespace-nowrap">現在</span>
+                  <span className="text-xs text-teal-700 font-semibold mt-1 whitespace-nowrap">現在</span>
                 )}
               </div>
               {idx < phases.length - 1 && (
@@ -103,11 +116,11 @@ export function RedFlagAlert({ flags }: { flags: Record<string, boolean | string
   return (
     <div className="rounded-lg bg-red-50 border border-red-200 p-4 mb-4">
       <div className="flex items-start gap-3">
-        <span className="text-red-500 text-lg flex-shrink-0">⚠️</span>
+        <span className="text-red-600 text-lg flex-shrink-0">⚠️</span>
         <div>
           <p className="font-semibold text-red-700 text-sm">レッドフラッグが確認されています</p>
           <p className="text-red-600 text-xs mt-1">医療機関への受診を検討してください。このアプリは診断を行いません。</p>
-          <p className="text-red-500 text-xs mt-1">強い痛み・しびれ・脱力・夜間痛・発熱・急な悪化がある場合は医師に相談してください。</p>
+          <p className="text-red-600 text-xs mt-1">強い痛み・しびれ・脱力・夜間痛・発熱・急な悪化がある場合は医師に相談してください。</p>
         </div>
       </div>
     </div>
@@ -124,7 +137,7 @@ export function NRSInput({
   onChange: (v: number) => void
   label?: string
 }) {
-  const nrsColor = value >= 7 ? 'text-red-600' : value >= 4 ? 'text-yellow-600' : 'text-green-600'
+  const nrsColor = value >= 7 ? 'text-red-600' : value >= 4 ? 'text-yellow-700' : 'text-green-700'
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-gray-700">{label}</label>
@@ -137,7 +150,7 @@ export function NRSInput({
         />
         <span className={cn('text-2xl font-bold w-8 text-center tabular-nums', nrsColor)}>{value}</span>
       </div>
-      <div className="flex justify-between text-xs text-gray-400">
+      <div className="flex justify-between text-xs text-gray-500">
         <span>0 痛みなし</span>
         <span>10 最大の痛み</span>
       </div>
@@ -148,7 +161,7 @@ export function NRSInput({
 // ── Card ──
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('rounded-xl border border-gray-200 bg-white shadow-sm', className)}>
+    <div className={cn(cardSurface, className)}>
       {children}
     </div>
   )
@@ -177,7 +190,7 @@ export function FormLabel({ children, required }: { children: ReactNode; require
   return (
     <label className="block text-sm font-medium text-gray-700 mb-1.5">
       {children}
-      {required && <span className="text-red-500 ml-1 text-xs">必須</span>}
+      {required && <span className="text-red-600 ml-1 text-xs">必須</span>}
     </label>
   )
 }
@@ -200,7 +213,7 @@ export function Textarea({
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="flex w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-1 disabled:opacity-50 resize-none"
+      className={cn(fieldClass, 'flex resize-none')}
     />
   )
 }
@@ -226,7 +239,8 @@ export function Input({
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        'flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-1 disabled:opacity-50',
+        fieldClass,
+        'flex h-10',
         className
       )}
     />
@@ -244,7 +258,7 @@ export function ToggleSwitch({
   onChange: (v: boolean) => void
 }) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer">
+    <label className="flex items-center gap-3 cursor-pointer max-lg:min-h-10">
       <button
         type="button"
         role="switch"
@@ -304,7 +318,7 @@ export function SaveButton({
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="inline-flex items-center gap-2 h-10 px-5 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50 disabled:pointer-events-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+      className={cn(buttonVariants(), 'px-5')}
     >
       {loading && (
         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

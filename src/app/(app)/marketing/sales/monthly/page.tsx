@@ -25,7 +25,7 @@ function DeltaCell({ def, d }: { def: MetricDef; d: Delta }) {
   return (
     <td className={`px-2 py-1.5 text-right tabular-nums ${color}`}>
       <div className="font-bold">{formatChange(def, d)}</div>
-      {d.before !== null && <div className="text-[11px] text-slate-400">{formatValue(def, d.before)}</div>}
+      {d.before !== null && <div className="text-xs text-slate-500">{formatValue(def, d.before)}</div>}
     </td>
   )
 }
@@ -109,10 +109,10 @@ export default function MonthlyReportPage() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={() => void load()} className="rounded-md border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50" title="読み直す">
+          <button type="button" onClick={() => void load()} className="rounded-md border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10" title="読み直す">
             <RefreshCcw className="h-4 w-4" />
           </button>
-          <button type="button" onClick={copy} disabled={!report} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <button type="button" onClick={copy} disabled={!report} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10">
             <Copy className="h-3.5 w-3.5" />
             {copied ? 'コピーしました' : '文にしてコピー'}
           </button>
@@ -162,7 +162,7 @@ export default function MonthlyReportPage() {
                 ))}
               </tbody>
             </table>
-            <p className="px-3 py-2 text-[11px] text-slate-500">
+            <p className="px-3 py-2 text-xs text-slate-500">
               緑＝良い方向、赤＝気になる方向。新患・再初検・離反は NOAH の画面で読めた月だけ。NOAH以外の収入は月単位（途中の月は入っている分）。
             </p>
           </section>
@@ -174,8 +174,8 @@ export default function MonthlyReportPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={trendRows} margin={{ top: 10, right: 4, bottom: 0, left: 0 }}>
                     <CartesianGrid vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => man(v)} />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                    <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => man(v)} />
                     <Tooltip formatter={(v) => [`${Math.round(Number(v)).toLocaleString('ja-JP')}円`, '売上（合計）']} labelFormatter={(l) => String(l)} />
                     <Bar dataKey="total" fill="#0f766e" maxBarSize={22} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                   </BarChart>
@@ -188,9 +188,9 @@ export default function MonthlyReportPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendRows} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
                     <CartesianGrid vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-                    <YAxis yAxisId="v" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} width={36} />
-                    <YAxis yAxisId="r" orientation="right" domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} width={34} tickFormatter={(v: number) => `${v}%`} />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                    <YAxis yAxisId="v" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} width={36} />
+                    <YAxis yAxisId="r" orientation="right" domain={[0, 100]} tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} width={34} tickFormatter={(v: number) => `${v}%`} />
                     <Tooltip />
                     <Line yAxisId="v" type="monotone" dataKey="visits" name="来院" stroke="#0f766e" strokeWidth={2} dot={false} isAnimationActive={false} />
                     <Line yAxisId="r" type="monotone" dataKey="selfRatio" name="自費の割合(%)" stroke="#b45309" strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -220,7 +220,7 @@ export default function MonthlyReportPage() {
                   <tr key={t.month} className={`border-t border-slate-100 ${t.month === report.current.month ? 'bg-teal-50/60' : ''}`}>
                     <td className="px-2 py-1 text-slate-700">
                       {ym(t.month)}
-                      {!t.complete && <span className="ml-1 text-[10px] text-amber-700">{t.throughDay}日まで</span>}
+                      {!t.complete && <span className="ml-1 text-xs text-amber-700">{t.throughDay}日まで</span>}
                     </td>
                     <td className="px-2 py-1 text-right font-bold tabular-nums">{(t.sales + t.outside).toLocaleString('ja-JP')}</td>
                     <td className="px-2 py-1 text-right tabular-nums">{t.sales.toLocaleString('ja-JP')}</td>
@@ -235,7 +235,7 @@ export default function MonthlyReportPage() {
               </tbody>
             </table>
           </section>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-xs text-slate-500">
             NOAH以外の収入は<Link href="/marketing/sales/goal" className="underline">月の目標への道すじ</Link>の「その他の収入」で入れたもの（毎月1日に自動で取り込み）。
           </p>
         </>

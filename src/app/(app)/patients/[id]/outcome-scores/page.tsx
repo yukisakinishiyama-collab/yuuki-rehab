@@ -135,16 +135,16 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
             <button
               key={tab.id}
               onClick={() => setActiveRegion(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all max-lg:min-h-10 ${
                 activeRegion === tab.id
-                  ? 'bg-teal-600 text-white shadow-sm'
+                  ? 'bg-teal-700 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:border-teal-300 hover:text-teal-700'
               } ${isPatientRegion ? 'ring-2 ring-teal-400 ring-offset-1' : ''}`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
               {isPatientRegion && (
-                <span className={`text-[10px] px-1 rounded ${activeRegion === tab.id ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-700'}`}>主</span>
+                <span className={`text-xs px-1 rounded ${activeRegion === tab.id ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-700'}`}>主</span>
               )}
             </button>
           )
@@ -153,7 +153,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
 
       {/* スコア選択 */}
       {regionScoreIds.length === 0 ? (
-        <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-400 text-sm">この部位に対応するスコアはありません</div>
+        <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-500 text-sm">この部位に対応するスコアはありません</div>
       ) : (
         <div className="flex gap-2 flex-wrap">
           {regionScoreIds.map(sid => {
@@ -165,12 +165,12 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                 onClick={() => setSelectedScoreId(sid)}
                 className={`flex flex-col items-start px-4 py-2.5 rounded-xl border text-left transition-all ${
                   selectedScoreId === sid
-                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                    ? 'bg-teal-700 text-white border-teal-700 shadow-sm'
                     : 'bg-white text-gray-700 border-gray-200 hover:border-teal-300'
                 }`}
               >
                 <div className="font-bold text-sm">{def.shortName}</div>
-                <div className={`text-[11px] mt-0.5 ${selectedScoreId === sid ? 'text-teal-100' : 'text-gray-400'}`}>
+                <div className={`text-xs mt-0.5 ${selectedScoreId === sid ? 'text-teal-100' : 'text-gray-500'}`}>
                   {cnt > 0 ? `${cnt}回記録済み` : '未記録'}
                 </div>
               </button>
@@ -190,11 +190,11 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h2 className="font-bold text-gray-900">{scoreDef.fullName}</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-500 mt-0.5">
                     {scoreDef.higherIsBetter ? '↑高いほど良好' : '↓低いほど良好'} · 最大{scoreDef.maxScore}{scoreDef.unit} · 出典：{scoreDef.reference}
                   </p>
                 </div>
-                <button onClick={() => setShowInfo(v => !v)} className="text-gray-400 hover:text-teal-600 transition-colors">
+                <button onClick={() => setShowInfo(v => !v)} className="text-gray-500 hover:text-teal-600 transition-colors max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10">
                   <Info className="w-4 h-4" />
                 </button>
               </div>
@@ -224,15 +224,15 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
               {scoreDef.items.map((item, idx) => (
                 <div key={item.id} className="p-4">
                   <div className="flex items-start gap-3">
-                    <span className="text-xs font-bold text-gray-400 mt-0.5 flex-shrink-0 w-5">{idx + 1}</span>
+                    <span className="text-xs font-bold text-gray-500 mt-0.5 flex-shrink-0 w-5">{idx + 1}</span>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800 leading-snug">{item.question}</p>
-                      {item.hint && <p className="text-xs text-gray-400 mt-0.5">{item.hint}</p>}
+                      {item.hint && <p className="text-xs text-gray-500 mt-0.5">{item.hint}</p>}
                       <div className="mt-2.5">
                         {item.type === 'radio' && item.options && (
                           <div className="space-y-1.5">
                             {item.options.map(opt => (
-                              <label key={opt.value} className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all ${
+                              <label key={opt.value} className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all max-lg:min-h-10 ${
                                 answers[item.id] === opt.value
                                   ? 'bg-teal-50 border-teal-300 shadow-sm'
                                   : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
@@ -249,7 +249,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                                 <span className={`text-sm leading-snug ${answers[item.id] === opt.value ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>
                                   {opt.label}
                                   {scoreDef.higherIsBetter
-                                    ? <span className="ml-1 text-xs text-gray-400">（{opt.value}点）</span>
+                                    ? <span className="ml-1 text-xs text-gray-500">（{opt.value}点）</span>
                                     : null
                                   }
                                 </span>
@@ -272,7 +272,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                                 {answers[item.id] ?? item.min ?? 0}
                               </span>
                             </div>
-                            <div className="flex justify-between text-xs text-gray-400">
+                            <div className="flex justify-between text-xs text-gray-500">
                               <span>{item.min ?? 0}</span>
                               <span>{item.max ?? 10}{item.unit ? ` ${item.unit}` : ''}</span>
                             </div>
@@ -292,7 +292,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                     </div>
                     {/* 回答済みチェック */}
                     {answers[item.id] !== undefined && (
-                      <span className="text-teal-500 text-lg flex-shrink-0">✓</span>
+                      <span className="text-teal-700 text-lg flex-shrink-0">✓</span>
                     )}
                   </div>
                 </div>
@@ -341,7 +341,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                   )}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-300">
+                <div className="text-center py-8 text-gray-500">
                   <div className="text-4xl mb-2">📋</div>
                   <p className="text-sm">回答すると自動計算されます</p>
                 </div>
@@ -355,13 +355,13 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                 <button
                   onClick={handleSave}
                   disabled={!result || saving}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Save className="w-4 h-4" />
                   {saving ? '保存中...' : 'この評価を保存'}
                 </button>
                 {savedId && (
-                  <p className="text-center text-xs text-emerald-600 font-medium">✓ 保存しました</p>
+                  <p className="text-center text-xs text-emerald-700 font-medium">✓ 保存しました</p>
                 )}
               </div>
             </div>
@@ -414,17 +414,17 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                         </span>
                       </div>
                       {rec.notes && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{rec.notes}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{rec.notes}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={e => { e.stopPropagation(); handleDelete(rec.id) }}
-                        className="p-1 text-gray-300 hover:text-red-500 transition-colors rounded"
+                        className="p-1 text-gray-500 hover:text-red-500 transition-colors rounded max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
                     </div>
                   </div>
                   {isExpanded && (
@@ -460,12 +460,12 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                   const c = rec.interpretationColor
                   return (
                     <div key={rec.id} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[9px] text-gray-400 font-bold">{rec.totalScore}</span>
+                      <span className="text-xs text-gray-500 font-bold">{rec.totalScore}</span>
                       <div className="w-full rounded-t-sm" style={{
                         height: `${Math.max(4, effPct * 0.5)}px`,
                         backgroundColor: c === 'green' ? '#10b981' : c === 'yellow' ? '#f59e0b' : c === 'orange' ? '#f97316' : '#ef4444'
                       }} />
-                      <span className="text-[9px] text-gray-400 truncate w-full text-center">
+                      <span className="text-xs text-gray-500 truncate w-full text-center">
                         {rec.scoreDate.slice(5)}
                       </span>
                     </div>

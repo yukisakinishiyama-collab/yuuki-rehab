@@ -102,7 +102,7 @@ export default function NewVideoPage() {
       {/* メタ情報 */}
       <div className="mt-4 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label className={labelCls}>タイトル<span className="text-rose-500">*</span></label>
+          <label className={labelCls}>タイトル<span className="text-rose-600">*</span></label>
           <input value={form.title} onChange={(e) => set('title', e.target.value)} className={`${inputCls} mt-1`} />
         </div>
         <div>
@@ -150,7 +150,7 @@ export default function NewVideoPage() {
 
       {/* 掲載許可（重要） */}
       <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 max-lg:min-h-10">
           <input type="checkbox" checked={form.patientPresent} onChange={(e) => set('patientPresent', e.target.checked)} />
           この動画に患者が写っている
         </label>
@@ -180,11 +180,11 @@ export default function NewVideoPage() {
         <button
           onClick={submit}
           disabled={saving || uploading}
-          className="rounded-lg bg-teal-700 px-5 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50"
+          className="rounded-lg bg-teal-700 px-5 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50 max-lg:min-h-10"
         >
           {saving ? '登録中…' : '登録する'}
         </button>
-        <button onClick={() => router.push('/marketing/videos')} className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600">
+        <button onClick={() => router.push('/marketing/videos')} className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 max-lg:min-h-10">
           キャンセル
         </button>
       </div>

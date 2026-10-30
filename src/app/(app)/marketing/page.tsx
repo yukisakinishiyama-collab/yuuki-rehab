@@ -63,7 +63,7 @@ export default function MarketingDashboard() {
         <h1 className="text-2xl font-bold">集客のまとめ</h1>
         <Link
           href="/marketing/compose"
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
         >
           ＋ 投稿を作る
         </Link>
@@ -116,12 +116,12 @@ export default function MarketingDashboard() {
           <ul className="mt-2 divide-y divide-slate-100 text-sm">
             {projects.slice(0, 8).map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="text-slate-400">{p.createdAt.slice(0, 10)}</span>
+                <span className="text-slate-500">{p.createdAt.slice(0, 10)}</span>
                 <span className="rounded bg-teal-50 px-2 py-0.5 text-xs text-teal-800">{p.objective}</span>
                 <Link href={`/marketing/compose?project=${p.id}`} className="font-medium text-slate-800 hover:underline">
                   {p.theme}
                 </Link>
-                <span className="text-xs text-slate-400">{p.variants.length}媒体</span>
+                <span className="text-xs text-slate-500">{p.variants.length}媒体</span>
               </li>
             ))}
           </ul>

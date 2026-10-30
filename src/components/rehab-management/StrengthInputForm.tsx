@@ -179,9 +179,9 @@ export default function StrengthInputForm({ patientId, onSaved }: Props) {
                 key={t.movement}
                 type="button"
                 onClick={() => applyTemplate(t)}
-                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors max-lg:min-h-10 ${
                   form.movement === t.movement
-                    ? 'bg-teal-600 text-white border-teal-600'
+                    ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
                 }`}
               >
@@ -223,7 +223,7 @@ export default function StrengthInputForm({ patientId, onSaved }: Props) {
                 onClick={() => setForm(f => ({ ...f, mmt: g }))}
                 className={`w-10 h-10 rounded-lg text-sm font-bold border transition-colors ${
                   form.mmt === g
-                    ? 'bg-teal-600 text-white border-teal-600'
+                    ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
                 }`}
               >
@@ -279,7 +279,7 @@ export default function StrengthInputForm({ patientId, onSaved }: Props) {
 
         <div className="flex items-center gap-3">
           <SaveButton onClick={handleSave} label="筋力記録を保存" />
-          {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+          {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
         </div>
       </CardContent>
     </Card>

@@ -110,11 +110,11 @@ function Card({ title, sub, children, action }: { title: string; sub?: string; c
 }
 
 function Delta({ now, before, unit, label }: { now: number; before: number | null; unit: '人' | '%' | 'pt'; label: string }) {
-  if (before === null) return <p className="mt-1 text-xs text-slate-400">比べる記録がありません</p>
+  if (before === null) return <p className="mt-1 text-xs text-slate-500">比べる記録がありません</p>
   let diff: number
   let text: string
   if (unit === '%') {
-    if (before <= 0) return <p className="mt-1 text-xs text-slate-400">比べる記録がありません</p>
+    if (before <= 0) return <p className="mt-1 text-xs text-slate-500">比べる記録がありません</p>
     diff = Math.round(((now - before) / before) * 100)
     text = `${diff > 0 ? '+' : ''}${diff}%`
   } else {
@@ -222,14 +222,14 @@ function DailyChart({ month, measure }: { month: NoahMonth; measure: 'v' | 's' }
             <CartesianGrid vertical={false} stroke={GRID} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: AXIS }}
+              tick={{ fontSize: 12, fill: AXIS }}
               tickLine={false}
               axisLine={{ stroke: GRID }}
               interval="preserveStartEnd"
               minTickGap={4}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: AXIS }}
+              tick={{ fontSize: 12, fill: AXIS }}
               tickLine={false}
               axisLine={false}
               width={44}
@@ -337,8 +337,8 @@ function MonthlyCharts({ months }: { months: NoahMonth[] }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 18, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={GRID} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
-            <YAxis tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={44} tickFormatter={tick} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
+            <YAxis tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={44} tickFormatter={tick} />
             <Tooltip
               cursor={{ fill: 'rgba(148,163,184,0.12)' }}
               content={({ active, payload }) => {
@@ -360,7 +360,7 @@ function MonthlyCharts({ months }: { months: NoahMonth[] }) {
                 dataKey={key}
                 position="top"
                 formatter={(v: unknown) => (rows.length <= 6 ? tick(Number(v)) : '')}
-                style={{ fontSize: 11, fill: '#334155' }}
+                style={{ fontSize: 12, fill: '#334155' }}
               />
             </Bar>
           </BarChart>
@@ -395,7 +395,7 @@ function WeekdayChart({ weekdays }: { weekdays: ApiData['weekdays'] }) {
         <BarChart data={rows} margin={{ top: 20, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={GRID} />
           <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
-          <YAxis tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          <YAxis tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
           <Tooltip
             cursor={{ fill: 'rgba(148,163,184,0.12)' }}
             content={({ active, payload }) => {
@@ -420,7 +420,7 @@ function WeekdayChart({ weekdays }: { weekdays: ApiData['weekdays'] }) {
             }}
           />
           <Bar dataKey="value" fill={SERIES} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
-            <LabelList dataKey="value" position="top" style={{ fontSize: 11, fill: '#334155' }} />
+            <LabelList dataKey="value" position="top" style={{ fontSize: 12, fill: '#334155' }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -470,12 +470,12 @@ function ItemsChart({ month }: { month: NoahMonth }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 72, bottom: 0, left: 0 }}>
           <CartesianGrid horizontal={false} stroke={GRID} />
-          <XAxis type="number" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} tickFormatter={man} />
+          <XAxis type="number" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} tickFormatter={man} />
           <YAxis
             type="category"
             dataKey="name"
             width={118}
-            tick={{ fontSize: 11, fill: '#334155' }}
+            tick={{ fontSize: 12, fill: '#334155' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(s: string) => (s.length > 10 ? `${s.slice(0, 10)}…` : s)}
@@ -506,7 +506,7 @@ function ItemsChart({ month }: { month: NoahMonth }) {
               dataKey="amount"
               position="right"
               formatter={(v: unknown) => fmtYen(Number(v))}
-              style={{ fontSize: 11, fill: '#334155' }}
+              style={{ fontSize: 12, fill: '#334155' }}
             />
           </Bar>
         </BarChart>
@@ -542,12 +542,12 @@ function RankChart({ rank }: { rank: NoahMonth['rank'] }) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={GRID} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
             <YAxis
               reversed
               domain={[1, bottom]}
               ticks={ticks}
-              tick={{ fontSize: 11, fill: AXIS }}
+              tick={{ fontSize: 12, fill: AXIS }}
               tickLine={false}
               axisLine={false}
               width={36}
@@ -603,9 +603,9 @@ function Openings({ openings, draftDay }: { openings: OpeningDay[]; draftDay: Op
         const ratio = Math.round(freeRatio(d) * 100)
         return (
           <li key={d.date} className="grid grid-cols-[5.75rem_minmax(3rem,1fr)_auto] items-center gap-2 text-sm sm:gap-3">
-            <span className={weekdayOfDate(d.date) === 0 ? 'text-slate-400' : 'text-slate-700'}>{dateLabel(d.date)}</span>
+            <span className={weekdayOfDate(d.date) === 0 ? 'text-slate-500' : 'text-slate-700'}>{dateLabel(d.date)}</span>
             {d.closed || weekdayOfDate(d.date) === 0 ? (
-              <span className="col-span-2 text-xs text-slate-400">休診</span>
+              <span className="col-span-2 text-xs text-slate-500">休診</span>
             ) : (
               <>
                 <span className="h-2 overflow-hidden rounded-full bg-teal-100" aria-hidden>
@@ -721,7 +721,7 @@ export default function SalesPage() {
           type="button"
           onClick={refreshNow}
           disabled={busy}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10"
         >
           {busy ? '読み込み中…' : '最新にする'}
         </button>
@@ -751,14 +751,14 @@ export default function SalesPage() {
                   type="button"
                     aria-pressed={m.month === month.month}
                   onClick={() => setSelected(m.month)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
+                  className={`rounded-lg px-3 py-1.5 text-sm font-bold max-lg:min-h-10 ${
                     m.month === month.month
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-teal-700 text-white'
                       : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   {ym(m.month)}
-                  {!isComplete(m) && <span className="ml-1 text-xs font-medium opacity-70">途中</span>}
+                  {!isComplete(m) && <span className="ml-1 text-xs font-medium">途中</span>}
                 </button>
               ))}
             </div>
@@ -839,7 +839,7 @@ export default function SalesPage() {
             title="日別の来院数（延べ）"
             sub={`${ym(month.month)}${isComplete(month) ? '' : `（${lastDay}日まで）`}・区分はNOAHの金額分析のとおり`}
             action={
-              <button type="button" onClick={() => setShowTable((v) => !v)} className="text-xs font-bold text-teal-800 underline">
+              <button type="button" onClick={() => setShowTable((v) => !v)} className="text-xs font-bold text-teal-800 underline max-lg:min-h-10">
                 {showTable ? '表を閉じる' : '表で見る'}
               </button>
             }

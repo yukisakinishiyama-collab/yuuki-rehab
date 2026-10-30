@@ -52,7 +52,7 @@ export default function CalendarPage() {
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium max-lg:min-h-10 ${
               filter === f ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-300 bg-white text-slate-600'
             }`}
           >

@@ -226,6 +226,26 @@ body {
 }
 
 /* ─────────────────────────────────────────────
+   院内アプリの入力欄（DESIGN_DECISIONS.md「院内アプリの見た目の決まり」）
+   下のタブが出る幅（1024px未満）と、指で操作する端末（iPhone・iPad）では、
+   院内アプリ（src/app/(app)/layout.tsx の data-clinic-app の中）の入力欄の文字を 16px にする。
+   iPhone は 16px より小さい入力欄を押すと画面を勝手に拡大し、戻すのに手間がかかるため。
+   - 各画面で text-sm・text-xs と書いた欄にも効く（@layer の外に書いているので、Tailwind のクラスより強い）
+   - 16px より大きくした欄（text-lg 以上）・チェックボックス・ラジオ・スライダー・ファイル選択はそのまま
+   - PC（幅1024px以上でマウスの端末）では、今までどおり各画面のクラスの大きさ
+───────────────────────────────────────────── */
+@media (width < 64rem), (pointer: coarse) {
+  [data-clinic-app]
+    :is(
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]),
+      textarea,
+      select
+    ):not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl) {
+    font-size: 16px;
+  }
+}
+
+/* ─────────────────────────────────────────────
    印刷スタイル
 ───────────────────────────────────────────── */
 @media print {

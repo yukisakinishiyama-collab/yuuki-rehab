@@ -83,7 +83,7 @@ export default function ReferencesPage() {
           </label>
         ))}
         <div className="flex items-center gap-3 sm:col-span-2">
-          <button type="button" onClick={submit} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white">
+          <button type="button" onClick={submit} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white max-lg:min-h-10">
             {editingId ? '更新する' : '登録する'}
           </button>
           {editingId && (
@@ -93,7 +93,7 @@ export default function ReferencesPage() {
                 setEditingId(null)
                 setDraft(EMPTY)
               }}
-              className="text-sm text-slate-500 underline"
+              className="text-sm text-slate-500 underline max-lg:min-h-10"
             >
               新規登録に戻る
             </button>
@@ -139,7 +139,7 @@ export default function ReferencesPage() {
                       saveReference({ ...r, approved: !r.approved })
                       refresh()
                     }}
-                    className={`rounded border px-2 py-1 text-xs font-bold ${
+                    className={`rounded border px-2 py-1 text-xs font-bold max-lg:min-h-10 ${
                       r.approved ? 'border-slate-300 text-slate-600' : 'border-emerald-400 bg-emerald-50 text-emerald-800'
                     }`}
                   >
@@ -152,7 +152,7 @@ export default function ReferencesPage() {
                       setDraft({ ...r })
                       window.scrollTo(0, 0)
                     }}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs font-bold"
+                    className="rounded border border-slate-300 px-2 py-1 text-xs font-bold max-lg:min-h-10"
                   >
                     編集
                   </button>
@@ -164,7 +164,7 @@ export default function ReferencesPage() {
                         refresh()
                       }
                     }}
-                    className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-700"
+                    className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-700 max-lg:min-h-10"
                   >
                     削除
                   </button>

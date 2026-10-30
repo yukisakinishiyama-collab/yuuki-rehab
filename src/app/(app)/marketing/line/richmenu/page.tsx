@@ -291,7 +291,7 @@ export default function RichMenuPage() {
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 font-mono text-xs"
             placeholder="LINE 管理画面のメニュー画像の URL（line-scdn.net）"
           />
-          <button type="button" onClick={loadFromUrl} disabled={!!busy} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={loadFromUrl} disabled={!!busy} className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 max-lg:min-h-10">
             URL から読む
           </button>
           <label className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold hover:bg-slate-50">
@@ -304,11 +304,11 @@ export default function RichMenuPage() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm space-y-3">
         <h2 className="font-bold">2. 描き足すもの</h2>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 max-lg:min-h-10">
           <input type="checkbox" checked={karte} onChange={(e) => setKarte(e.target.checked)} />
           右下を「カルテ連携」にする（リンク先 {KARTE_LINK_URL}）
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 max-lg:min-h-10">
           <input type="checkbox" checked={insta} onChange={(e) => setInsta(e.target.checked)} />
           上の帯の右に小さな「Instagram」を足す（{INSTAGRAM_URL}）
         </label>
@@ -324,10 +324,10 @@ export default function RichMenuPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm space-y-3">
         <h2 className="font-bold">3. LINE に登録する</h2>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={publish} disabled={!!busy || !base} className="rounded-md bg-emerald-600 px-4 py-2 font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={publish} disabled={!!busy || !base} className="rounded-md bg-emerald-700 px-4 py-2 font-bold text-white disabled:opacity-50 max-lg:min-h-10">
             この画像で友だち全員に表示する
           </button>
-          <button type="button" onClick={reset} disabled={!!busy} className="rounded-md border border-slate-300 px-4 py-2 font-bold hover:bg-slate-50 disabled:opacity-50">
+          <button type="button" onClick={reset} disabled={!!busy} className="rounded-md border border-slate-300 px-4 py-2 font-bold hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10">
             管理画面のメニューに戻す
           </button>
         </div>

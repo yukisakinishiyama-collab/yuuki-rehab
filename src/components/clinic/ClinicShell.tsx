@@ -7,14 +7,20 @@
  * - スマホ: 上に今の画面の名前（経営・集客は中の切り替えボタン）、下に5つのタブ
  * - 印刷（カルテの印刷など）にはメニューを出さない（no-print）
  * - 「経営」は隠しコマンドで開いたときだけ出す（患者さんの目に入らないように。src/lib/clinic/keiei-mode.ts）
+ *
+ * 見た目の決まり（DESIGN_DECISIONS.md「院内アプリの見た目の決まり」）
+ * - いまいる場所は、どのメニューでも teal（緑がかった青）で示す（PCの左・スマホの下のタブ・上の切り替え）。
+ *   下のタブにない画面（設定）を開いているときは、スマホの右上の「メニュー」を teal で塗る
+ * - スマホで指で押すもの（メニューの中の項目・上の切り替え）は高さ 40px 以上。PCの左のメニューは今までの高さ
+ * - スマホの上の見出しと下のタブの高さは変えない（予約の画面の高さ計算 YoyakuFrame・お知らせの位置が前提にしている）
  */
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ExternalLink, EyeOff, MoreHorizontal, X } from 'lucide-react'
+import { ExternalLink, EyeOff, Menu, X } from 'lucide-react'
 import { ROLE_COOKIE } from '@/lib/marketing/auth-shared'
 import { closeKeiei, countSecretKey, countSecretTap, extendKeiei, useKeieiOpen } from '@/lib/clinic/keiei-mode'
-import { activeSection, visibleNav, type NavSection } from './nav'
+import { activeSection, NAV, visibleNav, type NavSection } from './nav'
 
 /** ログイン中の役割（proxy が付ける読み取り用の Cookie。サーバー側の表示では出さない） */
 function readRoleLabel(): string | null {
@@ -29,6 +35,9 @@ function readRoleLabel(): string | null {
   }
 }
 const noSubscribe = () => () => {}
+
+/** 設定（メニューの下の段に出す。行き先・名前・アイコンは nav.ts の定義を使う） */
+const SETTINGS = NAV.find((s) => s.key === 'settings')
 
 function useRoleLabel(): string | null {
   return useSyncExternalStore(noSubscribe, readRoleLabel, () => null)
@@ -55,7 +64,7 @@ function Brand({ onSecret }: { onSecret: () => void }) {
       <BrandMark onSecret={onSecret} />
       <Link href="/dashboard" className="min-w-0 rounded-lg leading-tight focus-visible:outline-2 focus-visible:outline-teal-300">
         <span className="block text-[15px] font-black tracking-wide text-white">ゆうき整骨院</span>
-        <span className="block text-[11px] font-bold tracking-[0.14em] text-teal-200/80">院内アプリ</span>
+        <span className="block text-xs font-bold tracking-[0.14em] text-teal-200/80">院内アプリ</span>
       </Link>
     </div>
   )
@@ -79,6 +88,7 @@ function SideNav({
   onHide: () => void
 }) {
   const { section: current, link: currentLink } = activeSection(pathname)
+  const settingsOn = current?.key === 'settings'
   return (
     <div className="flex h-full flex-col">
       {showBrand && (
@@ -100,10 +110,10 @@ function SideNav({
                 }`}
               >
                 {active && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-teal-400" aria-hidden />}
-                <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-teal-300' : 'text-white/60 group-hover:text-white/80'}`} aria-hidden />
+                <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-teal-200' : 'text-white/60 group-hover:text-white/80'}`} aria-hidden />
                 <span className="min-w-0">
                   <span className="block text-[15px] font-bold leading-tight">{section.label}</span>
-                  <span className="block truncate text-[11px] leading-tight text-white/55">{section.hint}</span>
+                  <span className="block truncate text-xs leading-tight text-white/65">{section.hint}</span>
                 </span>
               </Link>
               {section.children && (
@@ -115,8 +125,8 @@ function SideNav({
                         <Link
                           href={child.href}
                           aria-current={on ? 'page' : undefined}
-                          className={`block rounded-lg px-2.5 py-1.5 text-[13px] transition-colors ${
-                            on ? 'bg-teal-400/15 font-bold text-teal-100' : 'text-white/70 hover:bg-white/5 hover:text-white'
+                          className={`flex min-h-10 items-center rounded-lg px-2.5 py-1.5 text-[13px] transition-colors lg:block lg:min-h-0 ${
+                            on ? 'bg-teal-400/15 font-bold text-teal-100' : 'text-white/80 hover:bg-white/5 hover:text-white'
                           }`}
                         >
                           {child.label}
@@ -135,43 +145,61 @@ function SideNav({
           <button
             type="button"
             onClick={onHide}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-bold text-amber-200 hover:bg-white/5"
+            className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-bold text-amber-200 hover:bg-white/5 lg:min-h-0"
           >
             <EyeOff className="h-4 w-4" aria-hidden />
             経営を隠す
           </button>
         )}
         {extras}
-        <Link
-          href="/marketing/settings"
-          aria-current={current?.key === 'settings' ? 'page' : undefined}
-          className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] ${
-            current?.key === 'settings' ? 'bg-white/10 font-bold text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
-          }`}
-        >
-          設定
-        </Link>
+        {SETTINGS && (
+          <Link
+            href={SETTINGS.href}
+            aria-current={settingsOn ? 'page' : undefined}
+            className={`relative flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] lg:min-h-0 ${
+              settingsOn ? 'bg-white/10 font-bold text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            {/* いまいる場所の印は、上の項目と同じ（左の teal の線と teal のアイコン） */}
+            {settingsOn && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-teal-400" aria-hidden />}
+            <SETTINGS.icon className={`h-4 w-4 ${settingsOn ? 'text-teal-200' : ''}`} aria-hidden />
+            {SETTINGS.label}
+          </Link>
+        )}
         <a
           href="/"
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+          className="flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-white/70 hover:bg-white/5 hover:text-white lg:min-h-0"
         >
           <ExternalLink className="h-4 w-4" aria-hidden />
           ホームページを見る
         </a>
-        {role && <p className="px-3 pt-1 text-[11px] text-white/50">ログイン中：{role}</p>}
+        {role && <p className="px-3 pt-1 text-xs text-white/60">ログイン中：{role}</p>}
       </div>
     </div>
   )
 }
 
-/** スマホ：経営・集客の中の画面の切り替え */
+/** スマホ：経営・集客の中の画面の切り替え（横に送れるボタンの列） */
 function SubNav({ section, pathname }: { section: NavSection; pathname: string }) {
   const { link } = activeSection(pathname)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  // いまの画面のボタンが右にはみ出して見えないことがあるので、開いたら列のまん中あたりへ送る（列の中だけを横に動かす）
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    const current = scroller?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!scroller || !current) return
+    scroller.scrollTo({ left: Math.max(0, current.offsetLeft - (scroller.clientWidth - current.offsetWidth) / 2) })
+  }, [link?.href])
   if (!section.children) return null
   return (
-    <div className="-mx-4 overflow-x-auto px-4 pb-2 lg:hidden" role="navigation" aria-label={`${section.label}の画面`}>
+    <div
+      ref={scrollerRef}
+      className="relative -mx-4 overflow-x-auto px-4 pb-2 lg:hidden"
+      role="navigation"
+      aria-label={`${section.label}の画面`}
+    >
       <ul className="flex w-max gap-1.5">
         {section.children.map((child) => {
           const on = link?.href === child.href
@@ -180,8 +208,8 @@ function SubNav({ section, pathname }: { section: NavSection; pathname: string }
               <Link
                 href={child.href}
                 aria-current={on ? 'page' : undefined}
-                className={`block whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-bold ${
-                  on ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                className={`flex min-h-10 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] font-bold ${
+                  on ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50'
                 }`}
               >
                 {child.label}
@@ -269,11 +297,13 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
   const covered = onKeiei && !keieiOpen
   const title = covered ? '院内アプリ' : (link?.label ?? section?.label ?? '院内アプリ')
   const tabs = visibleNav(keieiOpen).filter((s) => s.tab)
+  // 下のタブにない画面（設定）を開いているとき。どのタブも光らないので、かわりに「メニュー」を teal で塗る
+  const inMenuOnly = !covered && section !== null && !tabs.some((t) => t.key === section.key)
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* PC：左のメニュー */}
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 bg-[#13253d] lg:block">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 bg-navy lg:block">
         <SideNav
           pathname={pathname}
           extras={extras}
@@ -295,11 +325,11 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
             {/* 隠しコマンド（スマホ）：この文字を2秒以内に5回押す。見た目はただの見出し */}
             <p
               onClick={() => countSecretTap() && onSecret()}
-              className="select-none text-[11px] font-bold tracking-wide text-teal-700"
+              className="select-none text-xs font-bold tracking-wide text-teal-700"
             >
               ゆうき整骨院 院内アプリ
             </p>
-            <p className="truncate text-[17px] font-black leading-tight">{title}</p>
+            <p className="truncate text-lg font-black leading-tight text-slate-900">{title}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {keieiOpen && (
@@ -313,13 +343,19 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
                 隠す
               </button>
             )}
+            {/* 設定・カルテのクラウド保存・QR などは、ここから開く（アイコンだけだと気づきにくいので文字も出す）。
+                設定を開いているときは teal で塗る（いまいる場所の印。下のタブには設定がないため） */}
             <button
               type="button"
               onClick={() => setMoreOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
-              aria-label="そのほかのメニュー"
+              className={`flex h-10 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold ring-1 ${
+                inMenuOnly ? 'bg-teal-700 text-white ring-teal-700 hover:bg-teal-800' : 'text-slate-700 ring-slate-300 hover:bg-slate-100'
+              }`}
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
             >
-              <MoreHorizontal className="h-5 w-5" aria-hidden />
+              <Menu className="h-5 w-5" aria-hidden />
+              メニュー
             </button>
           </div>
         </div>
@@ -352,9 +388,10 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
                 <Link
                   href={s.href}
                   aria-current={on ? 'page' : undefined}
-                  className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold ${on ? 'text-teal-700' : 'text-slate-500'}`}
+                  className={`flex flex-col items-center gap-0.5 py-2 text-xs ${on ? 'font-bold text-teal-800' : 'font-medium text-slate-600'}`}
                 >
-                  <span className={`flex h-7 w-12 items-center justify-center rounded-full ${on ? 'bg-teal-100' : ''}`}>
+                  {/* いまの画面は、アイコンを teal の丸で塗る（色だけでなく形でも分かるように） */}
+                  <span className={`flex h-7 w-14 items-center justify-center rounded-full ${on ? 'bg-teal-700 text-white' : 'text-slate-500'}`}>
                     <Icon className="h-5 w-5" aria-hidden />
                   </span>
                   {s.label}
@@ -371,7 +408,7 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
           <button type="button" className="absolute inset-0 bg-slate-900/50" aria-label="閉じる" onClick={() => setMoreOpen(false)} />
           <div
             ref={sheetRef}
-            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-[#13253d] text-white shadow-xl"
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-navy text-white shadow-xl"
             style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))' }}
           >
             <div className="flex items-center justify-between px-4 pb-1 pt-3">
@@ -425,7 +462,7 @@ function Covered() {
       <div className="mt-4 flex justify-center">
         <Link
           href="/dashboard"
-          className="inline-flex h-11 items-center rounded-full bg-slate-900 px-6 text-sm font-bold text-white hover:bg-slate-800"
+          className="inline-flex h-11 items-center rounded-full bg-teal-700 px-6 text-sm font-bold text-white hover:bg-teal-800"
         >
           今日へ
         </Link>

@@ -77,7 +77,7 @@ export default function NoahImportPage() {
               ['読めなかった', plan.invalid],
             ].map(([label, n]) => (
               <div key={label} className="rounded-xl bg-slate-50 px-3 py-2">
-                <dt className="text-[11px] font-bold text-slate-500">{label}</dt>
+                <dt className="text-xs font-bold text-slate-500">{label}</dt>
                 <dd className="text-lg font-black tabular-nums text-slate-900">{n}人</dd>
               </div>
             ))}

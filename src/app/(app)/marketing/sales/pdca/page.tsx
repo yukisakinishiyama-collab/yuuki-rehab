@@ -64,20 +64,21 @@ const input =
 const pill =
   'inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 const primary =
-  'inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-teal-600 px-5 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-50'
+  'inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50'
 
 function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block min-w-0">
       <span className="text-xs font-bold text-slate-600">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-slate-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
     </label>
   )
 }
 
 function Section({ letter, title, children }: { letter: 'P' | 'D' | 'C' | 'A'; title: string; children: ReactNode }) {
-  const color: Record<string, string> = { P: 'bg-sky-600', D: 'bg-teal-600', C: 'bg-amber-600', A: 'bg-violet-600' }
+  // 白い文字をのせるので、文字が読める濃さにする（DESIGN_DECISIONS.md「院内アプリの見た目の決まり」の色）
+  const color: Record<string, string> = { P: 'bg-sky-700', D: 'bg-teal-700', C: 'bg-amber-700', A: 'bg-violet-600' }
   return (
     <section className="min-w-0 border-t border-slate-100 px-4 py-4 sm:px-6">
       <h3 className="mb-2.5 flex items-center gap-2 text-sm font-black text-slate-900">
@@ -106,8 +107,8 @@ function Steps({ status, hasLogs }: { status: PdcaStatus; hasLogs: boolean }) {
       {(['P', 'D', 'C', 'A'] as const).map((l, i) => (
         <span
           key={l}
-          className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-black ${
-            i < at ? 'bg-slate-200 text-slate-500' : i === at ? 'bg-slate-900 text-white' : 'border border-slate-200 text-slate-400'
+          className={`flex h-5 w-5 items-center justify-center rounded text-xs font-black ${
+            i < at ? 'bg-slate-200 text-slate-500' : i === at ? 'bg-teal-700 text-white' : 'border border-slate-200 text-slate-500'
           }`}
         >
           {l}
@@ -143,7 +144,7 @@ function DraftEditor({
         <p className="text-xs font-bold text-teal-700">
           計画の下書き（{state.ai ? 'AIに相談' : 'ひな形'}）— 直してから始めてください
         </p>
-        <button type="button" onClick={onCancel} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100" aria-label="下書きを閉じる">
+        <button type="button" onClick={onCancel} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 max-lg:h-10 max-lg:w-10" aria-label="下書きを閉じる">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -225,7 +226,7 @@ function DraftEditor({
                 <button
                   type="button"
                   onClick={() => set({ actions: d.actions.filter((_, j) => j !== i) })}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
                   aria-label={`やること${i + 1}を消す`}
                 >
                   <X className="h-4 w-4" />
@@ -355,7 +356,7 @@ function ItemCard({
         <span className="flex items-center gap-2">
           <Steps status={status} hasLogs={item.logs.length > 0 || done > 0} />
           <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-slate-900">{item.title}</span>
-          <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+          <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
         </span>
         {c && (
           <span className="block">
@@ -426,7 +427,7 @@ function ItemCard({
               </dd>
             </div>
             <div>
-              <button type="button" onClick={() => setEditing(true)} className="h-9 text-sm font-bold text-teal-700">
+              <button type="button" onClick={() => setEditing(true)} className="h-9 text-sm font-bold text-teal-700 max-lg:h-10">
                 計画を直す
               </button>
             </div>
@@ -449,7 +450,7 @@ function ItemCard({
                 }
                 className="mt-0.5 h-5 w-5 shrink-0 accent-teal-600"
               />
-              <label htmlFor={`a-${item.id}-${a.id}`} className={`min-w-0 flex-1 text-sm leading-relaxed ${a.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+              <label htmlFor={`a-${item.id}-${a.id}`} className={`min-w-0 flex-1 text-sm leading-relaxed max-lg:min-h-10 ${a.done ? 'text-slate-500 line-through' : 'text-slate-700'}`}>
                 {a.text}
               </label>
             </li>
@@ -464,7 +465,7 @@ function ItemCard({
           }}
         >
           <input className={`${input} mt-0`} placeholder="やることを足す" value={newAction} maxLength={200} onChange={(e) => setNewAction(e.target.value)} />
-          <button type="submit" className={`${pill} shrink-0`} disabled={!newAction.trim()}>
+          <button type="submit" className={` max-lg:min-h-10${pill} shrink-0`} disabled={!newAction.trim()}>
             足す
           </button>
         </form>
@@ -495,7 +496,7 @@ function ItemCard({
                 onChange={(e) => setManualValue(e.target.value)}
                 aria-label="数を記録"
               />
-              <button type="button" className={`${pill} shrink-0`} onClick={() => void addManual()} disabled={!manualValue.trim()}>
+              <button type="button" className={` max-lg:min-h-10${pill} shrink-0`} onClick={() => void addManual()} disabled={!manualValue.trim()}>
                 数を記録
               </button>
             </div>
@@ -504,11 +505,11 @@ function ItemCard({
             <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600">
               {item.logs.slice(0, 8).map((l) => (
                 <li key={l.id} className="flex gap-2">
-                  <span className="shrink-0 tabular-nums text-slate-400">{md(l.at)}</span>
+                  <span className="shrink-0 tabular-nums text-slate-500">{md(l.at)}</span>
                   <span className="min-w-0">{l.text}</span>
                 </li>
               ))}
-              {item.logs.length > 8 && <li className="text-slate-400">ほか {item.logs.length - 8}件</li>}
+              {item.logs.length > 8 && <li className="text-slate-500">ほか {item.logs.length - 8}件</li>}
             </ul>
           )}
         </div>
@@ -535,12 +536,12 @@ function ItemCard({
                 ] as const
               ).map(([label, v]) => (
                 <div key={label} className="rounded-xl bg-slate-50 px-3 py-2">
-                  <dt className="text-[11px] text-slate-500">{label}</dt>
+                  <dt className="text-xs text-slate-500">{label}</dt>
                   <dd className="font-bold tabular-nums text-slate-900">{v}</dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
               {c.phase === 'before'
                 ? `${item.start}から数えはじめます。`
                 : `${c.totalDays}日のうち${c.elapsedDays}日目。数字のもと：${def.source}。始める前の同じ日数＝${c.baselineRange.from}〜${c.baselineRange.to}。`}
@@ -565,7 +566,7 @@ function ItemCard({
               role="radio"
               aria-checked={review.decision === k}
               onClick={() => setReview({ ...review, decision: k })}
-              className={`h-10 rounded-full px-4 text-sm font-bold ${review.decision === k ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}
+              className={`h-10 rounded-full px-4 text-sm font-bold ${review.decision === k ? 'bg-teal-700 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}
             >
               {DECISION_LABELS[k]}
             </button>
@@ -603,15 +604,15 @@ function ItemCard({
           {confirmDelete ? (
             <span className="flex items-center gap-2 text-xs text-slate-600">
               この施策を消しますか？
-              <button type="button" className="h-9 rounded-full bg-red-600 px-3 font-bold text-white" onClick={() => void onDelete()}>
+              <button type="button" className="h-9 rounded-full bg-red-600 px-3 font-bold text-white max-lg:h-10" onClick={() => void onDelete()}>
                 消す
               </button>
-              <button type="button" className="h-9 px-2 font-bold text-slate-500" onClick={() => setConfirmDelete(false)}>
+              <button type="button" className="h-9 px-2 font-bold text-slate-500 max-lg:h-10" onClick={() => setConfirmDelete(false)}>
                 やめる
               </button>
             </span>
           ) : (
-            <button type="button" className="inline-flex h-9 items-center gap-1 text-xs font-bold text-slate-400 hover:text-red-600" onClick={() => setConfirmDelete(true)}>
+            <button type="button" className="inline-flex h-9 items-center gap-1 text-xs font-bold text-slate-500 hover:text-red-600 max-lg:h-10" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
               消す
             </button>
@@ -806,7 +807,7 @@ export default function PdcaPage() {
           <h2 className="text-[15px] font-bold">相談して計画をつくる</h2>
           <p className="mt-0.5 text-xs text-white/60">いま気になっていること・やりたいことを書いてください（患者さんのお名前は書かないでください）</p>
           <textarea
-            className="mt-3 min-h-24 w-full rounded-xl border-0 bg-white/95 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-300"
+            className="mt-3 min-h-24 w-full rounded-xl border-0 bg-white/95 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-300"
             placeholder="例：初めての方を月10人にしたい。Instagramからの予約が少ない気がする"
             value={concern}
             maxLength={600}
@@ -818,16 +819,16 @@ export default function PdcaPage() {
               type="button"
               onClick={() => void consult({})}
               disabled={consulting || !concern.trim() || !data}
-              className="inline-flex h-11 items-center gap-1.5 rounded-full bg-teal-500 px-5 text-sm font-bold text-white hover:bg-teal-400 disabled:opacity-50"
+              className="inline-flex h-11 items-center gap-1.5 rounded-full bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" aria-hidden />
               {consulting ? '考えています…' : data?.ai ? 'AIに相談して計画をつくる' : '計画の下書きをつくる'}
             </button>
-            {data?.ai && <span className="text-[11px] text-white/50">AIに相談すると、1回 数円〜10円ほどかかります</span>}
+            {data?.ai && <span className="text-xs text-white/50">AIに相談すると、1回 数円〜10円ほどかかります</span>}
           </div>
           {data && (
             <div className="mt-4 border-t border-white/10 pt-3">
-              <p className="text-[11px] text-white/60">ひな形から作る（AIを使わない・無料）</p>
+              <p className="text-xs text-white/60">ひな形から作る（AIを使わない・無料）</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {data.templates.map((t) => (
                   <button
@@ -835,7 +836,7 @@ export default function PdcaPage() {
                     type="button"
                     disabled={consulting}
                     onClick={() => void consult({ templateId: t.id, concernText: '' })}
-                    className="h-9 rounded-full bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 disabled:opacity-50"
+                    className="h-9 rounded-full bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 disabled:opacity-50 max-lg:h-10"
                   >
                     {t.label}
                   </button>
@@ -856,12 +857,12 @@ export default function PdcaPage() {
             className={`h-10 rounded-full text-sm font-bold ${tab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
             {t.label}
-            <span className="ml-1 tabular-nums text-xs text-slate-400">{groups[t.key].length}</span>
+            <span className="ml-1 tabular-nums text-xs text-slate-500">{groups[t.key].length}</span>
           </button>
         ))}
       </div>
 
-      {!loaded && <p className="text-sm text-slate-400">読み込み中…</p>}
+      {!loaded && <p className="text-sm text-slate-500">読み込み中…</p>}
       {loaded && data && list.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm leading-relaxed text-slate-600">
           {tab === 'doing'

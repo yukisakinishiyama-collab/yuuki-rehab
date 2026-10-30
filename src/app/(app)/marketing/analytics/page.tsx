@@ -133,7 +133,7 @@ function InstagramFollowers() {
             placeholder="今日のフォロワー数（例: 912）"
             className="w-48 rounded-lg border border-slate-300 p-2 text-sm"
           />
-          <button type="button" onClick={save} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white">
+          <button type="button" onClick={save} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white max-lg:min-h-10">
             記録する
           </button>
           {message && <span className="text-sm text-slate-600">{message}</span>}
@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
               key={d}
               type="button"
               onClick={() => setDays(d)}
-              className={`rounded-full border px-3 py-1 text-sm font-medium ${
+              className={`rounded-full border px-3 py-1 text-sm font-medium max-lg:min-h-10 ${
                 days === d ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-300 text-slate-600'
               }`}
             >
@@ -241,7 +241,7 @@ export default function AnalyticsPage() {
                 <ul className="mt-1 divide-y divide-slate-100 text-sm">
                   {data.bookings.posts.map((p) => (
                     <li key={p.campaign} className="flex items-center gap-2 py-1.5">
-                      <span className="font-mono text-xs text-slate-400">{p.scheduledAt ? p.scheduledAt.slice(5, 10).replace('-', '/') : p.campaign}</span>
+                      <span className="font-mono text-xs text-slate-500">{p.scheduledAt ? p.scheduledAt.slice(5, 10).replace('-', '/') : p.campaign}</span>
                       <span className="flex-1 truncate">{p.theme}</span>
                       <span className="font-bold text-teal-900">{p.bookings}件</span>
                     </li>
@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
                 <span className="w-40 font-medium">{step.label}</span>
                 <div className="h-6 flex-1 rounded bg-slate-100">
                   <div
-                    className="flex h-6 items-center rounded bg-teal-600 px-2 text-xs font-bold text-white"
+                    className="flex h-6 items-center rounded bg-teal-700 px-2 text-xs font-bold text-white"
                     style={{ width: `${Math.max((value / funnelMax) * 100, value > 0 ? 8 : 0)}%` }}
                   >
                     {value}

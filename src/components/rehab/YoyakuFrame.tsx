@@ -101,7 +101,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             href={RESERVATION_PATIENT_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 max-lg:min-h-10"
           >
             <ExternalLink size={13} />
             患者用予約ページ
@@ -110,7 +110,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             href={openUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-800"
+            className="flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-800 max-lg:min-h-10"
           >
             <ExternalLink size={13} />
             新しいタブで開く
@@ -127,11 +127,11 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             className="w-full h-full border-0"
           />
         ) : (
-          <p className="flex h-full items-center justify-center text-xs text-slate-400">予約管理を開いています…</p>
+          <p className="flex h-full items-center justify-center text-xs text-slate-500">予約管理を開いています…</p>
         )}
       </div>
 
-      <p className="text-[11px] text-slate-400 mt-2">
+      <p className="text-xs text-slate-500 mt-2">
         画面が表示されない・ログインがうまくいかない場合は「新しいタブで開く」をご利用ください。
       </p>
     </div>

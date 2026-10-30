@@ -211,7 +211,7 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter('birthday')}
                 title={`${BIRTHDAY_SOON_DAYS}日以内に誕生日の方`}
-                className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100"
+                className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100 max-lg:min-h-10"
               >
                 🎂 誕生日が近い {birthdaySoonCount}名
               </button>
@@ -221,7 +221,7 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter('line')}
                 title="公式LINEと結びついている方"
-                className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100"
+                className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 max-lg:min-h-10"
               >
                 LINE連携済み {lineLinkedCount}名
               </button>
@@ -242,7 +242,7 @@ export default function PatientsPage() {
       {/* 最近閲覧した患者 */}
       {recentPatients.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
             <History className="w-3.5 h-3.5" />最近閲覧した患者
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -251,13 +251,13 @@ export default function PatientsPage() {
                 key={p.id}
                 href={`/patients/${p.id}`}
                 className="flex items-center gap-2 flex-shrink-0 bg-white border border-gray-200
-                  rounded-full pl-1.5 pr-3 py-1.5 hover:border-teal-300 hover:shadow-sm transition-all"
+                  rounded-full pl-1.5 pr-3 py-1.5 hover:border-teal-300 hover:shadow-sm transition-all max-lg:min-h-10"
               >
                 <span className="w-6 h-6 bg-teal-50 rounded-full flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-teal-600" />
+                  <User className="w-3.5 h-3.5 text-teal-700" />
                 </span>
                 <span className="text-xs font-medium text-gray-700">{p.name}</span>
-                <span className="text-[10px] text-gray-400">{BODY_REGION_LABELS[p.bodyRegion]}</span>
+                <span className="text-xs text-gray-500">{BODY_REGION_LABELS[p.bodyRegion]}</span>
               </Link>
             ))}
           </div>
@@ -267,7 +267,7 @@ export default function PatientsPage() {
       {/* 検索・フィルター・並び替え */}
       <div className="space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             type="text"
             placeholder="氏名・カナ・診断名・ID・主訴で検索..."
@@ -284,9 +284,9 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter(opt.value)}
                 className={cn(
-                  'px-3 py-1.5 text-xs rounded-full border font-medium transition-colors',
+                  'px-3 py-1.5 text-xs rounded-full border font-medium transition-colors max-lg:min-h-10',
                   filter === opt.value
-                    ? 'bg-teal-600 text-white border-teal-600'
+                    ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-700'
                 )}
               >
@@ -295,7 +295,7 @@ export default function PatientsPage() {
             ))}
           </div>
           <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
             <select
               value={sortKey}
               onChange={e => setSortKey(e.target.value as SortKey)}
@@ -317,10 +317,10 @@ export default function PatientsPage() {
           <span>
             予約の「{karteMiss}」さんのカルテが見つかりませんでした。お名前を確かめるか、新しく登録してください。
           </span>
-          <Link href="/patients/new" className={cn(buttonVariants({ size: 'sm' }), 'bg-amber-600 hover:bg-amber-700')}>
+          <Link href="/patients/new" className={cn(buttonVariants({ size: 'sm' }), 'bg-amber-700 hover:bg-amber-800')}>
             この方のカルテを作る
           </Link>
-          <button type="button" onClick={() => setKarteMiss('')} className="ml-auto text-xs text-amber-700 underline">
+          <button type="button" onClick={() => setKarteMiss('')} className="ml-auto text-xs text-amber-700 underline max-lg:min-h-10">
             閉じる
           </button>
         </div>
@@ -328,7 +328,7 @@ export default function PatientsPage() {
 
       {/* 患者リスト */}
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
           <User className="w-12 h-12 mb-3 opacity-30" />
           <p className="text-sm">
             {search || filter !== 'all' ? '条件に一致する患者が見つかりません' : '患者が登録されていません'}
@@ -343,7 +343,7 @@ export default function PatientsPage() {
         <div className="space-y-5">
           {pinned.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
                 <Pin className="w-3.5 h-3.5" />ピン留め
               </div>
               <div className="space-y-2">
@@ -401,8 +401,8 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
     low: 'success', medium: 'warning', high: 'danger',
   }
   const nrsColor = (latestNote?.painToday ?? 0) >= 7 ? 'text-red-600'
-    : (latestNote?.painToday ?? 0) >= 4 ? 'text-yellow-600'
-    : 'text-green-600'
+    : (latestNote?.painToday ?? 0) >= 4 ? 'text-yellow-700'
+    : 'text-green-700'
   const age = calcAge(patient.birthDate)
   const bday = birthdayLabel(patient.birthDate)
 
@@ -423,7 +423,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
       <div className="flex items-center gap-4">
         {/* アバター */}
         <div className="w-11 h-11 bg-teal-50 rounded-full flex items-center justify-center flex-shrink-0">
-          <User className="w-5 h-5 text-teal-600" />
+          <User className="w-5 h-5 text-teal-700" />
         </div>
 
         {/* メイン情報 */}
@@ -431,14 +431,14 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{patient.name}</span>
             {/* 生年月日未入力の患者では年齢を表示しない（NaN歳の防止） */}
-            {Number.isFinite(age) && <span className="text-sm text-gray-400">{age}歳</span>}
+            {Number.isFinite(age) && <span className="text-sm text-gray-500">{age}歳</span>}
             {bday && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-[11px] font-bold text-pink-700">
+              <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-xs font-bold text-pink-700">
                 🎂 {bday}
               </span>
             )}
             {lineLinked && (
-              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700" title="公式LINEと結びついています">
+              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700" title="公式LINEと結びついています">
                 LINE
               </span>
             )}
@@ -446,13 +446,13 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
             <Badge variant={riskVariant[riskLevel]}>
               離脱リスク{RISK_LABELS[riskLevel]}
             </Badge>
-            {riskLevel === 'high' && <AlertTriangle className="w-4 h-4 text-red-500" />}
+            {riskLevel === 'high' && <AlertTriangle className="w-4 h-4 text-red-600" />}
             {/* キャンセル累計（0件の患者には出さない。無断ありは赤で強調） */}
             {cancelSummary && cancelSummary.total > 0 && (
               <span
                 title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
                   cancelSummary.no_show > 0
                     ? 'bg-red-50 text-red-700 border-red-200'
                     : 'bg-orange-50 text-orange-700 border-orange-200',
@@ -464,7 +464,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
             )}
           </div>
           <p className="text-xs text-gray-500 mt-1 truncate">{patient.mainComplaint}</p>
-          <p className="text-xs text-gray-400">{patient.diagnosisLabel}</p>
+          <p className="text-xs text-gray-500">{patient.diagnosisLabel}</p>
         </div>
 
         {/* 右側：最新NRS + 来院回数 */}
@@ -474,11 +474,11 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
               <div className={cn('text-lg font-bold tabular-nums', nrsColor)}>
                 NRS {latestNote.painToday}
               </div>
-              <div className="text-xs text-gray-400">{latestNote.visitDate}</div>
+              <div className="text-xs text-gray-500">{latestNote.visitDate}</div>
               <div className="text-xs text-gray-500">{notes.length}回来院</div>
             </>
           ) : (
-            <div className="text-xs text-gray-400 flex items-center gap-1">
+            <div className="text-xs text-gray-500 flex items-center gap-1">
               <Activity className="w-3 h-3" />
               初回評価待ち
             </div>
@@ -490,10 +490,10 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
           type="button"
           onClick={e => { e.stopPropagation(); onTogglePin() }}
           className={cn(
-            'p-1.5 rounded-lg transition-colors flex-shrink-0',
+            'p-1.5 rounded-lg transition-colors flex-shrink-0 max-lg:min-h-10',
             pinned
-              ? 'text-teal-600 hover:text-teal-800 hover:bg-teal-50'
-              : 'text-gray-300 hover:text-teal-500 hover:bg-gray-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+              ? 'text-teal-700 hover:text-teal-800 hover:bg-teal-50'
+              : 'text-gray-500 hover:text-teal-500 hover:bg-gray-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
           )}
           aria-label={pinned ? 'ピン留めを解除' : 'ピン留めする'}
           title={pinned ? 'ピン留めを解除' : 'ピン留めする'}
@@ -501,7 +501,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
           {pinned ? <Pin className="w-4 h-4 fill-current" /> : <PinOff className="w-4 h-4" />}
         </button>
 
-        <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-teal-500 transition-colors flex-shrink-0" />
+        <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-teal-500 transition-colors flex-shrink-0" />
       </div>
     </div>
   )

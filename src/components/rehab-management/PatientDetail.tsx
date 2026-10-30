@@ -12,7 +12,7 @@ import type {
 } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
-const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-600' : 'text-green-600'
+const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-700' : 'text-green-700'
 import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
@@ -241,17 +241,17 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
         />
         {voiceInterim && (
-          <p className="text-xs text-gray-400 italic px-1">🎤 {voiceInterim}…</p>
+          <p className="text-xs text-gray-500 italic px-1">🎤 {voiceInterim}…</p>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-400">Ctrl+Enter で保存</span>
+          <span className="text-xs text-gray-500">Ctrl+Enter で保存</span>
           <div className="flex items-center gap-3">
-            {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+            {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
             <button
               type="button"
               onClick={handleSave}
               disabled={!content.trim()}
-              className="px-4 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-1.5 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
             >
               保存
             </button>
@@ -261,10 +261,10 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
 
       {/* 月別タイムライン */}
       {totalEntries === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-8">まだ記録がありません</p>
+        <p className="text-center text-sm text-gray-500 py-8">まだ記録がありません</p>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-gray-400 px-1">
+          <p className="text-xs text-gray-500 px-1">
             メモ {memos.length}件 · テスト {specialTests.length}件 · {months.length}ヶ月分
           </p>
 
@@ -281,27 +281,27 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                   <button
                     type="button"
                     onClick={() => toggleMonth(ym)}
-                    className="flex items-center gap-2 flex-1 text-left"
+                    className="flex items-center gap-2 flex-1 text-left max-lg:min-h-10"
                   >
                     <span className="text-sm font-bold text-teal-700">{formatMonthLabel(ym)}</span>
                     {monthMemos.length > 0 && (
-                      <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                      <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
                         📝 {monthMemos.length}
                       </span>
                     )}
                     {monthTests.length > 0 && (
-                      <span className="text-xs text-purple-500 bg-purple-50 rounded-full px-2 py-0.5">
+                      <span className="text-xs text-purple-600 bg-purple-50 rounded-full px-2 py-0.5">
                         🔍 {monthTests.length}
                       </span>
                     )}
-                    <span className="text-gray-400 text-xs ml-1">{collapsed ? '▶' : '▼'}</span>
+                    <span className="text-gray-500 text-xs ml-1">{collapsed ? '▶' : '▼'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => printMonthlyChart(patient, monthMemos, monthTests, ym)}
                     className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-teal-600
                       border border-gray-200 hover:border-teal-300 rounded-lg px-2.5 py-1
-                      transition-colors bg-white"
+                      transition-colors bg-white max-lg:min-h-10"
                     title="この月をカルテとして印刷"
                   >
                     🖨️ カルテ印刷
@@ -321,7 +321,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                           <div key={memo.id} className="flex gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors">
                             <div className="flex-shrink-0 w-16">
                               <p className="text-xs font-semibold text-teal-700">{dayLabel}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">📝 メモ</p>
+                              <p className="text-xs text-gray-500 mt-0.5">📝 メモ</p>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
@@ -329,7 +329,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                             <button
                               type="button"
                               onClick={() => handleDelete(memo.id)}
-                              className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
+                              className="flex-shrink-0 text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
                               title="削除"
                             >×</button>
                           </div>
@@ -340,27 +340,27 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                           <div key={t.id} className="flex gap-3 px-4 py-3 bg-purple-50/30">
                             <div className="flex-shrink-0 w-16">
                               <p className="text-xs font-semibold text-purple-600">{dayLabel}</p>
-                              <p className="text-[10px] text-purple-400 mt-0.5">🔍 テスト</p>
+                              <p className="text-xs text-purple-600 mt-0.5">🔍 テスト</p>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-800">
                                 {t.testName}
-                                <span className="ml-1.5 text-xs text-gray-400 font-normal">{BODY_REGION_LABELS[t.bodyRegion]}</span>
+                                <span className="ml-1.5 text-xs text-gray-500 font-normal">{BODY_REGION_LABELS[t.bodyRegion]}</span>
                               </p>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => (
-                                  <span key={key} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${ST_RESULT_COLOR[t[key]]}`}>
+                                  <span key={key} className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${ST_RESULT_COLOR[t[key]]}`}>
                                     {['右', '左', '総合'][i]}:{ST_RESULT_LABEL[t[key]]}
                                   </span>
                                 ))}
                               </div>
                               {(t.faberDistanceRight != null || t.faberDistanceLeft != null) && (
-                                <p className="text-[10px] text-blue-600 mt-1">
+                                <p className="text-xs text-blue-600 mt-1">
                                   床→脛骨粗面: 右 {t.faberDistanceRight ?? '-'}cm / 左 {t.faberDistanceLeft ?? '-'}cm
                                 </p>
                               )}
                               {(t.apprehension || t.clickSound || t.limitation) && (
-                                <p className="text-[10px] text-orange-600 mt-1">
+                                <p className="text-xs text-orange-700 mt-1">
                                   {[t.apprehension && '不安感', t.clickSound && 'クリック音', t.limitation && '可動域制限'].filter(Boolean).join(' · ')}
                                 </p>
                               )}
@@ -394,7 +394,7 @@ const SOAP_RESULT_SYMBOL: Record<SpecialTestResult, string> = {
 // ── SOAPカルテ展開カード ────────────────────────────────────
 function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () => void }) {
   const [open, setOpen] = useState(false)
-  const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'
+  const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-700' : 'text-green-700'
   const adherenceLabel = note.homeExerciseAdherence === 'done' ? '✅ 実施' : note.homeExerciseAdherence === 'partial' ? '⚠️ 一部' : '❌ 未実施'
 
   return (
@@ -416,11 +416,11 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           </span>
           <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:block">{adherenceLabel}</span>
           {note.improvements && (
-            <span className="text-xs text-gray-400 truncate flex-1 hidden md:block">
+            <span className="text-xs text-gray-500 truncate flex-1 hidden md:block">
               ✓ {note.improvements}
             </span>
           )}
-          <span className={`text-gray-400 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+          <span className={`text-gray-500 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
             ▼
           </span>
         </button>
@@ -431,7 +431,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
             type="button"
             onClick={onReferral}
             title="この経過から紹介状・報告書を作成"
-            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
           >
             📄 紹介状
           </button>
@@ -445,7 +445,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* S: 主観的情報 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center">S</span>
+              <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">S</span>
               <span className="text-xs font-semibold text-blue-700">主観的情報（患者の訴え）</span>
             </div>
 
@@ -460,17 +460,17 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
                         {c.side !== 'na' && `（${SIDE_LABELS_SHORT[c.side]}）`}
                       </span>
                       {c.diagnosisLabel && (
-                        <span className="text-[10px] text-gray-400 truncate max-w-[80px]">{c.diagnosisLabel}</span>
+                        <span className="text-xs text-gray-500 truncate max-w-[80px]">{c.diagnosisLabel}</span>
                       )}
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className={`text-xl font-bold ${NRS_COLOR(c.nrs)}`}>{c.nrs}</span>
-                      <span className="text-[10px] text-gray-400">/10</span>
+                      <span className="text-xs text-gray-500">/10</span>
                     </div>
                     {c.symptoms.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {c.symptoms.map(s => (
-                          <span key={s} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-1.5 py-0.5">
+                          <span key={s} className="text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-1.5 py-0.5">
                             {s}
                           </span>
                         ))}
@@ -499,7 +499,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* O: 客観的情報 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">O</span>
+              <span className="w-5 h-5 rounded-full bg-green-700 text-white text-xs font-bold flex items-center justify-center">O</span>
               <span className="text-xs font-semibold text-green-700">客観的情報（検査・観察）</span>
             </div>
             {note.treatmentAreas && note.treatmentAreas.length > 0 && (
@@ -513,14 +513,14 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
               {note.strengthFindings && <Row label="筋力所見" value={note.strengthFindings} />}
               {note.soapSpecialTests && note.soapSpecialTests.length > 0 && (
                 <div className="sm:col-span-2 rounded-lg border border-gray-100 bg-white p-2">
-                  <p className="text-gray-400 font-medium mb-1.5">スペシャルテスト</p>
+                  <p className="text-gray-500 font-medium mb-1.5">スペシャルテスト</p>
                   <div className="flex flex-wrap gap-1.5">
                     {note.soapSpecialTests.map((t, i) => (
                       <span
                         key={i}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border font-medium ${SOAP_RESULT_COLORS[t.result]}`}
                       >
-                        <span className="text-gray-400 font-normal text-[10px]">{t.joint.replace('関節', '').replace('・手指', '')}</span>
+                        <span className="text-gray-500 font-normal text-xs">{t.joint.replace('関節', '').replace('・手指', '')}</span>
                         {t.testName.replace(/ test| sign/i, '')}
                         <span className="font-bold">{SOAP_RESULT_SYMBOL[t.result]}</span>
                       </span>
@@ -543,7 +543,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* A: 評価・分析 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">A</span>
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-amber-950 text-xs font-bold flex items-center justify-center">A</span>
               <span className="text-xs font-semibold text-amber-700">評価・分析</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -556,7 +556,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* P: 計画 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center">P</span>
+              <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">P</span>
               <span className="text-xs font-semibold text-purple-700">計画</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -590,7 +590,7 @@ function Row({ label, value, highlight, className = '' }: {
     'bg-white border-gray-100'
   return (
     <div className={`rounded-lg border p-2 ${bg} ${className}`}>
-      <p className="text-gray-400 font-medium mb-0.5">{label}</p>
+      <p className="text-gray-500 font-medium mb-0.5">{label}</p>
       <p className="text-gray-700 whitespace-pre-wrap">{value}</p>
     </div>
   )
@@ -627,7 +627,7 @@ function IntakeCard({
               🤖 AI分析済
             </span>
           )}
-          <span className={`text-gray-400 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+          <span className={`text-gray-500 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
             ▼
           </span>
         </button>
@@ -639,7 +639,7 @@ function IntakeCard({
               type="button"
               onClick={onReferral}
               title="紹介状・報告書を作成"
-              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
             >
               📄 紹介状
             </button>
@@ -664,7 +664,7 @@ function IntakeCard({
               <p className="text-xs font-semibold text-purple-700">🤖 AI分析結果</p>
               {intake.aiSuggestedTests && intake.aiSuggestedTests.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-gray-400 mb-1">推奨テスト</p>
+                  <p className="text-xs text-gray-500 mb-1">推奨テスト</p>
                   <div className="flex flex-wrap gap-1">
                     {intake.aiSuggestedTests.map((t, i) => (
                       <span key={i} className="text-xs px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-full">{t}</span>
@@ -674,7 +674,7 @@ function IntakeCard({
               )}
               {intake.aiDifferentials && intake.aiDifferentials.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-gray-400 mb-1">鑑別診断</p>
+                  <p className="text-xs text-gray-500 mb-1">鑑別診断</p>
                   <ul className="text-xs text-gray-600 space-y-0.5">
                     {intake.aiDifferentials.map((d, i) => <li key={i}>• {d}</li>)}
                   </ul>
@@ -682,7 +682,7 @@ function IntakeCard({
               )}
               {intake.aiProtocol && (
                 <div className="bg-green-50 border border-green-100 rounded-lg p-2">
-                  <p className="text-[10px] text-gray-400 mb-0.5">推奨プロトコル</p>
+                  <p className="text-xs text-gray-500 mb-0.5">推奨プロトコル</p>
                   <p className="text-xs text-green-800">{intake.aiProtocol}</p>
                 </div>
               )}
@@ -842,14 +842,14 @@ export default function PatientDetail({ patient }: Props) {
                     type="button"
                     onClick={() => setActiveTab('cancel')}
                     title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-colors max-lg:min-h-10 ${
                       cancelSummary.no_show > 0
                         ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
                         : 'border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
                     }`}
                   >
                     キャンセル {cancelSummary.total}回
-                    <span className="font-medium opacity-70 tabular-nums">
+                    <span className="font-medium tabular-nums">
                       （前{cancelSummary.advance}・当{cancelSummary.same_day}・無{cancelSummary.no_show}）
                     </span>
                   </button>
@@ -877,7 +877,7 @@ export default function PatientDetail({ patient }: Props) {
               { label: '初回来院', value: patient.firstVisitDate || '—' },
             ].map(f => (
               <div key={f.label} className="min-w-0 rounded-xl bg-slate-50 px-3 py-2">
-                <dt className="text-[11px] font-bold text-slate-500">{f.label}</dt>
+                <dt className="text-xs font-bold text-slate-500">{f.label}</dt>
                 <dd className={`mt-0.5 truncate text-base font-black ${f.tone || 'text-slate-900'}`}>{f.value}</dd>
               </div>
             ))}
@@ -894,26 +894,26 @@ export default function PatientDetail({ patient }: Props) {
             <button
               type="button"
               onClick={() => setActiveTab('soap')}
-              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-800"
+              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-800 max-lg:min-h-10"
             >
               今日のSOAPを書く
             </button>
             <button
               type="button"
               onClick={() => setShowReferralModal(true)}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10"
             >
               紹介状・報告書
             </button>
             <Link
               href={`/patients/${patient.id}/return-criteria`}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
             >
               復帰基準テスト
             </Link>
             <Link
               href={`/patients/${patient.id}/outcome-scores`}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
             >
               アウトカム評価
             </Link>
@@ -937,7 +937,7 @@ export default function PatientDetail({ patient }: Props) {
               >
                 {tab.label}
                 {tab.badge != null && tab.badge > 0 && (
-                  <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600 tabular-nums">
+                  <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600 tabular-nums">
                     {tab.badge}
                   </span>
                 )}
@@ -989,7 +989,7 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="bg-teal-50 rounded-xl p-4">
                     <p className="text-sm font-bold text-teal-800 mb-2">📣 患者様への今日のメッセージ</p>
                     <p className="text-sm text-teal-700">{patientMessage.encouragementMessage}</p>
-                    <p className="text-sm text-teal-600 mt-2">{patientMessage.phaseExplanation}</p>
+                    <p className="text-sm text-teal-700 mt-2">{patientMessage.phaseExplanation}</p>
                     {patientMessage.nextGoalMessage && (
                       <p className="text-sm text-teal-800 font-medium mt-2">🎯 {patientMessage.nextGoalMessage}</p>
                     )}
@@ -1005,7 +1005,7 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                     <p className="text-sm font-bold text-red-700 mb-2">⚠️ 離脱リスクが高い状態です</p>
                     <p className="text-sm text-red-600 mb-2">{retentionRisk.recommendedAction}</p>
-                    <ul className="text-xs text-red-500 space-y-1">
+                    <ul className="text-xs text-red-600 space-y-1">
                       {retentionRisk.reasons.map((r, i) => <li key={i}>• {r}</li>)}
                     </ul>
                   </div>
@@ -1036,19 +1036,19 @@ export default function PatientDetail({ patient }: Props) {
                   <ul className="space-y-2">
                     {latestSoap?.improvements && (
                       <li className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span className="text-green-700 mt-0.5">✓</span>
                         {latestSoap.improvements}
                       </li>
                     )}
                     {romRecords.length > 0 && (
                       <li className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span className="text-green-700 mt-0.5">✓</span>
                         ROM測定が {romRecords.length}件記録されています
                       </li>
                     )}
                     {strengthRecords.length > 0 && (
                       <li className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span className="text-green-700 mt-0.5">✓</span>
                         筋力測定が {strengthRecords.length}件記録されています
                       </li>
                     )}
@@ -1075,7 +1075,7 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">痛みNRS</span>
-                      <p className={`font-bold text-lg ${latestSoap.painToday >= 7 ? 'text-red-600' : latestSoap.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                      <p className={`font-bold text-lg ${latestSoap.painToday >= 7 ? 'text-red-600' : latestSoap.painToday >= 4 ? 'text-yellow-700' : 'text-green-700'}`}>
                         {latestSoap.painToday} / 10
                       </p>
                     </div>
@@ -1102,8 +1102,8 @@ export default function PatientDetail({ patient }: Props) {
                 type="button"
                 aria-pressed={evalTab === t.key}
                 onClick={() => setEvalTab(t.key)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors ${
-                  evalTab === t.key ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+                className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors max-lg:min-h-10 ${
+                  evalTab === t.key ? 'bg-teal-700 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
                 }`}
               >
                 {t.label}
@@ -1123,7 +1123,7 @@ export default function PatientDetail({ patient }: Props) {
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-gray-600 text-sm">{ev.evaluationDate}</span>
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium text-sm ${ev.painNrs >= 7 ? 'text-red-600' : ev.painNrs >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                            <span className={`font-medium text-sm ${ev.painNrs >= 7 ? 'text-red-600' : ev.painNrs >= 4 ? 'text-yellow-700' : 'text-green-700'}`}>
                               NRS: {ev.painNrs}
                             </span>
                             {ev.painDuration && (
@@ -1165,7 +1165,7 @@ export default function PatientDetail({ patient }: Props) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1 pt-2">
                   <SectionTitle>過去のカルテ</SectionTitle>
-                  <span className="text-xs text-gray-400">{soapNotes.length}件</span>
+                  <span className="text-xs text-gray-500">{soapNotes.length}件</span>
                 </div>
                 {soapNotes.map(note => (
                   <SOAPNoteCard
@@ -1233,12 +1233,12 @@ export default function PatientDetail({ patient }: Props) {
                               <td className="py-2 text-xs">{BODY_REGION_LABELS[r.bodyRegion]}</td>
                               <td className="py-2 text-xs font-medium">{r.movement}</td>
                               <td className="py-2 text-right">
-                                <span className={`text-xs font-bold ${pct && pct < 70 ? 'text-red-600' : pct && pct < 90 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                <span className={`text-xs font-bold ${pct && pct < 70 ? 'text-red-600' : pct && pct < 90 ? 'text-yellow-700' : 'text-green-700'}`}>
                                   {r.activeRom ?? '—'}{r.unit === 'deg' ? '°' : 'cm'}
                                 </span>
                               </td>
                               <td className="py-2 text-right text-xs">{r.passiveRom ?? '—'}</td>
-                              <td className="py-2 text-right text-xs text-gray-400">{r.normalValue}{r.unit === 'deg' ? '°' : 'cm'}</td>
+                              <td className="py-2 text-right text-xs text-gray-500">{r.normalValue}{r.unit === 'deg' ? '°' : 'cm'}</td>
                               <td className="py-2 text-center">{r.pain ? '⚠' : '—'}</td>
                             </tr>
                           )
@@ -1298,7 +1298,7 @@ export default function PatientDetail({ patient }: Props) {
                             <td className="py-2 text-xs font-medium">{r.movement}</td>
                             <td className="py-2 text-center text-xs">{r.side === 'right' ? '右' : r.side === 'left' ? '左' : r.side}</td>
                             <td className="py-2 text-center">
-                              <span className="font-bold text-teal-600 text-sm">{r.mmt !== null ? r.mmt : '—'}</span>
+                              <span className="font-bold text-teal-700 text-sm">{r.mmt !== null ? r.mmt : '—'}</span>
                             </td>
                             <td className="py-2 text-center text-xs">{r.hhdValue !== null ? `${r.hhdValue} ${r.unit}` : '—'}</td>
                             <td className="py-2 text-center">{r.pain ? '⚠' : '—'}</td>
@@ -1328,7 +1328,7 @@ export default function PatientDetail({ patient }: Props) {
                   </div>
                   <Link
                     href={`/patients/${patient.id}/outcome-scores`}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 transition-colors whitespace-nowrap flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white text-xs font-semibold rounded-lg hover:bg-teal-800 transition-colors whitespace-nowrap flex-shrink-0 max-lg:min-h-10"
                   >
                     スコア入力 →
                   </Link>
@@ -1343,7 +1343,7 @@ export default function PatientDetail({ patient }: Props) {
                   <SectionTitle>🏆 機能評価・競技復帰テスト</SectionTitle>
                   <Link
                     href={`/patients/${patient.id}/return-criteria`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-semibold rounded-lg hover:bg-emerald-800 transition-colors whitespace-nowrap max-lg:min-h-10"
                   >
                     評価ページへ →
                   </Link>
@@ -1353,7 +1353,7 @@ export default function PatientDetail({ patient }: Props) {
                 {returnAssessments.length === 0 ? (
                   <div className="text-center py-6 bg-emerald-50 rounded-xl border border-emerald-100">
                     <p className="text-sm font-medium text-emerald-700">まだ復帰基準テストが実施されていません</p>
-                    <p className="text-xs text-emerald-500 mt-1 max-w-xs mx-auto">
+                    <p className="text-xs text-emerald-700 mt-1 max-w-xs mx-auto">
                       {({
                         hip: 'Harris Hip Score / RSI / 片脚立位・ステップダウン / LEFS',
                         shoulder: 'ASES肩スコア / RSI / 座位ショットパット・Y-Balance / 上肢機能質問紙',
@@ -1365,7 +1365,7 @@ export default function PatientDetail({ patient }: Props) {
                     </p>
                     <Link
                       href={`/patients/${patient.id}/return-criteria`}
-                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg hover:bg-emerald-800 transition-colors max-lg:min-h-10"
                     >
                       🏆 復帰基準テストを実施する
                     </Link>
@@ -1373,8 +1373,8 @@ export default function PatientDetail({ patient }: Props) {
                 ) : (() => {
                   const latest = returnAssessments[0]
                   const VERDICT = {
-                    cleared:     { label: '✅ 復帰可能', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', num: 'text-emerald-600' },
-                    conditional: { label: '⚠️ 条件付き',  bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   num: 'text-amber-600'   },
+                    cleared:     { label: '✅ 復帰可能', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', num: 'text-emerald-700' },
+                    conditional: { label: '⚠️ 条件付き',  bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   num: 'text-amber-700'   },
                     not_ready:   { label: '🔴 未達',      bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-700',     num: 'text-red-600'     },
                   }[latest.verdict]
                   return (
@@ -1389,7 +1389,7 @@ export default function PatientDetail({ patient }: Props) {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className={`text-3xl font-bold ${VERDICT.num}`}>{latest.scores.composite}</div>
-                            <div className="text-xs text-gray-400">/ 100点</div>
+                            <div className="text-xs text-gray-500">/ 100点</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2 mt-3">
@@ -1409,11 +1409,11 @@ export default function PatientDetail({ patient }: Props) {
                             <div key={item.label} className="text-center bg-white/70 rounded-lg py-2 px-1">
                               <div className="text-lg leading-none">{item.icon}</div>
                               <div className={`text-sm font-bold mt-0.5 ${
-                                item.score >= 80 ? 'text-emerald-600' :
-                                item.score >= 65 ? 'text-amber-600' : 'text-red-600'
+                                item.score >= 80 ? 'text-emerald-700' :
+                                item.score >= 65 ? 'text-amber-700' : 'text-red-600'
                               }`}>{item.score}</div>
-                              <div className="text-[10px] text-gray-500 leading-tight">{item.label}</div>
-                              <div className="text-[9px] text-gray-400">{item.note}</div>
+                              <div className="text-xs text-gray-500 leading-tight">{item.label}</div>
+                              <div className="text-xs text-gray-500">{item.note}</div>
                             </div>
                           ))}
                         </div>
@@ -1422,7 +1422,7 @@ export default function PatientDetail({ patient }: Props) {
                         )}
                       </div>
                       {returnAssessments.length > 1 && (
-                        <p className="text-xs text-gray-400 text-center mt-2">
+                        <p className="text-xs text-gray-500 text-center mt-2">
                           過去 {returnAssessments.length} 件の評価 — 詳細・履歴は評価ページで確認できます
                         </p>
                       )}
@@ -1444,8 +1444,8 @@ export default function PatientDetail({ patient }: Props) {
                         <div className="flex items-start justify-between gap-2 flex-wrap">
                           <div>
                             <span className="font-medium text-gray-800">{t.testName}</span>
-                            <span className="ml-2 text-gray-400">{BODY_REGION_LABELS[t.bodyRegion]}</span>
-                            <span className="ml-2 text-gray-400">{t.measuredDate}</span>
+                            <span className="ml-2 text-gray-500">{BODY_REGION_LABELS[t.bodyRegion]}</span>
+                            <span className="ml-2 text-gray-500">{t.measuredDate}</span>
                           </div>
                           <div className="flex gap-1.5 flex-wrap">
                             {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => {
@@ -1468,9 +1468,9 @@ export default function PatientDetail({ patient }: Props) {
                         )}
                         {(t.apprehension || t.clickSound || t.limitation) && (
                           <div className="flex gap-1.5 mt-1.5">
-                            {t.apprehension && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">不安感あり</span>}
-                            {t.clickSound && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">クリック音</span>}
-                            {t.limitation && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">可動域制限</span>}
+                            {t.apprehension && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">不安感あり</span>}
+                            {t.clickSound && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">クリック音</span>}
+                            {t.limitation && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">可動域制限</span>}
                           </div>
                         )}
                         {t.memo && <p className="mt-1.5 text-gray-600">{t.memo}</p>}

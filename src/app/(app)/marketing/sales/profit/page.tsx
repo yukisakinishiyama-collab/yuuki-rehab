@@ -47,12 +47,12 @@ function ItemsEditor({ items, onChange, placeholder }: { items: CostItem[]; onCh
             placeholder="0"
           />
           <span className="text-xs text-slate-500">円</span>
-          <button type="button" onClick={() => onChange(items.filter((x) => x.id !== it.id))} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="消す">
+          <button type="button" onClick={() => onChange(items.filter((x) => x.id !== it.id))} className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-600 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10" title="消す">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...items, { id: newId(), label: '', amount: 0 }])} className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
+      <button type="button" onClick={() => onChange([...items, { id: newId(), label: '', amount: 0 }])} className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 max-lg:min-h-10">
         <Plus className="h-3.5 w-3.5" />
         項目を足す
       </button>
@@ -161,22 +161,22 @@ export default function ProfitPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">売上（合計）{!currentTotals.complete && <span className="ml-1 text-amber-700">{currentTotals.throughDay}日まで</span>}</div>
             <div className="text-2xl font-black tabular-nums text-slate-900">{man(current.revenue)}</div>
-            <div className="text-[11px] text-slate-500">NOAH {man(currentTotals.sales)}＋その他 {man(currentTotals.outside)}</div>
+            <div className="text-xs text-slate-500">NOAH {man(currentTotals.sales)}＋その他 {man(currentTotals.outside)}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">経費</div>
             <div className="text-2xl font-black tabular-nums text-slate-900">{man(current.expenses)}</div>
-            <div className="text-[11px] text-slate-500">固定 {man(current.fixed)}／変動 {man(current.variable)}{current.oneOff ? `／臨時 ${man(current.oneOff)}` : ''}</div>
+            <div className="text-xs text-slate-500">固定 {man(current.fixed)}／変動 {man(current.variable)}{current.oneOff ? `／臨時 ${man(current.oneOff)}` : ''}</div>
           </div>
           <div className={`rounded-xl border p-4 ${current.profit >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
             <div className="text-xs text-slate-600">利益（税引き前）</div>
             <div className={`text-2xl font-black tabular-nums ${current.profit >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>{current.profit < 0 ? '−' : ''}{man(Math.abs(current.profit))}</div>
-            <div className="text-[11px] text-slate-600">利益率 {current.margin === null ? '—' : `${Math.round(current.margin * 100)}%`}{current.projected ? `／このペースの月末 ${current.projected.profit < 0 ? '−' : ''}${man(Math.abs(current.projected.profit))}` : ''}</div>
+            <div className="text-xs text-slate-600">利益率 {current.margin === null ? '—' : `${Math.round(current.margin * 100)}%`}{current.projected ? `／このペースの月末 ${current.projected.profit < 0 ? '−' : ''}${man(Math.abs(current.projected.profit))}` : ''}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">損益分岐点の売上</div>
             <div className="text-2xl font-black tabular-nums text-slate-900">{man(current.breakEven)}</div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-xs text-slate-500">
               {current.toBreakEven > 0 ? `あと ${man(current.toBreakEven)}` : '超えています'}
               {current.breakEvenVisits !== null ? `／来院 約${current.breakEvenVisits}回分` : ''}
             </div>
@@ -195,7 +195,7 @@ export default function ProfitPage() {
         <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="font-bold text-slate-900">毎月の固定費 <span className="ml-1 text-sm font-normal text-slate-500">合計 {yen(fixedTotal)}</span></h2>
-            <p className="mb-2 text-[11px] text-slate-500">院長の報酬を入れるかは院長の決め方次第です（入れると「手元に残る利益」、入れないと「院の利益」）。</p>
+            <p className="mb-2 text-xs text-slate-500">院長の報酬を入れるかは院長の決め方次第です（入れると「手元に残る利益」、入れないと「院の利益」）。</p>
             <ItemsEditor items={settings.fixed} onChange={(fixed) => update({ fixed })} placeholder="項目名（例：家賃）" />
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <label className="text-slate-700">売上に比例する変動費（消耗品・テーピングなど）</label>
@@ -205,7 +205,7 @@ export default function ProfitPage() {
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="font-bold text-slate-900">{ym(selected || '2026-01')}だけの出費（臨時）</h2>
-            <p className="mb-2 text-[11px] text-slate-500">機器の修理、研修、税金・保険の年払いなど。</p>
+            <p className="mb-2 text-xs text-slate-500">機器の修理、研修、税金・保険の年払いなど。</p>
             <ItemsEditor items={oneOffItems} onChange={(items) => update({ oneOff: { ...settings.oneOff, [selected]: items } })} placeholder="項目名（例：機器の修理）" />
           </div>
         </section>
@@ -213,7 +213,7 @@ export default function ProfitPage() {
 
       {settings && (
         <div className="flex items-center gap-3">
-          <button type="button" onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-1 rounded-md bg-teal-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-1 rounded-md bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 max-lg:min-h-10">
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '経費の設定を保存'}
           </button>
@@ -238,7 +238,7 @@ export default function ProfitPage() {
             <tbody>
               {results.map((r) => (
                 <tr key={r.month} className={`border-t border-slate-100 ${r.month === selected ? 'bg-teal-50/60' : ''}`}>
-                  <td className="px-2 py-1 text-slate-700">{ym(r.month)}{r.projected && <span className="ml-1 text-[10px] text-amber-700">途中</span>}</td>
+                  <td className="px-2 py-1 text-slate-700">{ym(r.month)}{r.projected && <span className="ml-1 text-xs text-amber-700">途中</span>}</td>
                   <td className="px-2 py-1 text-right tabular-nums">{r.revenue.toLocaleString('ja-JP')}</td>
                   <td className="px-2 py-1 text-right tabular-nums">{r.expenses.toLocaleString('ja-JP')}</td>
                   <td className={`px-2 py-1 text-right font-bold tabular-nums ${r.profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{r.profit.toLocaleString('ja-JP')}</td>
@@ -248,7 +248,7 @@ export default function ProfitPage() {
               ))}
             </tbody>
           </table>
-          <p className="px-3 py-2 text-[11px] text-slate-500">固定費と変動費の割合は、すべての月に同じ値で当てています（月ごとの違いは「臨時の出費」で）。</p>
+          <p className="px-3 py-2 text-xs text-slate-500">固定費と変動費の割合は、すべての月に同じ値で当てています（月ごとの違いは「臨時の出費」で）。</p>
         </section>
       )}
     </div>

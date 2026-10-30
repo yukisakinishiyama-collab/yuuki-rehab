@@ -8,7 +8,7 @@
 //   （来院済みの付け忘れと区別できないため、必ず確認してもらう）
 // ──────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarX, RefreshCw, Check, X, ChevronDown, ChevronUp, Undo2 } from 'lucide-react'
+import { CalendarX, RefreshCw, Check, CircleCheck, X, ChevronDown, ChevronUp, Undo2 } from 'lucide-react'
 import type { CancellationKind, Patient } from '@/types/patient'
 import { CANCELLATION_KINDS, CANCELLATION_SHORT_LABELS } from '@/types/patient'
 import { nanoid } from 'nanoid'
@@ -18,8 +18,9 @@ import {
   getExcludedReservationNos, resolveNoShow, unresolveNoShow, getResolvedNoShows,
   type PendingCancellation, type SyncResult, type YoyakuFeed,
 } from '@/lib/yoyaku-cancel-sync'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { IconButton, Panel } from '@/components/clinic/Panel'
+import { cn } from '@/lib/utils'
 
 const FEED_KEY_STORAGE = 'yoyaku_feed_key'
 /** さかのぼる日数（数日アプリを開かなくても取りこぼさない） */
@@ -183,47 +184,41 @@ export default function YoyakuCancelSyncCard() {
   const visiblePending = showAllPending ? pending : pending.slice(0, PENDING_PAGE_SIZE)
   const hasNothingToDo = !loading && !error && !noKey && pending.length === 0
 
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <CalendarX className="w-4 h-4 text-orange-500" />
-            <CardTitle className="text-sm font-semibold text-gray-900">
-              キャンセルのカルテ反映
-            </CardTitle>
-            {result && (result.imported > 0 || result.withdrawn > 0 || result.linked > 0) && (
-              <span className="text-[11px] text-gray-500">
-                {[
-                  result.imported > 0 ? `${result.imported}件を記録` : '',
-                  result.linked > 0 ? `${result.linked}件は入力済みと照合` : '',
-                  result.withdrawn > 0 ? `${result.withdrawn}件を取り下げ` : '',
-                ].filter(Boolean).join(' / ')}
-              </span>
-            )}
-          </div>
-          <Button
-            variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-500"
-            onClick={() => void run()} disabled={loading}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-      </CardHeader>
+  const doneSummary =
+    result && (result.imported > 0 || result.withdrawn > 0 || result.linked > 0)
+      ? [
+          result.imported > 0 ? `${result.imported}件を記録` : '',
+          result.linked > 0 ? `${result.linked}件は入力済みと照合` : '',
+          result.withdrawn > 0 ? `${result.withdrawn}件を取り下げ` : '',
+        ].filter(Boolean).join(' / ')
+      : undefined
 
-      <CardContent className="pt-0 space-y-3">
+  return (
+    <Panel
+      title="キャンセルのカルテ反映"
+      icon={CalendarX}
+      meta={doneSummary}
+      // 確認が必要なキャンセルがあるときは、枠を黄色にして目立たせる
+      attention={pending.length > 0}
+      action={
+        <IconButton label="キャンセルを確かめ直す" onClick={() => void run()} disabled={loading}>
+          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
+        </IconButton>
+      }
+    >
+      <div className="space-y-3">
         {noKey && (
-          <p className="text-xs text-gray-500">
+          <p className="text-sm text-slate-600">
             「今日の予約」で予約システムと連携すると、キャンセルが自動でカルテに記録されます。
           </p>
         )}
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        {loading && !result && <p className="text-xs text-gray-400">予約を確認しています…</p>}
+        {error && <p className="text-sm text-red-700">{error}</p>}
+        {loading && !result && <p className="text-sm text-slate-500">予約を確認しています…</p>}
 
         {/* GAS側が未更新のとき（キャンセル日時が取れず、判定できないものが増える） */}
         {result && !result.feedV2 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            <p className="text-[11px] text-amber-800 leading-relaxed">
+            <p className="text-xs text-amber-800 leading-relaxed">
               予約システム側が旧バージョンのため、キャンセル日時を取得できません。
               「当日」か「予約日前」かの自動判定ができず、多くが要確認になります。
               予約システムの更新をおすすめします。
@@ -232,7 +227,8 @@ export default function YoyakuCancelSyncCard() {
         )}
 
         {hasNothingToDo && (
-          <p className="text-xs text-gray-400">
+          <p className="flex items-center gap-1.5 text-sm text-slate-600">
+            <CircleCheck className="h-4 w-4 shrink-0 text-green-700" aria-hidden />
             確認が必要なキャンセルはありません。
             {result && result.imported === 0 && result.withdrawn === 0 && ' すべて反映済みです。'}
           </p>
@@ -241,7 +237,7 @@ export default function YoyakuCancelSyncCard() {
         {/* ── 要確認リスト ── */}
         {pending.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-700">
+            <p className="text-sm font-bold text-amber-900">
               確認をお願いします（{pending.length}件）
             </p>
             {visiblePending.map((item) => {
@@ -262,21 +258,21 @@ export default function YoyakuCancelSyncCard() {
               return (
                 <div
                   key={item.reservationNo}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 space-y-2"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 space-y-2"
                 >
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-800">
+                      <div className="text-sm font-medium text-slate-900">
                         <span className="tabular-nums">{dayLabel(item.date)} {item.time}</span>
                         <span className="ml-2">{item.name} 様</span>
                       </div>
-                      <div className="text-[11px] text-gray-400 mt-0.5">
+                      <div className="text-xs text-slate-500 mt-0.5">
                         {REASON_LABELS[item.reason]}
                         {item.phone && <span className="ml-2">{item.phone}</span>}
                       </div>
                     </div>
                     {item.reason === 'no_show_candidate' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded border bg-red-50 text-red-600 border-red-200">
+                      <span className="text-xs px-1.5 py-0.5 rounded border bg-red-50 text-red-700 border-red-200">
                         無断の可能性
                       </span>
                     )}
@@ -286,27 +282,27 @@ export default function YoyakuCancelSyncCard() {
                       予約の氏名と一致するカルテがあれば、その名前のまま1タップで記録できるようにする。
                       自動では紐づけない（別人の可能性があるため）が、探させることもしない。 */}
                   {patientId ? (
-                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
-                      <span className="text-gray-500">カルテ</span>
-                      <span className="font-semibold text-gray-800">
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      <span className="text-slate-600">カルテ</span>
+                      <span className="font-semibold text-slate-900">
                         {sortedPatients.find((p) => p.id === patientId)?.name ?? ''} 様
                       </span>
                       <button
                         type="button"
                         onClick={() => setChoiceFor({ patientId: '' })}
-                        className="text-gray-400 hover:text-gray-600 underline"
+                        className="inline-flex min-h-10 items-center px-1 text-slate-600 underline hover:text-slate-900 lg:min-h-0"
                       >
                         別の方を選ぶ
                       </button>
                     </div>
                   ) : item.guessPatientId ? (
                     <div className="space-y-1.5">
-                      <p className="text-[11px] text-gray-500">
+                      <p className="text-xs text-slate-600">
                         同じ氏名のカルテがあります（電話番号は一致していません）
                       </p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Button
-                          size="sm" className="h-7 text-xs"
+                          size="sm"
                           onClick={() => handleConfirm(item, item.guessPatientId)}
                           disabled={!kind}
                         >
@@ -316,7 +312,7 @@ export default function YoyakuCancelSyncCard() {
                         <button
                           type="button"
                           onClick={() => setChoiceFor({ patientId: '__pick__' })}
-                          className="text-[11px] text-gray-400 hover:text-gray-600 underline px-1"
+                          className="inline-flex min-h-10 items-center px-1 text-sm text-slate-600 underline hover:text-slate-900 lg:min-h-0 lg:text-xs"
                         >
                           別の方を選ぶ
                         </button>
@@ -324,12 +320,12 @@ export default function YoyakuCancelSyncCard() {
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      <p className="text-[11px] text-gray-500">
+                      <p className="text-xs text-slate-600">
                         「{item.name}」様のカルテが見つかりません
                       </p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Button
-                          variant="outline" size="sm" className="h-7 text-xs"
+                          variant="outline" size="sm"
                           onClick={() => handleCreateAndConfirm(item)}
                           disabled={!kind}
                         >
@@ -338,7 +334,7 @@ export default function YoyakuCancelSyncCard() {
                         <button
                           type="button"
                           onClick={() => setChoiceFor({ patientId: '__pick__' })}
-                          className="text-[11px] text-gray-400 hover:text-gray-600 underline px-1"
+                          className="inline-flex min-h-10 items-center px-1 text-sm text-slate-600 underline hover:text-slate-900 lg:min-h-0 lg:text-xs"
                         >
                           既存のカルテから選ぶ
                         </button>
@@ -351,8 +347,8 @@ export default function YoyakuCancelSyncCard() {
                     <select
                       value=""
                       onChange={(e) => setChoiceFor({ patientId: e.target.value })}
-                      className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white
-                        focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                      className="min-h-10 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 bg-white
+                        focus:outline-none focus:ring-2 focus:ring-teal-500/40 lg:min-h-0"
                       aria-label="記録する患者"
                     >
                       <option value="">— 患者を選択 —</option>
@@ -366,16 +362,16 @@ export default function YoyakuCancelSyncCard() {
 
                   {/* 区分の指定 */}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-gray-500 mr-0.5">区分</span>
+                    <span className="text-xs text-slate-600 mr-0.5">区分</span>
                     {CANCELLATION_KINDS.map((k) => (
                       <button
                         key={k}
                         type="button"
                         onClick={() => setChoiceFor({ kind: k })}
-                        className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
+                        className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm font-medium transition-colors lg:min-h-0 lg:py-1 lg:text-xs ${
                           kind === k
-                            ? 'bg-teal-600 text-white border-teal-600'
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
+                            ? 'bg-teal-700 text-white border-teal-700'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-teal-400'
                         }`}
                       >
                         {CANCELLATION_SHORT_LABELS[k]}
@@ -388,7 +384,7 @@ export default function YoyakuCancelSyncCard() {
                         決まっていないときは上の「◯◯様のカルテに記録」が主役になる */}
                     {patientId && (
                       <Button
-                        size="sm" className="h-7 text-xs"
+                        size="sm"
                         onClick={() => handleConfirm(item)}
                         disabled={!kind}
                       >
@@ -397,14 +393,14 @@ export default function YoyakuCancelSyncCard() {
                     )}
                     {item.reason === 'no_show_candidate' ? (
                       <Button
-                        variant="outline" size="sm" className="h-7 text-xs"
+                        variant="outline" size="sm"
                         onClick={() => handleVisited(item)}
                       >
                         来院された（記録しない）
                       </Button>
                     ) : (
                       <Button
-                        variant="ghost" size="sm" className="h-7 text-xs text-gray-500"
+                        variant="ghost" size="sm" className="text-slate-600"
                         onClick={() => handleExclude(item)}
                       >
                         <X className="w-3.5 h-3.5" />今後取り込まない
@@ -418,7 +414,7 @@ export default function YoyakuCancelSyncCard() {
               <button
                 type="button"
                 onClick={() => setShowAllPending(true)}
-                className="w-full text-xs text-teal-700 hover:text-teal-900 py-2 transition-colors"
+                className="min-h-10 w-full py-2 text-sm text-teal-700 transition-colors hover:text-teal-900 lg:text-xs"
               >
                 残り {pending.length - visiblePending.length} 件を表示
               </button>
@@ -432,7 +428,7 @@ export default function YoyakuCancelSyncCard() {
             <button
               type="button"
               onClick={() => setShowExcluded((v) => !v)}
-              className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
+              className="inline-flex min-h-10 items-center gap-1 text-sm text-slate-600 transition-colors hover:text-slate-900 lg:min-h-0 lg:text-xs"
             >
               {showExcluded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               処理済みにした予約（除外 {excluded.length}件 / 来院確認 {resolved.length}件）
@@ -440,24 +436,24 @@ export default function YoyakuCancelSyncCard() {
             {showExcluded && (
               <ul className="mt-1.5 space-y-1">
                 {excluded.map((no) => (
-                  <li key={`ex-${no}`} className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
+                  <li key={`ex-${no}`} className="flex items-center justify-between gap-2 text-xs text-slate-600">
                     <span className="tabular-nums">予約番号 {no}（取り込まない）</span>
                     <button
                       type="button"
                       onClick={() => handleUnexclude(no)}
-                      className="flex items-center gap-1 text-teal-600 hover:text-teal-800 transition-colors"
+                      className="inline-flex min-h-10 shrink-0 items-center gap-1 px-1 text-teal-700 transition-colors hover:text-teal-900 lg:min-h-0"
                     >
                       <Undo2 className="w-3 h-3" />要確認に戻す
                     </button>
                   </li>
                 ))}
                 {resolved.map((no) => (
-                  <li key={`ok-${no}`} className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
+                  <li key={`ok-${no}`} className="flex items-center justify-between gap-2 text-xs text-slate-600">
                     <span className="tabular-nums">予約番号 {no}（来院された）</span>
                     <button
                       type="button"
                       onClick={() => handleUnresolve(no)}
-                      className="flex items-center gap-1 text-teal-600 hover:text-teal-800 transition-colors"
+                      className="inline-flex min-h-10 shrink-0 items-center gap-1 px-1 text-teal-700 transition-colors hover:text-teal-900 lg:min-h-0"
                     >
                       <Undo2 className="w-3 h-3" />取り消す
                     </button>
@@ -465,12 +461,12 @@ export default function YoyakuCancelSyncCard() {
                 ))}
               </ul>
             )}
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               「要確認に戻す」を押すと、次の更新でもう一度確認リストに出ます（自動記録はされません）。
             </p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   )
 }

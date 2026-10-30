@@ -144,7 +144,7 @@ function Fold({ title, sub, children, open }: { title: string; sub?: string; chi
           <span className="block text-[15px] font-bold text-slate-900">{title}</span>
           {sub && <span className="mt-0.5 block text-xs text-slate-500">{sub}</span>}
         </span>
-        <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+        <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">{children}</div>
     </details>
@@ -215,7 +215,7 @@ function Stepper({
           <Plus className="h-4 w-4" aria-hidden />
         </button>
       </div>
-      {hint && <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>}
+      {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
     </div>
   )
 }
@@ -296,9 +296,9 @@ function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
             <YAxis
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 12, fill: '#64748b' }}
               tickLine={false}
               axisLine={false}
               width={44}
@@ -324,7 +324,7 @@ function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
               y={goal}
               stroke="#b45309"
               strokeDasharray="5 3"
-              label={{ value: `目標 ${man(goal)}`, position: 'insideTopRight', fontSize: 11, fill: '#b45309' }}
+              label={{ value: `目標 ${man(goal)}`, position: 'insideTopRight', fontSize: 12, fill: '#b45309' }}
             />
             <Bar dataKey="noah" stackId="s" fill={BLUE} maxBarSize={28} isAnimationActive={false} />
             <Bar dataKey="extra" stackId="s" fill={TEAL} maxBarSize={28} isAnimationActive={false} />
@@ -332,7 +332,7 @@ function TrendChart({ rows, goal }: { rows: TrendRow[]; goal: number }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         <Legend color={BLUE} label="実績（NOAH）" />
         <Legend color={TEAL} label="実績（その他の収入）" />
         <Legend color={MUTED} label="今月の見込み（予測）" />
@@ -367,7 +367,7 @@ function Breakdown({ base, extraAmount }: { base: Baseline; extraAmount: number 
             </p>
             <p className="mt-1 text-lg font-black tabular-nums text-slate-900">{man(p.sales)}円</p>
             {p.key !== 'extra' && (
-              <p className="text-[11px] tabular-nums text-slate-500">
+              <p className="text-xs tabular-nums text-slate-500">
                 {fmt(p.visits)}回・1回 {p.visits > 0 ? yen(p.perVisit) : '—'}
               </p>
             )}
@@ -529,7 +529,7 @@ export default function GoalPage() {
           <button
             type="button"
             onClick={() => setEditGoal(String(goal / 10_000))}
-            className="h-9 rounded-full px-3 text-sm font-bold text-teal-700 hover:bg-teal-50"
+            className="h-9 rounded-full px-3 text-sm font-bold text-teal-700 hover:bg-teal-50 max-lg:h-10"
           >
             目標を変える
           </button>
@@ -552,7 +552,7 @@ export default function GoalPage() {
               className="h-11 w-24 rounded-xl border border-slate-300 px-3 text-right text-sm"
             />
             <span className="text-sm text-slate-600">万円</span>
-            <button type="submit" className="h-11 rounded-full bg-slate-900 px-5 text-sm font-bold text-white">
+            <button type="submit" className="h-11 rounded-full bg-teal-700 px-5 text-sm font-bold text-white">
               決める
             </button>
           </form>
@@ -582,7 +582,7 @@ export default function GoalPage() {
       </div>
 
       {message && <p className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-700">{message}</p>}
-      {!loaded && <p className="text-sm text-slate-400">読み込み中…</p>}
+      {!loaded && <p className="text-sm text-slate-500">読み込み中…</p>}
       {loaded && !base && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
           まだNOAHの集計が届いていません。毎晩21時すぎに届くと、ここに道すじが出ます。
@@ -625,12 +625,12 @@ export default function GoalPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-bold text-slate-500">1日の来院（実績）</p>
                   <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{fmt1(base.perDaySoFar)}人</p>
-                  <p className="text-[11px] text-slate-500">最多の日 {fmt(base.maxDayVisits)}人</p>
+                  <p className="text-xs text-slate-500">最多の日 {fmt(base.maxDayVisits)}人</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-bold text-slate-500">1回あたり（実績）</p>
                   <p className="mt-1 text-[22px] font-black tabular-nums text-slate-900">{yen(base.perVisit)}</p>
-                  <p className="text-[11px] text-slate-500">NOAHの分</p>
+                  <p className="text-xs text-slate-500">NOAHの分</p>
                 </div>
               </div>
 
@@ -645,7 +645,7 @@ export default function GoalPage() {
                     {nextAction.href && (
                       <Link
                         href={nextAction.href}
-                        className="inline-flex h-11 items-center rounded-full bg-teal-600 px-5 text-sm font-bold text-white hover:bg-teal-700"
+                        className="inline-flex h-11 items-center rounded-full bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800"
                       >
                         {nextAction.link}を開く
                       </Link>
@@ -687,7 +687,7 @@ export default function GoalPage() {
                 <ul className="space-y-2 text-sm leading-relaxed text-slate-700">
                   {notes.map((n) => (
                     <li key={n.text} className="flex gap-2">
-                      <span className={n.tone === 'warn' ? 'text-amber-600' : 'text-teal-700'} aria-hidden>
+                      <span className={n.tone === 'warn' ? 'text-amber-700' : 'text-teal-700'} aria-hidden>
                         ●
                       </span>
                       <span className="min-w-0">{n.text}</span>
@@ -708,7 +708,7 @@ export default function GoalPage() {
                           <span className="min-w-0 truncate text-slate-800">{name}</span>
                           <span className="shrink-0 text-right">
                             <span className="font-bold text-slate-900">{yen(total)}</span>
-                            <span className="block text-[11px] text-slate-500">
+                            <span className="block text-xs text-slate-500">
                               {fmt(count)}点・単価{yen(price)}
                             </span>
                           </span>
@@ -739,7 +739,7 @@ export default function GoalPage() {
                           ] as const
                         ).map(([label, v, sign]) => (
                           <div key={label} className="rounded-xl bg-slate-50 px-3 py-2">
-                            <dt className="text-[11px] text-slate-500">{label}</dt>
+                            <dt className="text-xs text-slate-500">{label}</dt>
                             <dd className="font-bold tabular-nums">
                               {sign}
                               {yen(v)}
@@ -757,7 +757,7 @@ export default function GoalPage() {
                           overlap: String(extraNow?.overlap ?? ''),
                         })
                       }
-                      className={`${pill} mt-3`}
+                      className={` max-lg:min-h-10${pill} mt-3`}
                     >
                       {extraNow ? '直す' : '入れる'}
                     </button>
@@ -794,7 +794,7 @@ export default function GoalPage() {
                       <button
                         type="submit"
                         disabled={saving}
-                        className="h-11 rounded-full bg-slate-900 px-6 text-sm font-bold text-white disabled:opacity-50"
+                        className="h-11 rounded-full bg-teal-700 px-6 text-sm font-bold text-white disabled:opacity-50"
                       >
                         {saving ? '保存中…' : '保存'}
                       </button>
@@ -841,7 +841,7 @@ export default function GoalPage() {
                     <button
                       type="button"
                       onClick={() => setSim(req.balanced.input)}
-                      className="h-10 rounded-full bg-teal-600 px-4 text-sm font-bold text-white hover:bg-teal-700"
+                      className="h-10 rounded-full bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800"
                     >
                       そろって{fmt1(req.balanced.k)}倍（おすすめ）
                     </button>
@@ -957,7 +957,7 @@ export default function GoalPage() {
                     hint="サブスクなど（アルファノート）"
                   />
                 </div>
-                <p className="mt-4 text-[11px] text-slate-500">保険の1回あたり（{yen(input.insUnit)}）は決まった料金なので動かしません。</p>
+                <p className="mt-4 text-xs text-slate-500">保険の1回あたり（{yen(input.insUnit)}）は決まった料金なので動かしません。</p>
               </Fold>
             </div>
           )}
@@ -981,7 +981,7 @@ export default function GoalPage() {
                     <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 sm:px-6 [&::-webkit-details-marker]:hidden">
                       <span
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-                          isNow ? 'bg-teal-600 text-white' : i < stageIdx ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-500'
+                          isNow ? 'bg-teal-700 text-white' : i < stageIdx ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-500'
                         }`}
                       >
                         {i + 1}
@@ -990,7 +990,7 @@ export default function GoalPage() {
                         <span className="block text-[15px] font-bold text-slate-900">
                           {STAGE_SHORT[st.key]}
                           {isNow && (
-                            <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 align-middle text-[11px] font-bold text-teal-700">
+                            <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 align-middle text-xs font-bold text-teal-700">
                               いまの段階
                             </span>
                           )}
@@ -999,7 +999,7 @@ export default function GoalPage() {
                           月 {man(st.target)}円（+{man(st.add)}円）・{done}／{ACTIONS[st.key].length} 完了
                         </span>
                       </span>
-                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                     </summary>
                     <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-6">
                       <p className="text-xs leading-relaxed text-slate-500">目安：{st.measure}</p>
@@ -1023,14 +1023,14 @@ export default function GoalPage() {
                             />
                             <label
                               htmlFor={`act-${a.id}`}
-                              className={`min-w-0 flex-1 text-sm leading-relaxed ${checks.has(a.id) ? 'text-slate-400 line-through' : 'text-slate-700'}`}
+                              className={`min-w-0 flex-1 text-sm leading-relaxed max-lg:min-h-10 ${checks.has(a.id) ? 'text-slate-500 line-through' : 'text-slate-700'}`}
                             >
                               {a.text}
                             </label>
                             {a.href && (
                               <Link
                                 href={a.href}
-                                className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                                className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
                               >
                                 {a.link}
                               </Link>

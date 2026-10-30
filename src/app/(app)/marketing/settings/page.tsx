@@ -92,7 +92,7 @@ export default function SettingsPage() {
                 <span className="font-mono">{entry.at.slice(0, 19).replace('T', ' ')}</span>
                 <span className="font-bold text-slate-800">{entry.action}</span>
                 <span className="truncate">{entry.target}</span>
-                {entry.detail && <span className="text-slate-400">{entry.detail}</span>}
+                {entry.detail && <span className="text-slate-500">{entry.detail}</span>}
               </li>
             ))}
           </ul>

@@ -102,7 +102,7 @@ const input =
 const pill =
   'inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 const primary =
-  'inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-teal-600 px-5 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-50'
+  'inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50'
 
 function CopyButton({ text, label = 'コピー' }: { text: string; label?: string }) {
   const [done, setDone] = useState(false)
@@ -193,7 +193,7 @@ function LinkMaker() {
               aria-checked={presetId === p.id}
               onClick={() => choose(p)}
               className={`h-10 rounded-full px-4 text-sm font-bold ${
-                presetId === p.id ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                presetId === p.id ? 'bg-teal-700 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
               {p.label}
@@ -248,7 +248,7 @@ function LinkMaker() {
               試しに開く
             </a>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
             試しに開くと、押した数に1回入ります。予約までは進めないでください。
           </p>
         </div>
@@ -271,7 +271,7 @@ function LinkMaker() {
               <li key={h.url} className="flex items-center justify-between gap-3 py-2">
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-slate-800">{h.label}</span>
-                  <span className="block truncate font-mono text-[11px] text-slate-400">{h.url}</span>
+                  <span className="block truncate font-mono text-xs text-slate-500">{h.url}</span>
                 </span>
                 <button
                   type="button"
@@ -485,7 +485,7 @@ function StoryMaker() {
                 ひとこと（40文字まで・空でもよい）
                 <input className={input} value={note} maxLength={40} placeholder="例：夕方は空きがあります" onChange={(e) => { setNote(e.target.value); setDirty(true) }} />
               </label>
-              <label className="flex items-center gap-2 text-xs text-slate-600">
+              <label className="flex items-center gap-2 text-xs text-slate-600 max-lg:min-h-10">
                 <input type="checkbox" checked={showRemaining} onChange={(e) => { setShowRemaining(e.target.checked); setDirty(true) }} />
                 残り枠の数を出す（外すと「空きあり・あと少し」だけ）
               </label>
@@ -493,7 +493,7 @@ function StoryMaker() {
                 <div key={d.date}>
                   <p className="text-xs text-slate-500">{d.label}：出さない時間は押して外す</p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {d.slots.length === 0 && <span className="text-xs text-slate-400">空いている時間はありません</span>}
+                    {d.slots.length === 0 && <span className="text-xs text-slate-500">空いている時間はありません</span>}
                     {d.slots.map((s) => {
                       const key = `${d.date} ${s.time}`
                       const off = hidden.includes(key)
@@ -503,7 +503,7 @@ function StoryMaker() {
                           type="button"
                           onClick={() => toggleSlot(key)}
                           aria-pressed={!off}
-                          className={`rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${off ? 'border-slate-200 bg-slate-100 text-slate-400 line-through' : 'border-teal-300 bg-teal-50 text-teal-800'}`}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums max-lg:min-h-10 ${off ? 'border-slate-200 bg-slate-100 text-slate-500 line-through' : 'border-teal-300 bg-teal-50 text-teal-800'}`}
                         >
                           {s.time}（{s.remaining}）
                         </button>
