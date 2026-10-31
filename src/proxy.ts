@@ -13,7 +13,8 @@
  *
  * 保護対象: 院内アプリの画面（/dashboard・/patients・/yoyaku・/marketing・/login）と、
  *           院内アプリだけが使うAPI（/api/marketing・/api/sync・/api/yoyaku・/api/intake-analysis・
- *           /api/referral-generate）。カルテ（患者さんの記録）を外から見られないようにする。
+ *           /api/referral-generate・/api/line-link）。カルテ（患者さんの記録）を外から見られないようにする。
+ *           /api/line-link は連携した患者さんの氏名・電話・生年月日を返すため必ず守る（2026-10-31 まで守られていなかった）。
  *           動画の保存（/api/upload）も保護する。ただし Vercel Blob からの保存完了の通知
  *           （x-vercel-signature 付き。中身は handleUpload が署名で確かめる）だけは通す。
  * 保護しないもの: 公開ホームページ、患者さんが使う LIFF（/liff・/api/liff）
@@ -110,5 +111,7 @@ export const config = {
     '/api/intake-analysis/:path*',
     '/api/referral-generate/:path*',
     '/api/upload/:path*',
+    // カルテ ↔ LINE の結びつけ（連携した患者さんの氏名・電話・生年月日・患者番号を返す。外す・お知らせの再送もここ）
+    '/api/line-link/:path*',
   ],
 }
