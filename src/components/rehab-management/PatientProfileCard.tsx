@@ -7,7 +7,7 @@ import type { Patient } from '@/types/patient'
 import { calcAge } from '@/lib/rehab-algorithms'
 import { birthdayLabel } from '@/lib/birthday'
 import { useLineLinks } from '@/lib/line-link-client'
-import { patientLinkKey } from '@/lib/line-link'
+import { patientLinkKey, phoneDigits } from '@/lib/line-link'
 import { Card, CardContent, SectionTitle } from './shared'
 
 function Row({ label, value }: { label: string; value?: string }) {
@@ -71,6 +71,12 @@ export default function PatientProfileCard({ patient }: { patient: Patient }) {
                       <span className="text-xs text-slate-500">{lineLink.linkedAt.slice(0, 10)} に結びつけ</span>
                       {lineLink.patientNo && <span className="text-xs text-slate-700">患者番号 <b>{lineLink.patientNo}</b></span>}
                       {lineLink.birthDate && !patient.birthDate && <span className="text-xs text-slate-500">生年月日 {lineLink.birthDate}（LINEで入力）</span>}
+                      {lineLink.phone && phoneDigits(lineLink.phone) !== phoneDigits(patient.phone) && (
+                        <span className="text-xs text-slate-500">
+                          LINEで入れた電話 {lineLink.phone}
+                          {patient.phone ? '（カルテの電話と違います）' : '（カルテに電話はありません）'}
+                        </span>
+                      )}
                       <button type="button" onClick={onUnlink} className="text-xs text-slate-500 underline hover:text-red-600 max-lg:min-h-10">
                         外す
                       </button>
@@ -80,7 +86,9 @@ export default function PatientProfileCard({ patient }: { patient: Patient }) {
                   ) : patientLinkKey(patient.name, patient.phone) ? (
                     <span className="text-xs text-slate-500">未連携（患者さんがLINEのメニュー「カルテ連携」で名前と電話番号を入れると結びつきます）</span>
                   ) : (
-                    <span className="text-xs text-slate-500">未連携（電話番号が無いと結びつけられません）</span>
+                    <span className="text-xs text-slate-500">
+                      未連携（患者さんがLINEのメニュー「カルテ連携」で入れたお名前と生年月日が、このカルテと同じなら結びつきます。電話番号があれば電話番号でも照らします）
+                    </span>
                   )}
                 </dd>
               </div>

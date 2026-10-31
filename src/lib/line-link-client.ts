@@ -10,6 +10,9 @@ import type { Patient } from '@/types/patient'
 const CACHE_KEY = 'line_link_cache'
 const CACHE_MS = 2 * 60 * 1000
 
+/** 氏名の比べ方（空白を取り、全角・半角をそろえる。NOAH 取り込みの nameKey と同じ） */
+const sameNameKey = (name: string): string => String(name || '').normalize('NFKC').replace(/\s+/g, '')
+
 interface Cache {
   at: number
   links: LineLinkSummary[]
@@ -66,13 +69,24 @@ export function useLineLinks() {
     [reload],
   )
 
-  /** 患者さんに結びついた LINE（無ければ null。まだ読めていなければ undefined） */
+  /**
+   * 患者さんに結びついた LINE（無ければ null。まだ読めていなければ undefined）
+   *
+   * 1. 電話番号＋氏名が同じ LINE（予約システムと同じ見分け方）
+   * 2. 見つからなければ、氏名＋生年月日が同じ LINE。
+   *    カルテに電話番号が無い方（NOAH から取り込んだカルテなど）や、カルテの電話（自宅）と
+   *    患者さんが LINE で入れた電話（携帯）が違う方も、LINE 連携済みとして出す。
+   *    生年月日は患者さんが連携のときに自分で入れたもの（サーバーでも、カルテと違えば結びつけない）
+   */
   const linkFor = useCallback(
-    (patient: Pick<Patient, 'name' | 'phone'>): LineLinkSummary | null | undefined => {
+    (patient: Pick<Patient, 'name' | 'phone'> & { birthDate?: string }): LineLinkSummary | null | undefined => {
       if (links === null) return undefined
       const key = patientLinkKey(patient.name, patient.phone)
-      if (!key) return null
-      return links.find((l) => l.key === key) ?? null
+      const byKey = key ? links.find((l) => l.key === key) : undefined
+      if (byKey) return byKey
+      const name = sameNameKey(patient.name)
+      if (!name || !patient.birthDate) return null
+      return links.find((l) => l.birthDate === patient.birthDate && sameNameKey(l.name) === name) ?? null
     },
     [links],
   )
