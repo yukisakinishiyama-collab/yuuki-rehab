@@ -864,6 +864,10 @@ export default function PatientDetail({ patient }: Props) {
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge color="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
                 {patient.diagnosisLabel && <Badge color="gray">{patient.diagnosisLabel}</Badge>}
+                {/* 予約の情報から自動で作ったカルテ（最初のSOAPを書くまで出す） */}
+                {patient.autoCreatedFrom === 'reservation' && soapNotes.length === 0 && (
+                  <Badge color="blue">予約から自動で登録</Badge>
+                )}
                 <RetentionRiskBadge level={retentionRisk.level} />
                 {/* キャンセル累計（0件のときは表示しない）。押すとキャンセルタブへ */}
                 {cancelSummary.total > 0 && (

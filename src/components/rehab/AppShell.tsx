@@ -28,13 +28,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!usesKarte || pulledRef.current) return
     pulledRef.current = true
-    import('@/lib/sync-service').then(async ({ pullFromCloud, isSyncEnabled }) => {
+    import('@/lib/sync-service').then(async ({ pullAtStartup, isSyncEnabled }) => {
       if (!isSyncEnabled()) return
       setSyncing(true)
-      const before = localStorage.getItem('pt_patients')
-      const ok = await pullFromCloud()
+      // カルテの自動作成（lib/karte-auto-create.ts）も同じ1回の取り込みを待つ
+      const { changed } = await pullAtStartup()
       setSyncing(false)
-      if (ok && before !== localStorage.getItem('pt_patients')) window.location.reload()
+      if (changed) window.location.reload()
     })
   }, [usesKarte])
 

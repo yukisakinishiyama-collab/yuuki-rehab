@@ -19,6 +19,7 @@ import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
 import { matchKartePatients } from '@/lib/karte-link'
+import { openOrCreateKarte } from '@/lib/karte-auto-create'
 import { nameKey } from '@/lib/noah-import'
 import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
 import { useLineLinks } from '@/lib/line-link-client'
@@ -62,6 +63,8 @@ export default function PatientsPage() {
   const [recentIds, setRecentIds] = useState<string[]>([])
   // 予約管理画面から「カルテを開く」で来たのに見つからなかった方（お名前を出して、登録しやすくする）
   const [karteMiss, setKarteMiss] = useState('')
+  // 予約管理画面から来た方のカルテが無いので、予約の情報から作っているところ
+  const [karteCreating, setKarteCreating] = useState('')
 
   useEffect(() => {
     initPatientStore()
@@ -83,7 +86,29 @@ export default function PatientsPage() {
       return
     }
     setSearch(karte)
-    if (found.length === 0) setKarteMiss(karte || tel)
+    // 同じお名前のカルテが2つ以上 → 一覧から選んでもらう
+    if (found.length > 1) return
+    // カルテが無い → 予約の情報（お名前・電話）から作って開く（クラウドの控えの取り込みを待ってから、もう一度探す）
+    if (!karte) {
+      setKarteMiss(tel)
+      return
+    }
+    setKarteCreating(karte)
+    let alive = true
+    void openOrCreateKarte({ name: karte, phone: tel }).then(r => {
+      if (!alive) return
+      if (r.kind === 'open' || r.kind === 'created') {
+        router.replace(`/patients/${r.patient.id}`)
+        return
+      }
+      if (r.kind === 'reload') return // 取り込みでカルテが変わり、画面が読み直される（読み直したあと、もう一度探す）
+      setKarteCreating('')
+      setPatients(getPatients())
+      if (r.kind === 'none') setKarteMiss(karte || tel)
+    })
+    return () => {
+      alive = false
+    }
   }, [router])
 
   // SOAPノートを一度だけ読み込み、患者別にグループ化（来院日の降順）
@@ -325,6 +350,13 @@ export default function PatientsPage() {
           </label>
         </div>
       </div>
+
+      {/* 予約管理画面から来た方のカルテを作っているところ */}
+      {karteCreating && (
+        <div role="status" className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          予約の「{karteCreating}」さんのカルテがまだ無いので、予約の情報から作っています…
+        </div>
+      )}
 
       {/* 予約管理画面から来たのにカルテが無かったとき */}
       {karteMiss && (
