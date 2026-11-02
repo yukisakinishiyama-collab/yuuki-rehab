@@ -8,6 +8,8 @@ import { notifyCloudSync } from './store-sync'
 
 const GOALS_KEY = 'pt_goals'
 const PROBLEMS_KEY = 'pt_problems'
+/** 目標を保存したときの知らせ（カルテの上の「目標・希望」と概要の「目標と課題」を同じ内容にそろえる） */
+export const GOALS_CHANGED_EVENT = 'pt-goals-changed'
 
 function get<T>(key: string): T[] {
   if (typeof window === 'undefined') return []
@@ -35,7 +37,25 @@ export function savePatientGoals(goals: Omit<PatientGoals, 'updatedAt'>): Patien
   const record: PatientGoals = { ...goals, updatedAt: new Date().toISOString() }
   const rest = get<PatientGoals>(GOALS_KEY).filter(g => g.patientId !== goals.patientId)
   set(GOALS_KEY, [...rest, record])
+  if (typeof window !== 'undefined') {
+    // 画面の描きかえの途中（setState の中）で呼ばれても大丈夫なように、少しあとで知らせる
+    const detail = { patientId: goals.patientId }
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent(GOALS_CHANGED_EVENT, { detail })), 0)
+  }
   return record
+}
+
+/** 目標の一部だけを直して保存する（ほかの項目は、いま保存されている内容のまま） */
+export function updatePatientGoals(
+  patientId: string,
+  patch: Partial<Pick<PatientGoals, 'patientGoal' | 'targetNote' | 'patientWishes' | 'nextVisitNote'>>,
+): PatientGoals {
+  const current = getPatientGoals(patientId) ?? {
+    patientId, patientGoal: '', targetNote: '', clinicalGoals: [], nextVisitNote: '', updatedAt: '',
+  }
+  const { updatedAt: _updatedAt, ...rest } = current
+  void _updatedAt
+  return savePatientGoals({ ...rest, ...patch, patientId })
 }
 
 // ── 問題リスト ──
