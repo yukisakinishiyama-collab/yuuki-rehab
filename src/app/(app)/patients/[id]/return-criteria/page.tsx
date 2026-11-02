@@ -3,6 +3,7 @@
 import { useState, useMemo, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ClearTextButton, CLEARABLE_PADDING } from '@/components/rehab-management/shared'
 import {
   ArrowLeft, CheckCircle, AlertTriangle, XCircle, Save, Trash2,
   ChevronDown, ChevronUp, Activity, Brain, Zap, Home, Trophy,
@@ -1541,11 +1542,14 @@ export default function ReturnCriteriaPage({
           {/* メモ */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
             <label className="text-xs font-semibold text-slate-600 block mb-1.5">臨床メモ</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-              placeholder="特記事項・所見・臨床家のコメント"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none
-                focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
+            <div className="relative">
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                placeholder="特記事項・所見・臨床家のコメント"
+                className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none
+                  focus:outline-none focus:ring-2 focus:ring-teal-500/40 ${CLEARABLE_PADDING}`}
+              />
+              <ClearTextButton value={notes} onChange={setNotes} multiline />
+            </div>
           </div>
         </div>
 

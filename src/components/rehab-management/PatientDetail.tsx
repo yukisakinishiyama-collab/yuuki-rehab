@@ -3,7 +3,7 @@
 // カルテ（患者さん1人分）
 // タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・キャンセル
 // ──────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
@@ -24,7 +24,7 @@ import {
   calculateImprovementScore, calculateROMImprovement,
   calculateRetentionRisk, getDaysSinceLastVisit, generatePatientFriendlyMessage,
 } from '@/lib/rehab-algorithms'
-import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle } from './shared'
+import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle, ClearTextButton, CLEARABLE_PADDING } from './shared'
 import { PainChart, ImprovementChart, ROMChart, StrengthChart, SpecialTestSummary, AdherenceChart } from './charts'
 import EvaluationForm from './EvaluationForm'
 import ROMInputForm from './ROMInputForm'
@@ -34,6 +34,8 @@ import SOAPForm from './SOAPForm'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
+import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
+import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
 import GoalsProblemsCard from './GoalsProblemsCard'
 import PatientProfileCard from './PatientProfileCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -159,6 +161,23 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   // 音声入力の認識途中テキスト（確定前のプレビュー表示用）
   const [voiceInterim, setVoiceInterim] = useState('')
+  // 音声で整えたメモを入れるときは、録音中に手で書いた分も含めた「いまの欄」に足す
+  const contentRef = useRef(content)
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
+  /** 口述を整えたメモを欄に入れる（保存はしない。読んで直してから保存） */
+  function applyVoiceMemo(result: VoiceMemoResult): VoiceApplied {
+    if (!result.memo) return { summary: <p>メモに書く内容が見つかりませんでした（雑談だけだった、声が遠かった など）。</p> }
+    const before = contentRef.current
+    const after = before.trim() ? `${before}${before.endsWith('\n') ? '' : '\n'}${result.memo}` : result.memo
+    setContent(after)
+    return {
+      summary: <p className="font-semibold">メモに入れました。読んで直してから「保存」を押してください。</p>,
+      undo: () => setContent(c => (c === after ? before : c)),
+    }
+  }
 
   // メモとテストを月別に統合
   type Entry =
@@ -216,13 +235,20 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
     <div className="space-y-4">
       {/* 入力エリア */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
-          <VoiceInputButton
-            onText={text => setContent(prev => (prev ? `${prev}${prev.endsWith('\n') ? '' : '\n'}${text}` : text))}
-            onInterim={setVoiceInterim}
-          />
-        </div>
+        <span className="block text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
+        {/* 話した内容を、言いよどみ・雑談を除いたメモの文に整えて欄に入れる（文字起こしの設定が無ければ、いままでの音声入力） */}
+        <VoiceKarteCapture
+          mode="memo"
+          onMemo={applyVoiceMemo}
+          fallback={
+            <div className="flex justify-end">
+              <VoiceInputButton
+                onText={text => setContent(prev => (prev ? `${prev}${prev.endsWith('\n') ? '' : '\n'}${text}` : text))}
+                onInterim={setVoiceInterim}
+              />
+            </div>
+          }
+        />
         <div className="flex items-center gap-3">
           <label className="text-xs text-gray-500 whitespace-nowrap">日付</label>
           <input
@@ -232,14 +258,17 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
         </div>
-        <textarea
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
-          rows={4}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
-          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
-        />
+        <div className="relative">
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
+            rows={4}
+            className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none ${CLEARABLE_PADDING}`}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
+          />
+          <ClearTextButton value={content} onChange={setContent} multiline />
+        </div>
         {voiceInterim && (
           <p className="text-xs text-gray-500 italic px-1">🎤 {voiceInterim}…</p>
         )}

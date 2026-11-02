@@ -2,6 +2,7 @@
 // 関節別詳細解剖マップ - イラスト風解剖図SVGコンポーネント
 
 import { useState } from 'react'
+import { ClearTextButton, CLEARABLE_PADDING } from './shared'
 
 export interface JointDetailMapProps {
   joint: string
@@ -562,6 +563,10 @@ export const SUPPORTED_JOINTS = Object.keys(JOINT_ZONES)
 export default function JointDetailMap({ joint, selected, onChange, readOnly = false }: JointDetailMapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [freeText, setFreeText] = useState('')
+  function setText(v: string) {
+    setFreeText(v)
+    onChange(v ? [v] : [])
+  }
 
   const zones = JOINT_ZONES[joint]
   const Silhouette = SILHOUETTE_MAP[joint]
@@ -571,14 +576,17 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
     return (
       <div className="mt-2">
         <p className="text-xs text-gray-500 mb-1">{joint}（自由入力）</p>
-        <textarea
-          value={freeText}
-          onChange={e => { setFreeText(e.target.value); onChange(e.target.value ? [e.target.value] : []) }}
-          rows={2}
-          disabled={readOnly}
-          placeholder="詳細な部位を入力してください"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none disabled:bg-gray-50"
-        />
+        <div className="relative">
+          <textarea
+            value={freeText}
+            onChange={e => setText(e.target.value)}
+            rows={2}
+            disabled={readOnly}
+            placeholder="詳細な部位を入力してください"
+            className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none disabled:bg-gray-50 ${CLEARABLE_PADDING}`}
+          />
+          <ClearTextButton value={freeText} onChange={setText} multiline disabled={readOnly} />
+        </div>
       </div>
     )
   }

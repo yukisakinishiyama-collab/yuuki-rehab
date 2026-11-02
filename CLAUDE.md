@@ -37,7 +37,7 @@ npm run lint     # ESLint
 - 集客・経営: `src/lib/marketing/kv-store-server.ts`（Supabase 設定時は KV テーブル）
 - 予約: GAS の予約システム（`?api=feed` / `?api=hubstats` / `?api=noahstats`）と連携
 
-主な API: `/api/marketing/**`、`/api/sync`、`/api/yoyaku/feed`、`/api/intake-analysis`・`/api/referral-generate`（Anthropic SDK）、`/api/upload`（動画ストックの Vercel Blob 保存）、`/api/liff/verify`。
+主な API: `/api/marketing/**`、`/api/sync`、`/api/yoyaku/feed`、`/api/intake-analysis`・`/api/referral-generate`（Anthropic SDK）、`/api/voice/transcribe`（カルテの音声入力。録音を OpenAI で文字に）・`/api/voice/organize`（文字起こしから患者さんの情報だけを Claude で S/O/A/P・メモに整理。欄に入れるだけで保存は院長）、`/api/upload`（動画ストックの Vercel Blob 保存）、`/api/liff/verify`。
 
 ### スタイリング
 

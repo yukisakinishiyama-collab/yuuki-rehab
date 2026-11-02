@@ -2,7 +2,7 @@
 // ──────────────────────────────────────────────
 // SOAPカルテ入力フォーム
 // ──────────────────────────────────────────────
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult, ComplaintEntry } from '@/types/patient'
 import { PHASE_SHORT_LABELS } from '@/types/patient'
@@ -15,6 +15,9 @@ import {
 } from './shared'
 import BodyMap from './BodyMap'
 import { TAP_AREA } from '@/components/ui/tap-area'
+import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
+import { SOAP_SECTION_LABELS, VOICE_SOAP_FIELDS, type SoapSection, type VoiceSoapResult } from '@/lib/voice/soap-fields'
+import { applyVoiceChanges, planVoiceSoapChanges, undoVoiceChanges } from '@/lib/voice/merge-soap'
 
 interface Props {
   patientId: string
@@ -381,6 +384,50 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
   const [form, setForm] = useState<FormState>(defaultForm)
   const [activeTab, setActiveTab] = useState<TabKey>('S')
   const [saved, setSaved] = useState(false)
+  // 音声の結果を入れるときは、録音中に手で書いた分も含めた「いまの欄」をもとにする
+  const formRef = useRef(form)
+  useEffect(() => {
+    formRef.current = form
+  }, [form])
+
+  /** 会話から振り分けた内容を欄に入れる（保存はしない。院長が読んで直してから保存） */
+  function applyVoice(result: VoiceSoapResult): VoiceApplied {
+    const changes = planVoiceSoapChanges(formRef.current, result, defaultForm)
+    if (changes.length === 0) {
+      return { summary: <p>カルテに書く内容が見つかりませんでした（雑談だけだった、声が遠かった など）。</p> }
+    }
+    setForm(f => applyVoiceChanges(f, changes))
+    const bySection = new Map<SoapSection, string[]>()
+    for (const c of changes) {
+      const field = VOICE_SOAP_FIELDS.find(v => v.key === c.key)
+      const section: SoapSection = field?.section ?? (c.key === 'painToday' || c.key === 'homeExerciseAdherence' ? 'S' : 'O')
+      const label = field?.label
+        ?? (c.key === 'painToday' ? `痛みNRS ${String(c.after)}` : c.key === 'swelling' ? '腫脹あり' : c.key === 'heat' ? '熱感あり' : '自宅運動の実施状況')
+      bySection.set(section, [...(bySection.get(section) ?? []), label])
+    }
+    const sections = (['S', 'O', 'A', 'P'] as const).filter(s => bySection.has(s))
+    if (sections[0]) setActiveTab(sections[0])
+    return {
+      summary: (
+        <>
+          <p className="font-semibold">{changes.length}か所に書き込みました。読んで直してから「カルテを保存」を押してください。</p>
+          <div className="flex flex-wrap gap-1.5">
+            {sections.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setActiveTab(s)}
+                className="rounded-full border border-teal-300 bg-white px-2.5 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 max-lg:min-h-10"
+              >
+                {SOAP_SECTION_LABELS[s]}：{bySection.get(s)?.join('・')}
+              </button>
+            ))}
+          </div>
+        </>
+      ),
+      undo: () => setForm(f => undoVoiceChanges(f, changes)),
+    }
+  }
 
   function handleSave() {
     const notes = getSOAPNotes(patientId)
@@ -475,6 +522,9 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* 音声から：施術中の会話 → 患者さんの情報だけを S/O/A/P に振り分けて欄に入れる */}
+        <VoiceKarteCapture mode="soap" onSoap={applyVoice} />
+
         {/* S: Subjective */}
         {activeTab === 'S' && (
           <div className="space-y-4">
