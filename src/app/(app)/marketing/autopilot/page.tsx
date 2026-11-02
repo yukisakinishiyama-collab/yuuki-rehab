@@ -503,6 +503,114 @@ function SettingsPanel({
         </label>
       </div>
 
+      <fieldset className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3">
+        <legend className="px-1 text-sm font-bold text-slate-900">キャンセルが出たら、ストーリーですぐ知らせる</legend>
+        <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
+          <input
+            type="checkbox"
+            checked={s.cancelStory}
+            disabled={disabled}
+            onChange={(e) => setS({ ...s, cancelStory: e.target.checked })}
+            className="mt-0.5 h-5 w-5 shrink-0"
+          />
+          予約システムでキャンセルになったら、空いた枠をInstagramのストーリーで知らせる（承認なしですぐ出します）
+        </label>
+        <p className="text-xs leading-relaxed text-slate-600">
+          見出し「キャンセルが出ました」と「本日 15:00 に空きが出ました」のひとことを、その日の空き状況の画像に載せて出します。
+          患者さんのお名前などは載せません。出す直前にいまの空きを取り直し、その枠がもう埋まっていたら出しません。出したら院長のLINEにお知らせします。
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-xs font-bold text-slate-600">知らせるキャンセル</span>
+            <select
+              value={s.cancelStoryDays}
+              disabled={disabled || !s.cancelStory}
+              onChange={(e) => setS({ ...s, cancelStoryDays: e.target.value as AutopilotSettings['cancelStoryDays'] })}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            >
+              <option value="today">当日の枠だけ</option>
+              <option value="tomorrow">当日と翌日の枠</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-600">枠の何分前までなら知らせるか</span>
+            <select
+              value={s.cancelStoryLeadMinutes}
+              disabled={disabled || !s.cancelStory}
+              onChange={(e) => setS({ ...s, cancelStoryLeadMinutes: Number(e.target.value) })}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            >
+              {[30, 60, 90, 120, 180].map((m) => (
+                <option key={m} value={m}>
+                  {m}分前まで{m === 60 ? '（おすすめ）' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-600">ストーリーを出してよい時間帯</span>
+            <span className="mt-1 flex items-center gap-2">
+              <select
+                value={s.cancelStoryFromHour}
+                disabled={disabled || !s.cancelStory}
+                onChange={(e) => {
+                  const from = Number(e.target.value)
+                  setS({ ...s, cancelStoryFromHour: from, cancelStoryToHour: Math.max(s.cancelStoryToHour, from + 1) })
+                }}
+                className="rounded-lg border border-slate-300 p-2"
+                aria-label="出してよい時間帯のはじめ"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {h}時
+                  </option>
+                ))}
+              </select>
+              〜
+              <select
+                value={s.cancelStoryToHour}
+                disabled={disabled || !s.cancelStory}
+                onChange={(e) => setS({ ...s, cancelStoryToHour: Number(e.target.value) })}
+                className="rounded-lg border border-slate-300 p-2"
+                aria-label="出してよい時間帯のおわり"
+              >
+                {Array.from({ length: 24 }, (_, i) => i + 1)
+                  .filter((h) => h > s.cancelStoryFromHour)
+                  .map((h) => (
+                    <option key={h} value={h}>
+                      {h}時
+                    </option>
+                  ))}
+              </select>
+            </span>
+            <span className="mt-1 block text-xs text-slate-500">時間帯の外のキャンセルは、はじめの時刻に出します（枠に間に合うときだけ）。</span>
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-600">1日に出す上限</span>
+            <select
+              value={s.cancelStoryMaxPerDay}
+              disabled={disabled || !s.cancelStory}
+              onChange={(e) => setS({ ...s, cancelStoryMaxPerDay: Number(e.target.value) })}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            >
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}回{n === 3 ? '（おすすめ）' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <a
+          href={`/api/marketing/image?${new URLSearchParams({ kind: 'story', range: 'today', fresh: '1', title: 'キャンセルが出ました', note: '本日 15:00 に空きが出ました' }).toString()}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center text-xs font-bold text-teal-700 underline max-lg:min-h-10"
+        >
+          見本の画像を見る（いまの本日の空きで作ります。ひとことの時刻は例です）
+        </a>
+      </fieldset>
+
       <label className="block">
         <span className="text-xs font-bold text-slate-600">来週の投稿で触れてほしいこと（院長メモ・任意）</span>
         <textarea

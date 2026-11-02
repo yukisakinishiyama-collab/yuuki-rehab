@@ -11,6 +11,9 @@
  *      成功時、シート保存用の sealed（長期の署名付き参照）を返す
  *    - kind: 'patient-cancel'  … sealed（予約行に保存済みの参照）
  *
+ * キャンセル（kind: 'cancel'）のときは、返事のあとで「空いた枠をInstagramのストーリーで知らせる」も行う
+ * （院長の設定がオンのときだけ。lib/marketing/cancel-story-server.ts。患者さんの情報はストーリーに使わない）
+ *
  * セキュリティ:
  * - RESERVATION_NOTIFY_SECRET（共有シークレット）で保護。未設定時は503
  * - 患者宛の宛先は【必ず】署名付きticket/sealedから復元する。生のuserIdは受け付けない
@@ -18,10 +21,12 @@
  * - 本文に載せる氏名は改行・制御文字を除去し長さを制限（メッセージ偽装の防止）
  * - LINEプッシュには既存の LINE_CHANNEL_ACCESS_TOKEN を使う（トークンはVercelに集約）
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { readTicket, sealUserId, unsealUserId } from '@/lib/liff-ticket'
 
 export const dynamic = 'force-dynamic'
+// キャンセルのストーリー（予約システムへの返事のあとで、空きの取り直し→画像→Instagramへの公開まで）に使う時間
+export const maxDuration = 120
 
 type NotifyBody = {
   kind?: 'new' | 'cancel' | 'reminder' | 'patient-confirm' | 'patient-cancel'
@@ -138,6 +143,21 @@ export async function POST(request: NextRequest) {
     body = (await request.json()) as NotifyBody
   } catch {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 })
+  }
+
+  // キャンセル：空いた枠をストーリーで知らせる（予約システムへの返事を待たせないよう、返事のあとで行う。
+  // 日時だけを渡す。お名前・電話などは渡さない）
+  if (body.kind === 'cancel') {
+    const notice = { date: body.date, time: body.time }
+    after(async () => {
+      try {
+        const { handleCancelStory } = await import('@/lib/marketing/cancel-story-server')
+        const r = await handleCancelStory(notice)
+        if (r.plan.action === 'skip') console.log('[cancel-story] 出しません:', r.plan.reason)
+      } catch (error) {
+        console.error('[cancel-story] 失敗しました', error)
+      }
+    })
   }
 
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN

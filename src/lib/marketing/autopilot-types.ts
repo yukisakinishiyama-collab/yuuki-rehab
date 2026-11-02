@@ -40,6 +40,20 @@ export interface AutopilotSettings {
    * 画像は投稿する時刻の空きで作り直し、空きが無くなっていたら出さない。承認されるまで出さない
    */
   availabilityStory: boolean
+  /**
+   * キャンセルが出たら、空いた枠を Instagram のストーリーですぐ知らせる（予約システムのキャンセルの通知をきっかけに）。
+   * 院長がこの設定をオンにしたことを「毎回の承認」の代わりにする（出すのは空き状況の定型の画像だけ。患者さんの情報は載せない）
+   */
+  cancelStory: boolean
+  /** どの日のキャンセルを知らせるか（today=当日だけ／tomorrow=当日と翌日） */
+  cancelStoryDays: 'today' | 'tomorrow'
+  /** 空いた枠の何分前までなら知らせるか（それより近い枠は、見てから来るのが間に合わないので出さない） */
+  cancelStoryLeadMinutes: number
+  /** ストーリーを出してよい時間帯（日本時間の時。from 時から to 時まで）。外のキャンセルは from 時に出す（枠に間に合うときだけ） */
+  cancelStoryFromHour: number
+  cancelStoryToHour: number
+  /** 1日に出すキャンセルのストーリーの上限 */
+  cancelStoryMaxPerDay: number
   /** 下書きを作る時刻（日曜・日本時間の時。既定18時） */
   generateHour: number
   /** 来週の投稿で触れてほしいこと（院長メモ）。次の下書きで1本目のテーマになり、使ったら空に戻る */
@@ -65,6 +79,13 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   google: true,
   availabilityPost: true,
   availabilityStory: true,
+  // キャンセルのストーリーは院長がオンにするまで出さない
+  cancelStory: false,
+  cancelStoryDays: 'tomorrow',
+  cancelStoryLeadMinutes: 60,
+  cancelStoryFromHour: 7,
+  cancelStoryToHour: 21,
+  cancelStoryMaxPerDay: 3,
   generateHour: 18,
   ownerNote: '',
 }

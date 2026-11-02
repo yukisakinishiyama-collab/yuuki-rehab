@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { IMAGE_SIZES, loadPhotoDataUrl, renderPhotoPostImage, renderStoryImage, renderTemplateImage } from '@/lib/marketing/image-template'
 import { addDays, jstParts, storyHasOpening, storyRange, storyRows, storyText, type OpeningDay } from '@/lib/marketing/autopilot-planner'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
+import { sanitizeStoryEdits, storyEditsProblem } from '@/lib/marketing/story-server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -49,8 +50,11 @@ export async function GET(request: NextRequest) {
         const r = storyRange(range, openings, now.date)
         const rows = storyRows(openings, r.dates)
         if (rows.length === 0) return NextResponse.json({ error: '載せられる日がありません（休診の日など）' }, { status: 404 })
-        const text = storyText(rows, r.scope, now.local, r.title)
-        const res = png(await renderStoryImage({ title: text.title, asOfLabel, scope: r.scope, rows }), `story-${now.date}.png`)
+        // 見出し・ひとことを変えた見本（キャンセルのストーリーの見本など）。表現チェックでNGなら使わない
+        const edits = sanitizeStoryEdits({ title: params.get('title') ?? undefined, note: params.get('note') ?? undefined })
+        const usable = storyEditsProblem(edits) ? {} : edits
+        const text = storyText(rows, r.scope, now.local, usable.title || r.title)
+        const res = png(await renderStoryImage({ title: text.title, asOfLabel, scope: r.scope, rows, note: usable.note }), `story-${now.date}.png`)
         res.headers.set('X-Story-Has-Opening', storyHasOpening(rows) ? '1' : '0')
         return res
       }
