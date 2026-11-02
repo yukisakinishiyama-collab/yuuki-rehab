@@ -37,6 +37,7 @@ import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
 import GoalsProblemsCard from './GoalsProblemsCard'
+import PatientGoalsBanner from './PatientGoalsBanner'
 import PatientProfileCard from './PatientProfileCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
@@ -892,6 +893,9 @@ export default function PatientDetail({ patient }: Props) {
               </div>
             )}
           </div>
+
+          {/* 患者さんの目標・希望（どのタブでも見える。その場で書ける・直せる） */}
+          <PatientGoalsBanner key={patient.id} patient={patient} latestSoap={latestSoap} />
 
           {/* 大事な数字 */}
           <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
