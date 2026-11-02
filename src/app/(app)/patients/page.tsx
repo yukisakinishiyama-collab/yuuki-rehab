@@ -19,6 +19,7 @@ import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
 import { matchKartePatients } from '@/lib/karte-link'
+import { nameKey } from '@/lib/noah-import'
 import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
 import { useLineLinks } from '@/lib/line-link-client'
 import { buttonVariants } from '@/components/ui/button'
@@ -140,6 +141,15 @@ export default function PatientsPage() {
 
   // 誕生日が近い方（今日〜BIRTHDAY_SOON_DAYS日以内）
   const birthdaySoonCount = useMemo(() => patients.filter(p => isBirthdaySoon(p.birthDate)).length, [patients])
+  // 同じお名前のカルテが2つ以上ある名前の数（「重複したカルテの整理」への入口に出す）
+  const sameNameCount = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const p of patients) {
+      const key = nameKey(p.name ?? '')
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return [...counts.values()].filter(n => n > 1).length
+  }, [patients])
 
   const highRiskCount = useMemo(
     () => patients.filter(p => riskByPatient.get(p.id)?.level === 'high').length,
@@ -229,6 +239,11 @@ export default function PatientsPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {sameNameCount > 0 && (
+            <Link href="/patients/duplicates" className={cn(buttonVariants({ variant: 'outline' }), 'border-amber-300 text-amber-900')}>
+              重複の整理（同じお名前 {sameNameCount}人分）
+            </Link>
+          )}
           <Link href="/patients/import" className={cn(buttonVariants({ variant: 'outline' }))}>
             NOAHから取り込む
           </Link>
