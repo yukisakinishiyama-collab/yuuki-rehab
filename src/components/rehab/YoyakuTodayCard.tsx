@@ -20,9 +20,11 @@
 // ──────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CalendarClock, Check, ChevronRight, FileText, KeyRound, Phone, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { CalendarClock, Check, ChevronRight, FilePlus2, FileText, KeyRound, Phone, RefreshCw } from 'lucide-react'
 import type { Patient } from '@/types/patient'
 import { getPatients, initPatientStore } from '@/lib/patient-store'
+import { openOrCreateKarte } from '@/lib/karte-auto-create'
 import { nextDate } from '@/lib/marketing/noah-analysis'
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -185,6 +187,31 @@ export default function YoyakuTodayCard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [patients, setPatients] = useState<Patient[]>([])
+  const router = useRouter()
+  // カルテを作って開いている途中の予約（予約番号）
+  const [creating, setCreating] = useState('')
+
+  /** カルテが無い方：予約の情報（お名前・ふりがな・電話）からカルテを作って開く */
+  async function createAndOpen(row: FeedRow, date: string) {
+    if (creating) return
+    setCreating(row.reservationNo)
+    try {
+      const r = await openOrCreateKarte({ name: row.name, kana: row.kana, phone: row.phone, date, kubun: row.kubun })
+      if (r.kind === 'open' || r.kind === 'created') {
+        router.push(`/patients/${r.patient.id}`)
+        return
+      }
+      // 同じお名前のカルテが2つ以上ある → 一覧で選んでもらう
+      if (r.kind === 'ambiguous') {
+        router.push(`/patients?karte=${encodeURIComponent(row.name)}&tel=${encodeURIComponent(row.phone)}`)
+        return
+      }
+      // reload：クラウドの控えを取り込んだので、画面が読み直される（読み直したあと、もう一度押してもらう）
+      setCreating('')
+    } catch {
+      setCreating('')
+    }
+  }
   const [updatedAt, setUpdatedAt] = useState('')
   // 「このあと」「次」に使ういまの日付と時刻（日本時間）。予約を読み直すたび（60秒ごと）に新しくする
   const [clock, setClock] = useState<{ date: string; minutes: number } | null>(null)
@@ -513,6 +540,19 @@ export default function YoyakuTodayCard() {
                                 <span className="text-xs font-bold leading-none">カルテ</span>
                                 <ChevronRight className="hidden h-3.5 w-3.5 lg:block" aria-hidden />
                               </Link>
+                            ) : !cancelled && row.name.trim() ? (
+                              // カルテが無い方：押すと予約の情報からカルテを作って開く（すぐ書ける）
+                              <button
+                                type="button"
+                                onClick={() => void createAndOpen(row, day.date)}
+                                disabled={creating !== ''}
+                                className="flex h-11 w-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-teal-400 bg-white text-teal-800 transition-colors hover:bg-teal-50 disabled:opacity-60 lg:h-8 lg:w-auto lg:flex-row lg:gap-1 lg:px-2.5"
+                                aria-label={`${row.name}様のカルテを作って開く`}
+                                title="カルテがまだ無いので、予約の情報（お名前・ふりがな・電話）から作って開きます"
+                              >
+                                <FilePlus2 className="h-4 w-4 lg:h-3.5 lg:w-3.5" aria-hidden />
+                                <span className="text-xs font-bold leading-none">{creating === row.reservationNo ? '作成中' : 'カルテ'}</span>
+                              </button>
                             ) : (
                               <span
                                 className="w-12 text-center text-xs text-slate-500 lg:w-auto lg:px-1"

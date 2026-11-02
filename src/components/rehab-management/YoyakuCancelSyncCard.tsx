@@ -13,6 +13,7 @@ import type { CancellationKind, Patient } from '@/types/patient'
 import { CANCELLATION_KINDS, CANCELLATION_SHORT_LABELS } from '@/types/patient'
 import { nanoid } from 'nanoid'
 import { getPatients, initPatientStore, savePatient } from '@/lib/patient-store'
+import { buildPatientFromReservation } from '@/lib/karte-auto-create'
 import {
   syncFromFeed, confirmPending, excludeReservationNo, unexcludeReservationNo,
   getExcludedReservationNos, resolveNoShow, unresolveNoShow, getResolvedNoShows,
@@ -122,24 +123,9 @@ export default function YoyakuCancelSyncCard() {
     const kind = choice[item.reservationNo]?.kind || item.suggestedKind
     if (!kind) return
     if (!confirm(`${item.name} 様のカルテを新しく作成して記録しますか？`)) return
-    const now = new Date().toISOString()
     const patient: Patient = {
-      id: nanoid(),
-      name: item.name,
-      kana: item.kana ?? '',
-      birthDate: '',
-      gender: 'other',
-      phone: item.phone ?? '',
-      emergencyContact: '',
-      mainComplaint: '',
-      bodyRegion: 'other',
-      diagnosisLabel: '',
-      onsetDate: '',
+      ...buildPatientFromReservation({ name: item.name, kana: item.kana, phone: item.phone }, '予約システムのキャンセルから作成'),
       firstVisitDate: item.date,
-      status: 'active',
-      therapistNotes: '予約システムのキャンセルから作成',
-      createdAt: now,
-      updatedAt: now,
     }
     savePatient(patient)
     setPatients(getPatients())

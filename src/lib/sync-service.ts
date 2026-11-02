@@ -72,6 +72,24 @@ export async function pullFromCloud(): Promise<boolean> {
 }
 
 // ────────────────────────────────
+// 起動時の取り込み（このページを開いてから1回だけ。何か所から呼んでも同じ1回を待つ）
+// カルテを自動で作る前に、これが終わるのを待つ（終わる前に作ると、取り込みで消えたり二重に作ったりするため）
+// ────────────────────────────────
+let startupPull: Promise<{ ok: boolean; changed: boolean }> | null = null
+
+export function pullAtStartup(): Promise<{ ok: boolean; changed: boolean }> {
+  if (!startupPull) {
+    startupPull = (async () => {
+      if (!SYNC_SECRET) return { ok: false, changed: false }
+      const before = localStorage.getItem('pt_patients')
+      const ok = await pullFromCloud()
+      return { ok, changed: ok && before !== localStorage.getItem('pt_patients') }
+    })()
+  }
+  return startupPull
+}
+
+// ────────────────────────────────
 // 保存後に呼ぶ（デバウンス付き）
 // ────────────────────────────────
 export function scheduleSync(delayMs = 1500): void {

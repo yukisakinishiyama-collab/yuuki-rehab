@@ -69,6 +69,8 @@ export interface Patient {
   insurance?: PatientInsurance
   /** NOAHのどの受診者番号から作ったか（同じ方の番号はまとめる）・来院の期間と回数 */
   noah?: NoahLink
+  /** 予約（お名前・ふりがな・電話）から自動で作ったカルテ（2026-11-02〜。カルテが無い方を開いたとき） */
+  autoCreatedFrom?: 'reservation'
 }
 
 /** 保険証の情報（NOAHの「受診者入力」「ハガキ・名簿」から） */
