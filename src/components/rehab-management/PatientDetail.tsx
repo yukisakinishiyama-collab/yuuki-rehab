@@ -24,7 +24,7 @@ import {
   calculateImprovementScore, calculateROMImprovement,
   calculateRetentionRisk, getDaysSinceLastVisit, generatePatientFriendlyMessage,
 } from '@/lib/rehab-algorithms'
-import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle } from './shared'
+import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle, ClearTextButton, CLEARABLE_PADDING } from './shared'
 import { PainChart, ImprovementChart, ROMChart, StrengthChart, SpecialTestSummary, AdherenceChart } from './charts'
 import EvaluationForm from './EvaluationForm'
 import ROMInputForm from './ROMInputForm'
@@ -232,14 +232,17 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
         </div>
-        <textarea
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
-          rows={4}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
-          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
-        />
+        <div className="relative">
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
+            rows={4}
+            className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none ${CLEARABLE_PADDING}`}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
+          />
+          <ClearTextButton value={content} onChange={setContent} multiline />
+        </div>
         {voiceInterim && (
           <p className="text-xs text-gray-500 italic px-1">🎤 {voiceInterim}…</p>
         )}

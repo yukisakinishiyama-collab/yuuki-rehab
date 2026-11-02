@@ -13,7 +13,7 @@ import {
   PROBLEM_STATUS_ORDER,
 } from '@/lib/clinical-goals-store'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
-import { Card, CardHeader, CardContent, SectionTitle } from './shared'
+import { Card, CardHeader, CardContent, SectionTitle, ClearTextButton, CLEARABLE_PADDING } from './shared'
 import { Target, Plus, Trash2 } from 'lucide-react'
 
 const STATUS_STYLES: Record<ProblemStatus, string> = {
@@ -120,14 +120,20 @@ export default function GoalsProblemsCard({ patient }: Props) {
             🎯 本人の目標（患者さんの言葉のまま）
           </label>
           <div className="flex items-center gap-1.5">
-            <input
-              value={goals.patientGoal}
-              onChange={e => setGoals({ ...goals, patientGoal: e.target.value })}
-              onBlur={() => persistGoals(goals)}
-              placeholder="例: サッカーの試合に出たい／孫と旅行に行きたい"
-              className="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
+            <div className="relative flex-1">
+              <input
+                value={goals.patientGoal}
+                onChange={e => setGoals({ ...goals, patientGoal: e.target.value })}
+                onBlur={() => persistGoals(goals)}
+                placeholder="例: サッカーの試合に出たい／孫と旅行に行きたい"
+                className={`w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                  focus:outline-none focus:ring-2 focus:ring-teal-500/40 ${CLEARABLE_PADDING}`}
+              />
+              <ClearTextButton
+                value={goals.patientGoal}
+                onChange={v => persistGoalsFn(prev => ({ ...prev, patientGoal: v }))}
+              />
+            </div>
             <VoiceInputButton
               size="sm"
               onText={t => persistGoalsFn(prev => ({
@@ -173,17 +179,20 @@ export default function GoalsProblemsCard({ patient }: Props) {
               </div>
             ))}
             <div className="flex items-center gap-1.5">
-              <input
-                value={newGoalLabel}
-                onChange={e => setNewGoalLabel(e.target.value)}
-                onKeyDown={e => {
-                  // IMEの変換確定Enterでは登録しない（未確定の断片が保存されるのを防ぐ）
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) addClinicalGoal()
-                }}
-                placeholder="例: 膝の曲がり140°／片脚スクワット10回"
-                className="flex-1 h-9 px-3 text-sm border border-dashed border-gray-300 rounded-lg
-                  focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-              />
+              <div className="relative flex-1">
+                <input
+                  value={newGoalLabel}
+                  onChange={e => setNewGoalLabel(e.target.value)}
+                  onKeyDown={e => {
+                    // IMEの変換確定Enterでは登録しない（未確定の断片が保存されるのを防ぐ）
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) addClinicalGoal()
+                  }}
+                  placeholder="例: 膝の曲がり140°／片脚スクワット10回"
+                  className={`w-full h-9 px-3 text-sm border border-dashed border-gray-300 rounded-lg
+                    focus:outline-none focus:ring-2 focus:ring-teal-500/40 max-lg:h-10 ${CLEARABLE_PADDING}`}
+                />
+                <ClearTextButton value={newGoalLabel} onChange={setNewGoalLabel} />
+              </div>
               <button
                 type="button"
                 onClick={addClinicalGoal}
@@ -203,14 +212,20 @@ export default function GoalsProblemsCard({ patient }: Props) {
             📅 次回、一緒に確認すること
           </label>
           <div className="flex items-center gap-1.5">
-            <input
-              value={goals.nextVisitNote ?? ''}
-              onChange={e => setGoals({ ...goals, nextVisitNote: e.target.value })}
-              onBlur={() => persistGoals(goals)}
-              placeholder="例: 太ももの筋力を測って、ジョギングを始められるか確認します"
-              className="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
+            <div className="relative flex-1">
+              <input
+                value={goals.nextVisitNote ?? ''}
+                onChange={e => setGoals({ ...goals, nextVisitNote: e.target.value })}
+                onBlur={() => persistGoals(goals)}
+                placeholder="例: 太ももの筋力を測って、ジョギングを始められるか確認します"
+                className={`w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                  focus:outline-none focus:ring-2 focus:ring-teal-500/40 ${CLEARABLE_PADDING}`}
+              />
+              <ClearTextButton
+                value={goals.nextVisitNote ?? ''}
+                onChange={v => persistGoalsFn(prev => ({ ...prev, nextVisitNote: v }))}
+              />
+            </div>
             <VoiceInputButton
               size="sm"
               onText={t => persistGoalsFn(prev => ({
@@ -253,16 +268,19 @@ export default function GoalsProblemsCard({ patient }: Props) {
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <input
-              value={newProblemLabel}
-              onChange={e => setNewProblemLabel(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddProblem()
-              }}
-              placeholder="問題を追加"
-              className="flex-1 h-9 px-3 text-sm border border-dashed border-gray-300 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
+            <div className="relative flex-1">
+              <input
+                value={newProblemLabel}
+                onChange={e => setNewProblemLabel(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddProblem()
+                }}
+                placeholder="問題を追加"
+                className={`w-full h-9 px-3 text-sm border border-dashed border-gray-300 rounded-lg
+                  focus:outline-none focus:ring-2 focus:ring-teal-500/40 max-lg:h-10 ${CLEARABLE_PADDING}`}
+              />
+              <ClearTextButton value={newProblemLabel} onChange={setNewProblemLabel} />
+            </div>
             <button
               type="button"
               onClick={handleAddProblem}

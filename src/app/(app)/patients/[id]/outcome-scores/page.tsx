@@ -12,6 +12,7 @@ import { SCORE_DEFS, REGION_SCORES } from '@/data/outcome-score-defs'
 import type { ScoreId, OutcomeScoreRecord } from '@/types/outcome-scores'
 import type { Patient, BodyRegion } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
+import { ClearTextButton, CLEARABLE_PADDING } from '@/components/rehab-management/shared'
 
 // 表示名とアイコン（部位別タブ）
 const REGION_TABS: { id: BodyRegion; label: string; icon: string }[] = [
@@ -302,13 +303,16 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
             {/* メモ */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <label className="text-xs font-medium text-gray-500">施術者メモ（任意）</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={2}
-                placeholder="特記事項・臨床所見・次回目標など"
-                className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
+              <div className="relative mt-1">
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="特記事項・臨床所見・次回目標など"
+                  className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 ${CLEARABLE_PADDING}`}
+                />
+                <ClearTextButton value={notes} onChange={setNotes} multiline />
+              </div>
             </div>
           </div>
 

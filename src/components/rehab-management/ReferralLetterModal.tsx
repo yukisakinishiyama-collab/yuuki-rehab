@@ -6,6 +6,7 @@ import { useState, useRef } from 'react'
 import type { Patient, Intake, SOAPNote } from '@/types/patient'
 import { X, Printer, Sparkles, AlertCircle, FileText, ClipboardList } from 'lucide-react'
 import { REPORT_COURSE_TEMPLATES } from '@/data/report-templates'
+import { ClearTextButton, CLEARABLE_PADDING } from './shared'
 import TemplatePicker from './TemplatePicker'
 
 interface Props {
@@ -376,33 +377,42 @@ ${printRef.current.innerHTML}
               <p className="text-xs font-semibold text-gray-600">宛先情報</p>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">医療機関名 <span className="text-red-600">*</span></label>
-                <input
-                  type="text"
-                  value={destination.institution}
-                  onChange={e => setDestination(d => ({ ...d, institution: e.target.value }))}
-                  placeholder="例：産業医科大学若松病院"
-                  className={INPUT_CLS}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={destination.institution}
+                    onChange={e => setDestination(d => ({ ...d, institution: e.target.value }))}
+                    placeholder="例：産業医科大学若松病院"
+                    className={`${INPUT_CLS} ${CLEARABLE_PADDING}`}
+                  />
+                  <ClearTextButton value={destination.institution} onChange={t => setDestination(d => ({ ...d, institution: t }))} />
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">診療科</label>
-                <input
-                  type="text"
-                  value={destination.department}
-                  onChange={e => setDestination(d => ({ ...d, department: e.target.value }))}
-                  placeholder="例：整形外科"
-                  className={INPUT_CLS}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={destination.department}
+                    onChange={e => setDestination(d => ({ ...d, department: e.target.value }))}
+                    placeholder="例：整形外科"
+                    className={`${INPUT_CLS} ${CLEARABLE_PADDING}`}
+                  />
+                  <ClearTextButton value={destination.department} onChange={t => setDestination(d => ({ ...d, department: t }))} />
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">担当医師名 <span className="text-red-600">*</span></label>
-                <input
-                  type="text"
-                  value={destination.doctor}
-                  onChange={e => setDestination(d => ({ ...d, doctor: e.target.value }))}
-                  placeholder="例：内田　宗志"
-                  className={INPUT_CLS}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={destination.doctor}
+                    onChange={e => setDestination(d => ({ ...d, doctor: e.target.value }))}
+                    placeholder="例：内田　宗志"
+                    className={`${INPUT_CLS} ${CLEARABLE_PADDING}`}
+                  />
+                  <ClearTextButton value={destination.doctor} onChange={t => setDestination(d => ({ ...d, doctor: t }))} />
+                </div>
               </div>
             </div>}
 
@@ -458,34 +468,43 @@ ${printRef.current.innerHTML}
 
               <div>
                 <label className="block text-xs text-gray-500 mb-1">傷病名</label>
-                <input
-                  type="text"
-                  value={content.diagnosis}
-                  onChange={e => setContent(c => ({ ...c, diagnosis: e.target.value }))}
-                  placeholder="例：左股関節唇損傷の疑い"
-                  className={INPUT_CLS}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={content.diagnosis}
+                    onChange={e => setContent(c => ({ ...c, diagnosis: e.target.value }))}
+                    placeholder="例：左股関節唇損傷の疑い"
+                    className={`${INPUT_CLS} ${CLEARABLE_PADDING}`}
+                  />
+                  <ClearTextButton value={content.diagnosis} onChange={t => setContent(c => ({ ...c, diagnosis: t }))} />
+                </div>
               </div>
 
               {letterType === 'referral' && (
                 <>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">発症経緯</label>
-                    <textarea
-                      value={content.onset}
-                      onChange={e => setContent(c => ({ ...c, onset: e.target.value }))}
-                      placeholder="発症時期・きっかけ・来院経緯など"
-                      className={TA_CLS}
-                    />
+                    <div className="relative">
+                      <textarea
+                        value={content.onset}
+                        onChange={e => setContent(c => ({ ...c, onset: e.target.value }))}
+                        placeholder="発症時期・きっかけ・来院経緯など"
+                        className={`${TA_CLS} ${CLEARABLE_PADDING}`}
+                      />
+                      <ClearTextButton value={content.onset} onChange={t => setContent(c => ({ ...c, onset: t }))} multiline />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">症状（身体所見）</label>
-                    <textarea
-                      value={content.symptoms}
-                      onChange={e => setContent(c => ({ ...c, symptoms: e.target.value }))}
-                      placeholder="主訴・理学所見・スペシャルテスト結果など"
-                      className={TA_CLS}
-                    />
+                    <div className="relative">
+                      <textarea
+                        value={content.symptoms}
+                        onChange={e => setContent(c => ({ ...c, symptoms: e.target.value }))}
+                        placeholder="主訴・理学所見・スペシャルテスト結果など"
+                        className={`${TA_CLS} ${CLEARABLE_PADDING}`}
+                      />
+                      <ClearTextButton value={content.symptoms} onChange={t => setContent(c => ({ ...c, symptoms: t }))} multiline />
+                    </div>
                   </div>
                 </>
               )}
@@ -501,28 +520,34 @@ ${printRef.current.innerHTML}
                     onSelect={text => setContent(c => ({ ...c, course: text }))}
                   />
                 </div>
-                <textarea
-                  value={content.course}
-                  onChange={e => setContent(c => ({ ...c, course: e.target.value }))}
-                  placeholder={letterType === 'referral'
-                    ? '治療経過と専門的診察が必要な理由など'
-                    : letterType === 'report'
-                    ? '当院での施術内容・経過・患者さんの状態など'
-                    : '今後の経過見通しや注意事項など'
-                  }
-                  className={`${TA_CLS} min-h-[120px]`}
-                />
+                <div className="relative">
+                  <textarea
+                    value={content.course}
+                    onChange={e => setContent(c => ({ ...c, course: e.target.value }))}
+                    placeholder={letterType === 'referral'
+                      ? '治療経過と専門的診察が必要な理由など'
+                      : letterType === 'report'
+                      ? '当院での施術内容・経過・患者さんの状態など'
+                      : '今後の経過見通しや注意事項など'
+                    }
+                    className={`${TA_CLS} min-h-[120px] ${CLEARABLE_PADDING}`}
+                  />
+                  <ClearTextButton value={content.course} onChange={t => setContent(c => ({ ...c, course: t }))} multiline />
+                </div>
               </div>
 
               {letterType === 'patient' && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">治療頻度の目安</label>
-                  <textarea
-                    value={content.recommendedFrequency}
-                    onChange={e => setContent(c => ({ ...c, recommendedFrequency: e.target.value }))}
-                    placeholder="例：最初の2週間は週2〜3回のご来院をお勧めします。痛みが落ち着いたら週1回程度に移行します。"
-                    className={TA_CLS}
-                  />
+                  <div className="relative">
+                    <textarea
+                      value={content.recommendedFrequency}
+                      onChange={e => setContent(c => ({ ...c, recommendedFrequency: e.target.value }))}
+                      placeholder="例：最初の2週間は週2〜3回のご来院をお勧めします。痛みが落ち着いたら週1回程度に移行します。"
+                      className={`${TA_CLS} ${CLEARABLE_PADDING}`}
+                    />
+                    <ClearTextButton value={content.recommendedFrequency} onChange={t => setContent(c => ({ ...c, recommendedFrequency: t }))} multiline />
+                  </div>
                 </div>
               )}
 

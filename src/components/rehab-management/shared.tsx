@@ -7,7 +7,8 @@
 // （色や枠を変えるときは ui/ の1か所を直せば、ここの SaveButton・Card を使う画面にも同じように効く。
 //   各画面に直接書いたボタン・カードは変わらない。DESIGN_DECISIONS.md「1か所では変わらないもの」）
 // ──────────────────────────────────────────────
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Undo2, X } from 'lucide-react'
 import type { RiskLevel, RehabPhase } from '@/types/patient'
 import { PHASE_SHORT_LABELS, RISK_LABELS } from '@/types/patient'
 import { cn } from '@/lib/utils'
@@ -195,6 +196,90 @@ export function FormLabel({ children, required }: { children: ReactNode; require
   )
 }
 
+// ── 記入欄の文字を消す（×）と「元に戻す」 ──
+/** 消すボタンのぶん、記入欄の右に空けておく余白（スマホは指で押す 40px） */
+export const CLEARABLE_PADDING = 'pr-11 lg:pr-9'
+/** 「元に戻す」を出しておく時間 */
+const UNDO_MS = 8000
+
+/**
+ * 記入欄（親の要素に relative を付ける）の右上に「×」を出し、押すと書いた文字をまとめて消す。
+ * 消したあと8秒は同じ場所に「元に戻す」を出す（押しまちがえても戻せる）。また書き始めたら消える。
+ * 押しても記入欄からカーソルを外さない（スマホのキーボードが閉じない・「書き終わったら保存」が古い文字で走らない）。
+ */
+export function ClearTextButton({
+  value,
+  onChange,
+  multiline = false,
+  disabled = false,
+  label = '書いた文字を消す',
+}: {
+  value: string
+  onChange: (v: string) => void
+  /** 文章欄（右上に出す）か、1行の欄（右の真ん中に出す）か */
+  multiline?: boolean
+  disabled?: boolean
+  label?: string
+}) {
+  const [undo, setUndo] = useState<string | null>(null)
+  // また書き始めたら「元に戻す」は出さない（そのあと手で全部消しても、古い文字は出てこない）
+  if (value && undo !== null) setUndo(null)
+
+  // 「元に戻す」は8秒で消す
+  useEffect(() => {
+    if (undo === null) return
+    const timer = window.setTimeout(() => setUndo(null), UNDO_MS)
+    return () => window.clearTimeout(timer)
+  }, [undo])
+
+  if (disabled) return null
+  const place = multiline ? 'top-1 right-1' : 'top-1/2 right-1 -translate-y-1/2'
+  const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault()
+
+  if (value) {
+    return (
+      <button
+        type="button"
+        onPointerDown={keepFocus}
+        onMouseDown={keepFocus}
+        onClick={() => {
+          setUndo(value)
+          onChange('')
+        }}
+        aria-label={label}
+        title={label}
+        className={cn(
+          'absolute z-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 max-lg:min-h-10 max-lg:min-w-10 lg:h-7 lg:w-7',
+          place,
+        )}
+      >
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+    )
+  }
+  if (undo !== null) {
+    return (
+      <button
+        type="button"
+        onPointerDown={keepFocus}
+        onMouseDown={keepFocus}
+        onClick={() => {
+          onChange(undo)
+          setUndo(null)
+        }}
+        className={cn(
+          'absolute z-10 inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 max-lg:min-h-10 lg:h-7',
+          place,
+        )}
+      >
+        <Undo2 className="h-3.5 w-3.5" aria-hidden />
+        元に戻す
+      </button>
+    )
+  }
+  return null
+}
+
 // ── Textarea ──
 export function Textarea({
   value,
@@ -208,13 +293,16 @@ export function Textarea({
   rows?: number
 }) {
   return (
-    <textarea
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className={cn(fieldClass, 'flex resize-none')}
-    />
+    <div className="relative w-full">
+      <textarea
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className={cn(fieldClass, 'flex resize-none', CLEARABLE_PADDING)}
+      />
+      <ClearTextButton value={value} onChange={onChange} multiline />
+    </div>
   )
 }
 
@@ -232,7 +320,9 @@ export function Input({
   type?: string
   className?: string
 }) {
-  return (
+  // 文字を書く欄だけに「×」を出す（日付・数字の欄は出さない）
+  const clearable = ['text', 'search', 'tel', 'email', 'url'].includes(type)
+  const field = (
     <input
       type={type}
       value={value}
@@ -241,9 +331,17 @@ export function Input({
       className={cn(
         fieldClass,
         'flex h-10',
+        clearable && CLEARABLE_PADDING,
         className
       )}
     />
+  )
+  if (!clearable) return field
+  return (
+    <div className="relative w-full">
+      {field}
+      <ClearTextButton value={value} onChange={onChange} />
+    </div>
   )
 }
 

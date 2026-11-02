@@ -5,6 +5,7 @@
 import { nanoid } from 'nanoid'
 import type { ComplaintEntry, ComplaintSymptom, BodyRegion, Side } from '@/types/patient'
 import { COMPLAINT_SYMPTOMS, BODY_REGION_LABELS } from '@/types/patient'
+import { ClearTextButton, CLEARABLE_PADDING } from './shared'
 
 const SIDE_LABELS: Record<Side, string> = {
   right: '右', left: '左', bilateral: '両側', na: 'N/A',
@@ -124,14 +125,17 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
             {/* 病名・診断名（任意） */}
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1">診断名・疾患名（任意）</p>
-              <input
-                type="text"
-                value={c.diagnosisLabel}
-                onChange={e => update(c.id, { diagnosisLabel: e.target.value })}
-                placeholder="例：ACL再建後、腱板断裂、腰椎椎間板ヘルニア"
-                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 placeholder-gray-300
-                  focus:outline-none focus:ring-2 focus:ring-teal-400"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={c.diagnosisLabel}
+                  onChange={e => update(c.id, { diagnosisLabel: e.target.value })}
+                  placeholder="例：ACL再建後、腱板断裂、腰椎椎間板ヘルニア"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 placeholder-gray-300
+                    focus:outline-none focus:ring-2 focus:ring-teal-400 max-lg:min-h-10 ${CLEARABLE_PADDING}`}
+                />
+                <ClearTextButton value={c.diagnosisLabel} onChange={v => update(c.id, { diagnosisLabel: v })} />
+              </div>
             </div>
 
             {/* NRS */}
