@@ -8,8 +8,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { refreshInstagramTokenIfNeeded } from '@/lib/marketing/instagram-token'
-import { dueJobs, recordAttempt, updateJob, type PublishJob } from '@/lib/marketing/jobs-store-server'
-import { publishToChannel } from '@/lib/marketing/publishers'
+import { dueJobs, type PublishJob } from '@/lib/marketing/jobs-store-server'
+import { runOneJob } from '@/lib/marketing/job-runner'
 import { cronOrAdmin } from '@/lib/marketing/auth'
 import { nudgeManualPosts } from '@/lib/marketing/autopilot-server'
 
@@ -24,42 +24,20 @@ async function run() {
   const manual: PublishJob[] = []
 
   for (const job of jobs) {
-    // 二重実行防止: processingに遷移できたジョブだけ処理する
-    const locked = await updateJob(job.id, (j) => {
-      if (j.status === 'pending') j.status = 'processing'
-    })
-    if (!locked || locked.status !== 'processing') continue
-
-    try {
-      const outcome = await publishToChannel(job.channel, job.content)
-      if (outcome.kind === 'published') {
-        await recordAttempt(job.id, true, outcome.message, outcome.url)
-        results.push({ id: job.id, channel: job.channel, outcome: 'published' })
-      } else if (outcome.kind === 'action_required') {
-        const updated = await updateJob(job.id, (j) => {
-          j.status = 'action_required'
-          j.actionReason = outcome.reason
-          j.manualUrl = outcome.manualUrl
-          j.attempts.push({ at: new Date().toISOString(), ok: false, message: `手動対応が必要: ${outcome.reason}` })
-        })
-        if (updated) manual.push(updated)
-        results.push({ id: job.id, channel: job.channel, outcome: 'action_required' })
-      } else if (outcome.kind === 'skipped') {
-        // 出す必要がなくなった（ストーリーの時刻に空きが無いなど）。やり直さない
-        await updateJob(job.id, (j) => {
-          j.status = 'cancelled'
-          j.actionReason = outcome.message
-          j.attempts.push({ at: new Date().toISOString(), ok: true, message: outcome.message })
-        })
-        results.push({ id: job.id, channel: job.channel, outcome: 'skipped' })
-      } else {
-        await recordAttempt(job.id, false, outcome.message)
-        results.push({ id: job.id, channel: job.channel, outcome: 'retry_scheduled' })
+    // 1件ずつ実行（pending → processing に移せたものだけ。二重実行を防ぐ）
+    const r = await runOneJob(job)
+    if (!r.ran) continue
+    // キャンセルで空いた枠のストーリー（時間帯の外で、あとで出すことにしたもの・やり直し）は、結果を院長のLINEへ
+    if (job.idempotencyKey.startsWith('cancel-story:')) {
+      try {
+        const { reportCancelStory } = await import('@/lib/marketing/cancel-story-server')
+        await reportCancelStory(job, r)
+      } catch (error) {
+        console.error('キャンセルのストーリーのお知らせに失敗:', error instanceof Error ? error.message : error)
       }
-    } catch (error) {
-      await recordAttempt(job.id, false, error instanceof Error ? error.message : '不明なエラー')
-      results.push({ id: job.id, channel: job.channel, outcome: 'retry_scheduled' })
     }
+    if (r.outcome === 'action_required' && r.job) manual.push(r.job)
+    results.push({ id: job.id, channel: job.channel, outcome: r.outcome })
   }
 
   // 手動で投稿する媒体は、院長のLINEへ本文を届ける（失敗してもジョブ処理の結果は返す）

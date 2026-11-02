@@ -87,7 +87,12 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   const { fetchHubStats } = await import('./booking-stats')
   const { jstParts } = await import('./autopilot-planner')
   const { buildStory } = await import('./story-server')
-  const fresh = await fetchHubStats(1).catch(() => null)
+  // 出す時刻のいまの空きで作る（控えは使わない）
+  const fresh = await fetchHubStats(1, { fresh: true }).catch(() => null)
+  // キャンセルで空いた枠のお知らせは、いまの空きが取れないと枠が空いているか分からないので、出さずにやり直す
+  if (story.trigger === 'cancel' && !fresh) {
+    return { kind: 'error', message: '予約システムからいまの空きを取れませんでした（やり直します）' }
+  }
   const openings = fresh?.openings?.length ? fresh.openings : story.snapshot
   const now = jstParts(new Date())
   // 院長が画面で直したところ（見出し・ひとこと・出さない時間など）も、出す時刻の空きに当てはめる
@@ -95,6 +100,19 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   const rows = built.rows
   if (rows.length === 0 || !built.hasOpening) {
     return { kind: 'skipped', message: '投稿の時刻に案内できる空きが無かったため、ストーリーは出しませんでした' }
+  }
+  // キャンセルで空いた枠のお知らせは、その枠がまだ空いているときだけ出す
+  if (story.requireSlot) {
+    const row = rows.find((r) => r.date === story.dates[0])
+    const slot = story.requireSlot
+    const stillOpen = row
+      ? row.slots
+        ? row.slots.some((s) => s.time === slot && s.remaining > 0)
+        : (slot < '13:00' ? row.am : row.pm) !== 'full' && !row.closed
+      : false
+    if (!stillOpen) {
+      return { kind: 'skipped', message: `キャンセルで空いた ${slot} の枠がもう埋まっていたため、ストーリーは出しませんでした` }
+    }
   }
   const text = { title: built.title }
   const asOfLabel = `${Number(now.local.slice(5, 7))}/${Number(now.local.slice(8, 10))} ${now.local.slice(11, 16)} 時点${fresh ? '' : '（前の晩の空き）'}`

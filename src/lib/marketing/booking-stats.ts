@@ -38,12 +38,13 @@ export { SOURCE_LABELS, sourceLabel } from './booking-stats-labels'
 const CACHE_MS = 5 * 60 * 1000
 const cache = new Map<number, { at: number; data: HubStats }>()
 
-export async function fetchHubStats(days = 30): Promise<HubStats | null> {
+/** fresh … 控え（5分）を使わず、その場で取り直す（キャンセルの直後・ストーリーを出す直前など、いまの空きが要るとき） */
+export async function fetchHubStats(days = 30, opts: { fresh?: boolean } = {}): Promise<HubStats | null> {
   const secret = process.env.RESERVATION_NOTIFY_SECRET
   if (!secret || process.env.MARKETING_MODE === 'mock') return null
   const span = Math.min(Math.max(Math.floor(days), 1), 120)
   const hit = cache.get(span)
-  if (hit && Date.now() - hit.at < CACHE_MS) return hit.data
+  if (!opts.fresh && hit && Date.now() - hit.at < CACHE_MS) return hit.data
   const ts = String(Date.now())
   const sig = createHmac('sha256', secret).update(`hubstats:${ts}`).digest('hex')
   try {
