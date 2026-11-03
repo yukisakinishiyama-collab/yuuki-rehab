@@ -227,7 +227,7 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
   const router = useRouter()
   const role = useRoleLabel()
   const [moreOpen, setMoreOpen] = useState(false)
-  const { section, link } = activeSection(pathname)
+  const { section, link, page } = activeSection(pathname)
   const headerRef = useRef<HTMLElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
   const keieiOpen = useKeieiOpen()
@@ -295,7 +295,8 @@ export default function ClinicShell({ children, extras }: { children: ReactNode;
   }, [moreOpen])
   // 経営の画面は、隠れているときは中身を出さない（時間切れで閉じたときも、ここで目隠しになる）
   const covered = onKeiei && !keieiOpen
-  const title = covered ? '院内アプリ' : (link?.label ?? section?.label ?? '院内アプリ')
+  // タブの下に入れた画面（集客の「自動投稿」など）は、その画面の名前を出す（光るのはタブ）
+  const title = covered ? '院内アプリ' : (page?.label ?? link?.label ?? section?.label ?? '院内アプリ')
   const tabs = visibleNav(keieiOpen).filter((s) => s.tab)
   // 下のタブにない画面（設定）を開いているとき。どのタブも光らないので、かわりに「メニュー」を teal で塗る
   const inMenuOnly = !covered && section !== null && !tabs.some((t) => t.key === section.key)

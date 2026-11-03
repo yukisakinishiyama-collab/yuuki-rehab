@@ -13,7 +13,8 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 const TABLE = 'marketing_line_contacts'
 
 /** LINE顧客一覧などがKV行を誤って拾わないための予約プレフィックス */
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'gbp:'] as const
+// mkt: … 集客の自動化設定・動いた記録・監査ログ（automation-store-server.ts）
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'gbp:', 'mkt:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')

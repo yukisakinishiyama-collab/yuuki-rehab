@@ -59,6 +59,24 @@ export interface LineContact {
   memo: string
   campaign: string
   messages: LineChatMessage[]
+  /**
+   * 問い合わせの対応状況（集客 → 問い合わせ）。スタッフが変えたときだけ入る。
+   * 入っていないときは、ほかの印（予約済み・要対応など）から決める（inquiry.ts の inquiryStatusOf）
+   */
+  inquiryStatus?: InquiryStatus
+  inquiryUpdatedAt?: string
+  /** 公式LINE をブロックされた日時（友だち追加し直すと消える） */
+  blockedAt?: string
+}
+
+/** 問い合わせの対応状況（指示書6章の4つ） */
+export type InquiryStatus = 'new' | 'in_progress' | 'reserved' | 'done'
+
+export const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
+  new: '未対応',
+  in_progress: '対応中',
+  reserved: '予約済み',
+  done: '完了',
 }
 
 export const CONTACT_TAGS = [

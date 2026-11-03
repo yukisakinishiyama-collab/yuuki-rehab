@@ -6,37 +6,44 @@
  *
  * 「経営」（売上などの数字）は患者さんの目に入らないよう、ふだんは出さない（secret）。
  * 隠しコマンドで開いたときだけ表示する（src/lib/clinic/keiei-mode.ts）。
+ *
+ * 集客は4つのタブ（集客概要・問い合わせ・コンテンツ・自動化設定。2026-11 の指示書6章）。
+ * 今までの集客の画面は URL を変えずに、各タブの下（pages）に入れた。開いているときはそのタブが光り、
+ * 上の見出しにはその画面の名前が出る。
  */
 import {
-  BookOpen,
   CalendarCheck,
   CalendarClock,
-  CalendarDays,
   ChartColumn,
   ChartLine,
   ClipboardList,
+  Gauge,
   House,
-  LayoutGrid,
-  ListChecks,
+  Inbox,
   Megaphone,
   Mountain,
-  MessageCircle,
   PenLine,
-  QrCode,
   RefreshCcw,
   Settings,
   Sparkles,
-  Star,
   Users,
-  Video,
   Wallet,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react'
+
+/** タブの下に入れた画面（切り替えのボタンには出さない） */
+export interface NavPage {
+  href: string
+  label: string
+}
 
 export interface NavLink {
   href: string
   label: string
   icon: LucideIcon
+  /** このタブの下に入れた画面 */
+  pages?: NavPage[]
 }
 
 export interface NavSection {
@@ -83,20 +90,37 @@ export const NAV: NavSection[] = [
     label: '集客',
     href: '/marketing',
     icon: Megaphone,
-    hint: '投稿・LINE・口コミ',
+    hint: '概要・問い合わせ・コンテンツ・自動化',
     tab: true,
     children: [
-      { href: '/marketing', label: '集客のまとめ', icon: Megaphone },
-      { href: '/marketing/autopilot', label: '自動投稿', icon: Sparkles },
-      { href: '/marketing/compose', label: '投稿を作る', icon: PenLine },
-      { href: '/marketing/calendar', label: '投稿カレンダー', icon: CalendarDays },
-      { href: '/marketing/jobs', label: '投稿の予定と結果', icon: ListChecks },
-      { href: '/marketing/tools', label: 'リンク・QR・ストーリー', icon: QrCode },
-      { href: '/marketing/line', label: 'LINE導線', icon: MessageCircle },
-      { href: '/marketing/line/richmenu', label: 'LINEのメニュー', icon: LayoutGrid },
-      { href: '/marketing/reviews', label: '口コミ返信', icon: Star },
-      { href: '/marketing/videos', label: '動画ストック', icon: Video },
-      { href: '/marketing/references', label: '論文・根拠', icon: BookOpen },
+      { href: '/marketing', label: '集客概要', icon: Gauge },
+      {
+        href: '/marketing/inquiries',
+        label: '問い合わせ',
+        icon: Inbox,
+        pages: [{ href: '/marketing/line', label: 'LINE導線（会話）' }],
+      },
+      {
+        href: '/marketing/content',
+        label: 'コンテンツ',
+        icon: PenLine,
+        pages: [
+          { href: '/marketing/autopilot', label: '自動投稿' },
+          { href: '/marketing/compose', label: '投稿を作る' },
+          { href: '/marketing/calendar', label: '投稿カレンダー' },
+          { href: '/marketing/jobs', label: '投稿の予定と結果' },
+          { href: '/marketing/tools', label: 'リンク・QR・ストーリー' },
+          { href: '/marketing/reviews', label: '口コミ返信' },
+          { href: '/marketing/videos', label: '動画ストック' },
+          { href: '/marketing/references', label: '論文・根拠' },
+        ],
+      },
+      {
+        href: '/marketing/automation',
+        label: '自動化設定',
+        icon: Workflow,
+        pages: [{ href: '/marketing/line/richmenu', label: 'LINEのメニュー' }],
+      },
     ],
   },
   { key: 'settings', label: '設定', href: '/marketing/settings', icon: Settings, hint: '院の情報・連携', tab: false },
@@ -107,20 +131,26 @@ export function visibleNav(keieiOpen: boolean): NavSection[] {
   return NAV.filter((s) => !s.secret || keieiOpen)
 }
 
-/** いまの画面がどの項目か（いちばん長く一致する入口で決める） */
-export function activeSection(pathname: string): { section: NavSection | null; link: NavLink | null } {
-  let best: { section: NavSection; link: NavLink | null; length: number } | null = null
-  const consider = (section: NavSection, href: string, link: NavLink | null) => {
+/**
+ * いまの画面がどの項目か（いちばん長く一致する入口で決める）
+ * page … タブの下に入れた画面を開いているとき、その画面（見出しの名前に使う。link はそのタブ）
+ */
+export function activeSection(pathname: string): { section: NavSection | null; link: NavLink | null; page: NavPage | null } {
+  let best: { section: NavSection; link: NavLink | null; page: NavPage | null; length: number } | null = null
+  const consider = (section: NavSection, href: string, link: NavLink | null, page: NavPage | null) => {
     const hit = pathname === href || pathname.startsWith(`${href}/`)
     // 同じ長さなら中の画面（子）を優先する（例: /marketing/sales は「経営」の中の「売上・来院」）
     if (hit && (!best || href.length > best.length || (link && href.length === best.length))) {
-      best = { section, link, length: href.length }
+      best = { section, link, page, length: href.length }
     }
   }
   for (const section of NAV) {
-    consider(section, section.href, null)
-    for (const child of section.children ?? []) consider(section, child.href, child)
+    consider(section, section.href, null, null)
+    for (const child of section.children ?? []) {
+      consider(section, child.href, child, null)
+      for (const page of child.pages ?? []) consider(section, page.href, child, page)
+    }
   }
-  const found = best as { section: NavSection; link: NavLink | null; length: number } | null
-  return { section: found?.section ?? null, link: found?.link ?? null }
+  const found = best as { section: NavSection; link: NavLink | null; page: NavPage | null; length: number } | null
+  return { section: found?.section ?? null, link: found?.link ?? null, page: found?.page ?? null }
 }

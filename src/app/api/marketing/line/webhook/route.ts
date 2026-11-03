@@ -15,6 +15,8 @@ import { recordEvent } from '@/lib/marketing/analytics-store-server'
 import type { BotReply, LineChatMessage } from '@/lib/marketing/line-types'
 import { isOwnerLineUser, replyOwner } from '@/lib/marketing/owner-notify'
 import { handleOwnerPostback } from '@/lib/marketing/autopilot-server'
+import { getRule, recordRun } from '@/lib/marketing/automation-store-server'
+import type { AutomationRule, RunResult } from '@/lib/marketing/automation-types'
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET ?? ''
 const ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
@@ -76,11 +78,64 @@ function describeInput(input: EngineInput): string {
   return input.text ?? ''
 }
 
-async function processEvent(userId: string, displayName: string | undefined, input: EngineInput) {
+/**
+ * 自動案内を返すか（集客 → 自動化設定の「LINE の自動案内」）
+ * - on   … 返す（今までどおり）
+ * - test … 院長の LINE にだけ返す（ほかの方には返さず、スタッフの返信待ちにする）
+ * - off  … 返さない（スタッフの返信待ちにする）
+ * どの形でも、緊急の可能性がある言葉への受診案内だけは返す（安全のため）。シミュレーターは送らないので、いつも返す
+ */
+function replyDecision(rule: AutomationRule, userId: string, safety: boolean, simulator: boolean): RunResult {
+  if (simulator) return 'test'
+  if (rule.mode === 'on' || safety) return 'sent'
+  if (rule.mode === 'test' && isOwnerLineUser(userId)) return 'test'
+  return 'skipped'
+}
+
+const INPUT_NOTE: Record<EngineInput['kind'], string> = {
+  follow: '友だち追加',
+  postback: 'ボタンを選んだ',
+  text: 'メッセージ',
+}
+
+async function processEvent(
+  userId: string,
+  displayName: string | undefined,
+  input: EngineInput,
+  opts: { rule: AutomationRule; simulator?: boolean },
+) {
   const contact = await getContact(userId, displayName)
-  const result = advanceScenario(contact, input)
+  // 友だち追加し直したら、ブロックの印を外す
+  if (input.kind === 'follow' && contact.blockedAt) delete contact.blockedAt
+  const result = advanceScenario(contact, input, { menu: opts.rule.lineMenu })
   Object.assign(contact, result.patch)
-  if (result.notify) contact.needsAttention = contact.needsAttention || result.notify
+  const now = new Date().toISOString()
+  if (result.notify) {
+    contact.needsAttention = contact.needsAttention || result.notify
+    // 新しくスタッフの対応が要ることが起きたら、問い合わせを「未対応」に戻す（完了のままにしない）
+    contact.inquiryStatus = 'new'
+    contact.inquiryUpdatedAt = now
+  }
+
+  // 自動案内を止めている・テスト中なら、返事をしない（緊急の受診案内は除く）
+  const decision = result.replies.length > 0
+    ? replyDecision(opts.rule, userId, result.patch.step === 'urgent', Boolean(opts.simulator))
+    : null
+  if (decision === 'skipped') {
+    result.replies = []
+    if (input.kind !== 'follow') {
+      contact.needsAttention = contact.needsAttention || 'LINEの自動案内を止めているため、スタッフの返信が必要です'
+      contact.inquiryStatus = 'new'
+      contact.inquiryUpdatedAt = now
+    }
+  }
+  if (decision) {
+    await recordRun({
+      automation: 'line_auto_reply',
+      result: decision,
+      note: `${INPUT_NOTE[input.kind]}${opts.simulator ? '（シミュレーター）' : ''}`,
+    })
+  }
 
   // 効果測定イベント（個人情報は保存しない・指示書17章）
   try {
@@ -100,7 +155,6 @@ async function processEvent(userId: string, displayName: string | undefined, inp
     // 計測失敗は応答を止めない
   }
 
-  const now = new Date().toISOString()
   const log: LineChatMessage[] = [{ at: now, from: 'user', text: describeInput(input) }]
   result.replies.forEach((reply) => {
     log.push({ at: now, from: 'bot', text: reply.type === 'text' ? reply.text : `${reply.text}\n[${reply.buttons.map((b) => b.label).join(' / ')}]` })
@@ -127,7 +181,9 @@ export async function POST(request: NextRequest) {
         input: EngineInput
       }
       if (!userId || !input) throw new Error('bad request')
-      const result = await processEvent(`sim_${userId}`, displayName, input)
+      // シミュレーターは送らないので、止める／テストに関係なく返事を見せる（選択肢の形は自動化設定のとおり）
+      const rule = await getRule('line_auto_reply')
+      const result = await processEvent(`sim_${userId}`, displayName, input, { rule, simulator: true })
       return NextResponse.json({ ok: true, replies: result.replies, notify: result.notify ?? null })
     } catch {
       return NextResponse.json({ error: 'invalid simulator request' }, { status: 400 })
@@ -140,10 +196,25 @@ export async function POST(request: NextRequest) {
   }
 
   const body = JSON.parse(rawBody) as { events?: Array<Record<string, unknown>> }
+  // 自動案内の設定（読めないときは今までどおり動かす。automation-store-server の getRules）
+  const rule = await getRule('line_auto_reply')
   for (const event of body.events ?? []) {
     const source = event.source as { userId?: string } | undefined
     const userId = source?.userId
     if (!userId) continue
+
+    // ブロック：返事はできないので、印と数（個人を特定しない計測）だけ残す
+    if (event.type === 'unfollow') {
+      try {
+        const contact = await getContact(userId)
+        contact.blockedAt = new Date().toISOString()
+        await saveContact(contact)
+      } catch (error) {
+        console.error('ブロックの記録に失敗:', error instanceof Error ? error.message : error)
+      }
+      await recordEvent('line_unfollow', {}, userId)
+      continue
+    }
 
     let input: EngineInput | null = null
     if (event.type === 'follow') input = { kind: 'follow' }
@@ -187,7 +258,7 @@ export async function POST(request: NextRequest) {
     }
     if (!input) continue
 
-    const result = await processEvent(userId, undefined, input)
+    const result = await processEvent(userId, undefined, input, { rule })
     const replyToken = event.replyToken as string | undefined
     if (replyToken) {
       try {

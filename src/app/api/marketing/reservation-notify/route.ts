@@ -23,6 +23,7 @@
  */
 import { after, NextRequest, NextResponse } from 'next/server'
 import { readTicket, sealUserId, unsealUserId } from '@/lib/liff-ticket'
+import { getRule, recordRun, sentToday } from '@/lib/marketing/automation-store-server'
 
 export const dynamic = 'force-dynamic'
 // キャンセルのストーリー（予約システムへの返事のあとで、空きの取り直し→画像→Instagramへの公開まで）に使う時間
@@ -166,6 +167,9 @@ export async function POST(request: NextRequest) {
   let to: string | undefined
   let text: string
   let sealed: string | undefined
+  /** 自動化設定が「テスト」で、院長の LINE に見本を送るとき */
+  let testRun = false
+  const patientNote = body.kind === 'patient-confirm' ? '予約の確定' : 'キャンセルの確認'
 
   if (isPatientPush) {
     // 患者宛：宛先は必ず署名付きticket/sealedから復元する（生のuserIdは受け付けない）
@@ -187,6 +191,28 @@ export async function POST(request: NextRequest) {
     if (body.kind === 'patient-confirm') {
       sealed = sealUserId(userId, secret)
     }
+
+    // 集客 → 自動化設定の「予約確認の LINE」（止める／テスト／動かす・1日の上限）。
+    // 止めている・上限のときも sealed は返す（あとで動かしたとき、キャンセルの確認を送れるように）
+    const rule = await getRule('reservation_confirm')
+    if (rule.mode === 'off') {
+      await recordRun({ automation: 'reservation_confirm', result: 'skipped', note: patientNote })
+      return NextResponse.json({ ok: true, delivered: false, reason: '自動化設定で止めています', sealed })
+    }
+    if (rule.mode === 'test') {
+      // テスト：患者さんには送らず、同じ文を院長の LINE にだけ送る
+      const owner = process.env.RESERVATION_NOTIFY_LINE_USER_ID
+      if (!owner) {
+        await recordRun({ automation: 'reservation_confirm', result: 'skipped', note: `${patientNote}（テストの送り先が未設定）` })
+        return NextResponse.json({ ok: true, delivered: false, reason: 'テスト中（院長の送り先が未設定）', sealed })
+      }
+      to = owner
+      text = `【テスト】患者さんにはまだ送っていません。「動かす」にすると、次の文が患者さんの LINE に届きます。\n\n${text}`
+      testRun = true
+    } else if (rule.dailyLimit && (await sentToday('reservation_confirm')) >= rule.dailyLimit) {
+      await recordRun({ automation: 'reservation_confirm', result: 'limited', note: patientNote })
+      return NextResponse.json({ ok: true, delivered: false, reason: '1日の上限に達したため送っていません', sealed })
+    }
   } else {
     // 院長宛（従来動作）
     to = process.env.RESERVATION_NOTIFY_LINE_USER_ID
@@ -206,13 +232,16 @@ export async function POST(request: NextRequest) {
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
+      if (isPatientPush) await recordRun({ automation: 'reservation_confirm', result: 'error', note: patientNote })
       return NextResponse.json(
         { ok: false, delivered: false, error: (data as { message?: string }).message ?? `HTTP ${res.status}` },
         { status: 502 },
       )
     }
-    return NextResponse.json({ ok: true, delivered: true, sealed })
+    if (isPatientPush) await recordRun({ automation: 'reservation_confirm', result: testRun ? 'test' : 'sent', note: patientNote })
+    return NextResponse.json({ ok: true, delivered: !testRun, test: testRun || undefined, sealed })
   } catch (error) {
+    if (isPatientPush) await recordRun({ automation: 'reservation_confirm', result: 'error', note: patientNote })
     return NextResponse.json(
       { ok: false, delivered: false, error: error instanceof Error ? error.message : '不明' },
       { status: 502 },
