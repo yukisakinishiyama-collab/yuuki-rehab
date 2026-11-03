@@ -14,6 +14,7 @@ export type AnalyticsEventKind =
   | 'line_guide' // 来院案内まで到達
   | 'line_urgent' // 緊急案内
   | 'line_handoff' // 人対応へ切替
+  | 'line_unfollow' // ブロック（2026-11-04 から記録）
   | 'link_click' // 計測リンクのクリック（予約・地図・Instagram等）
 
 export interface AnalyticsEvent {

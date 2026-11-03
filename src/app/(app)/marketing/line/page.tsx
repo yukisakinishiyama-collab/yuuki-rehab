@@ -26,6 +26,9 @@ export default function LinePage() {
   }, [])
 
   useEffect(() => {
+    // 問い合わせの画面の「会話を見る」から来たときは、その方を開いておく（?user=…）
+    const fromInquiry = new URLSearchParams(window.location.search).get('user')
+    if (fromInquiry) setSelectedId(fromInquiry)
     refresh()
     fetch('/api/marketing/line/webhook')
       .then((r) => r.json())

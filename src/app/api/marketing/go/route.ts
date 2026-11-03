@@ -17,6 +17,9 @@ const DESTINATIONS: Record<string, string> = {
   instagram: DEFAULT_CLINIC_PROFILE.instagramUrl,
   line: DEFAULT_CLINIC_PROFILE.lineUrl,
   home: HOMEPAGE_URL,
+  // ホームページの料金・アクセスのページ（LINE の「料金・通院方法」の案内から）
+  price: `${HOMEPAGE_URL}price`,
+  access: `${HOMEPAGE_URL}access`,
 }
 
 export async function GET(request: NextRequest) {

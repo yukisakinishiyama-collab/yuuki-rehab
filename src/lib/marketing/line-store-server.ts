@@ -102,7 +102,9 @@ export async function listContacts(): Promise<LineContact[]> {
 
 export async function patchContact(
   userId: string,
-  patch: Partial<Pick<LineContact, 'tags' | 'handoff' | 'memo' | 'needsAttention' | 'reserved' | 'optedOut'>>,
+  patch: Partial<
+    Pick<LineContact, 'tags' | 'handoff' | 'memo' | 'needsAttention' | 'reserved' | 'optedOut' | 'inquiryStatus' | 'inquiryUpdatedAt'>
+  >,
 ): Promise<LineContact | null> {
   const supabase = createSupabaseServer()
   if (supabase) {
