@@ -341,10 +341,12 @@ export default function AutomationPage() {
                             void save('line_auto_reply', { mode: la.mode, lineMenu }, `選択肢を「${LINE_MENU_LABELS[lineMenu]}」にしました`)
                           }
                         />
-                        <span className="text-xs text-slate-600">
-                          3つ：急なケガについて相談する／リハビリを予約する／料金・通院方法を確認する。切り替える前に
-                          <Link href="/marketing/line" className="mx-1 font-bold text-teal-800 underline">LINE導線のシミュレーター</Link>
-                          で流れを確かめてください（シミュレーターは選んだ形で動きます）。
+                        <span className="text-xs leading-relaxed text-slate-600">
+                          3つ：急なケガについて相談する／リハビリを予約する／料金・通院方法を確認する。
+                          <br />
+                          確かめ方：①動かし方を「テスト」、選択肢を「3つ」にする → ②院長の LINE から「急なケガについて相談する」などと送って返事を見る → ③よければ「動かす」に戻す。
+                          テスト中は、ほかの方には自動の案内が返らず、スタッフの返信待ちになります（診療時間外の数分で済ませるのがおすすめ）。
+                          LINE導線のシミュレーターは、本番では安全のため使えません（院内のパソコンで動かす開発用）。
                         </span>
                       </span>
                     ),
