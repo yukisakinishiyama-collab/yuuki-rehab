@@ -23,6 +23,7 @@
  */
 import { after, NextRequest, NextResponse } from 'next/server'
 import { readTicket, sealUserId, unsealUserId } from '@/lib/liff-ticket'
+import { formatDateJa, patientConfirmText, safeName, safeReservationNo } from '@/lib/reservation-message'
 
 export const dynamic = 'force-dynamic'
 // キャンセルのストーリー（予約システムへの返事のあとで、空きの取り直し→画像→Instagramへの公開まで）に使う時間
@@ -53,24 +54,6 @@ function authorized(request: NextRequest): boolean {
   return header === secret
 }
 
-/** 患者名など、外部入力を本文へ埋める前の無害化（改行・制御文字除去＋長さ制限） */
-function safeName(value?: string): string {
-  return String(value ?? '')
-    // 改行・制御文字・行区切りを除去（メッセージ本文の偽装を防ぐ）
-    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 40)
-}
-
-/** 'yyyy-MM-dd' を「M月D日（曜）」へ。形式外はそのまま返す */
-function formatDateJa(dateString?: string): string {
-  if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString ?? ''
-  const [year, month, day] = dateString.split('-').map(Number)
-  const youbi = ['日', '月', '火', '水', '木', '金', '土'][new Date(year, month - 1, day).getDay()]
-  return `${month}月${day}日（${youbi}）`
-}
-
 /** 院長宛の通知本文（一目で分かる形式） */
 function buildMessage(b: NotifyBody): string {
   // リマインド等、GAS側で整形済みの本文はそのまま送る
@@ -89,15 +72,12 @@ function buildMessage(b: NotifyBody): string {
   return lines.join('\n')
 }
 
-/** 患者宛の通知本文（予約完了・キャンセル確認） */
+/** 患者宛の通知本文（予約完了・キャンセル確認）。予約完了の文面は院内アプリの「LINEで予約日時を送る」と共通（lib/reservation-message.ts） */
 function buildPatientMessage(b: NotifyBody): string {
-  const name = safeName(b.name)
-  const reservationNo = /^[A-Za-z0-9]{1,12}$/.test(String(b.reservationNo ?? ''))
-    ? String(b.reservationNo)
-    : ''
-  const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
-
   if (b.kind === 'patient-cancel') {
+    const name = safeName(b.name)
+    const reservationNo = safeReservationNo(b.reservationNo)
+    const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
     return [
       `${name} 様`,
       '',
@@ -112,21 +92,7 @@ function buildPatientMessage(b: NotifyBody): string {
       .filter((x): x is string => x !== undefined)
       .join('\n')
   }
-  return [
-    `${name} 様`,
-    '',
-    'ゆうき整骨院です。ご予約ありがとうございます。',
-    '以下の内容で確定しました。',
-    '',
-    `📅 日時：${when}〜`,
-    reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
-    '',
-    '変更・キャンセルは、このトークまたは',
-    'お電話（083-265-4545）へお気軽にどうぞ。',
-    '当日はお気をつけてお越しください😊',
-  ]
-    .filter((x): x is string => x !== undefined)
-    .join('\n')
+  return patientConfirmText({ name: b.name, date: b.date, time: b.time, reservationNo: b.reservationNo })
 }
 
 export async function POST(request: NextRequest) {
