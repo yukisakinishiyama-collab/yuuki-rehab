@@ -4,13 +4,13 @@
 // カルテ概要タブの最上部に置き、「本人の目標」「臨床目標」「問題リスト」を
 // その場で編集できる。
 // ──────────────────────────────────────────────
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { Patient, PatientGoals, ClinicalProblem, ProblemStatus } from '@/types/patient'
 import { PROBLEM_STATUS_LABELS } from '@/types/patient'
 import {
   getPatientGoals, savePatientGoals, getProblems, addProblem, updateProblem, deleteProblem,
-  PROBLEM_STATUS_ORDER,
+  PROBLEM_STATUS_ORDER, GOALS_CHANGED_EVENT,
 } from '@/lib/clinical-goals-store'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import { Card, CardHeader, CardContent, SectionTitle, ClearTextButton, CLEARABLE_PADDING } from './shared'
@@ -40,6 +40,17 @@ export default function GoalsProblemsCard({ patient }: Props) {
       nextVisitNote: '', updatedAt: '',
     })
   const [problems, setProblems] = useState<ClinicalProblem[]>(() => getProblems(patient.id))
+
+  // カルテの上の「目標・希望」で直したら、こちらも同じ内容にする
+  useEffect(() => {
+    function onChanged(e: Event) {
+      if ((e as CustomEvent<{ patientId: string }>).detail?.patientId !== patient.id) return
+      const stored = getPatientGoals(patient.id)
+      if (stored) setGoals(stored)
+    }
+    window.addEventListener(GOALS_CHANGED_EVENT, onChanged)
+    return () => window.removeEventListener(GOALS_CHANGED_EVENT, onChanged)
+  }, [patient.id])
   const [newGoalLabel, setNewGoalLabel] = useState('')
   const [newProblemLabel, setNewProblemLabel] = useState('')
 
@@ -117,7 +128,7 @@ export default function GoalsProblemsCard({ patient }: Props) {
         {/* 本人の目標 */}
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-            🎯 本人の目標（患者さんの言葉のまま）
+            🎯 本人の目標（患者さんの言葉のまま。カルテの上にも出ます）
           </label>
           <div className="flex items-center gap-1.5">
             <div className="relative flex-1">

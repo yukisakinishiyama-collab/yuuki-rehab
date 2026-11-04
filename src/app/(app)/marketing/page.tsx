@@ -1,132 +1,223 @@
 'use client'
 
-/** 集客のまとめ：投稿状況の俯瞰と次のアクション */
+/**
+ * 集客 → 集客概要（指示書6章①）
+ *
+ * 今日の問い合わせ・今月の新規予約・流入元別・キャンセルの状況・承認待ち・連携の状態を1画面で。
+ * 取れなかった数字は 0 にせず「未取得／未連携」と理由を出す。数字ごとに期間と数え方を開いて見られる。
+ * 売上などの経営の数字は出さない（院長・スタッフとも同じ画面）。
+ */
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { loadProjects } from '@/lib/marketing/store'
-import { CHANNEL_LABELS, STATUS_LABELS, type ContentProject, type PostStatus } from '@/lib/marketing/types'
-import type { WeeklyProposal } from '@/lib/marketing/autopilot-types'
+import { AlertTriangle, CalendarRange, Inbox, Link2, RefreshCw, Sun } from 'lucide-react'
+import { IconButton, MoreLink, Panel } from '@/components/clinic/Panel'
+import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { useApi } from '@/lib/marketing/use-api'
+import { METRIC_STATE_LABELS, type ConnectionRow, type Metric, type OverviewData } from '@/lib/marketing/overview-types'
 
-/** 自動投稿の承認待ちのお知らせ（サーバーの投稿案を見る。失敗したら何も出さない） */
-function AutopilotBanner() {
-  const [pending, setPending] = useState<{ count: number; week: string } | null>(null)
-  useEffect(() => {
-    fetch('/api/marketing/autopilot', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { proposals?: WeeklyProposal[] } | null) => {
-        const proposals = data?.proposals ?? []
-        const target = [...proposals].reverse().find((p) => p.items.some((i) => i.status === 'proposed'))
-        if (target) setPending({ count: target.items.filter((i) => i.status === 'proposed').length, week: target.weekStart })
-      })
-      .catch(() => undefined)
-  }, [])
-  if (!pending) return null
+function formatValue(m: Metric): string {
+  if (m.value === null) return ''
+  return m.unit === '%' ? m.value.toFixed(1) : m.value.toLocaleString('ja-JP')
+}
+
+/** 数字1つ。取れなかったときは「未取得／未連携」と理由。期間と数え方は開いて見る */
+function MetricTile({ m }: { m: Metric }) {
+  const missing = m.value === null
+  const body = (
+    <>
+      <p className="text-xs font-bold text-slate-600">{m.label}</p>
+      {missing ? (
+        <p className="mt-1.5">
+          <Badge variant={m.state === 'not_connected' ? 'secondary' : 'warning'}>{METRIC_STATE_LABELS[m.state] || '未取得'}</Badge>
+        </p>
+      ) : (
+        <p className="mt-1 text-2xl font-black tabular-nums text-slate-900">
+          {formatValue(m)}
+          <span className="ml-0.5 text-sm font-bold text-slate-600">{m.unit}</span>
+        </p>
+      )}
+      <p className="mt-1 text-xs text-slate-500">{m.period}</p>
+    </>
+  )
   return (
-    <Link
-      href={`/marketing/autopilot?week=${pending.week}`}
-      className="block rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 hover:bg-amber-100"
-    >
-      <p className="font-bold">📝 自動投稿の案が {pending.count} 本、承認を待っています</p>
-      <p className="mt-1 text-sm">内容を確認して承認すると、予定の時刻に投稿されます →</p>
-    </Link>
+    <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3">
+      {m.href ? (
+        <Link href={m.href} className="rounded-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-teal-700">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
+      <details className="mt-2 text-xs text-slate-600">
+        <summary className="flex min-h-10 cursor-pointer items-center font-bold text-teal-800 lg:min-h-0">数え方</summary>
+        <p className="mt-1 leading-relaxed">{m.basis}</p>
+        {m.note && <p className="mt-1 leading-relaxed text-amber-800">{m.note}</p>}
+      </details>
+    </div>
   )
 }
 
-export default function MarketingDashboard() {
-  const [projects, setProjects] = useState<ContentProject[]>([])
-  useEffect(() => {
-    // 端末に保存された投稿を読む（表示が終わってから）
-    const id = requestAnimationFrame(() => setProjects(loadProjects()))
-    return () => cancelAnimationFrame(id)
-  }, [])
+const CONNECTION_BADGE: Record<ConnectionRow['state'], { label: string; variant: 'success' | 'secondary' | 'danger' }> = {
+  connected: { label: '連携中', variant: 'success' },
+  not_set: { label: '未連携', variant: 'secondary' },
+  error: { label: '取れない', variant: 'danger' },
+}
 
-  const variants = projects.flatMap((p) => p.variants.map((v) => ({ project: p, variant: v })))
-  const countBy = (status: PostStatus) => variants.filter((x) => x.variant.status === status).length
-  const blocked = variants.filter((x) => x.variant.compliance.status === 'blocked' && !x.variant.compliance.overrideReason)
-  const upcoming = variants
-    .filter((x) => x.variant.status === 'scheduled' && x.variant.scheduledAt)
-    .sort((a, b) => (a.variant.scheduledAt ?? '').localeCompare(b.variant.scheduledAt ?? ''))
-    .slice(0, 5)
+const pickOverview = (json: { overview?: OverviewData }) => json.overview
 
-  const cards: Array<{ status: PostStatus; tone: string }> = [
-    { status: 'draft', tone: 'bg-slate-100 text-slate-700' },
-    { status: 'review', tone: 'bg-amber-100 text-amber-800' },
-    { status: 'approved', tone: 'bg-blue-100 text-blue-800' },
-    { status: 'scheduled', tone: 'bg-teal-100 text-teal-800' },
-    { status: 'published', tone: 'bg-emerald-100 text-emerald-800' },
-    { status: 'failed', tone: 'bg-red-100 text-red-800' },
-  ]
+export default function MarketingOverview() {
+  const { data, error, loading, reload } = useApi('/api/marketing/overview', pickOverview)
+
+  const updated = data ? new Date(data.generatedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">集客のまとめ</h1>
-        <Link
-          href="/marketing/compose"
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
-        >
-          ＋ 投稿を作る
-        </Link>
-      </div>
-
-      <AutopilotBanner />
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {cards.map(({ status, tone }) => (
-          <div key={status} className={`rounded-xl p-4 ${tone}`}>
-            <p className="text-xs font-bold">{STATUS_LABELS[status]}</p>
-            <p className="mt-1 text-2xl font-black">{countBy(status)}</p>
-          </div>
-        ))}
-      </div>
-
-      {blocked.length > 0 && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="font-bold text-red-800">⚠ 公開禁止の表現が {blocked.length} 件あります</p>
-          <p className="mt-1 text-sm text-red-700">
-            投稿カレンダーから該当の投稿を開き、表現を修正するか理由を入力して解除してください。
+        <div>
+          <h1 className="sr-only text-2xl font-bold lg:not-sr-only">集客概要</h1>
+          <p className="text-sm text-slate-600">
+            問い合わせ・予約・流入元を、取れたものだけ数えています（取れないものは「未取得」）。
+            {updated && <span className="ml-1 text-xs text-slate-500">更新 {updated}</span>}
           </p>
+        </div>
+        <IconButton label="読み直す" onClick={reload} disabled={loading}>
+          <RefreshCw className={cn('h-5 w-5', loading && 'animate-spin')} aria-hidden />
+        </IconButton>
+      </div>
+
+      {error && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-bold">集客の数字を読み込めませんでした</p>
+          <p className="mt-1">{error}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-3')}
+          >
+            もう一度読む
+          </button>
         </div>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-bold">公開予定</h2>
-        {upcoming.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">予約済みの投稿はありません。</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-slate-100 text-sm">
-            {upcoming.map(({ project, variant }) => (
-              <li key={variant.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="font-mono text-teal-800">{variant.scheduledAt?.replace('T', ' ')}</span>
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">{CHANNEL_LABELS[variant.channel]}</span>
-                <span className="truncate">{project.theme}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {!data && loading && <p className="text-sm text-slate-500">読み込んでいます…</p>}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-bold">最近のプロジェクト</h2>
-        {projects.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">
-            まだ投稿がありません。「投稿を作る」から最初のコンテンツを生成してください。
-          </p>
-        ) : (
-          <ul className="mt-2 divide-y divide-slate-100 text-sm">
-            {projects.slice(0, 8).map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="text-slate-500">{p.createdAt.slice(0, 10)}</span>
-                <span className="rounded bg-teal-50 px-2 py-0.5 text-xs text-teal-800">{p.objective}</span>
-                <Link href={`/marketing/compose?project=${p.id}`} className="font-medium text-slate-800 hover:underline">
-                  {p.theme}
+      {data && (
+        <>
+          {/* 確認してほしいもの（承認待ち・未対応） */}
+          {(data.pending.approvals > 0 || data.pending.inquiriesNew > 0) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {data.pending.approvals > 0 && (
+                <Link
+                  href="/marketing/autopilot"
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 hover:bg-amber-100"
+                >
+                  <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
+                  <span>
+                    <span className="block font-bold">投稿の案が {data.pending.approvals} 本、承認を待っています</span>
+                    <span className="block text-sm">承認するまで公開されません →</span>
+                  </span>
                 </Link>
-                <span className="text-xs text-slate-500">{p.variants.length}媒体</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              )}
+              {data.pending.inquiriesNew > 0 && (
+                <Link
+                  href="/marketing/inquiries"
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 hover:bg-amber-100"
+                >
+                  <Inbox className="h-5 w-5 shrink-0" aria-hidden />
+                  <span>
+                    <span className="block font-bold">未対応の問い合わせが {data.pending.inquiriesNew} 人</span>
+                    <span className="block text-sm">LINE の相談を確認してください →</span>
+                  </span>
+                </Link>
+              )}
+            </div>
+          )}
+
+          <Panel title="今日" icon={Sun} action={<MoreLink href="/marketing/inquiries">問い合わせ</MoreLink>}>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {data.today.map((m) => (
+                <MetricTile key={m.key} m={m} />
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title={`今月（${data.monthLabel}）`} icon={CalendarRange}>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {data.month.map((m) => (
+                <MetricTile key={m.key} m={m} />
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="流入元別の予約" meta={`${data.monthLabel}・受付日で数える`}>
+            {data.sources === null ? (
+              <p className="text-sm text-slate-600">
+                <Badge variant="warning" className="mr-2">未取得</Badge>
+                {data.sourcesNote}
+              </p>
+            ) : data.sources.length === 0 ? (
+              <p className="text-sm text-slate-600">今月の予約・予約ボタンの記録はまだありません。</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[28rem] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs text-slate-600">
+                        <th className="py-2 pr-2 font-bold">流入元</th>
+                        <th className="py-2 pr-2 text-right font-bold">予約</th>
+                        <th className="py-2 pr-2 text-right font-bold">うち初めて</th>
+                        <th className="py-2 pr-2 text-right font-bold">キャンセル</th>
+                        <th className="py-2 text-right font-bold">予約ボタン</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.sources.map((s) => (
+                        <tr key={s.source} className="border-b border-slate-100 last:border-0">
+                          <td className="py-2 pr-2 font-medium text-slate-800">{s.label}</td>
+                          <td className="py-2 pr-2 text-right tabular-nums">{s.bookings}</td>
+                          <td className="py-2 pr-2 text-right tabular-nums">{s.firstVisit}</td>
+                          <td className="py-2 pr-2 text-right tabular-nums">{s.cancelled}</td>
+                          <td className="py-2 text-right tabular-nums">{s.clicks}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{data.sourcesNote}。数の変化は、投稿や季節など多くの理由が重なるため、1つの原因とは決めつけません。</p>
+              </>
+            )}
+          </Panel>
+
+          <Panel title="連携の状態" icon={Link2} meta="つながっていないものは、動いているように見せません">
+            <ul className="divide-y divide-slate-100">
+              {data.connections.map((c) => {
+                const badge = CONNECTION_BADGE[c.state]
+                const row = (
+                  <>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-slate-800">{c.label}</span>
+                      <span className="block text-xs text-slate-600">{c.note}</span>
+                    </span>
+                    <Badge variant={badge.variant} className="shrink-0">{badge.label}</Badge>
+                  </>
+                )
+                return (
+                  <li key={c.key}>
+                    {c.href ? (
+                      <Link href={c.href} className="flex min-h-11 items-center justify-between gap-3 py-2 hover:bg-slate-50">
+                        {row}
+                      </Link>
+                    ) : (
+                      <div className="flex min-h-11 items-center justify-between gap-3 py-2">{row}</div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </Panel>
+        </>
+      )}
     </div>
   )
 }

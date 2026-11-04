@@ -10,6 +10,13 @@
  *      LINE連携済みの患者へ完了通知を送るときに使う）
  *      成功時、シート保存用の sealed（長期の署名付き参照）を返す
  *    - kind: 'patient-cancel'  … sealed（予約行に保存済みの参照）
+ *    - kind: 'patient-remind'  … sealed＋date・time。前日のお知らせ（予約システムの毎朝の処理から）
+ *    - kind: 'patient-waitlist'… sealed＋date・time。キャンセル待ちの方への空き枠のお知らせ（先着順に1人ずつ）
+ *    患者宛は、集客 → 自動化設定の「止める／テスト／動かす」・1日の上限に従う。
+ *    前日のお知らせ・空き枠のお知らせは、さらに次を確かめる（予約システムは返事を見て、メールに切り替える・あとで送り直す）
+ *      - 本人が「予約のお知らせ停止」と送っていたら送らない → { delivered:false, optedOut:true }
+ *      - 空き枠のお知らせは送ってよい時間帯（8時〜20時）だけ → 時間外は { delivered:false, deferred:true }
+ *      - 同じお知らせは二度送らない → { duplicate:true }（送り済みなら delivered:true）
  *
  * キャンセル（kind: 'cancel'）のときは、返事のあとで「空いた枠をInstagramのストーリーで知らせる」も行う
  * （院長の設定がオンのときだけ。lib/marketing/cancel-story-server.ts。患者さんの情報はストーリーに使わない）
@@ -23,14 +30,18 @@
  */
 import { after, NextRequest, NextResponse } from 'next/server'
 import { readTicket, sealUserId, unsealUserId } from '@/lib/liff-ticket'
-import { formatDateJa, patientConfirmText, safeName, safeReservationNo } from '@/lib/reservation-message'
+import { getRule, markSent, recordRun, sentToday, wasSent } from '@/lib/marketing/automation-store-server'
+import { TEST_SAMPLES_PER_DAY, type AutomationKey } from '@/lib/marketing/automation-types'
+import { checkConsent, lineMark } from '@/lib/marketing/consent-store-server'
+import { CONSENT_KEYWORDS, inSendHours } from '@/lib/marketing/consent'
+import { DEFAULT_CLINIC_PROFILE, LIFF_RESERVE_URL } from '@/lib/marketing/clinic'
 
 export const dynamic = 'force-dynamic'
 // キャンセルのストーリー（予約システムへの返事のあとで、空きの取り直し→画像→Instagramへの公開まで）に使う時間
 export const maxDuration = 120
 
 type NotifyBody = {
-  kind?: 'new' | 'cancel' | 'reminder' | 'patient-confirm' | 'patient-cancel'
+  kind?: 'new' | 'cancel' | 'reminder' | PatientKind
   /** patient-confirm用：LIFF検証済みの短命チケット */
   ticket?: string
   /** patient-cancel用：予約行に保存された長期参照 */
@@ -47,11 +58,56 @@ type NotifyBody = {
   text?: string
 }
 
+const PATIENT_KINDS = ['patient-confirm', 'patient-cancel', 'patient-remind', 'patient-waitlist'] as const
+type PatientKind = (typeof PATIENT_KINDS)[number]
+
+/** 患者宛の通知 → 自動化設定のどれに従うか */
+const PATIENT_AUTOMATION: Record<PatientKind, AutomationKey> = {
+  'patient-confirm': 'reservation_confirm',
+  'patient-cancel': 'reservation_confirm',
+  'patient-remind': 'reservation_remind',
+  'patient-waitlist': 'waitlist_notify',
+}
+
+/** 動いた記録に残す「何のときか」（個人の情報は入れない） */
+const PATIENT_NOTE: Record<PatientKind, string> = {
+  'patient-confirm': '予約の確定',
+  'patient-cancel': 'キャンセルの確認',
+  'patient-remind': '前日のお知らせ',
+  'patient-waitlist': 'キャンセル待ちの空き枠',
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const TIME_RE = /^\d{2}:\d{2}$/
+
+/** 日本時間の明日 'YYYY-MM-DD' */
+function jstTomorrow(now = new Date()): string {
+  return new Date(now.getTime() + (9 + 24) * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
 function authorized(request: NextRequest): boolean {
   const secret = process.env.RESERVATION_NOTIFY_SECRET
   if (!secret) return false
   const header = request.headers.get('x-reservation-secret') ?? ''
   return header === secret
+}
+
+/** 患者名など、外部入力を本文へ埋める前の無害化（改行・制御文字除去＋長さ制限） */
+function safeName(value?: string): string {
+  return String(value ?? '')
+    // 改行・制御文字・行区切りを除去（メッセージ本文の偽装を防ぐ）
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40)
+}
+
+/** 'yyyy-MM-dd' を「M月D日（曜）」へ。形式外はそのまま返す */
+function formatDateJa(dateString?: string): string {
+  if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString ?? ''
+  const [year, month, day] = dateString.split('-').map(Number)
+  const youbi = ['日', '月', '火', '水', '木', '金', '土'][new Date(year, month - 1, day).getDay()]
+  return `${month}月${day}日（${youbi}）`
 }
 
 /** 院長宛の通知本文（一目で分かる形式） */
@@ -72,12 +128,52 @@ function buildMessage(b: NotifyBody): string {
   return lines.join('\n')
 }
 
-/** 患者宛の通知本文（予約完了・キャンセル確認）。予約完了の文面は院内アプリの「LINEで予約日時を送る」と共通（lib/reservation-message.ts） */
+/** 患者宛の通知本文（予約完了・キャンセル確認） */
 function buildPatientMessage(b: NotifyBody): string {
+  const name = safeName(b.name)
+  const reservationNo = /^[A-Za-z0-9]{1,12}$/.test(String(b.reservationNo ?? ''))
+    ? String(b.reservationNo)
+    : ''
+  const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
+
+  if (b.kind === 'patient-remind') {
+    // 文面は日時・場所・変更とキャンセルの方法だけ（来院を強くすすめる言葉・施術の指示は入れない）
+    const tomorrow = b.date === jstTomorrow()
+    return [
+      name ? `${name} 様` : undefined,
+      name ? '' : undefined,
+      `ゆうき整骨院です。${tomorrow ? '明日の' : ''}ご予約のお知らせです。`,
+      '',
+      `📅 日時：${when}〜`,
+      reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
+      `📍 場所：${DEFAULT_CLINIC_PROFILE.address}（${DEFAULT_CLINIC_PROFILE.parking}）`,
+      '',
+      '変更・キャンセルは、このトークまたは',
+      `お電話（${DEFAULT_CLINIC_PROFILE.phone}）へどうぞ。`,
+      '',
+      `※このお知らせが不要な方は「${CONSENT_KEYWORDS.stopReservation}」と送ってください。`,
+    ]
+      .filter((x): x is string => x !== undefined)
+      .join('\n')
+  }
+  if (b.kind === 'patient-waitlist') {
+    return [
+      name ? `${name} 様` : undefined,
+      name ? '' : undefined,
+      'ゆうき整骨院です。キャンセル待ちにご登録の日に、空きが出ました。',
+      '',
+      `📅 空いた枠：${when}〜`,
+      '',
+      '先着順のため、このご連絡はご予約の確定ではありません。',
+      'ご希望の場合は、こちら（またはメニューの「ネット予約」）からお手続きください。',
+      LIFF_RESERVE_URL,
+      '',
+      `※キャンセル待ちのご案内が不要な方は「${CONSENT_KEYWORDS.stopReservation}」と送ってください。`,
+    ]
+      .filter((x): x is string => x !== undefined)
+      .join('\n')
+  }
   if (b.kind === 'patient-cancel') {
-    const name = safeName(b.name)
-    const reservationNo = safeReservationNo(b.reservationNo)
-    const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
     return [
       `${name} 様`,
       '',
@@ -92,7 +188,21 @@ function buildPatientMessage(b: NotifyBody): string {
       .filter((x): x is string => x !== undefined)
       .join('\n')
   }
-  return patientConfirmText({ name: b.name, date: b.date, time: b.time, reservationNo: b.reservationNo })
+  return [
+    `${name} 様`,
+    '',
+    'ゆうき整骨院です。ご予約ありがとうございます。',
+    '以下の内容で確定しました。',
+    '',
+    `📅 日時：${when}〜`,
+    reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
+    '',
+    '変更・キャンセルは、このトークまたは',
+    'お電話（083-265-4545）へお気軽にどうぞ。',
+    '当日はお気をつけてお越しください😊',
+  ]
+    .filter((x): x is string => x !== undefined)
+    .join('\n')
 }
 
 export async function POST(request: NextRequest) {
@@ -127,13 +237,27 @@ export async function POST(request: NextRequest) {
   }
 
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
-  const isPatientPush = body.kind === 'patient-confirm' || body.kind === 'patient-cancel'
+  const patientKind = PATIENT_KINDS.find((k) => k === body.kind)
+  const isPatientPush = Boolean(patientKind)
 
   let to: string | undefined
   let text: string
   let sealed: string | undefined
+  /** 自動化設定が「テスト」で、院長の LINE に見本を送るとき */
+  let testRun = false
+  const automation: AutomationKey = patientKind ? PATIENT_AUTOMATION[patientKind] : 'reservation_confirm'
+  const patientNote = patientKind ? PATIENT_NOTE[patientKind] : ''
+  /** 送れたら残す「送り済み」の印（前日のお知らせ・空き枠のお知らせ） */
+  let sentMark: { day: string; mark: string } | undefined
 
-  if (isPatientPush) {
+  if (patientKind) {
+    // 前日のお知らせ・空き枠のお知らせ（本人のお手続きへの返事ではなく、院から知らせるもの）
+    const isNotice = patientKind === 'patient-remind' || patientKind === 'patient-waitlist'
+    const day = String(body.date ?? '')
+    const hhmm = String(body.time ?? '').slice(0, 5)
+    if (isNotice && (!DATE_RE.test(day) || !TIME_RE.test(hhmm))) {
+      return NextResponse.json({ ok: false, delivered: false, error: 'date（YYYY-MM-DD）と time（HH:MM）が要ります' }, { status: 400 })
+    }
     // 患者宛：宛先は必ず署名付きticket/sealedから復元する（生のuserIdは受け付けない）
     // patient-confirm は ticket（LIFF予約）優先。無ければ sealed（管理画面からの手動登録）
     const userId =
@@ -152,6 +276,86 @@ export async function POST(request: NextRequest) {
     // 予約確定時は、以後のキャンセル通知に使う長期参照をGASへ返す
     if (body.kind === 'patient-confirm') {
       sealed = sealUserId(userId, secret)
+    }
+
+    // 集客 → 自動化設定（止める／テスト／動かす・1日の上限）。
+    // 止めている・上限のときも sealed は返す（あとで動かしたとき、キャンセルの確認を送れるように）
+    const rule = await getRule(automation)
+
+    if (isNotice) {
+      // 本人が止めていないか（読めないときは送らない。予約システムはメールに切り替える／あとで送り直す）
+      const consent = await checkConsent(userId, 'reservation')
+      if (consent !== 'allowed') {
+        await recordRun({
+          automation,
+          result: consent === 'opted_out' ? 'opted_out' : 'error',
+          note: consent === 'opted_out' ? patientNote : `${patientNote}（受け取りの記録を読めない）`,
+        })
+        return NextResponse.json({
+          ok: true,
+          delivered: false,
+          optedOut: consent === 'opted_out' || undefined,
+          reason: consent === 'opted_out' ? 'ご本人が予約のお知らせを止めています' : '受け取りの記録を読めないため送っていません',
+        })
+      }
+      // 空き枠のお知らせは、送ってよい時間帯だけ（時間外は予約システムがあとで送り直す）
+      if (patientKind === 'patient-waitlist' && !inSendHours(new Date(), rule.fromHour, rule.toHour)) {
+        await recordRun({ automation, result: 'deferred', note: patientNote })
+        return NextResponse.json({
+          ok: true,
+          delivered: false,
+          deferred: true,
+          reason: `送る時間外です（${rule.fromHour}時〜${rule.toHour}時）`,
+        })
+      }
+    }
+
+    if (rule.mode === 'off') {
+      await recordRun({ automation, result: 'skipped', note: patientNote })
+      return NextResponse.json({ ok: true, delivered: false, reason: '自動化設定で止めています', sealed })
+    }
+
+    if (isNotice) {
+      // 同じお知らせを二度送らない（印は LINE の ID のハッシュ・時刻・予約番号だけ）
+      const reservationNo = /^[A-Za-z0-9]{1,12}$/.test(String(body.reservationNo ?? '')) ? String(body.reservationNo) : ''
+      const mark = [patientKind, rule.mode === 'test' ? 'test' : 'live', lineMark(userId), hhmm, reservationNo].join('|')
+      if (await wasSent(day, mark)) {
+        await recordRun({ automation, result: 'duplicate', note: patientNote })
+        return NextResponse.json({
+          ok: true,
+          delivered: rule.mode !== 'test',
+          test: rule.mode === 'test' || undefined,
+          duplicate: true,
+          reason: '同じお知らせは送り済みです',
+        })
+      }
+      sentMark = { day, mark }
+    }
+
+    if (rule.mode === 'test') {
+      // テスト：患者さんには送らず、同じ文を院長の LINE にだけ送る
+      const owner = process.env.RESERVATION_NOTIFY_LINE_USER_ID
+      if (!owner) {
+        await recordRun({ automation, result: 'skipped', note: `${patientNote}（テストの送り先が未設定）` })
+        return NextResponse.json({ ok: true, delivered: false, test: true, reason: 'テスト中（院長の送り先が未設定）', sealed })
+      }
+      // 見本は1日に数通まで（予約が多い日に何十通も届かないように）
+      if ((await sentToday(automation, 'test')) >= TEST_SAMPLES_PER_DAY) {
+        await recordRun({ automation, result: 'limited', note: `${patientNote}（テストの見本は1日${TEST_SAMPLES_PER_DAY}通まで）` })
+        return NextResponse.json({
+          ok: true,
+          delivered: false,
+          test: true,
+          reason: `テスト中（今日の見本は${TEST_SAMPLES_PER_DAY}通送りました）`,
+          sealed,
+        })
+      }
+      to = owner
+      text = `【テスト】患者さんにはまだ送っていません。「動かす」にすると、次の文が患者さんの LINE に届きます。\n\n${text}`
+      testRun = true
+    } else if (rule.dailyLimit && (await sentToday(automation)) >= rule.dailyLimit) {
+      await recordRun({ automation, result: 'limited', note: patientNote })
+      return NextResponse.json({ ok: true, delivered: false, reason: '1日の上限に達したため送っていません', sealed })
     }
   } else {
     // 院長宛（従来動作）
@@ -172,13 +376,17 @@ export async function POST(request: NextRequest) {
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
+      if (isPatientPush) await recordRun({ automation, result: 'error', note: patientNote })
       return NextResponse.json(
         { ok: false, delivered: false, error: (data as { message?: string }).message ?? `HTTP ${res.status}` },
         { status: 502 },
       )
     }
-    return NextResponse.json({ ok: true, delivered: true, sealed })
+    if (isPatientPush) await recordRun({ automation, result: testRun ? 'test' : 'sent', note: patientNote })
+    if (sentMark) await markSent(sentMark.day, sentMark.mark)
+    return NextResponse.json({ ok: true, delivered: !testRun, test: testRun || undefined, sealed })
   } catch (error) {
+    if (isPatientPush) await recordRun({ automation, result: 'error', note: patientNote })
     return NextResponse.json(
       { ok: false, delivered: false, error: error instanceof Error ? error.message : '不明' },
       { status: 502 },
