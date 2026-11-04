@@ -39,6 +39,8 @@ export interface LineChatMessage {
   at: string
   from: 'user' | 'bot' | 'staff'
   text: string
+  /** consent … お知らせの受け取りの変更（「配信停止」など）。問い合わせには数えない */
+  note?: 'consent'
 }
 
 /** LINE顧客（指示書6章） */

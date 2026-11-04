@@ -1,11 +1,14 @@
 /**
  * 自動化設定（集客 → 自動化設定）
  *
- * GET … 自動化ごとの状態・上限・止まる条件・動いた記録、公式LINE の今月の通数と上限、監査ログ
+ * GET … 自動化ごとの状態・上限・止まる条件・動いた記録、公式LINE の今月の通数と上限、監査ログ、
+ *       お知らせを止めている方の数（数だけ）
  *       （院長・スタッフとも見られる。お名前・LINE の ID は返さない）
  * PUT … 院長だけ。{ key, ... }
  *       - reservation_confirm … { mode: on|test|off, dailyLimit }
  *       - line_auto_reply     … { mode: on|test|off, lineMenu: classic|three }
+ *       - reservation_remind  … { mode: on|test|off, dailyLimit }（前日のお知らせ）
+ *       - waitlist_notify     … { mode: on|test|off, dailyLimit }（空き枠のお知らせ。時間帯は 8〜20時で固定）
  *       - autopilot           … { enabled }（自動投稿の「毎週の下書き」。中身の設定は自動投稿の画面）
  *       - cancel_story        … { enabled }（キャンセルのストーリー。時間帯・上限は自動投稿の画面）
  *       - birthday            … { enabled }（誕生日のご挨拶。文面は LINE導線の画面）
@@ -14,7 +17,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, ROLE_HEADER } from '@/lib/marketing/auth'
 import { getRules, listAudit, listRuns, recordAudit, saveRule } from '@/lib/marketing/automation-store-server'
-import { MODE_LABELS, type AutomationMode, type LineMenuVariant } from '@/lib/marketing/automation-types'
+import {
+  AUTOMATION_KEY_LABELS,
+  AUTOMATION_KEYS,
+  LIMITED_KEYS,
+  MODE_LABELS,
+  type AutomationKey,
+  type AutomationMode,
+  type LineMenuVariant,
+} from '@/lib/marketing/automation-types'
+import { consentCounts } from '@/lib/marketing/consent-store-server'
 import { fetchLineQuota } from '@/lib/marketing/line-quota-server'
 import { getAutopilotSettings, listProposals, saveAutopilotSettings } from '@/lib/marketing/autopilot-store-server'
 import { getLog as getBirthdayLog, getSettings as getBirthdaySettings, saveSettings as saveBirthdaySettings } from '@/lib/marketing/birthday-server'
@@ -31,7 +43,7 @@ const MENUS: LineMenuVariant[] = ['classic', 'three']
 
 export async function GET() {
   try {
-    const [rules, runs, quota, autopilot, proposals, birthday, birthdayLog, jobs, audit] = await Promise.all([
+    const [rules, runs, quota, autopilot, proposals, birthday, birthdayLog, jobs, audit, consent] = await Promise.all([
       getRules(),
       listRuns(7).catch(() => []),
       fetchLineQuota(),
@@ -41,6 +53,7 @@ export async function GET() {
       getBirthdayLog().catch(() => null),
       listJobs().catch(() => []),
       listAudit(20).catch(() => []),
+      consentCounts().catch(() => null),
     ])
     const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     const cancelStories = jobs
@@ -89,6 +102,7 @@ export async function GET() {
           }
         : null,
       audit,
+      consent,
     })
   } catch (error) {
     console.error('自動化設定の読み込みに失敗:', error instanceof Error ? error.message : error)
@@ -108,26 +122,27 @@ export async function PUT(request: NextRequest) {
   const role = request.headers.get(ROLE_HEADER) ?? 'local'
   const key = String(body.key ?? '')
 
-  if (key === 'reservation_confirm' || key === 'line_auto_reply') {
+  if (AUTOMATION_KEYS.includes(key as AutomationKey)) {
+    const ruleKey = key as AutomationKey
     const mode = body.mode as AutomationMode
     if (!MODES.includes(mode)) return NextResponse.json({ ok: false, error: '動かし方の指定が正しくありません' }, { status: 400 })
     const rule: Parameters<typeof saveRule>[1] = { mode, updatedBy: role }
-    if (key === 'reservation_confirm' && body.dailyLimit !== undefined) {
+    if (LIMITED_KEYS.includes(ruleKey) && body.dailyLimit !== undefined) {
       const limit = Number(body.dailyLimit)
       if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
         return NextResponse.json({ ok: false, error: '1日の上限は 1〜500 の数で入れてください' }, { status: 400 })
       }
       rule.dailyLimit = limit
     }
-    if (key === 'line_auto_reply' && body.lineMenu !== undefined) {
+    if (ruleKey === 'line_auto_reply' && body.lineMenu !== undefined) {
       if (!MENUS.includes(body.lineMenu as LineMenuVariant)) {
         return NextResponse.json({ ok: false, error: '選択肢の形の指定が正しくありません' }, { status: 400 })
       }
       rule.lineMenu = body.lineMenu as LineMenuVariant
     }
-    const before = (await getRules())[key]
-    const rules = await saveRule(key, rule)
-    const after = rules[key]
+    const before = (await getRules())[ruleKey]
+    const rules = await saveRule(ruleKey, rule)
+    const after = rules[ruleKey]
     const changes = [
       before.mode !== after.mode ? `${MODE_LABELS[before.mode]} → ${MODE_LABELS[after.mode]}` : '',
       before.dailyLimit !== after.dailyLimit ? `1日の上限 ${before.dailyLimit ?? '-'} → ${after.dailyLimit ?? '-'}` : '',
@@ -136,7 +151,7 @@ export async function PUT(request: NextRequest) {
     await recordAudit({
       role,
       action: '自動化設定を変更',
-      target: key === 'reservation_confirm' ? '予約確認の LINE' : 'LINE の自動案内',
+      target: AUTOMATION_KEY_LABELS[ruleKey],
       detail: changes.join('、') || '変更なし',
     })
     return NextResponse.json({ ok: true, rules })

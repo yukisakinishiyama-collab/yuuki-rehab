@@ -109,7 +109,9 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   const bookingState = rows ? 'ok' : bookingConfigured ? 'unavailable' : 'not_connected'
   const total = rows?.length ?? null
   const cancelled = rows ? rows.filter((r) => r.status === 'キャンセル').length : null
-  const hasNoShowStatus = Boolean(stats?.bookings.some((b) => b.status.includes('無断')))
+  // 予約システムで「無断キャンセル」を選べるようになっていれば、0件でも数えられる
+  const hasNoShowStatus = Boolean(stats?.statuses?.some((s) => s.includes('無断')) || stats?.bookings.some((b) => b.status.includes('無断')))
+  const followup = stats?.followup ?? null
 
   const monthMetrics: Metric[] = [
     {
@@ -161,6 +163,23 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
       period,
       basis: '予約システムで「無断」と記録されたもの',
       note: rows && !hasNoShowStatus ? '予約システムの集計に無断キャンセルの区別がありません（カルテのキャンセルの記録で確認してください）' : rows ? undefined : bookingNote,
+    },
+    {
+      key: 'first_visit_next',
+      label: '初めての方の次回予約',
+      value: followup && followup.firstVisits > 0 ? Math.round((followup.withNext / followup.firstVisits) * 1000) / 10 : null,
+      unit: '%',
+      state: followup ? (followup.firstVisits > 0 ? 'ok' : 'unavailable') : stats ? 'unavailable' : bookingState,
+      period: followup ? `${md(followup.since)}〜（初めての来院から${followup.windowDays}日以内）` : period,
+      basis:
+        '初めての方の予約（来院済み）のうち、そのあと同じ方の次の予約が入ったものの割合。予約システムの中で数え、件数だけを受け取る（お名前などは受け取らない）',
+      note: !followup
+        ? stats
+          ? '予約システムの集計がまだ対応していません（第2段階で予約システムに足します）'
+          : bookingNote
+        : followup.firstVisits === 0
+          ? 'この期間の初めての方の来院がまだありません'
+          : `${followup.withNext} / ${followup.firstVisits} 件`,
     },
   ]
 
