@@ -15,7 +15,10 @@ import { recordEvent } from '@/lib/marketing/analytics-store-server'
 import type { BotReply, LineChatMessage } from '@/lib/marketing/line-types'
 import { isOwnerLineUser, replyOwner } from '@/lib/marketing/owner-notify'
 import { handleOwnerPostback } from '@/lib/marketing/autopilot-server'
-import { getRule, recordRun } from '@/lib/marketing/automation-store-server'
+import { getRule, recordAudit, recordRun } from '@/lib/marketing/automation-store-server'
+import { CONSENT_PURPOSE_LABELS, consentReply, parseConsentCommand, type ConsentCommand } from '@/lib/marketing/consent'
+import { applyConsent } from '@/lib/marketing/consent-store-server'
+import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
 import type { AutomationRule, RunResult } from '@/lib/marketing/automation-types'
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET ?? ''
@@ -96,6 +99,47 @@ const INPUT_NOTE: Record<EngineInput['kind'], string> = {
   follow: '友だち追加',
   postback: 'ボタンを選んだ',
   text: 'メッセージ',
+}
+
+/**
+ * 本人の「配信停止」「予約のお知らせ停止」など：受け取りを変えて、その旨を返す
+ * - 本人の求めへの返事なので、LINE の自動案内を止めていても返す
+ * - お知らせ・ご挨拶を止めたら、LINE導線の「配信停止」の印（optedOut）も合わせる（追客の一覧から外れる）
+ * - 会話ログには残すが、問い合わせには数えない（note: 'consent'）
+ * - 保存できなかったときは、そう伝えてスタッフの確認待ちにする（止めたつもりで送ってしまうのを防ぐ）
+ */
+async function handleConsentCommand(
+  userId: string,
+  displayName: string | undefined,
+  text: string,
+  command: ConsentCommand,
+  opts: { simulator?: boolean } = {},
+): Promise<BotReply[]> {
+  const contact = await getContact(userId, displayName)
+  const now = new Date().toISOString()
+  let reply: string
+  try {
+    await applyConsent(userId, command, 'line')
+    if (command.purpose === 'marketing') contact.optedOut = !command.allow
+    reply = consentReply(command)
+    await recordAudit({
+      role: 'line',
+      action: command.allow ? 'お知らせの受け取りを再開' : 'お知らせの受け取りを停止',
+      target: CONSENT_PURPOSE_LABELS[command.purpose],
+      detail: `ご本人が LINE で送った${opts.simulator ? '（シミュレーター）' : ''}`,
+    })
+  } catch (error) {
+    console.error('お知らせの受け取りの保存に失敗:', error instanceof Error ? error.message : error)
+    reply = `申し訳ありません。いま設定を変えられませんでした。しばらくしてからもう一度送るか、お電話（${DEFAULT_CLINIC_PROFILE.phone}）でお知らせください。`
+    contact.needsAttention = contact.needsAttention || 'お知らせの停止・再開の依頼を保存できませんでした（ご本人の希望の確認が必要です）'
+    contact.inquiryStatus = 'new'
+    contact.inquiryUpdatedAt = now
+  }
+  await saveContact(contact, [
+    { at: now, from: 'user', text, note: 'consent' },
+    { at: now, from: 'bot', text: reply, note: 'consent' },
+  ])
+  return [{ type: 'text', text: reply }]
 }
 
 async function processEvent(
@@ -181,6 +225,11 @@ export async function POST(request: NextRequest) {
         input: EngineInput
       }
       if (!userId || !input) throw new Error('bad request')
+      const consentCommand = input.kind === 'text' ? parseConsentCommand(input.text ?? '') : null
+      if (consentCommand) {
+        const replies = await handleConsentCommand(`sim_${userId}`, displayName, input.text ?? '', consentCommand, { simulator: true })
+        return NextResponse.json({ ok: true, replies, notify: null })
+      }
       // シミュレーターは送らないので、止める／テストに関係なく返事を見せる（選択肢の形は自動化設定のとおり）
       const rule = await getRule('line_auto_reply')
       const result = await processEvent(`sim_${userId}`, displayName, input, { rule, simulator: true })
@@ -230,6 +279,18 @@ export async function POST(request: NextRequest) {
             await replyToLine(replyToken, [
               { type: 'text', text: `あなたのLINE userIdはこちらです（予約通知の送信先に設定します）：\n${userId}` },
             ])
+          }
+          continue
+        }
+        // 「配信停止」「予約のお知らせ停止」など（自動案内の会話には流さない）
+        const consentCommand = parseConsentCommand(message.text ?? '')
+        if (consentCommand) {
+          const replyToken = event.replyToken as string | undefined
+          try {
+            const replies = await handleConsentCommand(userId, undefined, message.text ?? '', consentCommand)
+            if (replyToken) await replyToLine(replyToken, replies)
+          } catch (error) {
+            console.error('お知らせの受け取りの処理に失敗:', error instanceof Error ? error.message : error)
           }
           continue
         }

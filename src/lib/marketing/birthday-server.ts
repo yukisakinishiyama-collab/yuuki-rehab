@@ -6,12 +6,15 @@
  * - 同じ年に2回送らないよう、送った年を keiei:birthday-log に残す
  * - 2/29 生まれは、うるう年でない年は 2/28 に送る（lib/birthday.ts と同じ決め方）
  * - 送る相手は封印（sealed）から取り出した userId。生の userId は保存しない
+ * - 本人が「配信停止」と送った方・院で配信停止にした方には送らない（consent-store-server）
  */
 import { kvGet, kvList, kvSet } from './kv-store-server'
 import { unsealUserId } from '@/lib/liff-ticket'
 import { daysUntilBirthday } from '@/lib/birthday'
 import type { LineLink } from '@/lib/line-link'
 import { DEFAULT_CLINIC_PROFILE } from './clinic'
+import { checkConsent } from './consent-store-server'
+import { recordRun } from './automation-store-server'
 
 export const BIRTHDAY_KEY = 'keiei:birthday'
 const LOG_KEY = 'keiei:birthday-log'
@@ -116,6 +119,13 @@ export async function runBirthday(now = new Date()): Promise<RunResult> {
     if (!userId) {
       result.errors += 1
       result.details.push({ name: l.name, ok: false, error: '封印を開けません' })
+      continue
+    }
+    // 本人が「配信停止」と送った方・院で配信停止にした方には送らない（受け取りを確かめられないときも送らない）
+    const consent = await checkConsent(userId, 'marketing')
+    if (consent !== 'allowed') {
+      result.skipped += 1
+      await recordRun({ automation: 'birthday', result: consent === 'opted_out' ? 'opted_out' : 'error', note: '誕生日のご挨拶' })
       continue
     }
     const r = await push(userId, render(settings.template, l.name))

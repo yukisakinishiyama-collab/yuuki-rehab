@@ -39,8 +39,9 @@ type ContactLike = Pick<
   'messages' | 'intent' | 'needsAttention' | 'handoff' | 'reserved' | 'tags' | 'step' | 'inquiryStatus'
 >
 
+/** 本人が送った文（友だち追加の印と、「配信停止」などお知らせの受け取りの変更は除く） */
 function userMessages(contact: Pick<LineContact, 'messages'>) {
-  return (contact.messages ?? []).filter((m) => m.from === 'user' && m.text !== FOLLOW_TEXT)
+  return (contact.messages ?? []).filter((m) => m.from === 'user' && m.text !== FOLLOW_TEXT && m.note !== 'consent')
 }
 
 /** 問い合わせとして数えるか（本人が何か送った・選んだ） */

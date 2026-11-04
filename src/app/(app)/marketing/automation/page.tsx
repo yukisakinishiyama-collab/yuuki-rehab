@@ -3,15 +3,17 @@
 /**
  * 集客 → 自動化設定（指示書6章④）
  *
- * 予約確認・LINE の自動案内・投稿案の自動作成・キャンセルの空き枠ストーリー・誕生日のご挨拶の ON/OFF と、
- * 上限・送る時間帯・止まる条件・動いた記録、公式LINE の今月の通数を1か所で見る。
+ * 予約確認・前日のお知らせ・空き枠のお知らせ（キャンセル待ち）・LINE の自動案内・投稿案の自動作成・
+ * キャンセルの空き枠ストーリー・誕生日のご挨拶の動かし方と、上限・送る時間帯・止まる条件・動いた記録、
+ * 公式LINE の今月の通数、お知らせを止めている方の数を1か所で見る。
  * - 変えられるのは院長だけ（スタッフは見るだけ。サーバーでも院長だけに限っている）
  * - 新しく動かすものは「テスト」で確かめてから「動かす」にする（予約確認のテストは院長の LINE にだけ届く）
- * - まだ作っていない自動化（前日リマインド・キャンセル待ち・週次レポート）は「未実装」と出す。動いているように見せない
+ * - まだ作っていない自動化（週次レポート）は「未実装」と出す。動いているように見せない
+ * - 前日のお知らせ・空き枠のお知らせは、予約システム（GAS）から頼まれて送る。予約システムがまだ頼んでこない間は、そう出す
  */
 import Link from 'next/link'
 import { useState, type ReactNode } from 'react'
-import { History, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
+import { BellOff, History, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 import { IconButton, Panel } from '@/components/clinic/Panel'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -19,16 +21,20 @@ import { cn } from '@/lib/utils'
 import { useApi } from '@/lib/marketing/use-api'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import {
+  AUTOMATION_KEY_LABELS,
   LINE_MENU_LABELS,
   MODE_LABELS,
   RUN_RESULT_LABELS,
+  TEST_SAMPLES_PER_DAY,
   type AuditEntry,
+  type AutomationKey,
   type AutomationMode,
   type AutomationRules,
   type AutomationRun,
   type LineMenuVariant,
 } from '@/lib/marketing/automation-types'
 import type { LineQuota } from '@/lib/marketing/line-quota-server'
+import { CONSENT_KEYWORDS } from '@/lib/marketing/consent'
 
 interface AutomationData {
   rules: AutomationRules
@@ -52,11 +58,12 @@ interface AutomationData {
   cancelStories: Array<{ at: string; scheduledAt: string; status: string }>
   birthday: { enabled: boolean; sent30: number; failed30: number } | null
   audit: AuditEntry[]
+  /** お知らせを止めている方の数（数だけ）。読めないときは null */
+  consent: { recorded: number; marketingOff: number; reservationOff: number } | null
 }
 
 const AUTOMATION_LABELS: Record<AutomationRun['automation'], string> = {
-  reservation_confirm: '予約確認の LINE',
-  line_auto_reply: 'LINE の自動案内',
+  ...AUTOMATION_KEY_LABELS,
   autopilot: '投稿案の自動作成',
   cancel_story: 'キャンセルの空き枠ストーリー',
   birthday: '誕生日のご挨拶',
@@ -162,8 +169,8 @@ export default function AutomationPage() {
   const [saving, setSaving] = useState('')
   const [notice, setNotice] = useState('')
   // 1日の上限の入力（触っていないときは保存されている値を出す）
-  const [limitInput, setLimitDraft] = useState<string | null>(null)
-  const limitDraft = limitInput ?? String(data?.rules.reservation_confirm.dailyLimit ?? '')
+  const [limitInputs, setLimitDrafts] = useState<Partial<Record<AutomationKey, string>>>({})
+  const limitDraft = (key: AutomationKey) => limitInputs[key] ?? String(data?.rules[key].dailyLimit ?? '')
 
   async function save(key: string, body: Record<string, unknown>, done: string) {
     setSaving(key)
@@ -178,7 +185,7 @@ export default function AutomationPage() {
       const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? `保存できませんでした（${res.status}）`)
       setNotice(done)
-      setLimitDraft(null)
+      setLimitDrafts({})
       reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存できませんでした')
@@ -189,9 +196,48 @@ export default function AutomationPage() {
 
   const rc = data?.rules.reservation_confirm
   const la = data?.rules.line_auto_reply
+  const rr = data?.rules.reservation_remind
+  const wl = data?.rules.waitlist_notify
   const ap = data?.autopilot
   const quota = data?.quota
   const readOnly = !isAdmin
+
+  /** 1日の上限の欄（院長だけ変えられる） */
+  function limitFact(key: AutomationKey) {
+    const rule = data?.rules[key]
+    const draft = limitDraft(key)
+    return {
+      label: '1日の上限',
+      value: (
+        <span className="flex flex-wrap items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={500}
+            value={draft}
+            disabled={readOnly}
+            onChange={(e) => setLimitDrafts((d) => ({ ...d, [key]: e.target.value }))}
+            className="h-10 w-24 rounded-lg border border-slate-300 px-2 text-sm lg:h-8"
+            aria-label={`${AUTOMATION_KEY_LABELS[key]}の1日の上限（通）`}
+          />
+          通
+          {!readOnly && rule && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={saving !== '' || draft === String(rule.dailyLimit ?? '')}
+              onClick={() => void save(key, { mode: rule.mode, dailyLimit: Number(draft) }, `${AUTOMATION_KEY_LABELS[key]}の1日の上限を保存しました`)}
+            >
+              上限を保存
+            </Button>
+          )}
+        </span>
+      ),
+    }
+  }
+
+  /** 予約システムから、この7日に一度でも頼まれたか（まだなら「予約システム側の準備中」と出す） */
+  const hasRuns = (key: AutomationKey) => Boolean(data?.runs.some((r) => r.automation === key))
 
   return (
     <div className="space-y-5">
@@ -221,7 +267,7 @@ export default function AutomationPage() {
 
       {!data && loading && <p className="text-sm text-slate-500">読み込んでいます…</p>}
 
-      {data && rc && la && quota && (
+      {data && rc && la && rr && wl && quota && (
         <>
           {/* 公式LINE の通数（8割で警告） */}
           <Panel title="公式LINE の今月の通数" icon={MessageCircle} attention={quota.warn}>
@@ -273,41 +319,85 @@ export default function AutomationPage() {
                 }
                 facts={[
                   { label: '送る相手', value: 'LINE からネット予約した方（予約のときに本人が LINE で確かめた方だけ）' },
-                  { label: '送るとき', value: '予約が確定したとき・キャンセルを受けたとき、すぐ（予約のお知らせなので時間帯では止めません）' },
-                  {
-                    label: '1日の上限',
-                    value: (
-                      <span className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          max={500}
-                          value={limitDraft}
-                          disabled={readOnly}
-                          onChange={(e) => setLimitDraft(e.target.value)}
-                          className="h-10 w-24 rounded-lg border border-slate-300 px-2 text-sm lg:h-8"
-                          aria-label="1日の上限（通）"
-                        />
-                        通
-                        {!readOnly && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={saving !== '' || limitDraft === String(rc.dailyLimit ?? '')}
-                            onClick={() => void save('reservation_confirm', { mode: rc.mode, dailyLimit: Number(limitDraft) }, '1日の上限を保存しました')}
-                          >
-                            上限を保存
-                          </Button>
-                        )}
-                      </span>
-                    ),
-                  },
-                  { label: '止まる条件', value: '「止める」のとき／1日の上限に達したとき／テストのとき（患者さんには送らず、院長の LINE にだけ見本が届く）' },
+                  { label: '送るとき', value: '予約が確定したとき・キャンセルを受けたとき、すぐ（お手続きへの返事なので、時間帯やお知らせの受け取りでは止めません）' },
+                  limitFact('reservation_confirm'),
+                  { label: '止まる条件', value: `「止める」のとき／1日の上限に達したとき／テストのとき（患者さんには送らず、院長の LINE にだけ見本が届く。見本は1日${TEST_SAMPLES_PER_DAY}通まで）` },
                 ]}
               >
                 {!data.bookingConfigured && <p className="mt-2 text-sm font-bold text-amber-800">予約システムと未連携のため、いまは動いていません。</p>}
                 {rc.mode === 'test' && !data.ownerLineSet && (
                   <p className="mt-2 text-sm font-bold text-amber-800">院長の LINE の送り先が未設定のため、テストの見本は届きません。</p>
+                )}
+              </AutomationCard>
+
+              {/* 前日のお知らせ */}
+              <AutomationCard
+                title="前日のお知らせ（患者さんへ・LINE）"
+                state={<Badge variant={MODE_BADGE[rr.mode]}>{MODE_LABELS[rr.mode]}</Badge>}
+                control={
+                  <Segmented
+                    label="前日のお知らせの動かし方"
+                    value={rr.mode}
+                    options={MODE_OPTIONS}
+                    disabled={readOnly || saving !== ''}
+                    onChange={(mode) => void save('reservation_remind', { mode }, `前日のお知らせを「${MODE_LABELS[mode]}」にしました`)}
+                  />
+                }
+                facts={[
+                  {
+                    label: '送る相手',
+                    value: 'LINE からネット予約した方のうち、予約のときに「前日にお知らせを受け取る」にチェックがあり、止めていない方（チェックは最初から入っていて、外せます）',
+                  },
+                  { label: '送るとき', value: '予約の前日の朝8時ごろ（予約システムの毎朝の処理から）。1つの予約に1回だけ' },
+                  limitFact('reservation_remind'),
+                  {
+                    label: '止まる条件',
+                    value: `キャンセル・日時が変わった予約には送らない／ご本人が「${CONSENT_KEYWORDS.stopReservation}」と送ったら送らない／同じお知らせは二度送らない／テスト中は院長の LINE にだけ見本が届き（1日${TEST_SAMPLES_PER_DAY}通まで）、患者さんには今までどおりメールのお知らせ（メールを登録した方）`,
+                  },
+                  { label: '文面', value: '日時・予約番号・場所・変更とキャンセルの方法だけ（来院をすすめる言葉・施術の指示は入れません）' },
+                ]}
+              >
+                {!hasRuns('reservation_remind') && (
+                  <p className="mt-2 text-sm font-bold text-amber-800">
+                    予約システム（GAS）側の対応はこれからです（反映の前に院長に確認します）。反映すると、ここと「動いた記録」に出ます。
+                  </p>
+                )}
+                {rr.mode === 'test' && !data.ownerLineSet && (
+                  <p className="mt-2 text-sm font-bold text-amber-800">院長の LINE の送り先が未設定のため、テストの見本は届きません。</p>
+                )}
+              </AutomationCard>
+
+              {/* 空き枠のお知らせ（キャンセル待ち） */}
+              <AutomationCard
+                title="空き枠のお知らせ（キャンセル待ちの方へ・LINE）"
+                state={<Badge variant={MODE_BADGE[wl.mode]}>{MODE_LABELS[wl.mode]}</Badge>}
+                control={
+                  <Segmented
+                    label="空き枠のお知らせの動かし方"
+                    value={wl.mode}
+                    options={MODE_OPTIONS}
+                    disabled={readOnly || saving !== ''}
+                    onChange={(mode) => void save('waitlist_notify', { mode }, `空き枠のお知らせを「${MODE_LABELS[mode]}」にしました`)}
+                  />
+                }
+                facts={[
+                  { label: '送る相手', value: 'LINE の予約で、満席の日に「キャンセル待ち」に登録した方' },
+                  {
+                    label: '送るとき',
+                    value: `キャンセルが出たとき、その日・時間帯を希望した方へ登録の順に1人ずつ（1時間たっても空いていれば次の方へ）。${wl.fromHour ?? 8}時〜${wl.toHour ?? 20}時だけ（夜のキャンセルは翌朝${wl.fromHour ?? 8}時）`,
+                  },
+                  limitFact('waitlist_notify'),
+                  {
+                    label: '止まる条件',
+                    value: `同じ枠に同時に何人も送らない／同じ枠を同じ方に二度送らない／過ぎた日の登録は終わり／ご本人が「${CONSENT_KEYWORDS.stopReservation}」と送ったら送らない／テスト中は院長の LINE にだけ見本（1日${TEST_SAMPLES_PER_DAY}通まで）`,
+                  },
+                  { label: '文面', value: '「先着順で、このご連絡は予約の確定ではない」と書き、ネット予約へ案内する' },
+                ]}
+              >
+                {!hasRuns('waitlist_notify') && (
+                  <p className="mt-2 text-sm font-bold text-amber-800">
+                    予約システム（GAS）側のキャンセル待ちの登録はこれからです（反映の前に院長に確認します）。反映すると、ここと「動いた記録」に出ます。
+                  </p>
                 )}
               </AutomationCard>
 
@@ -476,13 +566,32 @@ export default function AutomationPage() {
 
               {/* まだ作っていないもの */}
               {[
-                { title: '予約前リマインド（患者さんへ）', note: '第2段階で作ります。同意のある方へ前日に1回、変更・キャンセル済みの予約には送らない形にします。いまは院長あての前日の一覧だけ、予約システムから届きます。' },
-                { title: 'キャンセル待ちのお知らせ', note: '第2段階で作ります。希望した方を順に、同じ枠に重ねて送らない形にします。' },
                 { title: '集客レポート（週次）', note: '第4段階で作ります。予約につながった媒体・テーマを、因果を決めつけない書き方でまとめます。' },
               ].map((x) => (
                 <AutomationCard key={x.title} title={x.title} state={<Badge variant="outline">未実装</Badge>} facts={[{ label: '予定', value: x.note }]} />
               ))}
             </div>
+          </Panel>
+
+          <Panel title="お知らせの受け取り" icon={BellOff} meta="数だけ（お名前は出しません）">
+            <dl className="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[14rem_1fr]">
+              <dt className="text-xs font-bold text-slate-600 sm:pt-0.5">お知らせ・ご挨拶を止めている方</dt>
+              <dd className="font-bold tabular-nums text-slate-900">{data.consent ? `${data.consent.marketingOff} 人` : '読めませんでした'}</dd>
+              <dt className="text-xs font-bold text-slate-600 sm:pt-0.5">予約のお知らせを止めている方</dt>
+              <dd className="font-bold tabular-nums text-slate-900">{data.consent ? `${data.consent.reservationOff} 人` : '読めませんでした'}</dd>
+            </dl>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs leading-relaxed text-slate-700">
+              <li>
+                ご本人が公式LINE で「{CONSENT_KEYWORDS.stopMarketing}」と送ると、誕生日のご挨拶など一人ずつ送るお知らせが止まります（「{CONSENT_KEYWORDS.resumeMarketing}」で戻ります）。LINE導線の画面で「配信停止」にした方も同じです。
+              </li>
+              <li>
+                「{CONSENT_KEYWORDS.stopReservation}」と送ると、前日のお知らせ・キャンセル待ちのご案内が止まります（「{CONSENT_KEYWORDS.resumeReservation}」で戻ります）。
+              </li>
+              <li>予約の確定・キャンセルの控えは、ご本人のお手続きへの返事なので、止めていても送ります。</li>
+              <li className="font-bold text-amber-800">
+                友だち全員への一斉配信（コンテンツから LINE へ配信）は、LINE の仕組み上、止めている方にも届きます。
+              </li>
+            </ul>
           </Panel>
 
           <Panel title="動いた記録（7日）" icon={History} meta="お名前・LINE の ID は残していません">
@@ -512,7 +621,9 @@ export default function AutomationPage() {
                 {data.audit.map((a, i) => (
                   <li key={`${a.at}-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5">
                     <span className="text-xs tabular-nums text-slate-500">{dt(a.at)}</span>
-                    <span className="text-xs font-bold text-slate-600">{a.role === 'admin' ? '院長' : a.role === 'staff' ? 'スタッフ' : a.role}</span>
+                    <span className="text-xs font-bold text-slate-600">
+                      {a.role === 'admin' ? '院長' : a.role === 'staff' ? 'スタッフ' : a.role === 'line' ? 'ご本人（LINE）' : a.role}
+                    </span>
                     <span className="font-medium text-slate-800">{a.target}</span>
                     <span className="text-xs text-slate-600">{a.action}{a.detail ? `：${a.detail}` : ''}</span>
                   </li>

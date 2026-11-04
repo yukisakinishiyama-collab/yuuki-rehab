@@ -25,10 +25,37 @@ export interface BookingStatRow {
   status: string
 }
 
+/** 初めての方の次回予約（予約システムの中で数えた件数だけ。だれの予約かは受け取らない） */
+export interface FollowupStats {
+  /** 数え始めの日 'YYYY-MM-DD'（この日以降に来院した、初めての方の予約） */
+  since: string
+  /** 初めての来院から何日以内の次の予約を数えるか */
+  windowDays: number
+  /** 初めての方の予約（来院済み）の数 */
+  firstVisits: number
+  /** そのうち、次の予約が入ったものの数 */
+  withNext: number
+}
+
 export interface HubStats {
   generatedAt: string
   bookings: BookingStatRow[]
   openings: OpeningDay[]
+  /** 予約システムで選べる状態（「無断キャンセル」を記録できるか見る）。古い予約システムは返さない */
+  statuses?: string[]
+  followup?: FollowupStats
+}
+
+function readFollowup(value: unknown): FollowupStats | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const v = value as Record<string, unknown>
+  const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? Math.floor(x) : null)
+  const firstVisits = n(v.firstVisits)
+  const withNext = n(v.withNext)
+  const windowDays = n(v.windowDays)
+  const since = typeof v.since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.since) ? v.since : null
+  if (firstVisits === null || withNext === null || windowDays === null || !since || withNext > firstVisits) return undefined
+  return { since, windowDays, firstVisits, withNext }
 }
 
 // 流入元の表示名は画面（ブラウザ）からも使うので、別のファイルに置く
@@ -59,6 +86,8 @@ export async function fetchHubStats(days = 30, opts: { fresh?: boolean } = {}): 
       generatedAt: String(data.generatedAt ?? ''),
       bookings: data.bookings,
       openings: Array.isArray(data.openings) ? data.openings : [],
+      statuses: Array.isArray(data.statuses) ? data.statuses.map(String).slice(0, 20) : undefined,
+      followup: readFollowup(data.followup),
     }
     cache.set(span, { at: Date.now(), data: result })
     return result

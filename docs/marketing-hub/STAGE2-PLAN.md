@@ -36,6 +36,20 @@
 - 予約の状態に `無断キャンセル` を足す（管理画面で選べるように）→ 集客概要の「無断キャンセル」が出る
 - 「新患の次回予約率」：初めての方の予約のうち、その後に同じ方の予約があるかを **GAS の中で数え、件数だけ** 返す（個人を特定できるものは渡さない）
 
+## 予約システムとの約束（院内アプリ側は入った）
+
+`POST /api/marketing/reservation-notify`（ヘッダー `x-reservation-secret`）。宛先はいつも予約の行の `LINE通知キー`（sealed）。
+
+| kind | 送るもの | 返事と、予約システムがすること |
+|---|---|---|
+| `patient-remind` | `sealed`・`name`・`date`（YYYY-MM-DD）・`time`（HH:MM）・`reservationNo` | `delivered:true` → `前日通知日時` を入れる（メールは送らない）／`delivered:false` → メールのある方はメールで送る（今までどおり）。`test:true` のときも患者さんには届いていないのでメールへ |
+| `patient-waitlist` | `sealed`・`name`・`date`・`time`（空いた枠の開始） | `delivered:true` → その方を「案内済み」にして、1時間たっても空いていれば次の方へ／`deferred:true` → 時間外。8時を過ぎたらもう一度／`optedOut:true` → その方は飛ばして次の方へ／`test:true` → 「テスト済み」にして同じ枠では送り直さない |
+
+- どちらも、本人が LINE で「予約のお知らせ停止」と送っていれば `optedOut:true`（送らない）。同じお知らせを二度頼まれたら `duplicate:true`
+- 予約フォームの「前日にお知らせを受け取る」のチェックを外した予約は、予約システムが `patient-remind` を頼まない
+- 自動化設定の既定は「テスト」。テスト中は院長の LINE にだけ見本が届き、動いた記録に残る
+- 集計（`?api=hubstats`）に足すもの：`statuses`（選べる状態の一覧。`無断キャンセル` を含める）と `followup`（`{ since, windowDays, firstVisits, withNext }`。件数だけ）。院内アプリは受け取れるようになっていて、来るまでは「未取得」と出す
+
 ## 進め方
 1. 院内アプリ側（関門・自動化設定・記録）を先に作り、PR にする（既定はテストなので、入れても患者さんには届かない）
 2. GAS 側を作り、院長の確認のうえ Apps Script に入れて再デプロイ（テストで院長の LINE に届くのを確かめる）
