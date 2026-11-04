@@ -3,7 +3,8 @@
 /**
  * 売上・来院（NOAH）— 院長のみ
  *
- * 毎晩、院のパソコンで NOAH の「金額分析」「リピート率」を読み取った数字（個人情報なし）を、
+ * 院長が入れた NOAH の「金額集計」の CSV（数字だけ。個人情報なし）を、
+ * （2026-11-05〜。それまでは毎晩、院のパソコンで自動で読み取っていた）
  * 日別・月別・曜日別のグラフにする。夜のLINEの「今日のまとめ」と同じ「次の一手」も載せる。
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -22,6 +23,7 @@ import {
   YAxis,
 } from 'recharts'
 import { useMarketingRole } from '@/lib/marketing/use-role'
+import KeieiCsvImport from '@/components/clinic/KeieiCsvImport'
 import { NOAH_KINDS, type NoahKind, type NoahMonth, type NoahStore } from '@/lib/marketing/noah-types'
 import {
   dateLabel,
@@ -49,7 +51,6 @@ interface ApiData {
   openings: OpeningDay[]
   next: OpeningDay | null
   draftDay: OpeningDay | null
-  refreshError?: string
   error?: string
 }
 
@@ -657,17 +658,15 @@ export default function SalesPage() {
     }
   }, [fetchData])
 
-  async function refreshNow() {
+  /** CSV を入れたあとに読み直す */
+  async function reload() {
     setBusy(true)
-    setMessage('')
     try {
       const { ok, body } = await fetchData(true)
-      if (!ok) {
-        setMessage(body.error ?? '読み込めませんでした')
-        return
-      }
-      setData(body)
-      setMessage(body.refreshError ?? '最新の集計にしました')
+      if (ok) {
+        setData(body)
+        setSelected(null)
+      } else setMessage(body.error ?? '読み込めませんでした')
     } catch {
       setMessage('読み込めませんでした（通信の失敗）')
     } finally {
@@ -709,31 +708,25 @@ export default function SalesPage() {
         <div className="min-w-0">
           <h1 className="text-xl font-black text-slate-900">売上・来院（NOAH）</h1>
           <p className="mt-1 text-sm text-slate-600">
-            毎晩、院のパソコンで NOAH の集計を読み取って更新します（数字だけ。患者さんのお名前などは扱いません）。
+            NOAH とアルファノートで出力した CSV を入れると、最新になります（数字だけ。患者さんのお名前などは扱いません）。
           </p>
           {latest && (
             <p className="mt-1 text-xs text-slate-500">
-              最新：{dateLabel(latest.asOf)}まで（NOAHから書き出し {latest.exportedAt.replace('T', ' ')}）
+              最新：{dateLabel(latest.asOf)}まで（入れた日時 {latest.exportedAt.replace('T', ' ')}）
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={refreshNow}
-          disabled={busy}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10"
-        >
-          {busy ? '読み込み中…' : '最新にする'}
-        </button>
       </div>
       {message && <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{message}</p>}
 
+      {/* CSVを入れて最新にする（NOAH の金額集計・アルファノートのカード／QR） */}
+      <KeieiCsvImport storeMonths={months} onSaved={() => void reload()} />
+
       {data && months.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
-          <p className="font-bold text-slate-800">まだ NOAH の集計が届いていません。</p>
+          <p className="font-bold text-slate-800">まだ NOAH の集計が入っていません。</p>
           <p className="mt-2">
-            毎晩21時ごろ、院のパソコンで Claude が NOAH の「分析 → 金額分析」を読み取り、ここに届けます。
-            パソコンの電源が入っていて、Claude のアプリと NOAH が開いていることが必要です。
+            NOAH の「分析 → 金額分析 → F5 金額集計 → F9 CSV出力」で出した CSV を、上の「CSVを選ぶ」から入れてください。
           </p>
           {data.store?.folderFound === false && (
             <p className="mt-2 text-xs text-slate-500">（集計を置くフォルダがまだ作られていません）</p>
