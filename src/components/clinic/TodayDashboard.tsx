@@ -79,7 +79,7 @@ function SalesPanel() {
       {state.kind === 'denied' && <p className="text-sm text-slate-600">売上は院長のログインで表示されます。</p>}
       {state.kind === 'error' && <p className="text-sm text-slate-600">集計を読み込めませんでした。</p>}
       {state.kind === 'ok' && !s && (
-        <p className="text-sm text-slate-600">まだ NOAH の集計が届いていません（毎晩21時すぎに届きます）。</p>
+        <p className="text-sm text-slate-600">まだ NOAH の集計が入っていません（経営 →「売上・来院」で CSV を入れると出ます）。</p>
       )}
       {s && (
         <div className="space-y-3">

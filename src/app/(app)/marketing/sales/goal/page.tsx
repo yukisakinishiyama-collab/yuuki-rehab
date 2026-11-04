@@ -9,7 +9,7 @@
  *   試算   … 基本の2つ（1日の来院・自費の1回あたり）＋詳しい条件。目標に届く組み合わせはボタンで入れる
  *   計画   … 4つの段階（いまの段階だけ開く）と打ち手のチェック・守ること
  *
- * 数字は NOAH の集計（毎晩届く数字だけ）と、NOAH に入らない収入（アルファノートのサブスクなど）から。すべて目安。
+ * 数字は NOAH の集計（院長が「売上・来院」で入れた CSV の数字だけ）と、NOAH に入らない収入（アルファノートのサブスクなど）から。すべて目安。
  * 「実績」と「見込み（予測）」「試算」は、ラベルで必ず分けて見せる。
  * 計算は src/lib/marketing/goal-plan.ts（架空の数字で単体テストあり）。データは院長だけが読めるAPIから取る。
  */
@@ -585,7 +585,7 @@ export default function GoalPage() {
       {!loaded && <p className="text-sm text-slate-500">読み込み中…</p>}
       {loaded && !base && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
-          まだNOAHの集計が届いていません。毎晩21時すぎに届くと、ここに道すじが出ます。
+          まだNOAHの集計が入っていません。「売上・来院」で CSV を入れると、ここに道すじが出ます。
         </div>
       )}
 

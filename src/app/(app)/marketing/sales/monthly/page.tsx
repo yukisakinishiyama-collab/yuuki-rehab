@@ -123,7 +123,7 @@ export default function MonthlyReportPage() {
       {error && <p className="text-sm text-red-700">{error}</p>}
       {loaded && !report && !error && (
         <p className="text-sm text-slate-600">
-          NOAH の集計がまだありません。毎晩の読み取りが届くと出ます（<Link href="/marketing/sales" className="underline">売上・来院</Link>）。
+          NOAH の集計がまだありません。CSV を入れると出ます（<Link href="/marketing/sales" className="underline">売上・来院</Link>）。
         </p>
       )}
 

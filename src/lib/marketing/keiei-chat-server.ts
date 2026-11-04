@@ -112,7 +112,7 @@ export async function buildContext(goal?: number | null): Promise<string> {
       lines.push(`NOAHのエリアランキング（${r[0]}）: ${r[1]}院中 ${r[2]}位`)
     }
   } else {
-    lines.push('', 'NOAH の集計はまだありません（毎晩の読み取りが届くと出ます）')
+    lines.push('', 'NOAH の集計はまだありません（経営の「売上・来院」で CSV を入れると出ます）')
   }
 
   if (stats?.bookings) {
