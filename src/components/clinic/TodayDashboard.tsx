@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ChartColumn, ChevronRight, ClipboardList, Search, Send, UserPlus } from 'lucide-react'
 import YoyakuTodayCard from '@/components/rehab/YoyakuTodayCard'
+import LineReservationPanel from './LineReservationPanel'
 import YoyakuCancelSyncCard from '@/components/rehab-management/YoyakuCancelSyncCard'
 import { getCancellations, getPatients, getSOAPNotes, initPatientStore } from '@/lib/patient-store'
 import { getRecentViews } from '@/lib/patient-ui-prefs'
@@ -413,6 +414,8 @@ export default function TodayDashboard() {
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="min-w-0 space-y-5 lg:col-span-2">
           <YoyakuTodayCard />
+          {/* LINE連携している方の予約を、LINEで送る（予約日・時間） */}
+          <LineReservationPanel />
           <YoyakuCancelSyncCard />
         </div>
         <div className="min-w-0 space-y-5">

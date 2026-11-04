@@ -14,7 +14,8 @@ const TABLE = 'marketing_line_contacts'
 
 /** LINE顧客一覧などがKV行を誤って拾わないための予約プレフィックス */
 // mkt: … 集客の自動化設定・動いた記録・監査ログ（automation-store-server.ts）
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'gbp:', 'mkt:'] as const
+// linesent: … 「LINEで予約日時を送る」で送った記録（api/line-link/reservation）
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'gbp:', 'mkt:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')
