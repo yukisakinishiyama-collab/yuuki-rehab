@@ -7,6 +7,8 @@
 // 文面は、LINEから予約した方に予約システムから届く「予約が確定しました」と同じ（lib/reservation-message.ts）。
 // 送った予約は「送信済み」。予約の日時が変わったら「日時が変わりました」と出して、送り直せる。
 // 予約の読み込みは「今日の予約」と同じ（この端末に入れた予約管理のパスワードで、予約システムから読む）。
+// 2026-11-05〜 予約が入ると「確定しました」は自動で送る（line-reservation-server.ts）。送ったものはここで「送信済み」になる。
+// 開いたときの一覧で、前日のお知らせの控えも最新にする。ボタンは送り直したいとき・自動で送れなかったとき用
 // ──────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, MessageCircle, Send } from 'lucide-react'
@@ -73,7 +75,7 @@ function sentLabel(iso: string): string {
 type Upcoming =
   | { kind: 'nokey' }
   | { kind: 'error'; message: string }
-  | { kind: 'ok'; rows: (FeedRow & { date: string })[] }
+  | { kind: 'ok'; rows: (FeedRow & { date: string })[]; until: string }
 
 /** これからの予約（キャンセル・来院済み・過ぎた時刻を除く）を予約システムから読む */
 async function readUpcoming(): Promise<Upcoming> {
@@ -90,7 +92,9 @@ async function readUpcoming(): Promise<Upcoming> {
       .flatMap((d) => d.rows.map((r) => ({ ...r, date: d.date })))
       .filter((r) => r.status !== CANCELLED && r.status !== VISITED && r.reservationNo)
       .filter((r) => r.date > now.date || (r.date === now.date && hhmm(r.time) >= now.time))
-    return { kind: 'ok', rows }
+    // 予約システムが返した最後の日（前日のお知らせの控えをそろえる範囲）
+    const until = (data.days ?? []).reduce((max, d) => (d.date > max ? d.date : max), '')
+    return { kind: 'ok', rows, until }
   } catch {
     return { kind: 'error', message: '予約を読み込めませんでした' }
   }
@@ -99,6 +103,7 @@ async function readUpcoming(): Promise<Upcoming> {
 export default function LineReservationPanel() {
   const { links, linkFor } = useLineLinks()
   const [rows, setRows] = useState<(FeedRow & { date: string })[] | null>(null)
+  const [until, setUntil] = useState('')
   const [noKey, setNoKey] = useState(false)
   const [patients, setPatients] = useState<Patient[]>([])
   const [sent, setSent] = useState<Record<string, SentInfo>>({})
@@ -123,6 +128,7 @@ export default function LineReservationPanel() {
         initPatientStore()
         setPatients(getPatients())
         setRows(result.rows)
+        setUntil(result.until)
         setError('')
       })
   }, [])
@@ -160,6 +166,25 @@ export default function LineReservationPanel() {
     }
     return out.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
   }, [rows, links, patients, linkFor])
+
+  // 前日のお知らせの控えを、いま読んだ一覧で最新にする（予約の通知の前からある予約・日時の変更・キャンセルをそろえる）
+  const syncBody = useMemo(() => {
+    const now = nowLocal()
+    // 範囲は、今日から予約システムが返した最後の日まで
+    if (!rows || !links || !/^\d{4}-\d{2}-\d{2}$/.test(until) || until < now.date) return ''
+    const to = until
+    // rows は予約番号・日付・時刻だけ（お名前・電話は送らない）。控えを消すのは、予約番号が一覧から無くなったものだけ
+    return JSON.stringify({
+      from: now.date,
+      to,
+      rows: rows.map((r) => ({ reservationNo: r.reservationNo, date: r.date, time: hhmm(r.time) })),
+      items: items.map((i) => ({ key: i.link.key, reservationNo: i.reservationNo, date: i.date, time: i.time })),
+    })
+  }, [rows, until, links, items])
+  useEffect(() => {
+    if (!syncBody) return
+    void fetch('/api/line-link/reservation', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: syncBody }).catch(() => {})
+  }, [syncBody])
 
   // 送ったかどうかを読み込む
   const nos = items.map((i) => i.reservationNo).join(',')
@@ -306,7 +331,7 @@ export default function LineReservationPanel() {
             </ul>
           )}
           <p className="text-xs text-slate-600">
-            LINEから予約された方には、予約システムから同じ「確定しました」のお知らせが自動で届いています。二重に送らないようご注意ください。
+            LINE連携の方には、予約が入ると「確定しました」を自動で送り（送ったものは「送信済み」）、前日にもお知らせを自動で送ります。ここは送り直したいとき用です。
           </p>
         </div>
       )}
