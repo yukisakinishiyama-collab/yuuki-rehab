@@ -3,6 +3,7 @@
  * 2026-11-02 院長の依頼「LINE連携した人に予約した際、LINEに予約日・時間を送るボタン」
  *
  * - GET  ?nos=R1,R2 … 予約ごとに、このアプリから送ったか（送った日時・そのときの予約日時）
+ * - PUT  { from, to, items } … 前日のお知らせの控えを、画面で読んだ予約の一覧で最新にする
  * - POST { key, reservationNo, date, time } … その予約の日時を、結びついたLINEへ送る
  *   宛先は連携の記録（linelink:<key>）の封印から、サーバーの中でだけ開く（画面から LINE の宛先は受け取らない）
  *   本文のお名前も連携の記録のもの（画面から来たお名前は使わない）。文面は予約確定のお知らせと同じ
@@ -44,6 +45,33 @@ export async function GET(request: NextRequest) {
     if (record) sent[no] = { date: record.date, time: record.time, sentAt: record.sentAt }
   }
   return NextResponse.json({ ok: true, sent }, { headers: { 'Cache-Control': 'no-store' } })
+}
+
+const syncSchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** これからの予約すべて（予約番号・日付・時刻だけ） */
+  rows: z.array(z.object({ reservationNo: z.string().max(20), date: z.string().max(10), time: z.string().max(8) })).max(1000),
+  /** そのうち LINE 連携の方（連携のキーつき） */
+  items: z
+    .array(z.object({ key: z.string().max(80), reservationNo: z.string().max(20), date: z.string().max(10), time: z.string().max(8) }))
+    .max(300),
+})
+
+/**
+ * PUT { from, to, rows, items } … 「今日」の画面で読んだ予約で、前日のお知らせの控えを最新にする
+ * （予約システムから「新しい予約」の通知が来る前に入っていた予約・日時の変更・キャンセルをそろえる）
+ */
+export async function PUT(request: NextRequest) {
+  const parsed = syncSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ ok: false, error: '予約の一覧の形が正しくありません' }, { status: 400 })
+  try {
+    const { syncLineReservations } = await import('@/lib/marketing/line-reservation-server')
+    const r = await syncLineReservations(parsed.data)
+    return NextResponse.json({ ok: true, ...r })
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : '保存できませんでした' }, { status: 400 })
+  }
 }
 
 const bodySchema = z.object({
