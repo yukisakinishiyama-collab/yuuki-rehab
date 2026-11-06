@@ -8,7 +8,7 @@ import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, ProgressRecord,
-  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion, KartePhoto,
+  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion, KartePhoto, AttendanceRecord,
 } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
@@ -17,7 +17,7 @@ import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getAttendanceRecords,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
 import {
@@ -35,6 +35,7 @@ import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import KarteQuestionsTab from './KarteQuestionsTab'
 import PhotosTab from './PhotosTab'
+import VisitCalendar from './VisitCalendar'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
@@ -754,6 +755,7 @@ export default function PatientDetail({ patient }: Props) {
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
   const [karteQuestions, setKarteQuestions] = useState<KarteQuestion[]>([])
   const [kartePhotos, setKartePhotos] = useState<KartePhoto[]>([])
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
@@ -776,6 +778,7 @@ export default function PatientDetail({ patient }: Props) {
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
     setKarteQuestions(getKarteQuestions(patient.id))
     setKartePhotos(getKartePhotos(patient.id))
+    setAttendance(getAttendanceRecords(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
   }
@@ -1202,6 +1205,18 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── SOAPカルテタブ ── */}
         {activeTab === 'soap' && (
           <div className="space-y-4">
+            {/* 来院カレンダー（来院・キャンセル・これからの予約を月で見る） */}
+            <VisitCalendar
+              patient={patient}
+              soapNotes={soapNotes}
+              attendance={attendance}
+              cancellations={cancellations}
+              evaluations={evaluations}
+              intakes={intakes}
+              photos={kartePhotos}
+              onOpenSoap={id => document.getElementById(`soap-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            />
+
             {/* 新規カルテ入力 */}
             <SOAPForm patientId={patient.id} onSaved={reload} />
 
@@ -1213,15 +1228,16 @@ export default function PatientDetail({ patient }: Props) {
                   <span className="text-xs text-gray-500">{soapNotes.length}件</span>
                 </div>
                 {soapNotes.map(note => (
-                  <SOAPNoteCard
-                    key={note.id}
-                    note={note}
-                    onReferral={() => {
-                      setSelectedSoap(note)
-                      setSelectedIntake(null)
-                      setShowReferralModal(true)
-                    }}
-                  />
+                  <div key={note.id} id={`soap-${note.id}`} className="scroll-mt-24">
+                    <SOAPNoteCard
+                      note={note}
+                      onReferral={() => {
+                        setSelectedSoap(note)
+                        setSelectedIntake(null)
+                        setShowReferralModal(true)
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             )}

@@ -24,7 +24,7 @@ npm run lint     # ESLint
 
 - 今日（ホーム）: `/dashboard` → `src/components/clinic/TodayDashboard.tsx`
 - 予約: `/yoyaku`（GAS の予約管理画面を常駐 iframe で表示。`src/components/rehab/YoyakuFrame.tsx`）
-- カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・評価・問診・メモ・疑問・AI相談・患部の写真・キャンセル・紹介状）
+- カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・来院カレンダー・評価・問診・メモ・疑問・AI相談・患部の写真・キャンセル・紹介状）
 - 経営: `/marketing/sales`（NOAH の売上・来院）、`/marketing/analytics`（集客の効果）
 - 集客: `/marketing/**`（自動投稿・投稿づくり・LINE導線・口コミ返信など。`src/lib/marketing/`）
 
