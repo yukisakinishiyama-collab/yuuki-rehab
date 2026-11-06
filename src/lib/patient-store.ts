@@ -4,7 +4,7 @@
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
-  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion,
+  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion, KartePhoto,
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
 
@@ -26,6 +26,7 @@ const KEYS = {
   retentionRisks: 'pt_retention_risks',
   quickMemos: 'pt_quick_memos',
   karteQuestions: 'pt_karte_questions',
+  kartePhotos: 'pt_karte_photos',
   intakes: 'pt_intakes',
   explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
@@ -236,6 +237,24 @@ export function saveKarteQuestion(question: KarteQuestion): void {
 
 export function deleteKarteQuestion(id: string): void {
   set(KEYS.karteQuestions, getKarteQuestions().filter(q => q.id !== id))
+}
+
+// ── 患部の写真（メタデータ。画像本体はクラウド） ──
+export function getKartePhotos(patientId?: string): KartePhoto[] {
+  const all = get<KartePhoto>(KEYS.kartePhotos)
+  return patientId ? all.filter(p => p.patientId === patientId) : all
+}
+
+export function saveKartePhoto(photo: KartePhoto): void {
+  const list = getKartePhotos()
+  const idx = list.findIndex(p => p.id === photo.id)
+  if (idx >= 0) list[idx] = photo
+  else list.push(photo)
+  set(KEYS.kartePhotos, list)
+}
+
+export function deleteKartePhoto(id: string): void {
+  set(KEYS.kartePhotos, getKartePhotos().filter(p => p.id !== id))
 }
 
 // ── 問診票 ──
