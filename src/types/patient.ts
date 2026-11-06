@@ -374,6 +374,37 @@ export interface QuickMemo {
 }
 
 // ──────────────────────────────────────────────
+// 疑問メモ・AI相談
+// 患者さんについて「疑問に思ったこと」を残し、必要なときにAIへ相談できる。
+// AIにはお名前などの個人を特定できる情報は送らない（consult-context.ts）。判断は院長。
+// ──────────────────────────────────────────────
+export type KarteQuestionStatus = 'open' | 'resolved'
+
+export interface KarteConsult {
+  id: string
+  askedAt: string
+  /** 送った情報の種類（画面で見せる用。中身は入れない） */
+  sentItems: string[]
+  answer: string
+  model?: string
+}
+
+export interface KarteQuestion {
+  id: string
+  patientId: string
+  /** 疑問に思った日（yyyy-MM-dd） */
+  questionDate: string
+  question: string
+  status: KarteQuestionStatus
+  /** 解決したときの結論・メモ */
+  resolution?: string
+  resolvedAt?: string
+  consults: KarteConsult[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ──────────────────────────────────────────────
 // 来院記録
 // ──────────────────────────────────────────────
 export interface AttendanceRecord {
