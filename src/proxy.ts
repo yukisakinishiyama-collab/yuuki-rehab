@@ -115,5 +115,7 @@ export const config = {
     '/api/line-link/:path*',
     // カルテの音声入力（録音を OpenAI で文字に・Claude で患者さんの情報だけに整理。外から使われないように）
     '/api/voice/:path*',
+    // 疑問メモの AI相談（カルテの要約を Claude に送る。外から使われないように）
+    '/api/karte/:path*',
   ],
 }

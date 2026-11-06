@@ -1,14 +1,14 @@
 'use client'
 // ──────────────────────────────────────────────
 // カルテ（患者さん1人分）
-// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・キャンセル
+// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・疑問・AI相談・キャンセル
 // ──────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, ProgressRecord,
-  SpecialTestResult, QuickMemo, Intake, CancellationRecord,
+  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion,
 } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
@@ -17,7 +17,7 @@ import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
 import {
@@ -33,6 +33,7 @@ import SpecialTestInputForm from './SpecialTestInputForm'
 import SOAPForm from './SOAPForm'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
+import KarteQuestionsTab from './KarteQuestionsTab'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
@@ -725,7 +726,7 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'cancel'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'cancel'
 /** 「評価・測定」の中の切り替え */
 type EvalKey = 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
 const EVAL_TABS: { key: EvalKey; label: string }[] = [
@@ -750,6 +751,7 @@ export default function PatientDetail({ patient }: Props) {
   const [soapNotes, setSoapNotes] = useState<SOAPNote[]>([])
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
+  const [karteQuestions, setKarteQuestions] = useState<KarteQuestion[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
@@ -770,6 +772,7 @@ export default function PatientDetail({ patient }: Props) {
     setProgressRecords(getProgressRecords(patient.id))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
+    setKarteQuestions(getKarteQuestions(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
   }
@@ -844,6 +847,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'eval', label: '評価・測定' },
     { key: 'intake', label: '問診票', badge: intakes.length || undefined },
     { key: 'memo', label: '簡易メモ', badge: quickMemos.length || undefined },
+    { key: 'question', label: '疑問・AI相談', badge: karteQuestions.filter(q => q.status === 'open').length || undefined },
     { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
 
@@ -1226,6 +1230,19 @@ export default function PatientDetail({ patient }: Props) {
             patient={patient}
             memos={quickMemos}
             specialTests={specialTests}
+            onUpdate={reload}
+          />
+        )}
+
+        {/* ── 疑問・AI相談 タブ ── */}
+        {activeTab === 'question' && (
+          <KarteQuestionsTab
+            patient={patient}
+            questions={karteQuestions}
+            intakes={intakes}
+            soapNotes={soapNotes}
+            specialTests={specialTests}
+            memos={quickMemos}
             onUpdate={reload}
           />
         )}

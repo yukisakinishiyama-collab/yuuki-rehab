@@ -4,7 +4,7 @@
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
-  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake,
+  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion,
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
 
@@ -25,6 +25,7 @@ const KEYS = {
   cancellations: 'pt_cancellations',
   retentionRisks: 'pt_retention_risks',
   quickMemos: 'pt_quick_memos',
+  karteQuestions: 'pt_karte_questions',
   intakes: 'pt_intakes',
   explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
@@ -217,6 +218,24 @@ export function saveQuickMemo(memo: QuickMemo): void {
 
 export function deleteQuickMemo(id: string): void {
   set(KEYS.quickMemos, getQuickMemos().filter(m => m.id !== id))
+}
+
+// ── 疑問メモ・AI相談 ──
+export function getKarteQuestions(patientId?: string): KarteQuestion[] {
+  const all = get<KarteQuestion>(KEYS.karteQuestions)
+  return patientId ? all.filter(q => q.patientId === patientId) : all
+}
+
+export function saveKarteQuestion(question: KarteQuestion): void {
+  const list = getKarteQuestions()
+  const idx = list.findIndex(q => q.id === question.id)
+  if (idx >= 0) list[idx] = question
+  else list.push(question)
+  set(KEYS.karteQuestions, list)
+}
+
+export function deleteKarteQuestion(id: string): void {
+  set(KEYS.karteQuestions, getKarteQuestions().filter(q => q.id !== id))
 }
 
 // ── 問診票 ──
