@@ -5,6 +5,7 @@
  * - 管理画面の「今すぐ実行」からも呼べる（管理者のBasic認証で許可）
  * - CRON_SECRET 設定時は Authorization: Bearer で保護
  * - 自動投稿（autopilot）のジョブが手動対応になったら、本文と「投稿した」ボタンを院長のLINEへ送る
+ * - LINE連携の方への前日のお知らせ（日本時間10〜20時。明日の予約の控えの分。送り済みはすぐ終わる）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { refreshInstagramTokenIfNeeded } from '@/lib/marketing/instagram-token'
@@ -60,7 +61,16 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, nudged, aiVideos }
+  // LINE連携の方への前日のお知らせ（2026-11-05 院長の依頼。時間外・送り済みはすぐ終わる）
+  let lineReminders: unknown = null
+  try {
+    const { runLineReminders } = await import('@/lib/marketing/line-reservation-server')
+    lineReminders = await runLineReminders()
+  } catch (error) {
+    console.error('前日のお知らせに失敗:', error instanceof Error ? error.message : error)
+  }
+
+  return { ok: true, processed: results.length, results, nudged, aiVideos, lineReminders }
 }
 
 export async function GET(request: NextRequest) {

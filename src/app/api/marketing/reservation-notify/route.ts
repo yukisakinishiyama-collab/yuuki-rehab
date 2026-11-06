@@ -18,6 +18,10 @@
  *      - 空き枠のお知らせは送ってよい時間帯（8時〜20時）だけ → 時間外は { delivered:false, deferred:true }
  *      - 同じお知らせは二度送らない → { duplicate:true }（送り済みなら delivered:true）
  *
+ * 新しい予約（kind: 'new'）のときは、返事のあとで、カルテから LINE 連携した方へ「確定しました」を送る
+ * （予約システムが LINE を知らない方。LINE から予約した方には予約システムが patient-confirm で送るので、二重には送らない）。
+ * 予約を控えて、前日のお知らせも送る（lib/marketing/line-reservation-server.ts。2026-11-05 院長の依頼）
+ *
  * キャンセル（kind: 'cancel'）のときは、返事のあとで「空いた枠をInstagramのストーリーで知らせる」も行う
  * （院長の設定がオンのときだけ。lib/marketing/cancel-story-server.ts。患者さんの情報はストーリーに使わない）
  *
@@ -34,7 +38,8 @@ import { getRule, markSent, recordRun, sentToday, wasSent } from '@/lib/marketin
 import { TEST_SAMPLES_PER_DAY, type AutomationKey } from '@/lib/marketing/automation-types'
 import { checkConsent, lineMark } from '@/lib/marketing/consent-store-server'
 import { CONSENT_KEYWORDS, inSendHours } from '@/lib/marketing/consent'
-import { DEFAULT_CLINIC_PROFILE, LIFF_RESERVE_URL } from '@/lib/marketing/clinic'
+import { LIFF_RESERVE_URL } from '@/lib/marketing/clinic'
+import { patientRemindText } from '@/lib/reservation-message'
 
 export const dynamic = 'force-dynamic'
 // キャンセルのストーリー（予約システムへの返事のあとで、空きの取り直し→画像→Instagramへの公開まで）に使う時間
@@ -79,11 +84,6 @@ const PATIENT_NOTE: Record<PatientKind, string> = {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const TIME_RE = /^\d{2}:\d{2}$/
-
-/** 日本時間の明日 'YYYY-MM-DD' */
-function jstTomorrow(now = new Date()): string {
-  return new Date(now.getTime() + (9 + 24) * 60 * 60 * 1000).toISOString().slice(0, 10)
-}
 
 function authorized(request: NextRequest): boolean {
   const secret = process.env.RESERVATION_NOTIFY_SECRET
@@ -137,24 +137,8 @@ function buildPatientMessage(b: NotifyBody): string {
   const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
 
   if (b.kind === 'patient-remind') {
-    // 文面は日時・場所・変更とキャンセルの方法だけ（来院を強くすすめる言葉・施術の指示は入れない）
-    const tomorrow = b.date === jstTomorrow()
-    return [
-      name ? `${name} 様` : undefined,
-      name ? '' : undefined,
-      `ゆうき整骨院です。${tomorrow ? '明日の' : ''}ご予約のお知らせです。`,
-      '',
-      `📅 日時：${when}〜`,
-      reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
-      `📍 場所：${DEFAULT_CLINIC_PROFILE.address}（${DEFAULT_CLINIC_PROFILE.parking}）`,
-      '',
-      '変更・キャンセルは、このトークまたは',
-      `お電話（${DEFAULT_CLINIC_PROFILE.phone}）へどうぞ。`,
-      '',
-      `※このお知らせが不要な方は「${CONSENT_KEYWORDS.stopReservation}」と送ってください。`,
-    ]
-      .filter((x): x is string => x !== undefined)
-      .join('\n')
+    // 文面は院内アプリからの前日のお知らせ（LINE連携の方）と共通（lib/reservation-message.ts）
+    return patientRemindText({ name: b.name, date: b.date, time: b.time, reservationNo: b.reservationNo })
   }
   if (b.kind === 'patient-waitlist') {
     return [
@@ -223,8 +207,30 @@ export async function POST(request: NextRequest) {
 
   // キャンセル：空いた枠をストーリーで知らせる（予約システムへの返事を待たせないよう、返事のあとで行う。
   // 日時だけを渡す。お名前・電話などは渡さない）
+  // 新しい予約：カルテから LINE 連携した方へ「確定しました」（予約システムへの返事を待たせないよう、返事のあとで）
+  if (body.kind === 'new') {
+    const rsv = { reservationNo: body.reservationNo, name: body.name, phone: body.phone, date: body.date, time: body.time }
+    after(async () => {
+      try {
+        const { onNewReservation } = await import('@/lib/marketing/line-reservation-server')
+        console.log('[line-reservation] 予約の確定:', await onNewReservation(rsv))
+      } catch (error) {
+        console.error('[line-reservation] 失敗しました', error)
+      }
+    })
+  }
+
   if (body.kind === 'cancel') {
     const notice = { date: body.date, time: body.time }
+    const cancelledNo = body.reservationNo
+    after(async () => {
+      try {
+        const { onCancelReservation } = await import('@/lib/marketing/line-reservation-server')
+        await onCancelReservation(cancelledNo)
+      } catch (error) {
+        console.error('[line-reservation] キャンセルの控えを消せませんでした', error)
+      }
+    })
     after(async () => {
       try {
         const { handleCancelStory } = await import('@/lib/marketing/cancel-story-server')
@@ -315,6 +321,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, delivered: false, reason: '自動化設定で止めています', sealed })
     }
 
+    // カルテから LINE 連携した方へ、こちらから先に同じ予約の「確定しました」を送っていたら二重に送らない
+    if (body.kind === 'patient-confirm' && rule.mode !== 'test') {
+      const { confirmSentFor } = await import('@/lib/marketing/line-reservation-server')
+      if (await confirmSentFor(body.reservationNo, body.date, body.time).catch(() => false)) {
+        await recordRun({ automation, result: 'duplicate', note: patientNote })
+        return NextResponse.json({ ok: true, delivered: true, duplicate: true, reason: '同じお知らせは送り済みです', sealed })
+      }
+    }
+
     if (isNotice) {
       // 同じお知らせを二度送らない（印は LINE の ID のハッシュ・時刻・予約番号だけ）
       const reservationNo = /^[A-Za-z0-9]{1,12}$/.test(String(body.reservationNo ?? '')) ? String(body.reservationNo) : ''
@@ -369,7 +384,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+    // LINE_API_BASE_URL は動作確認用（ふだんは設定しない）
+    const res = await fetch(`${(process.env.LINE_API_BASE_URL ?? 'https://api.line.me').replace(/\/$/, '')}/v2/bot/message/push`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
@@ -384,6 +400,11 @@ export async function POST(request: NextRequest) {
     }
     if (isPatientPush) await recordRun({ automation, result: testRun ? 'test' : 'sent', note: patientNote })
     if (sentMark) await markSent(sentMark.day, sentMark.mark)
+    // 予約システムが本人へ「確定しました」を送った → カルテ連携の方への自動の確定を二重に送らない
+    if (patientKind === 'patient-confirm' && !testRun && to) {
+      const { markConfirmSent } = await import('@/lib/marketing/line-reservation-server')
+      await markConfirmSent({ reservationNo: body.reservationNo, date: body.date, time: body.time, userId: to }).catch(() => {})
+    }
     return NextResponse.json({ ok: true, delivered: !testRun, test: testRun || undefined, sealed })
   } catch (error) {
     if (isPatientPush) await recordRun({ automation, result: 'error', note: patientNote })
