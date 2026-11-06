@@ -405,6 +405,27 @@ export interface KarteQuestion {
 }
 
 // ──────────────────────────────────────────────
+// 患部の写真
+// 写真そのものはクラウド（Supabase Storage の非公開バケット）に置き、ここには場所と説明だけを持つ。
+// 表示・削除は院内アプリの API 経由（Basic 認証の内側）。
+// ──────────────────────────────────────────────
+export interface KartePhoto {
+  id: string
+  patientId: string
+  /** 撮った日（yyyy-MM-dd） */
+  takenDate: string
+  /** クラウド上の場所（patientId/id.jpg） */
+  storagePath: string
+  /** 部位・状態などの説明（任意） */
+  caption: string
+  bodyRegion?: BodyRegion
+  width: number
+  height: number
+  bytes: number
+  createdAt: string
+}
+
+// ──────────────────────────────────────────────
 // 来院記録
 // ──────────────────────────────────────────────
 export interface AttendanceRecord {

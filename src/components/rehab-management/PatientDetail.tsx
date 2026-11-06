@@ -1,14 +1,14 @@
 'use client'
 // ──────────────────────────────────────────────
 // カルテ（患者さん1人分）
-// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・疑問・AI相談・キャンセル
+// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・疑問・AI相談・写真・キャンセル
 // ──────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, ProgressRecord,
-  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion,
+  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion, KartePhoto,
 } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
@@ -17,7 +17,7 @@ import BodyMap from './BodyMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
 import {
@@ -34,6 +34,7 @@ import SOAPForm from './SOAPForm'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import KarteQuestionsTab from './KarteQuestionsTab'
+import PhotosTab from './PhotosTab'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
@@ -726,7 +727,7 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'cancel'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'cancel'
 /** 「評価・測定」の中の切り替え */
 type EvalKey = 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
 const EVAL_TABS: { key: EvalKey; label: string }[] = [
@@ -752,6 +753,7 @@ export default function PatientDetail({ patient }: Props) {
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
   const [karteQuestions, setKarteQuestions] = useState<KarteQuestion[]>([])
+  const [kartePhotos, setKartePhotos] = useState<KartePhoto[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
@@ -773,6 +775,7 @@ export default function PatientDetail({ patient }: Props) {
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
     setKarteQuestions(getKarteQuestions(patient.id))
+    setKartePhotos(getKartePhotos(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
   }
@@ -848,6 +851,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'intake', label: '問診票', badge: intakes.length || undefined },
     { key: 'memo', label: '簡易メモ', badge: quickMemos.length || undefined },
     { key: 'question', label: '疑問・AI相談', badge: karteQuestions.filter(q => q.status === 'open').length || undefined },
+    { key: 'photo', label: '写真', badge: kartePhotos.length || undefined },
     { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
 
@@ -1245,6 +1249,11 @@ export default function PatientDetail({ patient }: Props) {
             memos={quickMemos}
             onUpdate={reload}
           />
+        )}
+
+        {/* ── 写真タブ ── */}
+        {activeTab === 'photo' && (
+          <PhotosTab patient={patient} photos={kartePhotos} onUpdate={reload} />
         )}
 
         {/* ── キャンセルタブ ── */}
