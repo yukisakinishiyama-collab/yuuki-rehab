@@ -4,13 +4,14 @@
 // スマホのカメラで撮った写真を、日付・部位・説明つきでカルテに残す。
 // 写真はクラウド（非公開）に置き、端末には場所と説明だけを持つ（photo-storage-server.ts / photo-client.ts）。
 // ──────────────────────────────────────────────
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { nanoid } from 'nanoid'
 import type { BodyRegion, KartePhoto, Patient } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 import { deleteKartePhoto, saveKartePhoto } from '@/lib/patient-store'
 import { deletePhotoFile, fetchPhotoMeta, photoUrl, pushPhotoMeta, removePhotoMeta, resizePhoto, uploadPhoto } from '@/lib/karte/photo-client'
 import { ClearTextButton, CLEARABLE_PADDING } from './shared'
+import CameraCapture, { canUseInAppCamera } from './CameraCapture'
 
 type Props = {
   patient: Patient
@@ -29,6 +30,9 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<KartePhoto | null>(null)
+  const [camera, setCamera] = useState(false)
+  // ホーム画面のアプリでも開けるよう、使える端末ではアプリ内カメラを出す（サーバー側では false）
+  const inAppCamera = useSyncExternalStore(() => () => {}, canUseInAppCamera, () => false)
   const cameraRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [syncNote, setSyncNote] = useState<string | null>(null)
@@ -134,10 +138,20 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
         <span className="block text-sm font-semibold text-gray-700">📷 患部の写真を残す</span>
         {/* スマホのブラウザでは display:none の入力を click() で開けないことがあるため、<label> で直接開く（入力は sr-only） */}
         <div className="flex flex-wrap gap-2">
-          <label className="inline-flex items-center px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 cursor-pointer max-lg:min-h-10">
-            カメラで撮る
-            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={e => pick(e.target.files?.[0])} />
-          </label>
+          {inAppCamera ? (
+            <button
+              type="button"
+              onClick={() => { setError(null); setCamera(true) }}
+              className="inline-flex items-center px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 max-lg:min-h-10"
+            >
+              カメラで撮る
+            </button>
+          ) : (
+            <label className="inline-flex items-center px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 cursor-pointer max-lg:min-h-10">
+              カメラで撮る
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={e => pick(e.target.files?.[0])} />
+            </label>
+          )}
           <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 cursor-pointer max-lg:min-h-10">
             写真を選ぶ
             <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={e => pick(e.target.files?.[0])} />
@@ -226,6 +240,14 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
             </div>
           ))}
         </div>
+      )}
+
+      {/* アプリ内カメラ */}
+      {camera && (
+        <CameraCapture
+          onCapture={file => { setCamera(false); pick(file) }}
+          onClose={() => setCamera(false)}
+        />
       )}
 
       {/* 拡大表示 */}
