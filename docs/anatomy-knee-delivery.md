@@ -1,5 +1,7 @@
 # 膝関節の解剖図（2026-11-07）
 
+> 以下は旧1枚絵の納品記録。層の合成一致を満たす新規原画への作り直しは [肩・膝の納品メモ](anatomy-shoulder-delivery.md) を参照。現在の画像・座標・容量・検査結果はそちらが最新。
+
 ## 納品内容
 
 - `public/anatomy/knee/{anterior,posterior,medial,lateral}.webp`
