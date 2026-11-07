@@ -9,7 +9,7 @@ import { nanoid } from 'nanoid'
 import type { BodyRegion, KartePhoto, Patient } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 import { deleteKartePhoto, saveKartePhoto } from '@/lib/patient-store'
-import { deletePhotoFile, photoUrl, resizePhoto, uploadPhoto } from '@/lib/karte/photo-client'
+import { deletePhotoFile, fetchPhotoMeta, photoUrl, pushPhotoMeta, removePhotoMeta, resizePhoto, uploadPhoto } from '@/lib/karte/photo-client'
 import { ClearTextButton, CLEARABLE_PADDING } from './shared'
 
 type Props = {
@@ -31,8 +31,27 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
   const [viewing, setViewing] = useState<KartePhoto | null>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [syncNote, setSyncNote] = useState<string | null>(null)
 
   useEffect(() => () => { if (pending) URL.revokeObjectURL(pending.preview) }, [pending])
+
+  // クラウドの一覧を取り込む（スマホで撮った写真をパソコンでも出す）。端末にしか無いものはクラウドへ送る
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const cloud = await fetchPhotoMeta(patient.id)
+      if (cancelled || !cloud) return
+      const localIds = new Set(photos.map(p => p.id))
+      const cloudIds = new Set(cloud.map(p => p.id))
+      let changed = false
+      for (const p of cloud) if (!localIds.has(p.id)) { saveKartePhoto(p); changed = true }
+      for (const p of photos) if (!cloudIds.has(p.id)) { pushPhotoMeta(p).catch(() => undefined) }
+      if (changed) { setSyncNote('クラウドの写真を取り込みました'); onUpdate() }
+    })()
+    return () => { cancelled = true }
+    // 初回と患者さんが変わったときだけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient.id])
 
   function pick(file: File | undefined) {
     if (!file) return
@@ -48,10 +67,14 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const resized = await resizePhoto(pending.file)
+      // 縮小できない形式（古い端末・特殊な形式）のときは、JPEG で 3MB 以下ならそのまま送る
+      const resized = await resizePhoto(pending.file).catch(() => {
+        if (pending.file.type === 'image/jpeg' && pending.file.size <= 3 * 1024 * 1024) return { blob: pending.file, width: 0, height: 0 }
+        throw new Error('この写真の形式は読み込めませんでした。カメラの設定で「互換性優先（JPEG）」にするか、別の写真をお試しください')
+      })
       const id = nanoid()
       const { storagePath, bytes } = await uploadPhoto({ patientId: patient.id, photoId: id, blob: resized.blob })
-      saveKartePhoto({
+      const photo: KartePhoto = {
         id,
         patientId: patient.id,
         takenDate: date,
@@ -62,7 +85,10 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
         height: resized.height,
         bytes,
         createdAt: new Date().toISOString(),
-      })
+      }
+      saveKartePhoto(photo)
+      // 一覧もクラウドへ（失敗しても端末には残る。次に開いたときに送り直す）
+      pushPhotoMeta(photo).catch(() => undefined)
       URL.revokeObjectURL(pending.preview)
       setPending(null)
       setCaption('')
@@ -85,12 +111,15 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
       console.warn('写真の削除', e)
     }
     deleteKartePhoto(photo.id)
+    await removePhotoMeta(photo.patientId, photo.id)
     setViewing(null)
     onUpdate()
   }
 
   function updateCaption(photo: KartePhoto, next: string) {
-    saveKartePhoto({ ...photo, caption: next })
+    const updated = { ...photo, caption: next }
+    saveKartePhoto(updated)
+    pushPhotoMeta(updated).catch(() => undefined)
     onUpdate()
   }
 
@@ -103,23 +132,16 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
       {/* 撮る・選ぶ */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
         <span className="block text-sm font-semibold text-gray-700">📷 患部の写真を残す</span>
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => pick(e.target.files?.[0])} />
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => pick(e.target.files?.[0])} />
+        {/* スマホのブラウザでは display:none の入力を click() で開けないことがあるため、<label> で直接開く（入力は sr-only） */}
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => cameraRef.current?.click()}
-            className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 max-lg:min-h-10"
-          >
+          <label className="inline-flex items-center px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 cursor-pointer max-lg:min-h-10">
             カメラで撮る
-          </button>
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 max-lg:min-h-10"
-          >
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={e => pick(e.target.files?.[0])} />
+          </label>
+          <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 cursor-pointer max-lg:min-h-10">
             写真を選ぶ
-          </button>
+            <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={e => pick(e.target.files?.[0])} />
+          </label>
         </div>
 
         {pending && (
@@ -179,7 +201,7 @@ export default function PhotosTab({ patient, photos, onUpdate }: Props) {
             </div>
           </div>
         )}
-        <p className="text-xs text-slate-500">写真は縮小してクラウド（非公開）に保存します。院内アプリにログインした人だけが見られます。</p>
+        <p className="text-xs text-slate-500">写真は縮小してクラウド（非公開）に保存します。院内アプリにログインした人だけが見られます。{syncNote ? ` ${syncNote}。` : ''}</p>
       </div>
 
       {/* 一覧（日付ごと） */}
