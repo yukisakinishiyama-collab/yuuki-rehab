@@ -86,3 +86,22 @@ export interface AnatomyJointSpec {
   /** 納品者・日付などのメモ */
   credit?: string
 }
+
+// ── 解剖図への直接のマーク（部位の多角形とは別に、ペンで描いた線・×印） ──
+// 座標は右側の図の px（画像そのものの座標）。左は表示時に反転するので、保存値は反転しない。
+
+/** 1つの向きのマーク */
+export interface AnatomyViewMarks {
+  /** ×印の位置 */
+  pins: Array<[number, number]>
+  /** ペンで描いた線（1本 = 点の列） */
+  strokes: Array<Array<[number, number]>>
+}
+
+/** 向きごとのマーク（キーは AnatomyView） */
+export type AnatomyMarks = Partial<Record<AnatomyView, AnatomyViewMarks>>
+
+export function hasAnatomyMarks(marks: AnatomyMarks | undefined): boolean {
+  if (!marks) return false
+  return Object.values(marks).some(m => m && (m.pins.length > 0 || m.strokes.length > 0))
+}

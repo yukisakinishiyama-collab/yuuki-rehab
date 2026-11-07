@@ -18,6 +18,7 @@ import BodyMap from './BodyMap'
 import AnatomyMap from './AnatomyMap'
 import { SUPPORTED_JOINTS } from './JointDetailMap'
 import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
+import { hasAnatomyMarks, type AnatomyMarks } from '@/lib/anatomy/types'
 import { TAP_AREA } from '@/components/ui/tap-area'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import { SOAP_SECTION_LABELS, VOICE_SOAP_FIELDS, type SoapSection, type VoiceSoapResult } from '@/lib/voice/soap-fields'
@@ -36,6 +37,8 @@ interface FormState {
   painLocations: string[]
   /** 解剖図で押した部位（関節ごと） */
   jointDetailLocations: Record<string, string[]>
+  /** 解剖図に直接描いたマーク（関節ごと） */
+  anatomyMarks: Record<string, AnatomyMarks>
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -356,6 +359,7 @@ const defaultForm: FormState = {
   complaints: [],
   painLocations: [],
   jointDetailLocations: {},
+  anatomyMarks: {},
   painToday: 3,
   changeFromLast: '',
   adlDifficulty: '',
@@ -405,6 +409,7 @@ function initialForm(patientId: string): { form: FormState; previousNrs: Record<
       complaints: c.complaints,
       painLocations: c.painLocations,
       jointDetailLocations: c.jointDetailLocations,
+      anatomyMarks: c.anatomyMarks,
       treatmentAreas: c.treatmentAreas,
       currentPhase: c.currentPhase,
       homeExercise: c.homeExercise,
@@ -506,6 +511,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       complaints: complaints.length > 0 ? complaints : undefined,
       painLocations: form.painLocations,
       jointDetailLocations: Object.keys(form.jointDetailLocations).length > 0 ? form.jointDetailLocations : undefined,
+      anatomyMarks: Object.values(form.anatomyMarks).some(hasAnatomyMarks) ? form.anatomyMarks : undefined,
       painToday: derivedNrs,
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
@@ -654,10 +660,9 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
             {selectedJoints.length > 0 && (
               <div className="space-y-4">
                 <FormLabel>痛みの場所（解剖図）</FormLabel>
-                <p className="text-xs text-gray-500 -mt-1">人体図で押した関節のイラストです。痛む部位を押してください（複数可）。</p>
+                <p className="text-xs text-gray-500 -mt-1">人体図で押した関節のイラストです。痛む部位を押すか、「ペン」「×印」で直接描いてください。</p>
                 {selectedJoints.map(({ joint, side }) => (
                   <div key={joint}>
-                    <p className="text-xs font-semibold text-gray-700 mb-1">{side === 'left' ? '左' : side === 'right' ? '右' : ''}{joint}</p>
                     <AnatomyMap
                       joint={joint}
                       side={side}
@@ -666,6 +671,8 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                         ...f,
                         jointDetailLocations: { ...f.jointDetailLocations, [joint]: regions },
                       }))}
+                      marks={form.anatomyMarks[joint]}
+                      onMarksChange={m => setForm(f => ({ ...f, anatomyMarks: { ...f.anatomyMarks, [joint]: m } }))}
                     />
                   </div>
                 ))}
