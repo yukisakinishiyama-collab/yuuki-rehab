@@ -6,6 +6,7 @@
  * - complaintEpisodes: 部位ごとの「いつ始まり、いつ終わったか」を SOAP の履歴から組み立てる（部位の移り変わり）
  * - coverSuggestion: 主な部位・傷病名が変わっていたら、カルテの表紙（Patient）を合わせる提案を返す
  */
+import type { AnatomyMarks } from '@/lib/anatomy/types'
 import type { ComplaintEntry, Patient, SOAPNote, BodyRegion, Side } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 
@@ -20,6 +21,7 @@ export interface CarriedForward {
   complaints: ComplaintEntry[]
   painLocations: string[]
   jointDetailLocations: Record<string, string[]>
+  anatomyMarks: Record<string, AnatomyMarks>
   treatmentAreas: string[]
   currentPhase: SOAPNote['currentPhase']
   homeExercise: string
@@ -48,6 +50,7 @@ export function carryForward(last: SOAPNote): CarriedForward {
     complaints: active.map(c => ({ ...c, status: 'active', startedAt: c.startedAt ?? last.visitDate, resolvedAt: undefined })),
     painLocations: [...(last.painLocations ?? [])],
     jointDetailLocations: Object.fromEntries(Object.entries(last.jointDetailLocations ?? {}).map(([k, v]) => [k, [...v]])),
+    anatomyMarks: JSON.parse(JSON.stringify(last.anatomyMarks ?? {})) as Record<string, AnatomyMarks>,
     treatmentAreas: [...(last.treatmentAreas ?? [])],
     currentPhase: last.currentPhase,
     homeExercise: last.homeExercise ?? '',

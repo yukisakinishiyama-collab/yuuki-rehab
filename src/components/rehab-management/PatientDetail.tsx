@@ -15,6 +15,9 @@ const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', b
 const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-700' : 'text-green-700'
 import BodyMap from './BodyMap'
 import { zoneLabel } from './JointDetailMap'
+import AnatomyMap from './AnatomyMap'
+import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
+import { hasAnatomyMarks } from '@/lib/anatomy/types'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
@@ -565,6 +568,25 @@ function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferr
                     <span className="font-semibold">{joint}</span>：{ids.map(id => zoneLabel(joint, id)).join('・')}
                   </p>
                 ))}
+              </div>
+            )}
+            {note.anatomyMarks && Object.values(note.anatomyMarks).some(hasAnatomyMarks) && (
+              <div className="mb-3 space-y-2">
+                <p className="text-xs text-gray-500 font-medium">解剖図への書き込み</p>
+                {Object.entries(note.anatomyMarks).filter(([, m]) => hasAnatomyMarks(m)).map(([joint, m]) => {
+                  const side = jointsFromPainLocations(note.painLocations ?? [], [joint]).find(j => j.joint === joint)?.side
+                  return (
+                    <AnatomyMap
+                      key={joint}
+                      joint={joint}
+                      side={side}
+                      selected={note.jointDetailLocations?.[joint] ?? []}
+                      onChange={() => {}}
+                      marks={m}
+                      readOnly
+                    />
+                  )
+                })}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
