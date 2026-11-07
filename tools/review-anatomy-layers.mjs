@@ -37,7 +37,7 @@ async function contact(filename, images, columns, headings) {
   await sharp({ create: { width: w * columns, height: Math.ceil(images.length / columns) * (h + head), channels: 3, background: '#fff' } }).composite(overlays).webp({ quality: 80, effort: 6 }).toFile(resolve(out, filename))
 }
 
-for (const key of ['knee', 'ankle']) {
+for (const key of ['knee', 'ankle', 'shoulder']) {
   const spec = JSON.parse(readFileSync(resolve(root, `src/lib/anatomy/zones/${key}.json`), 'utf8'))
   const comparisons = [], comparisonTitles = [], isolated = [], isolatedTitles = [], zoneImages = [], zoneTitles = []
   for (const view of spec.views) {
@@ -82,8 +82,8 @@ for (const key of ['knee', 'ankle']) {
       }
       if (changed) changedPixels++
     }
-    // 足関節は納品した層から1枚絵を書き出すので、デコード後も完全一致する。
-    if (key === 'ankle') assert.equal(max, 0, `${view.view}: 足関節の合成が不一致`)
+    // 全関節とも最終WebPの層から1枚絵を書き出し、デコード後の画素も一致させる。
+    assert.equal(max, 0, `${key}/${view.view}: 層の合成と1枚絵が不一致`)
     const diffPNG = await sharp(difference, { raw: { width: 1000, height: 1300, channels: 3 } }).png().toBuffer()
     const blendPNG = await sharp(blend, { raw: { width: 1000, height: 1300, channels: 3 } }).png().toBuffer()
     comparisons.push(flat, stack, blendPNG, diffPNG)
@@ -125,4 +125,4 @@ for (const key of ['knee', 'ankle']) {
 }
 writeFileSync(resolve(out, 'metrics.json'), JSON.stringify(report, null, 2) + '\n')
 console.log(`確認画像と数値: ${out}`)
-if (report.some(r => !r.exactCompositeMatch)) console.log('注意: 膝の既存1枚絵との完全一致は未達。差分画像を確認してください。')
+console.log('全方向で層の合成と1枚絵が画素単位で完全一致。')
