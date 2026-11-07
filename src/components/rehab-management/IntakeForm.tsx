@@ -11,7 +11,8 @@ import {
   ToggleSwitch, SectionTitle, NRSInput,
 } from './shared'
 import BodyMap from './BodyMap'
-import JointDetailMap, { SUPPORTED_JOINTS } from './JointDetailMap'
+import { SUPPORTED_JOINTS } from './JointDetailMap'
+import AnatomyMap from './AnatomyMap'
 import IntakeFlowchart, { type FlowchartResult } from './IntakeFlowchart'
 
 interface Props {
@@ -387,7 +388,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                   関節別詳細部位
                 </p>
                 {selectedJoints.map(joint => (
-                  <JointDetailMap
+                  <AnatomyMap
                     key={joint}
                     joint={joint}
                     selected={form.jointDetailLocations[joint] ?? []}

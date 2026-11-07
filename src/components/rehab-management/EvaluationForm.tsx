@@ -13,7 +13,8 @@ import {
 } from './shared'
 import { RedFlagAlert } from './shared'
 import BodyMap from './BodyMap'
-import JointDetailMap, { SUPPORTED_JOINTS } from './JointDetailMap'
+import { SUPPORTED_JOINTS } from './JointDetailMap'
+import AnatomyMap from './AnatomyMap'
 
 interface Props {
   patientId: string
@@ -230,7 +231,7 @@ export default function EvaluationForm({ patientId, onSaved }: Props) {
               <div className="space-y-4">
                 <p className="text-xs font-semibold text-gray-600">関節別詳細部位</p>
                 {selectedJoints.map(joint => (
-                  <JointDetailMap
+                  <AnatomyMap
                     key={joint}
                     joint={joint}
                     selected={form.jointDetailLocations[joint] ?? []}

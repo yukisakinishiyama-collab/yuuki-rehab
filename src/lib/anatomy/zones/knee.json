@@ -1,0 +1,7 @@
+{
+  "joint": "膝関節",
+  "key": "knee",
+  "mirrorForLeft": true,
+  "credit": "（未納品）docs/anatomy-illustrations-brief.md の仕様で Codex が納品する。views が空の間は従来の図を使う",
+  "views": []
+}
