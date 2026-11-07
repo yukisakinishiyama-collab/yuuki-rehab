@@ -23,12 +23,24 @@ export function canUseInAppCamera(): boolean {
 
 type Facing = 'environment' | 'user'
 
+/** 許可されていないときの案内（端末ごと）。許可を求める画面が出ないのは、端末側で「ブロック」になっているとき */
+function permissionHelp(): string {
+  const ua = navigator.userAgent
+  if (/Android/i.test(ua)) {
+    return 'カメラの使用が許可されていません。Chrome の「⋮ → 設定 → サイトの設定 → カメラ」で「ブロック中」からこのサイトを「許可」にするか、Android の「設定 → アプリ → Chrome（と ゆうき院内）→ 権限 → カメラ」を許可にしてから「もう一度試す」を押してください。'
+  }
+  if (/iPhone|iPad/i.test(ua)) {
+    return 'カメラの使用が許可されていません。iPhone の「設定 → アプリ → Safari（またはホーム画面のアプリ）→ カメラ」を「許可」にしてから「もう一度試す」を押してください。'
+  }
+  return 'カメラの使用が許可されていません。ブラウザのサイト設定でカメラを「許可」にしてから「もう一度試す」を押してください。'
+}
+
 export default function CameraCapture({ onCapture, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   // 向き・準備できたか・エラー はひとまとまり（向きを変えるときに一緒に初期化する）
-  const [cam, setCam] = useState<{ facing: Facing; ready: boolean; error: string | null }>({ facing: 'environment', ready: false, error: null })
-  const { facing, ready, error } = cam
+  const [cam, setCam] = useState<{ facing: Facing; ready: boolean; error: string | null; attempt: number }>({ facing: 'environment', ready: false, error: null, attempt: 0 })
+  const { facing, ready, error, attempt } = cam
   const setReady = (ready: boolean) => setCam(c => ({ ...c, ready }))
   const setError = (error: string | null) => setCam(c => ({ ...c, error }))
   const [canSwitch, setCanSwitch] = useState(false)
@@ -68,7 +80,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         const name = e instanceof DOMException ? e.name : ''
         setError(
           name === 'NotAllowedError' || name === 'SecurityError'
-            ? 'カメラの使用が許可されていません。iPhone は「設定 → アプリ（または Safari）→ カメラ」を「許可」にしてから、もう一度お試しください。'
+            ? permissionHelp()
             : name === 'NotFoundError' || name === 'OverconstrainedError'
               ? 'この端末でカメラが見つかりませんでした。「写真を選ぶ」から、カメラアプリで撮った写真を選んでください。'
               : 'カメラを開けませんでした。「写真を選ぶ」から、カメラアプリで撮った写真を選んでください。',
@@ -79,7 +91,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       cancelled = true
       stop()
     }
-  }, [facing, stop])
+  }, [facing, attempt, stop])
 
   // 画面を離れたら必ず止める
   useEffect(() => stop, [stop])
@@ -140,8 +152,15 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
             <p>{error}</p>
             <button
               type="button"
-              onClick={() => { stop(); onClose() }}
+              onClick={() => setCam(c => ({ ...c, ready: false, error: null, attempt: c.attempt + 1 }))}
               className="w-full px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg max-lg:min-h-10"
+            >
+              もう一度試す
+            </button>
+            <button
+              type="button"
+              onClick={() => { stop(); onClose() }}
+              className="w-full px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg max-lg:min-h-10"
             >
               戻る
             </button>
@@ -162,7 +181,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         </button>
         <button
           type="button"
-          onClick={() => setCam(c => ({ facing: c.facing === 'environment' ? 'user' : 'environment', ready: false, error: null }))}
+          onClick={() => setCam(c => ({ ...c, facing: c.facing === 'environment' ? 'user' : 'environment', ready: false, error: null }))}
           disabled={!canSwitch || !ready}
           aria-label="カメラを切り替える"
           className="flex h-12 w-14 items-center justify-center rounded-lg text-white/90 hover:bg-white/10 disabled:opacity-0"
