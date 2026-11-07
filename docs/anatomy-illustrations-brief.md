@@ -33,6 +33,41 @@
 
 納品の順番は **膝 → 足 → 肩 → 腰 → 股 → 肘 → 手 → 頚** でお願いします（1関節ずつ PR で構いません。`src/lib/anatomy/index.ts` の import に1行足してください）。
 
+## 1.5 層（軟部組織を押して外せるように）— 2026-11-07 追加
+
+院長の希望で、**骨 → 靭帯・腱 → 筋** を層にして、画面で「筋」「靭帯・腱」を押して外し、下の構造を見られるようにします。
+
+向きごとに次の画像を用意してください（`public/anatomy/<key>/<view>-<layer>.webp`）:
+
+| 層 key | ファイル | 中身 | 透過 |
+|---|---|---|---|
+| bone | `<view>-bone.webp` | 骨・軟骨・半月板・関節裂隙だけ。白背景 | 不透過でよい |
+| ligament | `<view>-ligament.webp` | 靭帯・腱・滑液包だけ（骨は描かない） | **透過**（骨の上に重ねる） |
+| muscle | `<view>-muscle.webp` | 筋・神経だけ（骨・靭帯は描かない） | **透過** |
+
+- 3枚は**同じ構図・同じ縮尺・同じ位置**で描く（重ねたときにずれないこと）。1枚絵をまず作り、そこから層を分けると揃えやすい
+- 透過は WebP の alpha を使う。輪郭の外は完全透明に。半透明の陰影は可
+- `image`（1枚絵）も引き続き用意する（層をすべて重ねた見た目と同じもの。古い画面・印刷の下絵）
+- 部位の多角形は、その部位の種類（type）で層が決まる（bone/cartilage/meniscus → bone、ligament/tendon/bursa → ligament、muscle/nerve → muscle）。層を外すと、その層の部位は押せなくなる
+
+JSON には `layers` を足します:
+
+```json
+{
+  "view": "anterior",
+  "image": "/anatomy/knee/anterior.webp",
+  "width": 1000, "height": 1300,
+  "layers": [
+    { "key": "bone",     "image": "/anatomy/knee/anterior-bone.webp" },
+    { "key": "ligament", "image": "/anatomy/knee/anterior-ligament.webp" },
+    { "key": "muscle",   "image": "/anatomy/knee/anterior-muscle.webp" }
+  ],
+  "zones": [ ... ]
+}
+```
+
+膝は、まず1枚絵と座標で納品してから、層の3枚を追加してください（膝で形が固まったら、他の関節は最初から層つきで）。筋が主題でない関節（例: 足関節の靭帯図）は muscle 層を省略してよい（bone と ligament の2層）。
+
 ## 2. 画風（必ず揃える）
 
 - 医学書のような**線画＋薄い陰影**のイラスト。骨を主体に、靭帯・腱・筋は半透明に重ねて位置が分かる程度に描く

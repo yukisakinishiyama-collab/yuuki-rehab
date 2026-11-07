@@ -7,7 +7,7 @@
 // ──────────────────────────────────────────────
 import { useMemo, useState } from 'react'
 import type { Side } from '@/types/patient'
-import { ANATOMY_VIEW_LABELS, getAnatomySpec, polygonCenter, type AnatomyViewSpec, type ZoneType } from '@/lib/anatomy'
+import { ANATOMY_LAYER_LABELS, ANATOMY_LAYER_ORDER, ANATOMY_VIEW_LABELS, getAnatomySpec, polygonCenter, ZONE_LAYER, type AnatomyLayerKey, type AnatomyViewSpec, type ZoneType } from '@/lib/anatomy'
 import JointDetailMap from './JointDetailMap'
 
 export interface AnatomyMapProps {
@@ -52,8 +52,31 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly }: {
   const initial = views.find(v => v.zones.some(z => selected.includes(z.id))) ?? views[0]
   const [viewKey, setViewKey] = useState(initial.view)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  // 外した層（骨は外せない）。向きを変えても引き継ぐ
+  const [hiddenLayers, setHiddenLayers] = useState<Set<AnatomyLayerKey>>(() => {
+    const init = new Set<AnatomyLayerKey>()
+    for (const v of views) for (const l of v.layers ?? []) if (l.defaultVisible === false) init.add(l.key)
+    return init
+  })
   const view = views.find(v => v.view === viewKey) ?? views[0]
   const allZones = useMemo(() => views.flatMap(v => v.zones), [views])
+  const layers = useMemo(
+    () => [...(view.layers ?? [])].sort((a, b) => ANATOMY_LAYER_ORDER.indexOf(a.key) - ANATOMY_LAYER_ORDER.indexOf(b.key)),
+    [view],
+  )
+  const layerKeys = new Set(layers.map(l => l.key))
+  const isLayerShown = (key: AnatomyLayerKey) => !layerKeys.has(key) || !hiddenLayers.has(key)
+  // 層を外した部位は押せない（見えていないものを選ばない）。選択済みは残す
+  const visibleZones = view.zones.filter(z => isLayerShown(ZONE_LAYER[z.type]))
+
+  function toggleLayer(key: AnatomyLayerKey) {
+    if (key === 'bone') return
+    setHiddenLayers(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   function toggle(id: string) {
     if (readOnly) return
@@ -84,9 +107,33 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly }: {
         </div>
       </div>
 
+      {/* 層の切り替え（軟部組織を外して下を見る） */}
+      {layers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-1">
+          <span className="text-xs text-gray-500">層：</span>
+          {layers.map(l => {
+            const shown = isLayerShown(l.key)
+            const locked = l.key === 'bone'
+            return (
+              <button
+                key={l.key}
+                type="button"
+                onClick={() => toggleLayer(l.key)}
+                disabled={locked}
+                aria-pressed={shown}
+                className={`px-2.5 py-1 text-xs rounded-full border max-lg:min-h-10 ${shown ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-gray-500 border-gray-200 line-through'} ${locked ? 'opacity-70' : ''}`}
+                title={locked ? '骨は外せません' : shown ? '押すとこの層を外します' : '押すとこの層を戻します'}
+              >
+                {ANATOMY_LAYER_LABELS[l.key]}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* 凡例 */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 px-1">
-        {(Object.keys(TYPE_LABELS) as ZoneType[]).filter(t => view.zones.some(z => z.type === t)).map(t => (
+        {(Object.keys(TYPE_LABELS) as ZoneType[]).filter(t => visibleZones.some(z => z.type === t)).map(t => (
           <span key={t} className="flex items-center gap-1 text-xs text-gray-500">
             <span className="inline-block w-3 h-3 rounded-full border" style={{ background: TYPE_COLORS[t].selected, borderColor: TYPE_COLORS[t].stroke }} />
             {TYPE_LABELS[t]}
@@ -104,8 +151,14 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly }: {
         </div>
         <svg viewBox={`0 0 ${view.width} ${view.height}`} className="w-full max-w-[360px]" style={{ userSelect: 'none' }} role="img" aria-label={`${joint}の${ANATOMY_VIEW_LABELS[view.view]}`}>
           <g transform={transform}>
-            <image href={view.image} x="0" y="0" width={view.width} height={view.height} preserveAspectRatio="xMidYMid meet" />
-            {view.zones.map(z => {
+            {layers.length > 0 ? (
+              layers.filter(l => isLayerShown(l.key)).map(l => (
+                <image key={l.key} href={l.image} x="0" y="0" width={view.width} height={view.height} preserveAspectRatio="xMidYMid meet" />
+              ))
+            ) : (
+              <image href={view.image} x="0" y="0" width={view.width} height={view.height} preserveAspectRatio="xMidYMid meet" />
+            )}
+            {visibleZones.map(z => {
               const isSelected = selected.includes(z.id)
               const isHovered = hoveredId === z.id
               const c = TYPE_COLORS[z.type]
@@ -129,7 +182,7 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly }: {
             })}
           </g>
           {/* 選んだ部位の名札（反転しても文字は読める向きに） */}
-          {view.zones.filter(z => selected.includes(z.id)).map(z => {
+          {visibleZones.filter(z => selected.includes(z.id)).map(z => {
             const [cx, cy] = z.labelAt ?? polygonCenter(z.polygon)
             const x = mirror ? view.width - cx : cx
             return (
@@ -158,7 +211,7 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly }: {
           })}
         </div>
       )}
-      {!readOnly && <p className="text-xs text-gray-500 px-1">向きを切り替えて、部位を押して選択・解除できます</p>}
+      {!readOnly && <p className="text-xs text-gray-500 px-1">向きを切り替えて、部位を押して選択・解除できます{layers.length > 1 ? '。「層」を押すと筋や靭帯を外して下の構造を見られます' : ''}</p>}
     </div>
   )
 }
