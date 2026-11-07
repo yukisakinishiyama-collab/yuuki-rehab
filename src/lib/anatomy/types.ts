@@ -32,13 +32,47 @@ export interface AnatomyZone {
   labelAt?: [number, number]
 }
 
+/** 層（下から順に重ねる）。bone が土台、その上に靭帯・腱、筋、皮膚の順 */
+export type AnatomyLayerKey = 'bone' | 'ligament' | 'muscle' | 'skin'
+
+export const ANATOMY_LAYER_LABELS: Record<AnatomyLayerKey, string> = {
+  bone: '骨',
+  ligament: '靭帯・腱',
+  muscle: '筋',
+  skin: '皮膚',
+}
+
+export const ANATOMY_LAYER_ORDER: AnatomyLayerKey[] = ['bone', 'ligament', 'muscle', 'skin']
+
+export interface AnatomyLayer {
+  key: AnatomyLayerKey
+  /** 透過画像（bone だけ不透過でよい）。向きの画像と同じ大きさ */
+  image: string
+  /** 最初から表示するか（省略時は表示） */
+  defaultVisible?: boolean
+}
+
+/** 部位の種類 → どの層に属するか（層を外すと、その層の部位も押せなくなる） */
+export const ZONE_LAYER: Record<ZoneType, AnatomyLayerKey> = {
+  bone: 'bone',
+  cartilage: 'bone',
+  meniscus: 'bone',
+  ligament: 'ligament',
+  tendon: 'ligament',
+  bursa: 'ligament',
+  muscle: 'muscle',
+  nerve: 'muscle',
+}
+
 export interface AnatomyViewSpec {
   view: AnatomyView
-  /** public/ からのパス。例: /anatomy/knee/anterior.webp */
+  /** 層が無いときの1枚絵（層があるときは、層をすべて外したときの下絵にはならない。bone 層が土台） */
   image: string
   width: number
   height: number
   zones: AnatomyZone[]
+  /** 軟部組織を層にして、押して外せるようにする（任意。無ければ image の1枚絵） */
+  layers?: AnatomyLayer[]
 }
 
 export interface AnatomyJointSpec {

@@ -42,6 +42,20 @@ for (const file of readdirSync(ZONES_DIR).filter((f) => f.endsWith('.json'))) {
     if (!v.image || !existsSync(img)) fail(`${v.view}: 画像が無い ${v.image}`)
     else if (statSync(img).size > 400 * 1024) fail(`${v.view}: 画像が 400KB を超えている（${Math.round(statSync(img).size / 1024)}KB）`)
     else ok(`${v.view}: 画像あり ${v.image}`)
+    if (Array.isArray(v.layers)) {
+      const LAYERS = ['bone', 'ligament', 'muscle', 'skin']
+      const keys = new Set()
+      for (const l of v.layers) {
+        if (!LAYERS.includes(l.key)) fail(`${v.view}: 層「${l.key}」は使えない（${LAYERS.join('/')}）`)
+        if (keys.has(l.key)) fail(`${v.view}: 層「${l.key}」が重複`)
+        keys.add(l.key)
+        const limg = join(PUBLIC, String(l.image || '').replace(/^\//, ''))
+        if (!l.image || !existsSync(limg)) fail(`${v.view}: 層 ${l.key} の画像が無い ${l.image}`)
+        else if (statSync(limg).size > 400 * 1024) fail(`${v.view}: 層 ${l.key} の画像が 400KB を超えている`)
+      }
+      if (!keys.has('bone')) fail(`${v.view}: 層があるのに bone（土台）が無い`)
+      else ok(`${v.view}: 層 ${[...keys].join('・')}`)
+    }
     if (!Array.isArray(v.zones) || v.zones.length === 0) { fail(`${v.view}: zones が空`); continue }
     for (const z of v.zones) {
       if (!known[spec.joint].has(z.id)) fail(`${v.view}: 部位ID「${z.id}」は既存一覧に無い`)
