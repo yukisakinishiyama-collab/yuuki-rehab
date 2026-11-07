@@ -25,7 +25,14 @@ import {
   calculateRetentionRisk, getDaysSinceLastVisit, generatePatientFriendlyMessage,
 } from '@/lib/rehab-algorithms'
 import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle, ClearTextButton, CLEARABLE_PADDING } from './shared'
-import { PainChart, ImprovementChart, ROMChart, StrengthChart, SpecialTestSummary, AdherenceChart } from './charts'
+// グラフ（recharts）は重いので、使うタブを開いたときだけ読み込む（SOAP タブの表示を軽くする）
+import dynamic from 'next/dynamic'
+const chartLoading = () => <div className="h-40 animate-pulse rounded-xl bg-slate-100" aria-hidden />
+const PainChart = dynamic(() => import('./charts').then(m => m.PainChart), { ssr: false, loading: chartLoading })
+const ImprovementChart = dynamic(() => import('./charts').then(m => m.ImprovementChart), { ssr: false, loading: chartLoading })
+const ROMChart = dynamic(() => import('./charts').then(m => m.ROMChart), { ssr: false, loading: chartLoading })
+const SpecialTestSummary = dynamic(() => import('./charts').then(m => m.SpecialTestSummary), { ssr: false, loading: chartLoading })
+const AdherenceChart = dynamic(() => import('./charts').then(m => m.AdherenceChart), { ssr: false, loading: chartLoading })
 import EvaluationForm from './EvaluationForm'
 import ROMInputForm from './ROMInputForm'
 import StrengthInputForm from './StrengthInputForm'
