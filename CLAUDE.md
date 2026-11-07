@@ -39,6 +39,10 @@ npm run lint     # ESLint
 
 主な API: `/api/marketing/**`、`/api/sync`、`/api/yoyaku/feed`、`/api/intake-analysis`・`/api/referral-generate`（Anthropic SDK）、`/api/voice/transcribe`（カルテの音声入力。録音を OpenAI で文字に）・`/api/voice/organize`（文字起こしから患者さんの情報だけを Claude で S/O/A/P・メモに整理。欄に入れるだけで保存は院長）、`/api/karte/consult`（カルテの「疑問・AI相談」。お名前などを除いた要約と疑問を Claude に送る。`src/lib/karte/`）、`/api/karte/photos`（患部の写真。Supabase Storage の非公開バケット karte-photos に保存。メタデータは `pt_karte_photos`）、`/api/upload`（動画ストックの Vercel Blob 保存）、`/api/liff/verify`。
 
+### 解剖図（関節の部位えらび）
+
+`src/components/rehab-management/AnatomyMap.tsx` が、`src/lib/anatomy/zones/<key>.json`（向きごとの画像 `public/anatomy/<key>/<view>.webp` ＋ 押せる部位の多角形）を読んで表示する。JSON が無い関節は従来の `JointDetailMap.tsx` に戻る。図と座標は Codex が `docs/anatomy-illustrations-brief.md` の仕様で納品し、`node tools/test-anatomy-zones.mjs` で検査する。部位ID（`JOINT_ZONES`）はカルテの保存値なので増減しない。計画全体は `docs/karte-soap-upgrade.md`。
+
 ### スタイリング
 
 Tailwind CSS 4（`@tailwindcss/postcss` 経由）。カスタムトークン（`--color-navy`、`--color-line`）と `.hero-h1` のレスポンシブ見出しは `src/app/globals.css` の `@theme` で定義。CSS Modules は使用しない。日本語フォントスタック（Hiragino Sans → Noto Sans JP）。
