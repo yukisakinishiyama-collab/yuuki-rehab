@@ -560,6 +560,11 @@ const IMAGE_MAP: Record<string, string> = {
 
 export const SUPPORTED_JOINTS = Object.keys(JOINT_ZONES)
 
+/** 部位IDの表示名（カルテの一覧で使う）。見つからなければ ID をそのまま */
+export function zoneLabel(joint: string, id: string): string {
+  return JOINT_ZONES[joint]?.find(z => z.id === id)?.label ?? id
+}
+
 export default function JointDetailMap({ joint, selected, onChange, readOnly = false }: JointDetailMapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [freeText, setFreeText] = useState('')
