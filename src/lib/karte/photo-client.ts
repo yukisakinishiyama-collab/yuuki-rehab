@@ -59,3 +59,30 @@ export async function deletePhotoFile(storagePath: string): Promise<void> {
     throw new Error(data.error ?? `HTTP ${res.status}`)
   }
 }
+
+// ── 一覧（メタデータ）のクラウド同期 ──
+// 端末の localStorage の一覧とクラウドの一覧を合わせる（クラウドが正。端末は表示用の控え）
+import type { KartePhoto } from '@/types/patient'
+
+export async function fetchPhotoMeta(patientId: string): Promise<KartePhoto[] | null> {
+  try {
+    const res = await fetch(`/api/karte/photos/meta?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = (await res.json()) as { photos?: KartePhoto[] }
+    return Array.isArray(data.photos) ? data.photos : null
+  } catch {
+    return null
+  }
+}
+
+export async function pushPhotoMeta(photo: KartePhoto): Promise<void> {
+  const res = await fetch('/api/karte/photos/meta', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photo }) })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error ?? `HTTP ${res.status}`)
+  }
+}
+
+export async function removePhotoMeta(patientId: string, id: string): Promise<void> {
+  await fetch(`/api/karte/photos/meta?patientId=${encodeURIComponent(patientId)}&id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => undefined)
+}

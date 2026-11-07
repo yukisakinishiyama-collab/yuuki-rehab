@@ -603,7 +603,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* 音声から：施術中の会話 → 患者さんの情報だけを S/O/A/P に振り分けて欄に入れる */}
-        <VoiceKarteCapture mode="soap" onSoap={applyVoice} />
+        <VoiceKarteCapture mode="soap" patientId={patientId} onSoap={applyVoice} />
 
         {/* S: Subjective */}
         {activeTab === 'S' && (

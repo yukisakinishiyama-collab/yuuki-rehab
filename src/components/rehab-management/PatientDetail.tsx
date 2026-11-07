@@ -244,6 +244,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
         {/* 話した内容を、言いよどみ・雑談を除いたメモの文に整えて欄に入れる（文字起こしの設定が無ければ、いままでの音声入力） */}
         <VoiceKarteCapture
           mode="memo"
+          patientId={patient.id}
           onMemo={applyVoiceMemo}
           fallback={
             <div className="flex justify-end">

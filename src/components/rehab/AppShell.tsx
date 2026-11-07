@@ -14,6 +14,7 @@ import AuthGuard from './AuthGuard'
 import YoyakuFrame from './YoyakuFrame'
 import QRLoginModal from './QRLoginModal'
 import ClinicShell from '@/components/clinic/ClinicShell'
+import { VoiceFloatingBar, VoiceSessionProvider } from './VoiceSession'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -78,14 +79,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
       {() => (
-        <>
+        <VoiceSessionProvider>
           <ClinicShell extras={extras}>
             {children}
             {/* 予約管理（常駐iframe）：タブ切替で再読み込みせず一瞬で戻れる */}
             <YoyakuFrame visible={pathname === '/yoyaku'} />
           </ClinicShell>
+          {/* 録音中の帯（録音の本体は枠にあるので、他の画面へ行っても続く） */}
+          <VoiceFloatingBar activePatientId={pathname.match(/^\/patients\/([^/]+)/)?.[1]} />
           {showQR && <QRLoginModal onClose={() => setShowQR(false)} />}
-        </>
+        </VoiceSessionProvider>
       )}
     </AuthGuard>
   )
