@@ -3,8 +3,9 @@
 // 見るもの: JSON の形、部位IDが既存の一覧と一致するか、多角形が画像の中に収まるか、画像ファイルがあるか
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const ROOT = new URL('..', import.meta.url).pathname
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const ZONES_DIR = join(ROOT, 'src/lib/anatomy/zones')
 const PUBLIC = join(ROOT, 'public')
 const VIEWS = ['anterior', 'posterior', 'medial', 'lateral', 'superior', 'palmar', 'dorsal']
