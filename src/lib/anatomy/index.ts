@@ -8,11 +8,13 @@ import ankle from './zones/ankle.json'
 import shoulder from './zones/shoulder.json'
 import lumbar from './zones/lumbar.json'
 import hip from './zones/hip.json'
+import elbow from './zones/elbow.json'
+import wrist from './zones/wrist.json'
 
 export * from './types'
 
 const SPECS: Record<string, AnatomyJointSpec> = {}
-for (const spec of [knee as AnatomyJointSpec, ankle as AnatomyJointSpec, shoulder as AnatomyJointSpec, lumbar as AnatomyJointSpec, hip as AnatomyJointSpec]) {
+for (const spec of [knee as AnatomyJointSpec, ankle as AnatomyJointSpec, shoulder as AnatomyJointSpec, lumbar as AnatomyJointSpec, hip as AnatomyJointSpec, elbow as AnatomyJointSpec, wrist as AnatomyJointSpec]) {
   if (spec.views.length > 0) SPECS[spec.joint] = spec
 }
 

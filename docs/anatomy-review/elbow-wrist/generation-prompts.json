@@ -1,0 +1,174 @@
+[
+  {
+    "key": "elbow",
+    "view": "anterior",
+    "detail": "True ANTERIOR view of the RIGHT adult elbow in extension and supination. Humeral shaft vertical at x50%, from y9% to joint y49%; proximal radius on viewer LEFT (lateral), ulna on viewer RIGHT (medial), descending to y91%. Distal humerus widens at joint, round capitellum on left over radial head, trochlea central/right over ulna coronoid. Prominent medial epicondyle at viewer right, smaller lateral epicondyle on left. Radius and ulna distinct and uncrossed; radial tuberosity visible below radial head. Joint spans x27–72%, centered y49%. Show distal third humerus and proximal half forearm, not wrist or hand. Olecranon lies behind and should not resemble posterior view.",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create an ORIGINAL medical textbook illustration: fine charcoal gray outlines, delicate light grayscale hatching, clean pure white background, portrait canvas aspect ratio 1000:1300. A single anatomical view centered with generous white margins. BONES ONLY, with faint joint cartilage. No muscle, tendons, ligaments, nerves, skin or vessels. No text, letters, numerals, labels, arrows, leader lines, watermark, frame, panels. No copying of any published illustration. Clean low-noise rendering suitable for a small WebP. True ANTERIOR view of the RIGHT adult elbow in extension and supination. Humeral shaft vertical at x50%, from y9% to joint y49%; proximal radius on viewer LEFT (lateral), ulna on viewer RIGHT (medial), descending to y91%. Distal humerus widens at joint, round capitellum on left over radial head, trochlea central/right over ulna coronoid. Prominent medial epicondyle at viewer right, smaller lateral epicondyle on left. Radius and ulna distinct and uncrossed; radial tuberosity visible below radial head. Joint spans x27–72%, centered y49%. Show distal third humerus and proximal half forearm, not wrist or hand. Olecranon lies behind and should not resemble posterior view.",
+    "transparent_background": false
+  },
+  {
+    "key": "elbow",
+    "view": "posterior",
+    "detail": "True POSTERIOR view of the RIGHT adult elbow in extension. Humeral shaft vertical at x50%, from y9% to joint y49%; proximal radius on viewer RIGHT (lateral), ulna on viewer LEFT/center (medial), descending to y91%. Distal humerus wide; larger medial epicondyle viewer LEFT, smaller lateral epicondyle viewer RIGHT. Central posterior olecranon seated within olecranon fossa, clearly defined olecranon tip and dorsal ridge of ulna. Radial head is lateral RIGHT. Joint spans x27–72%, centered y49%. Show distal third humerus and proximal half forearm only, not wrist or hand. Same scale as anterior, uncrossed forearm bones.",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create an ORIGINAL medical textbook illustration: fine charcoal gray outlines, delicate light grayscale hatching, clean pure white background, portrait canvas aspect ratio 1000:1300. A single anatomical view centered with generous white margins. BONES ONLY, with faint joint cartilage. No muscle, tendons, ligaments, nerves, skin or vessels. No text, letters, numerals, labels, arrows, leader lines, watermark, frame, panels. No copying of any published illustration. Clean low-noise rendering suitable for a small WebP. True POSTERIOR view of the RIGHT adult elbow in extension. Humeral shaft vertical at x50%, from y9% to joint y49%; proximal radius on viewer RIGHT (lateral), ulna on viewer LEFT/center (medial), descending to y91%. Distal humerus wide; larger medial epicondyle viewer LEFT, smaller lateral epicondyle viewer RIGHT. Central posterior olecranon seated within olecranon fossa, clearly defined olecranon tip and dorsal ridge of ulna. Radial head is lateral RIGHT. Joint spans x27–72%, centered y49%. Show distal third humerus and proximal half forearm only, not wrist or hand. Same scale as anterior, uncrossed forearm bones.",
+    "transparent_background": false
+  },
+  {
+    "key": "elbow",
+    "view": "medial",
+    "detail": "True MEDIAL view of the RIGHT adult elbow, flexed about 35 degrees. Anterior is viewer RIGHT, posterior is viewer LEFT. Humeral shaft vertical x48% from y9% to joint y49%; forearm slopes downward to viewer right, ends around x70% y91%. Clearly show projecting MEDIAL epicondyle, trochlear groove, proximal ulna with coronoid toward anterior RIGHT and olecranon curving upward at posterior LEFT. Radius mostly concealed behind ulna, only a faint narrow partial contour anteriorly. NO visible large lateral radial-head disk. Joint centered x48% y49%, spans x30-65%. Crop bone shafts only at their natural illustrated ends inside white margins, no wrist or hand.",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create an ORIGINAL medical textbook illustration: fine charcoal gray outlines, delicate light grayscale hatching, clean pure white background, portrait canvas aspect ratio 1000:1300. A single anatomical view centered with generous white margins. BONES ONLY, with faint joint cartilage. No muscle, tendons, ligaments, nerves, skin or vessels. No text, letters, numerals, labels, arrows, leader lines, watermark, frame, panels. No copying of any published illustration. Clean low-noise rendering suitable for a small WebP. True MEDIAL view of the RIGHT adult elbow, flexed about 35 degrees. Anterior is viewer RIGHT, posterior is viewer LEFT. Humeral shaft vertical x48% from y9% to joint y49%; forearm slopes downward to viewer right, ends around x70% y91%. Clearly show projecting MEDIAL epicondyle, trochlear groove, proximal ulna with coronoid toward anterior RIGHT and olecranon curving upward at posterior LEFT. Radius mostly concealed behind ulna, only a faint narrow partial contour anteriorly. NO visible large lateral radial-head disk. Joint centered x48% y49%, spans x30-65%. Crop bone shafts only at their natural illustrated ends inside white margins, no wrist or hand.",
+    "transparent_background": false
+  },
+  {
+    "key": "elbow",
+    "view": "lateral",
+    "detail": "True LATERAL view of the RIGHT adult elbow, flexed about 35 degrees. Anterior is viewer LEFT, posterior is viewer RIGHT. Humeral shaft vertical x52% from y9% to joint y49%; forearm slopes downward to viewer LEFT, ends around x30% y91%. Clearly show the small lateral epicondyle, rounded capitellum articulating with the round shallow cup RADIAL HEAD anterior/LEFT, radial neck and tuberosity below. Ulna with olecranon is posterior/RIGHT, curves upward behind joint; distinct ulna and radius shafts. Joint centered x52% y49%, spans x35-70%. Same magnification as medial. No wrist or hand.",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create an ORIGINAL medical textbook illustration: fine charcoal gray outlines, delicate light grayscale hatching, clean pure white background, portrait canvas aspect ratio 1000:1300. A single anatomical view centered with generous white margins. BONES ONLY, with faint joint cartilage. No muscle, tendons, ligaments, nerves, skin or vessels. No text, letters, numerals, labels, arrows, leader lines, watermark, frame, panels. No copying of any published illustration. Clean low-noise rendering suitable for a small WebP. True LATERAL view of the RIGHT adult elbow, flexed about 35 degrees. Anterior is viewer LEFT, posterior is viewer RIGHT. Humeral shaft vertical x52% from y9% to joint y49%; forearm slopes downward to viewer LEFT, ends around x30% y91%. Clearly show the small lateral epicondyle, rounded capitellum articulating with the round shallow cup RADIAL HEAD anterior/LEFT, radial neck and tuberosity below. Ulna with olecranon is posterior/RIGHT, curves upward behind joint; distinct ulna and radius shafts. Joint centered x52% y49%, spans x35-70%. Same magnification as medial. No wrist or hand.",
+    "transparent_background": false
+  },
+  {
+    "key": "wrist",
+    "view": "palmar",
+    "detail": "True PALMAR view of an entire adult RIGHT hand, fingers pointing UP, forearm DOWN. Thumb on viewer RIGHT, little finger on viewer LEFT. Exactly five digits: thumb with 2 phalanges, other four with 3 each; five metacarpals, eight anatomically shaped carpal bones in two rows, distal radius and ulna. Fingers slightly spread and all fingertips fully included. Middle fingertip y8%, other tips progressively lower. MCP heads form arc at y46-53%; carpus at y66-76%; distal radius and ulna at y80%, ends y94%. Radius on RIGHT (thumb side), narrower ulna on LEFT. Elongated scaphoid radial/right proximal row, lunate near center, triquetrum ulnar/left, pisiform visible volarly. First CMC at base of thumb metacarpal on RIGHT, thin articular cartilage. Faint triangular TFCC cartilage under distal ulna between ulna and triquetrum. Hand spans x14-87%, carpals span x36-66%. Anatomically credible separated bones with clean narrow joint spaces, natural finger proportions; not a skeletal glove, no soft tissue.",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create an ORIGINAL medical textbook illustration: fine charcoal gray outlines, delicate light grayscale hatching, clean pure white background, portrait canvas aspect ratio 1000:1300. A single anatomical view centered with generous white margins. BONES ONLY, with faint joint cartilage. No muscle, tendons, ligaments, nerves, skin or vessels. No text, letters, numerals, labels, arrows, leader lines, watermark, frame, panels. No copying of any published illustration. Clean low-noise rendering suitable for a small WebP. True PALMAR view of an entire adult RIGHT hand, fingers pointing UP, forearm DOWN. Thumb on viewer RIGHT, little finger on viewer LEFT. Exactly five digits: thumb with 2 phalanges, other four with 3 each; five metacarpals, eight anatomically shaped carpal bones in two rows, distal radius and ulna. Fingers slightly spread and all fingertips fully included. Middle fingertip y8%, other tips progressively lower. MCP heads form arc at y46-53%; carpus at y66-76%; distal radius and ulna at y80%, ends y94%. Radius on RIGHT (thumb side), narrower ulna on LEFT. Elongated scaphoid radial/right proximal row, lunate near center, triquetrum ulnar/left, pisiform visible volarly. First CMC at base of thumb metacarpal on RIGHT, thin articular cartilage. Faint triangular TFCC cartilage under distal ulna between ulna and triquetrum. Hand spans x14-87%, carpals span x36-66%. Anatomically credible separated bones with clean narrow joint spaces, natural finger proportions; not a skeletal glove, no soft tissue.",
+    "transparent_background": false
+  },
+  {
+    "key": "wrist",
+    "view": "dorsal",
+    "detail": "True DORSAL view of an entire adult RIGHT hand, fingers pointing UP, forearm DOWN. Thumb on viewer LEFT, little finger on viewer RIGHT. Exactly five digits: thumb with 2 phalanges, other four with 3 each; five metacarpals, eight anatomically shaped carpal bones in two rows, distal radius and ulna. Fingers slightly spread and all fingertips fully included. Middle fingertip y8%, other tips progressively lower. MCP heads form arc at y46-53%; carpus at y66-76%; distal radius and ulna at y80%, ends y94%. Radius on LEFT (thumb side), narrow ulna on RIGHT. Scaphoid radial/left proximal row, lunate near center, triquetrum ulnar/right, pisiform mostly hidden. First CMC at base of thumb metacarpal LEFT, thin cartilage. Faint triangular TFCC cartilage under distal ulna between ulna and triquetrum. Hand spans x13-86%, carpus spans x34-64%. Natural finger proportions with clean joint gaps. This is a dorsal view, not a mirrored palmar surface; show dorsal carpal contours and distal radial Lister tubercle. No soft tissues.",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create an ORIGINAL medical textbook illustration: fine charcoal gray outlines, delicate light grayscale hatching, clean pure white background, portrait canvas aspect ratio 1000:1300. A single anatomical view centered with generous white margins. BONES ONLY, with faint joint cartilage. No muscle, tendons, ligaments, nerves, skin or vessels. No text, letters, numerals, labels, arrows, leader lines, watermark, frame, panels. No copying of any published illustration. Clean low-noise rendering suitable for a small WebP. True DORSAL view of an entire adult RIGHT hand, fingers pointing UP, forearm DOWN. Thumb on viewer LEFT, little finger on viewer RIGHT. Exactly five digits: thumb with 2 phalanges, other four with 3 each; five metacarpals, eight anatomically shaped carpal bones in two rows, distal radius and ulna. Fingers slightly spread and all fingertips fully included. Middle fingertip y8%, other tips progressively lower. MCP heads form arc at y46-53%; carpus at y66-76%; distal radius and ulna at y80%, ends y94%. Radius on LEFT (thumb side), narrow ulna on RIGHT. Scaphoid radial/left proximal row, lunate near center, triquetrum ulnar/right, pisiform mostly hidden. First CMC at base of thumb metacarpal LEFT, thin cartilage. Faint triangular TFCC cartilage under distal ulna between ulna and triquetrum. Hand spans x13-86%, carpus spans x34-64%. Natural finger proportions with clean joint gaps. This is a dorsal view, not a mirrored palmar surface; show dorsal carpal contours and distal radial Lister tubercle. No soft tissues.",
+    "transparent_background": false
+  },
+  {
+    "key": "wrist",
+    "view": "dorsal",
+    "layer": "bone",
+    "transparent_background": false,
+    "reference": "public/anatomy/wrist/dorsal-bone.webp",
+    "operation": "correction",
+    "prompt": "Use case: precise-object-edit. Correct the attached ORIGINAL RIGHT hand dorsal BONE layer. Preserve exactly the bones, five fingers, shape, scale, orientation, grayscale textbook linework and white background. Remove ONLY the thin curved horizontal connecting lines between neighboring metacarpal heads at the four finger knuckles; these are soft tissue and must not be in a bones-only image. Leave each joint's articular contours intact. Everything between separate metacarpals must be pure white. Do not add text or other tissues. Preserve full canvas framing, all fingertips and wrist."
+  },
+  {
+    "key": "elbow",
+    "view": "anterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL bone image is ONLY a spatial registration reference. Independently draw ONLY specified LIGAMENTS AND TENDONS on a true transparent alpha background at the SAME scale, positions and 1000:1300 portrait framing as reference. OMIT EVERY bone, cartilage, muscle, nerve, vessel, skin and bone outline from output. Do NOT draw skeleton, shadow, hand outline, white background or checkerboard pixels. Do NOT crop or recenter the tissues. Fine gray ink contour and sparse light grayscale fibrous shading, tissue white/light gray with transparency. No labels, text, letters, numbers, arrows, leader lines, frames or watermark. Coordinates below use 1000x1300 canvas. RIGHT elbow anterior, lateral viewer LEFT. Three groups of thin tendons/ligaments: (1) distal biceps tendon from x485 y430 narrowing to x450 y650 then curving to radial tuberosity x415 y855, 20-35px wide; (2) lateral collateral fan from lateral epicondyle (315,600) to annular ligament around radial head (375,725), and a separate common extensor origin patch x295-335 y600-705; (3) medial UCL fan from medial epicondyle (650,600) to sublime tubercle medial ulna (585,760), and separate common flexor origin patch x655-695 y605-730. Make central biceps tendon and both side fans separately discernible. Stop common tendons at proximal forearm; no fleshy muscle masses. Do not cover round capitellum/trochlea with a capsule.",
+    "reference": "public/anatomy/elbow/anterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "posterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL bone image is ONLY a spatial registration reference. Independently draw ONLY specified LIGAMENTS AND TENDONS on a true transparent alpha background at the SAME scale, positions and 1000:1300 portrait framing as reference. OMIT EVERY bone, cartilage, muscle, nerve, vessel, skin and bone outline from output. Do NOT draw skeleton, shadow, hand outline, white background or checkerboard pixels. Do NOT crop or recenter the tissues. Fine gray ink contour and sparse light grayscale fibrous shading, tissue white/light gray with transparency. No labels, text, letters, numbers, arrows, leader lines, frames or watermark. Coordinates below use 1000x1300 canvas. RIGHT elbow posterior, medial viewer LEFT. Broad flat TRICEPS tendon from x410-515 y390 descending and narrowing to olecranon tip x425-505 y565. Thin longitudinal fibers. Small common flexor origin at x280-330 y590-690 on medial LEFT, and common extensor origin x630-675 y620-720 on lateral RIGHT. Lateral ligament fan at x625 y630 to x610 y740 and thin annular band around radial head x555-660 y700. Small medial collateral posterior fan between (325,620) and (390,735). All tissues isolated transparent; NO ulnar nerve or muscles and NO olecranon bone.",
+    "reference": "public/anatomy/elbow/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "medial",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL bone image is ONLY a spatial registration reference. Independently draw ONLY specified LIGAMENTS AND TENDONS on a true transparent alpha background at the SAME scale, positions and 1000:1300 portrait framing as reference. OMIT EVERY bone, cartilage, muscle, nerve, vessel, skin and bone outline from output. Do NOT draw skeleton, shadow, hand outline, white background or checkerboard pixels. Do NOT crop or recenter the tissues. Fine gray ink contour and sparse light grayscale fibrous shading, tissue white/light gray with transparency. No labels, text, letters, numbers, arrows, leader lines, frames or watermark. Coordinates below use 1000x1300 canvas. RIGHT elbow true MEDIAL, anterior viewer RIGHT. ONLY: triangular UCL fan from medial epicondyle at (525,600) to coronoid/sublime region (505,755) and posterior band to (310,730), thin fibrous band along proximal ulna joins these distal endpoints; separate short common flexor tendon origin from (555,615) descending diagonally RIGHT to (620,780), 30-45px wide; posterior triceps tendon from (285,390) to olecranon tip (285,605), 45px wide. Main UCL must be visible with separate fibers; posterior triceps and anterior flexor tendon not connected. No biceps, no radius, no muscles, no nerves, no bones.",
+    "reference": "public/anatomy/elbow/medial-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "lateral",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL bone image is ONLY a spatial registration reference. Independently draw ONLY specified LIGAMENTS AND TENDONS on a true transparent alpha background at the SAME scale, positions and 1000:1300 portrait framing as reference. OMIT EVERY bone, cartilage, muscle, nerve, vessel, skin and bone outline from output. Do NOT draw skeleton, shadow, hand outline, white background or checkerboard pixels. Do NOT crop or recenter the tissues. Fine gray ink contour and sparse light grayscale fibrous shading, tissue white/light gray with transparency. No labels, text, letters, numbers, arrows, leader lines, frames or watermark. Coordinates below use 1000x1300 canvas. RIGHT elbow true LATERAL, anterior viewer LEFT. ONLY: lateral collateral ligament complex fan from lateral epicondyle (580,625) to annular band around radial head (465,735), with lateral ulnar band continuing to supinator crest on proximal ulna (545,825). Common extensor tendon origin starts (585,635), extending down/left to (485,855), as a separate slightly superficial fibrous ribbon 35px wide. Distal biceps tendon anteriorly from (390,500) to radial tuberosity (380,855), 20px wide. Triceps tendon posteriorly from (700,400) to olecranon (690,595), 40px wide. Keep each separate. No capsule covering whole joint; no nerves or muscle.",
+    "reference": "public/anatomy/elbow/lateral-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "wrist",
+    "view": "palmar",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL bone image is ONLY a spatial registration reference. Independently draw ONLY specified LIGAMENTS AND TENDONS on a true transparent alpha background at the SAME scale, positions and 1000:1300 portrait framing as reference. OMIT EVERY bone, cartilage, muscle, nerve, vessel, skin and bone outline from output. Do NOT draw skeleton, shadow, hand outline, white background or checkerboard pixels. Do NOT crop or recenter the tissues. Fine gray ink contour and sparse light grayscale fibrous shading, tissue white/light gray with transparency. No labels, text, letters, numbers, arrows, leader lines, frames or watermark. Coordinates below use 1000x1300 canvas. RIGHT full hand PALMAR, thumb viewer RIGHT. Fine flexor tendons only from lower forearm x430-500 y1160 through carpal tunnel centered (470,910), diverging into four fine digit slips toward little finger MCP (280,620), ring MCP (360,560), middle MCP (465,535), index MCP (580,550), continue lightly to respective fingers (do not obscure joint shapes). Flexor pollicis longus from wrist (515,970) toward thumb MCP (720,680) and thumb distal phalanx (810,530). Short transverse carpal ligament at x360-565 y890-925, pale so tunnel position can be seen through it. On far radial edge draw two distinct APL/EPB tendon slips from (590,1100) over radial styloid (590,960) to thumb metacarpal base (620,840) and thumb proximal phalanx (750,640). This first compartment is lateral radial, not the central tunnel. No TFCC (belongs on bone layer), no nerves, no muscle, no bones.",
+    "reference": "public/anatomy/wrist/palmar-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "wrist",
+    "view": "dorsal",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL bone image is ONLY a spatial registration reference. Independently draw ONLY specified LIGAMENTS AND TENDONS on a true transparent alpha background at the SAME scale, positions and 1000:1300 portrait framing as reference. OMIT EVERY bone, cartilage, muscle, nerve, vessel, skin and bone outline from output. Do NOT draw skeleton, shadow, hand outline, white background or checkerboard pixels. Do NOT crop or recenter the tissues. Fine gray ink contour and sparse light grayscale fibrous shading, tissue white/light gray with transparency. No labels, text, letters, numbers, arrows, leader lines, frames or watermark. Coordinates below use 1000x1300 canvas. RIGHT full hand DORSAL, thumb viewer LEFT. Extensor tendons: fine longitudinal lines from forearm x430-540 y1160 through narrow extensor retinaculum x380-600 y1000 then diverge up dorsum to index MCP (390,535), middle MCP (490,515), ring MCP (590,550), little MCP (670,610), then continue lightly along their finger axes to near tips. Long thumb extensor curves from central dorsal distal radius (475,1020) to thumb (240,680). Two first-compartment APL/EPB slips run on radial LEFT edge from (355,1110) across radial styloid (360,965) to first metacarpal base (345,830) and thumb proximal phalanx (210,610). Small pale dorsal carpal ligament fibers at x410-550 y865-940. Fine tendons, avoid dense straps across MCP joints. No TFCC, no muscles, no nerves, no bone contours, no hand silhouette.",
+    "reference": "public/anatomy/wrist/dorsal-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "anterior",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL skeleton is only a POSITION reference, not part of output. Independently draw ONLY specified MUSCLES AND NERVES on TRUE ALPHA TRANSPARENT background. SAME positions and scale as 1000x1300 reference. OMIT EVERY bone, ligament, tendon, cartilage, vessel and skin. No outline of skeleton or hand. No white background, shadow or painted checkerboard. No recentering or zoom. Grayscale fine charcoal linework, gentle pale muscle-fiber shading, thin outlined nerves. No text/labels/numbers/arrows/leader lines. Each tissue should be isolated and recognisable. Coordinates use reference pixels. RIGHT anterior elbow, lateral LEFT. Short lower biceps muscle belly x420-545 y210-465 tapering at (485,465), no tendon continuation. Proximal common extensor muscle group (anatomical extensor origin region) begins immediately distal to LEFT lateral epicondyle at (305,655), a small pale fusiform mass x260-350 y700-990. Common flexor/pronator muscle origin group begins just distal to RIGHT medial epicondyle (665,660), pale fusiform mass x600-720 y715-1015. Keep muscles lateral to central joint so the trochlea remains clear. Do not draw ulnar nerve on front. No tendon bands.",
+    "reference": "public/anatomy/elbow/anterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "posterior",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL skeleton is only a POSITION reference, not part of output. Independently draw ONLY specified MUSCLES AND NERVES on TRUE ALPHA TRANSPARENT background. SAME positions and scale as 1000x1300 reference. OMIT EVERY bone, ligament, tendon, cartilage, vessel and skin. No outline of skeleton or hand. No white background, shadow or painted checkerboard. No recentering or zoom. Grayscale fine charcoal linework, gentle pale muscle-fiber shading, thin outlined nerves. No text/labels/numbers/arrows/leader lines. Each tissue should be isolated and recognisable. Coordinates use reference pixels. RIGHT posterior elbow, medial LEFT. Distal TRICEPS muscle belly x385-540 y170-415 ends at y415, no tendon; small common extensor muscle origin mass begins lateral RIGHT at (660,690), runs x650-735 y730-1015; small flexor origin mass on medial LEFT x245-310 y690-965. ULNAR NERVE: slender 10px cord from (345,390), passing BEHIND medial epicondyle through cubital groove between medial epicondyle and olecranon at (355,645), then down medial forearm to (335,930). Make the nerve curved and separate from muscles, no branching outside elbow. No muscles across olecranon surface.",
+    "reference": "public/anatomy/elbow/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "medial",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL skeleton is only a POSITION reference, not part of output. Independently draw ONLY specified MUSCLES AND NERVES on TRUE ALPHA TRANSPARENT background. SAME positions and scale as 1000x1300 reference. OMIT EVERY bone, ligament, tendon, cartilage, vessel and skin. No outline of skeleton or hand. No white background, shadow or painted checkerboard. No recentering or zoom. Grayscale fine charcoal linework, gentle pale muscle-fiber shading, thin outlined nerves. No text/labels/numbers/arrows/leader lines. Each tissue should be isolated and recognisable. Coordinates use reference pixels. RIGHT true MEDIAL elbow, anterior RIGHT. Small triceps belly posterior LEFT x220-320 y195-405, no tendon below. Common flexor/pronator muscle group starts immediately distal/anterior to medial epicondyle at (585,730), fusiform belly runs diagonally toward (680,970), x580-735 y750-1050, no long tendon. ULNAR NERVE is a distinct 10px cord behind medial epicondyle: starts (390,370), descends (390,530), arcs between medial epicondyle and olecranon through (345,615) then (355,730), continues along proximal ulna to (495,920). Keep nerve separate from UCL (not in this layer). No bones.",
+    "reference": "public/anatomy/elbow/medial-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "lateral",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL skeleton is only a POSITION reference, not part of output. Independently draw ONLY specified MUSCLES AND NERVES on TRUE ALPHA TRANSPARENT background. SAME positions and scale as 1000x1300 reference. OMIT EVERY bone, ligament, tendon, cartilage, vessel and skin. No outline of skeleton or hand. No white background, shadow or painted checkerboard. No recentering or zoom. Grayscale fine charcoal linework, gentle pale muscle-fiber shading, thin outlined nerves. No text/labels/numbers/arrows/leader lines. Each tissue should be isolated and recognisable. Coordinates use reference pixels. RIGHT true LATERAL elbow, anterior LEFT. Small triceps muscle belly x665-755 y200-415, terminates before tendon. Small distal biceps belly x340-425 y285-510, terminates before tendon. Common extensor muscle origin group begins distal to lateral epicondyle via extensor tendon end around (500,795), muscle tapers down-left across x370-525 y805-1025 toward (365,1060). Pale anatomical extensor fiber arrangement, leave anterior radial head unobscured. No ulnar nerve (medial), no flexor muscle, no bone, no tendons.",
+    "reference": "public/anatomy/elbow/lateral-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "wrist",
+    "view": "palmar",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Attached ORIGINAL skeleton is only a POSITION reference, not part of output. Independently draw ONLY specified MUSCLES AND NERVES on TRUE ALPHA TRANSPARENT background. SAME positions and scale as 1000x1300 reference. OMIT EVERY bone, ligament, tendon, cartilage, vessel and skin. No outline of skeleton or hand. No white background, shadow or painted checkerboard. No recentering or zoom. Grayscale fine charcoal linework, gentle pale muscle-fiber shading, thin outlined nerves. No text/labels/numbers/arrows/leader lines. Each tissue should be isolated and recognisable. Coordinates use reference pixels. RIGHT entire hand PALMAR, thumb viewer RIGHT. Median nerve only as slim 10px cord at central wrist from (470,1165) through CARPAL TUNNEL at (465,930), bifurcates distally around (470,815) into delicate branches toward thumb/index/middle/radial half ring; keep branches sparse and stop near MCP levels. Small pale THENAR muscle mass x575-675 y720-865 at thumb base, and small HYPOTHENAR mass x280-335 y690-845 along little metacarpal. A few delicate lumbrical/interosseous muscle bellies between metacarpal shafts x385-435 y640-770 and x495-530 y620-760. DO NOT cover the four MCP joints with muscle. No muscle at wrist joint itself; no tendons. Only nerve traverses carpal tunnel.",
+    "reference": "public/anatomy/wrist/palmar-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "elbow",
+    "view": "anterior",
+    "layer": "muscle",
+    "prompt": "Precise edit of attached original transparent medical muscle overlay. Remove ALL long thin cordlike nerve lines on both sides of these three muscle bellies. Keep exactly the three MUSCLE bellies, in their original positions, proportions, grayscale fibrous shading and canvas framing. Top central biceps muscle, lower left common extensor muscle, lower right common flexor muscle. No nerves at all, no tendons, no additional tissue, no bones, no text. Preserve true transparent alpha background, all other pixels empty transparent. Three isolated fleshy muscle bellies only.",
+    "reference": "elbow-anterior-muscle (first generated overlay)",
+    "transparent_background": true,
+    "operation": "correction"
+  },
+  {
+    "key": "elbow",
+    "view": "lateral",
+    "layer": "muscle",
+    "prompt": "Precise edit of attached original transparent medical muscle overlay. Remove ALL thin cordlike nerves and branching lines, both around the upper right muscle and over the lower large muscle. Keep exactly three MUSCLE bellies with clean fibrous muscle texture: small upper left biceps, small upper right triceps, large diagonal lower common extensor muscle. Preserve their positions, shapes, grayscale, canvas and true alpha transparency. No nerves, no tendons, bones or text. Everything outside these three muscles fully transparent.",
+    "reference": "elbow-lateral-muscle (first generated overlay)",
+    "transparent_background": true,
+    "operation": "correction"
+  },
+  {
+    "key": "wrist",
+    "view": "dorsal",
+    "layer": "muscle",
+    "prompt": "Scientific educational original medical illustration, independent MUSCLE-ONLY overlay. Attached RIGHT HAND DORSAL skeleton is only a POSITION reference and must be OMITTED entirely from output. On the SAME 1000:1300 canvas draw ONLY FOUR small dorsal interosseous muscle bellies between metacarpal shafts: first web x300-365 y660-790, second x410-455 y640-780, third x525-555 y650-770, fourth x590-625 y685-800. Thumb side is LEFT. Delicate grayscale fibrous muscle shading and fine dark gray outlines. Four isolated short feathery fusiform bellies; NO bones, skeletal outlines, nerves, tendons, ligaments, skin, wrist tissue or finger tissue. Leave MCP joints unobscured. True alpha transparent background, no white field or checkerboard, no text, labels or arrows. Do not enlarge/recenter the muscles, preserve the reference positions and empty margins.",
+    "reference": "public/anatomy/wrist/dorsal-bone.webp",
+    "transparent_background": true,
+    "operation": "generate"
+  }
+]
