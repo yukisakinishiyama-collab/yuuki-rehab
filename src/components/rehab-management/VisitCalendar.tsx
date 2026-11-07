@@ -96,7 +96,7 @@ export default function VisitCalendar({ patient, soapNotes, attendance, cancella
       </button>
 
       {open && (
-        <div className="px-3 pb-4">
+        <div className="px-3 pb-3 max-w-sm">
           {/* 月の切り替え */}
           <div className="flex items-center justify-between px-1 pb-2">
             <button type="button" onClick={() => move(-1)} aria-label="前の月" className="px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 max-lg:min-h-10">‹ 前の月</button>
@@ -108,7 +108,7 @@ export default function VisitCalendar({ patient, soapNotes, attendance, cancella
           </div>
 
           {/* カレンダー本体 */}
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5">
             {WEEKDAYS.map((w, i) => (
               <div key={w} className={`text-center text-xs font-medium py-1 ${i === 0 ? 'text-red-600' : i === 6 ? 'text-sky-700' : 'text-gray-500'}`}>{w}</div>
             ))}
@@ -132,12 +132,12 @@ export default function VisitCalendar({ patient, soapNotes, attendance, cancella
                   key={date}
                   type="button"
                   onClick={() => setSelected(s => (s === date ? null : date))}
-                  className={`relative flex flex-col items-center justify-center rounded-lg text-sm aspect-square max-lg:min-h-10 transition-colors ${base} ${isSelected ? 'ring-2 ring-teal-500 ring-offset-1' : ''} ${isToday && !info?.visited ? 'outline outline-1 outline-gray-400' : ''}`}
+                  className={`relative flex flex-col items-center justify-center rounded-md text-sm h-9 max-lg:min-h-10 transition-colors ${base} ${isSelected ? 'ring-2 ring-teal-500 ring-offset-1' : ''} ${isToday && !info?.visited ? 'outline outline-1 outline-gray-400' : ''}`}
                   aria-label={`${cursor.month}月${day}日${info?.visited ? ' 来院' : ''}${info?.reserved ? ' 予約' : ''}${info?.cancelled ? ' キャンセル' : ''}`}
                 >
                   <span>{day}</span>
                   {extra.length > 0 && (
-                    <span className="absolute bottom-0.5 flex gap-0.5">
+                    <span className="absolute bottom-0 flex gap-0.5">
                       {extra.slice(0, 3).map((e, i) => <span key={i} className={`h-1 w-1 rounded-full ${info?.visited ? 'bg-white/80' : EVENT_STYLE[e.kind].dot}`} />)}
                     </span>
                   )}

@@ -18,6 +18,7 @@ import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
   getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getAttendanceRecords,
+  deleteSOAPNote, deleteROMRecord, deleteStrengthRecord, deleteSpecialTest,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
 import {
@@ -434,7 +435,22 @@ const SOAP_RESULT_SYMBOL: Record<SpecialTestResult, string> = {
 }
 
 // ── SOAPカルテ展開カード ────────────────────────────────────
-function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () => void }) {
+/** 誤って入れた記録を消す小さなボタン（確認つき） */
+function DeleteRowButton({ label, onDelete }: { label: string; onDelete: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => { if (window.confirm(`${label}を削除しますか？\nこの操作は取り消せません。`)) onDelete() }}
+      aria-label={`${label}を削除`}
+      title="削除"
+      className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-700 max-lg:min-h-10 max-lg:min-w-10"
+    >
+      🗑
+    </button>
+  )
+}
+
+function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferral?: () => void; onDelete?: () => void }) {
   const [open, setOpen] = useState(false)
   const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-700' : 'text-green-700'
   const adherenceLabel = note.homeExerciseAdherence === 'done' ? '✅ 実施' : note.homeExerciseAdherence === 'partial' ? '⚠️ 一部' : '❌ 未実施'
@@ -476,6 +492,17 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
             className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
           >
             📄 紹介状
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            title="このカルテを削除"
+            aria-label={`${note.visitDate} のカルテを削除`}
+            className="flex-shrink-0 px-2 py-1.5 text-gray-500 text-xs rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors max-lg:min-h-10 max-lg:min-w-10"
+          >
+            🗑
           </button>
         )}
       </div>
@@ -1247,6 +1274,11 @@ export default function PatientDetail({ patient }: Props) {
                         setSelectedIntake(null)
                         setShowReferralModal(true)
                       }}
+                      onDelete={() => {
+                        if (!window.confirm(`${note.visitDate} のカルテ（${note.visitNumber}回目）を削除しますか？\nこの操作は取り消せません。`)) return
+                        deleteSOAPNote(note.id)
+                        reload()
+                      }}
                     />
                   </div>
                 ))}
@@ -1311,6 +1343,7 @@ export default function PatientDetail({ patient }: Props) {
                           <th className="text-right py-2 text-gray-500 font-medium text-xs">他動</th>
                           <th className="text-right py-2 text-gray-500 font-medium text-xs">正常値</th>
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">痛み</th>
+                          <th className="py-2"><span className="sr-only">削除</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1330,6 +1363,9 @@ export default function PatientDetail({ patient }: Props) {
                               <td className="py-2 text-right text-xs">{r.passiveRom ?? '—'}</td>
                               <td className="py-2 text-right text-xs text-gray-500">{r.normalValue}{r.unit === 'deg' ? '°' : 'cm'}</td>
                               <td className="py-2 text-center">{r.pain ? '⚠' : '—'}</td>
+                              <td className="py-1 text-right">
+                                <DeleteRowButton label={`${r.measuredDate} ${r.movement} のROM記録`} onDelete={() => { deleteROMRecord(r.id); reload() }} />
+                              </td>
                             </tr>
                           )
                         })}
@@ -1379,6 +1415,7 @@ export default function PatientDetail({ patient }: Props) {
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">MMT</th>
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">HHD</th>
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">痛み</th>
+                          <th className="py-2"><span className="sr-only">削除</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1392,6 +1429,9 @@ export default function PatientDetail({ patient }: Props) {
                             </td>
                             <td className="py-2 text-center text-xs">{r.hhdValue !== null ? `${r.hhdValue} ${r.unit}` : '—'}</td>
                             <td className="py-2 text-center">{r.pain ? '⚠' : '—'}</td>
+                            <td className="py-1 text-right">
+                              <DeleteRowButton label={`${r.measuredDate} ${r.movement} の筋力記録`} onDelete={() => { deleteStrengthRecord(r.id); reload() }} />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1537,7 +1577,7 @@ export default function PatientDetail({ patient }: Props) {
                             <span className="ml-2 text-gray-500">{BODY_REGION_LABELS[t.bodyRegion]}</span>
                             <span className="ml-2 text-gray-500">{t.measuredDate}</span>
                           </div>
-                          <div className="flex gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => {
                               const val = t[key]
                               const label = ['右', '左', '総合'][i]
@@ -1549,6 +1589,7 @@ export default function PatientDetail({ patient }: Props) {
                                 </span>
                               )
                             })}
+                            <DeleteRowButton label={`${t.measuredDate} ${t.testName} のテスト結果`} onDelete={() => { deleteSpecialTest(t.id); reload() }} />
                           </div>
                         </div>
                         {(t.faberDistanceRight != null || t.faberDistanceLeft != null) && (
