@@ -14,6 +14,7 @@ import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
 const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-700' : 'text-green-700'
 import BodyMap from './BodyMap'
+import { zoneLabel } from './JointDetailMap'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
@@ -554,6 +555,16 @@ function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferr
               <div className="mb-3">
                 <p className="text-xs text-gray-500 font-medium mb-1">この日の痛み部位</p>
                 <BodyMap selected={note.painLocations} onChange={() => {}} readOnly />
+              </div>
+            )}
+            {note.jointDetailLocations && Object.values(note.jointDetailLocations).some(v => v.length > 0) && (
+              <div className="mb-3 space-y-1">
+                <p className="text-xs text-gray-500 font-medium">痛みの場所（解剖図）</p>
+                {Object.entries(note.jointDetailLocations).filter(([, ids]) => ids.length > 0).map(([joint, ids]) => (
+                  <p key={joint} className="text-xs text-gray-800">
+                    <span className="font-semibold">{joint}</span>：{ids.map(id => zoneLabel(joint, id)).join('・')}
+                  </p>
+                ))}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">

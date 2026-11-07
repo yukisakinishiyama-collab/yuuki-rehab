@@ -19,6 +19,7 @@ export interface CarriedForward {
   from: SOAPNote
   complaints: ComplaintEntry[]
   painLocations: string[]
+  jointDetailLocations: Record<string, string[]>
   treatmentAreas: string[]
   currentPhase: SOAPNote['currentPhase']
   homeExercise: string
@@ -46,6 +47,7 @@ export function carryForward(last: SOAPNote): CarriedForward {
     // 同じ id のまま持ち越す（部位の移り変わりを id でつなぐため）。開始日は最初の記録のまま
     complaints: active.map(c => ({ ...c, status: 'active', startedAt: c.startedAt ?? last.visitDate, resolvedAt: undefined })),
     painLocations: [...(last.painLocations ?? [])],
+    jointDetailLocations: Object.fromEntries(Object.entries(last.jointDetailLocations ?? {}).map(([k, v]) => [k, [...v]])),
     treatmentAreas: [...(last.treatmentAreas ?? [])],
     currentPhase: last.currentPhase,
     homeExercise: last.homeExercise ?? '',
