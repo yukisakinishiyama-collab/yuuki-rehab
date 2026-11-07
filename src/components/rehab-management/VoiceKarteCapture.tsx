@@ -6,12 +6,15 @@
 // 2. 止めると、Claude が患者さんの情報だけを取り出して欄に振り分ける（雑談・お名前は書かない）
 // 3. 欄に入れるだけ。院長が読んで直してから「保存」を押す（2026-11-02 院長の判断）
 // 音声はどこにも保存しない。文字起こしは確認用にこの画面にだけ出す（保存しない）。
+// 録音の本体は画面の枠（VoiceSessionProvider）にあり、録音したまま他のタブ・画面へ行ける。
+// この部品は「始める」ボタンと、結果を欄に入れる役。結果が届いたとき表示されていなければ、次に開いたときに入れる。
 // ──────────────────────────────────────────────
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, Loader2, Mic, Square, Undo2, X } from 'lucide-react'
-import { formatElapsed, useDictation, useServerTranscription } from '@/lib/voice/use-dictation'
+import { formatElapsed, useServerTranscription } from '@/lib/voice/use-dictation'
 import { organizeTranscript } from '@/lib/voice/organize-client'
 import type { VoiceMemoResult, VoiceSoapResult } from '@/lib/voice/soap-fields'
+import { useVoiceSession, type VoiceOutcome } from '@/components/rehab/VoiceSession'
 import { cn } from '@/lib/utils'
 
 /** 欄に入れたあとの知らせ（親が作る）と、入れる前に戻す処理 */
@@ -22,6 +25,8 @@ export interface VoiceApplied {
 
 interface Props {
   mode: 'soap' | 'memo'
+  /** 結果の宛先（この患者さんのカルテに入れる） */
+  patientId: string
   onSoap?: (result: VoiceSoapResult) => VoiceApplied
   onMemo?: (result: VoiceMemoResult) => VoiceApplied
   /** 文字起こしの設定が無い・端末が録音に非対応のときに代わりに出すもの */
@@ -50,14 +55,10 @@ type Phase =
   | { kind: 'done'; applied: VoiceApplied; excluded: string[]; transcript: string; failed: number }
   | { kind: 'error'; message: string; transcript: string }
 
-export default function VoiceKarteCapture({ mode, onSoap, onMemo, fallback = null, className }: Props) {
+export default function VoiceKarteCapture({ mode, patientId, onSoap, onMemo, fallback = null, className }: Props) {
   const server = useServerTranscription()
-  // 会話の録音が上限（1時間）に達したら、そこまでの分を振り分ける
-  const stopRef = useRef<() => Promise<void>>(async () => {})
-  const dictation = useDictation({
-    profile: mode === 'soap' ? 'session' : 'field',
-    onLimit: () => void stopRef.current(),
-  })
+  const voice = useVoiceSession()
+  const target = { patientId, mode }
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const [showText, setShowText] = useState(false)
   const text = TEXT[mode]
@@ -68,50 +69,70 @@ export default function VoiceKarteCapture({ mode, onSoap, onMemo, fallback = nul
     handlersRef.current = { onSoap, onMemo }
   }, [onSoap, onMemo])
 
+  /** 文字起こしから、もう一度 AI で整理し直す（失敗したときの再試行） */
   async function organize(transcript: string, failed: number) {
     setPhase({ kind: 'organizing' })
     try {
       if (mode === 'soap') {
         const result = await organizeTranscript('soap', transcript)
-        const applied = handlersRef.current.onSoap?.(result) ?? { summary: null }
-        setPhase({ kind: 'done', applied, excluded: result.excluded, transcript, failed })
+        applyOutcome({ kind: 'soap', result, transcript, failed })
       } else {
         const result = await organizeTranscript('memo', transcript)
-        const applied = handlersRef.current.onMemo?.(result) ?? { summary: null }
-        setPhase({ kind: 'done', applied, excluded: result.excluded, transcript, failed })
+        applyOutcome({ kind: 'memo', result, transcript, failed })
       }
     } catch (e) {
       setPhase({ kind: 'error', message: e instanceof Error ? e.message : String(e), transcript })
     }
   }
 
+  /** 届いた結果を欄に入れる */
+  function applyOutcome(o: VoiceOutcome) {
+    if (o.kind === 'error') {
+      setPhase({ kind: 'error', message: o.message, transcript: o.transcript })
+      return
+    }
+    if (o.kind === 'soap') {
+      const applied = handlersRef.current.onSoap?.(o.result) ?? { summary: null }
+      setPhase({ kind: 'done', applied, excluded: o.result.excluded, transcript: o.transcript, failed: o.failed })
+    } else {
+      const applied = handlersRef.current.onMemo?.(o.result) ?? { summary: null }
+      setPhase({ kind: 'done', applied, excluded: o.result.excluded, transcript: o.transcript, failed: o.failed })
+    }
+  }
+
+  // 表示したとき（他の画面で止めた分）と、表示中に結果が届いたときに欄に入れる
+  const { takeOutcome, subscribe } = voice
+  useEffect(() => {
+    const pick = () => {
+      const o = takeOutcome({ patientId, mode })
+      if (o) applyOutcome(o)
+    }
+    pick()
+    return subscribe({ patientId, mode }, pick)
+  }, [patientId, mode, takeOutcome, subscribe])
+
   async function startRecording() {
     setPhase({ kind: 'idle' })
     setShowText(false)
-    await dictation.start()
-  }
-
-  async function stopRecording() {
-    const { transcript, failed } = await dictation.stop()
-    if (!transcript.replace(/［聞き取れなかった部分］/g, '').trim()) {
-      setPhase({ kind: 'error', message: '声を聞き取れませんでした。マイクに近づいて、もう一度お試しください。', transcript: '' })
-      return
+    const ok = await voice.start(target)
+    if (!ok && voice.session) {
+      setPhase({ kind: 'error', message: '別の録音が続いています。画面下の帯で止めてから始めてください。', transcript: '' })
     }
-    await organize(transcript, failed)
   }
-
-  useEffect(() => {
-    stopRef.current = stopRecording
-  })
 
   if (server === 'checking') return null
   if (server === 'no') return <>{fallback}</>
 
-  const { status, elapsedMs, level, pieces, pending, error } = dictation
+  const mine = voice.session && voice.session.target.patientId === patientId && voice.session.target.mode === mode ? voice.session : null
+  const organizingMine = voice.organizing?.patientId === patientId && voice.organizing?.mode === mode
+  const status = mine?.status ?? 'idle'
+  const elapsedMs = mine?.elapsedMs ?? 0
+  const level = mine?.level ?? 0
+  const pending = mine?.pending ?? 0
+  const error = mine?.error ?? ''
   const recording = status === 'recording' || status === 'starting'
   const finishing = status === 'finishing'
-
-  const lastHeard = pieces.join('').slice(-90)
+  const lastHeard = mine?.lastHeard ?? ''
 
   // ── 録音中・文字にしている途中 ──
   if (recording || finishing) {
@@ -133,7 +154,7 @@ export default function VoiceKarteCapture({ mode, onSoap, onMemo, fallback = nul
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void dictation.cancel()}
+              onClick={() => void voice.cancel()}
               disabled={finishing}
               className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 max-lg:min-h-10"
             >
@@ -141,7 +162,7 @@ export default function VoiceKarteCapture({ mode, onSoap, onMemo, fallback = nul
             </button>
             <button
               type="button"
-              onClick={() => void stopRecording()}
+              onClick={() => void voice.stop()}
               disabled={finishing}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 max-lg:min-h-10"
             >
@@ -157,7 +178,7 @@ export default function VoiceKarteCapture({ mode, onSoap, onMemo, fallback = nul
           </p>
         ) : (
           <p className="text-xs text-slate-600">
-            {pending > 0 ? '文字にしています…' : mode === 'soap' ? 'ふだんどおり会話してください。話の切れ目ごとに文字にしていきます。' : '話し終わったら「止めて整える」を押してください。'}
+            {pending > 0 ? '文字にしています…' : mode === 'soap' ? 'ふだんどおり会話してください。話の切れ目ごとに文字にしていきます。録音したまま他のタブや画面を見ても大丈夫です。' : '話し終わったら「止めて整える」を押してください。'}
           </p>
         )}
         {error && <p className="text-xs text-red-700">{error}</p>}
@@ -166,7 +187,7 @@ export default function VoiceKarteCapture({ mode, onSoap, onMemo, fallback = nul
   }
 
   // ── AIで整理中 ──
-  if (phase.kind === 'organizing') {
+  if (phase.kind === 'organizing' || organizingMine) {
     return (
       <div className={cn('flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-800', className)} role="status" aria-live="polite">
         <Loader2 className="h-4 w-4 animate-spin" />
