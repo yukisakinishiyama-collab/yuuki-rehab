@@ -38,6 +38,11 @@ export interface ComplaintEntry {
   diagnosisLabel: string
   nrs: number
   symptoms: ComplaintSymptom[]
+  /** 経過中／軽快・終了（省略＝経過中）。終了した部位は次回のカルテに引き継がない */
+  status?: 'active' | 'resolved'
+  /** この部位の記録を始めた日（経過のカルテに引き継ぐとき、同じ id のまま持ち越す） */
+  startedAt?: string
+  resolvedAt?: string
 }
 
 // ──────────────────────────────────────────────
@@ -250,6 +255,10 @@ export interface SOAPNote {
   patientId: string
   visitDate: string
   visitNumber: number
+  /** 初診（空から書く）か経過（前回から引き継いで変わったところだけ直す）か。省略＝従来 */
+  visitKind?: 'first' | 'followup'
+  /** 前回からの変化のひとこと（改善・不変・悪化）。changeFromLast の文章とは別に持つ */
+  trend?: 'better' | 'same' | 'worse'
   // S: Subjective
   complaints?: ComplaintEntry[]           // 部位別NRS・症状（複数対応）
   painLocations?: string[]   // この日の痛み部位（人体図）
