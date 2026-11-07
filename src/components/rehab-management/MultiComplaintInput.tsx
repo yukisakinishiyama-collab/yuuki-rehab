@@ -24,9 +24,13 @@ const NRS_COLORS = (n: number) =>
 interface Props {
   value: ComplaintEntry[]
   onChange: (v: ComplaintEntry[]) => void
+  /** 経過のカルテで、前回の NRS（部位 id → 値）。「前回 6 → 今日」と出す */
+  previousNrs?: Record<string, number>
+  /** 新しい部位の開始日に使う */
+  visitDate?: string
 }
 
-export default function MultiComplaintInput({ value, onChange }: Props) {
+export default function MultiComplaintInput({ value, onChange, previousNrs = {}, visitDate }: Props) {
   function addComplaint() {
     onChange([...value, {
       id: nanoid(),
@@ -35,6 +39,8 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
       diagnosisLabel: '',
       nrs: 3,
       symptoms: [],
+      status: 'active',
+      startedAt: visitDate,
     }])
   }
 
@@ -66,11 +72,20 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
             <span className="w-5 h-5 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
               {idx + 1}
             </span>
-            <span className="text-xs font-semibold text-gray-600 flex-1">
+            <span className={`text-xs font-semibold flex-1 ${c.status === 'resolved' ? 'text-gray-500 line-through' : 'text-gray-600'}`}>
               {BODY_REGION_LABELS[c.bodyRegion]}
               {c.side !== 'na' && `（${SIDE_LABELS[c.side]}）`}
               {c.diagnosisLabel && ` — ${c.diagnosisLabel}`}
+              {c.startedAt && <span className="ml-1 font-normal text-gray-500">{c.startedAt.slice(5).replace('-', '/')}〜</span>}
             </span>
+            <button
+              type="button"
+              onClick={() => update(c.id, c.status === 'resolved' ? { status: 'active', resolvedAt: undefined } : { status: 'resolved', resolvedAt: visitDate })}
+              className={`px-2 py-0.5 text-xs rounded-full border max-lg:min-h-10 ${c.status === 'resolved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'}`}
+              title={c.status === 'resolved' ? '経過中に戻す' : 'この部位は軽快・終了（次回から引き継がない）'}
+            >
+              {c.status === 'resolved' ? '✓ 軽快・終了' : '軽快・終了にする'}
+            </button>
             <button
               type="button"
               onClick={() => remove(c.id)}
@@ -142,9 +157,17 @@ export default function MultiComplaintInput({ value, onChange }: Props) {
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1">
                 痛みの強さ（NRS）
+                {previousNrs[c.id] !== undefined && (
+                  <span className="ml-2 font-normal text-gray-500">前回 {previousNrs[c.id]} →</span>
+                )}
                 <span className={`ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${NRS_COLORS(c.nrs)}`}>
                   {c.nrs}
                 </span>
+                {previousNrs[c.id] !== undefined && c.nrs !== previousNrs[c.id] && (
+                  <span className={`ml-1 text-xs font-bold ${c.nrs < previousNrs[c.id] ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {c.nrs < previousNrs[c.id] ? `↓${previousNrs[c.id] - c.nrs}` : `↑${c.nrs - previousNrs[c.id]}`}
+                  </span>
+                )}
               </p>
               <div className="flex gap-1">
                 {Array.from({ length: 11 }, (_, i) => (

@@ -8,7 +8,8 @@ import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult, Complain
 import { PHASE_SHORT_LABELS } from '@/types/patient'
 import MultiComplaintInput from './MultiComplaintInput'
 import { SPECIAL_TEST_DESCRIPTIONS } from '@/lib/special-test-descriptions'
-import { saveSOAPNote, getSOAPNotes } from '@/lib/patient-store'
+import { saveSOAPNote, getSOAPNotes, getPatient, savePatient } from '@/lib/patient-store'
+import { carryForward, coverSuggestion, latestNote, TREND_LABELS } from '@/lib/karte/followup'
 import {
   Card, CardHeader, CardContent, FormLabel, Input, Textarea,
   ToggleSwitch, SaveButton, SectionTitle, NRSInput,
@@ -26,6 +27,8 @@ interface Props {
 
 interface FormState {
   visitDate: string
+  visitKind: 'first' | 'followup'
+  trend?: 'better' | 'same' | 'worse'
   complaints: ComplaintEntry[]
   painLocations: string[]
   painToday: number
@@ -343,6 +346,8 @@ const PHASES: RehabPhase[] = [1, 2, 3, 4, 5, 6]
 
 const defaultForm: FormState = {
   visitDate: new Date().toISOString().split('T')[0],
+  visitKind: 'first',
+  trend: undefined,
   complaints: [],
   painLocations: [],
   painToday: 3,
@@ -380,10 +385,52 @@ const defaultForm: FormState = {
 
 type TabKey = 'S' | 'O' | 'A' | 'P'
 
+/** 前回のカルテから引き継いだ初期値（経過モード）。前回が無ければ初診 */
+function initialForm(patientId: string): { form: FormState; previousNrs: Record<string, number>; from: SOAPNote | null } {
+  const last = latestNote(getSOAPNotes(patientId))
+  if (!last) return { form: defaultForm, previousNrs: {}, from: null }
+  const c = carryForward(last)
+  return {
+    from: last,
+    previousNrs: c.previousNrs,
+    form: {
+      ...defaultForm,
+      visitKind: 'followup',
+      complaints: c.complaints,
+      painLocations: c.painLocations,
+      treatmentAreas: c.treatmentAreas,
+      currentPhase: c.currentPhase,
+      homeExercise: c.homeExercise,
+      forbiddenMovements: c.forbiddenMovements,
+      recommendedFrequency: c.recommendedFrequency || defaultForm.recommendedFrequency,
+      patientGoalToday: c.patientGoalToday,
+      nextGoal: c.nextGoal,
+      treatmentToday: c.treatmentToday,
+      painToday: last.painToday >= 0 ? last.painToday : defaultForm.painToday,
+    },
+  }
+}
+
 export default function SOAPForm({ patientId, onSaved }: Props) {
-  const [form, setForm] = useState<FormState>(defaultForm)
+  const [init] = useState(() => initialForm(patientId))
+  const [form, setForm] = useState<FormState>(init.form)
+  const [carriedFrom, setCarriedFrom] = useState<SOAPNote | null>(init.from)
+  const previousNrs = carriedFrom ? init.previousNrs : {}
   const [activeTab, setActiveTab] = useState<TabKey>('S')
   const [saved, setSaved] = useState(false)
+  const [coverNotice, setCoverNotice] = useState<string | null>(null)
+
+  /** 引き継ぎをやめて空から書く（初診・別のケガなど） */
+  function startBlank() {
+    setForm({ ...defaultForm, visitDate: form.visitDate, visitKind: 'first' })
+    setCarriedFrom(null)
+  }
+  /** 前回から引き継ぎ直す */
+  function startFromLast() {
+    const next = initialForm(patientId)
+    setForm({ ...next.form, visitDate: form.visitDate })
+    setCarriedFrom(next.from)
+  }
   // 音声の結果を入れるときは、録音中に手で書いた分も含めた「いまの欄」をもとにする
   const formRef = useRef(form)
   useEffect(() => {
@@ -436,12 +483,19 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       ? Math.max(...form.complaints.map(c => c.nrs))
       : form.painToday
 
+    const complaints = form.complaints.map(c => ({
+      ...c,
+      startedAt: c.startedAt ?? form.visitDate,
+      resolvedAt: c.status === 'resolved' ? (c.resolvedAt ?? form.visitDate) : undefined,
+    }))
     const note: SOAPNote = {
       id: nanoid(),
       patientId,
       visitDate: form.visitDate,
       visitNumber: notes.length + 1,
-      complaints: form.complaints.length > 0 ? form.complaints : undefined,
+      visitKind: form.visitKind,
+      trend: form.trend,
+      complaints: complaints.length > 0 ? complaints : undefined,
       painLocations: form.painLocations,
       painToday: derivedNrs,
       changeFromLast: form.changeFromLast,
@@ -477,8 +531,20 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       createdAt: new Date().toISOString(),
     }
     saveSOAPNote(note)
+    // 主な部位・傷病名が変わっていたら、カルテの表紙も合わせるか聞く（院長が決める）
+    const patient = getPatient(patientId)
+    const suggestion = patient ? coverSuggestion(patient, complaints) : null
+    if (patient && suggestion && window.confirm(`主な部位・傷病名が変わっています（${suggestion.reason}）。カルテの表紙も合わせますか？`)) {
+      savePatient({ ...patient, bodyRegion: suggestion.bodyRegion, diagnosisLabel: suggestion.diagnosisLabel, updatedAt: new Date().toISOString() })
+      setCoverNotice('カルテの表紙（部位・傷病名）を更新しました')
+    }
     setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setTimeout(() => { setSaved(false); setCoverNotice(null) }, 3000)
+    // 次の入力に備えて、今保存した内容から引き継ぎ直す
+    const next = initialForm(patientId)
+    setForm(next.form)
+    setCarriedFrom(next.from)
+    setActiveTab('S')
     onSaved?.()
   }
 
@@ -492,9 +558,15 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <SectionTitle>SOAPカルテ</SectionTitle>
           <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+              <button type="button" onClick={() => { if (form.visitKind !== 'first') startBlank() }}
+                className={`px-3 py-1.5 max-lg:min-h-10 ${form.visitKind === 'first' ? 'bg-teal-700 text-white' : 'bg-white text-gray-600'}`}>初診・新しい記録</button>
+              <button type="button" onClick={() => { if (form.visitKind !== 'followup') startFromLast() }}
+                className={`px-3 py-1.5 max-lg:min-h-10 ${form.visitKind === 'followup' ? 'bg-teal-700 text-white' : 'bg-white text-gray-600'}`}>経過（前回から）</button>
+            </div>
             <Input
               type="date"
               value={form.visitDate}
@@ -503,6 +575,14 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
             />
           </div>
         </div>
+        {form.visitKind === 'followup' && carriedFrom ? (
+          <p className="mt-2 text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+            前回（{carriedFrom.visitDate}・{carriedFrom.visitNumber}回目）から部位・NRS・施術・自宅運動・目標を引き継いでいます。変わったところだけ直して保存してください。
+            終わった部位は「軽快・終了」に、新しいケガは「＋部位・疾患を追加」で足せます。
+          </p>
+        ) : form.visitKind === 'followup' ? (
+          <p className="mt-2 text-xs text-gray-500">前回のカルテがないため、空から書きます。</p>
+        ) : null}
         {/* タブ */}
         <div className="flex gap-1 mt-3">
           {tabs.map(tab => (
@@ -535,6 +615,8 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 <MultiComplaintInput
                   value={form.complaints}
                   onChange={v => setForm(f => ({ ...f, complaints: v }))}
+                  previousNrs={previousNrs}
+                  visitDate={form.visitDate}
                 />
               </div>
               {form.complaints.length === 0 && (
@@ -561,6 +643,16 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
 
             <div>
               <FormLabel>前回からの変化</FormLabel>
+              <div className="flex gap-1.5 mt-1 mb-1.5">
+                {(Object.keys(TREND_LABELS) as Array<keyof typeof TREND_LABELS>).map(t => (
+                  <button key={t} type="button" onClick={() => setForm(f => ({ ...f, trend: f.trend === t ? undefined : t }))}
+                    className={`px-3 py-1 text-xs rounded-full border font-medium max-lg:min-h-10 ${form.trend === t
+                      ? t === 'better' ? 'bg-emerald-700 text-white border-emerald-700' : t === 'worse' ? 'bg-red-600 text-white border-red-600' : 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-gray-600 border-gray-200'}`}>
+                    {TREND_LABELS[t]}
+                  </button>
+                ))}
+              </div>
               <Textarea value={form.changeFromLast} onChange={v => setForm(f => ({ ...f, changeFromLast: v }))}
                 placeholder="例：階段が少し楽になった。朝の痛みが減った。" rows={2} />
             </div>
@@ -773,7 +865,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
             })}
           </div>
           <div className="flex items-center gap-3">
-            {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
+            {saved && <span className="text-teal-700 text-sm">✓ 保存しました{coverNotice ? `（${coverNotice}）` : ''}</span>}
             <SaveButton onClick={handleSave} label="カルテを保存" />
           </div>
         </div>

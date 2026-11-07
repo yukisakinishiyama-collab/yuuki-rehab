@@ -36,6 +36,7 @@ import CancellationTab from './CancellationTab'
 import KarteQuestionsTab from './KarteQuestionsTab'
 import PhotosTab from './PhotosTab'
 import VisitCalendar from './VisitCalendar'
+import ComplaintTimeline from './ComplaintTimeline'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
@@ -1216,6 +1217,8 @@ export default function PatientDetail({ patient }: Props) {
               photos={kartePhotos}
               onOpenSoap={id => document.getElementById(`soap-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
             />
+            {/* 部位の移り変わり（いつ始まり・いつ終わったか） */}
+            <ComplaintTimeline soapNotes={soapNotes} />
 
             {/* 新規カルテ入力 */}
             <SOAPForm patientId={patient.id} onSaved={reload} />
