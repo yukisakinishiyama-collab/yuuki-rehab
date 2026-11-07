@@ -5,7 +5,7 @@
 // SOAPノートは一度だけ読み込んで患者別にグループ化し、
 // 患者数が増えても検索入力ごとの再パースが起きないようにしている。
 // ──────────────────────────────────────────────
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -27,6 +27,9 @@ import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+
+/** 一覧で一度に描く人数 */
+const PAGE_SIZE = 40
 
 const FILTER_OPTIONS = [
   { label: 'すべて',     value: 'all' },
@@ -227,6 +230,30 @@ export default function PatientsPage() {
 
   const isEmpty = pinned.length === 0 && others.length === 0
 
+  // ── 一覧は少しずつ描く ──
+  // 数百人ぶんのカードを一度に描くと、スマホで画面が出るまで数秒かかる。
+  // 最初は PAGE_SIZE 件だけ描き、画面の下に近づいたら続きを足す（検索・絞り込みは全員が対象のまま）。
+  const [shown, setShown] = useState(PAGE_SIZE)
+  const listKey = `${search}\u0000${filter}\u0000${sortKey}`
+  const [shownFor, setShownFor] = useState(listKey)
+  if (shownFor !== listKey) {
+    // 条件が変わったら先頭から描き直す（レンダー中の state 更新は React の推奨パターン）
+    setShownFor(listKey)
+    setShown(PAGE_SIZE)
+  }
+  const visibleOthers = others.length > shown ? others.slice(0, shown) : others
+  const hasMore = others.length > shown
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) setShown(n => n + PAGE_SIZE)
+    }, { rootMargin: '600px 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, shown])
+
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
@@ -411,7 +438,7 @@ export default function PatientsPage() {
             </div>
           )}
           <div className="space-y-2">
-            {others.map(patient => (
+            {visibleOthers.map(patient => (
               <PatientCard
                 key={patient.id}
                 patient={patient}
@@ -424,6 +451,18 @@ export default function PatientsPage() {
                 onClick={() => router.push(`/patients/${patient.id}`)}
               />
             ))}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex flex-col items-center gap-2 py-3">
+                <p className="text-xs text-gray-500">{pinned.length + visibleOthers.length} / {pinned.length + others.length}名を表示</p>
+                <button
+                  type="button"
+                  onClick={() => setShown(n => n + PAGE_SIZE)}
+                  className="px-4 py-2 text-sm font-medium text-teal-700 bg-white border border-teal-200 rounded-lg hover:bg-teal-50 max-lg:min-h-10"
+                >
+                  さらに表示
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

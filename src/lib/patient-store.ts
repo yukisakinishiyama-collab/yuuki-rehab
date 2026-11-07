@@ -33,10 +33,24 @@ const KEYS = {
   version: 'pt_version',
 } as const
 
+/**
+ * 読み込みの控え（速さのため）
+ * localStorage の文字列をそのまま JSON.parse すると、カルテが増えるほど 1 回ごとに数十ms かかり、
+ * カルテ画面は開くたびに 10 回以上読むので、スマホでは体感で遅くなる。
+ * 文字列が前回と同じなら、前回の結果を使う（文字列の比較は parse よりずっと速い）。
+ * 別の場所（クラウドの取り込み・重複の整理）が localStorage を直接書き換えても、文字列が変わるので自然に読み直す。
+ */
+const cache = new Map<string, { raw: string; parsed: unknown[] }>()
+
 function get<T>(key: string): T[] {
   if (typeof window === 'undefined') return []
   try {
-    return JSON.parse(localStorage.getItem(key) ?? '[]') as T[]
+    const raw = localStorage.getItem(key) ?? '[]'
+    const hit = cache.get(key)
+    if (hit && hit.raw === raw) return hit.parsed.slice() as T[]
+    const parsed = JSON.parse(raw) as T[]
+    cache.set(key, { raw, parsed })
+    return parsed.slice()
   } catch {
     return []
   }
@@ -44,7 +58,9 @@ function get<T>(key: string): T[] {
 
 function set<T>(key: string, data: T[]): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(key, JSON.stringify(data))
+  const raw = JSON.stringify(data)
+  localStorage.setItem(key, raw)
+  cache.set(key, { raw, parsed: data.slice() })
   // 保存後にクラウドへ自動同期（設定済みの場合のみ）
   import('./sync-service').then(({ scheduleSync }) => scheduleSync())
 }
