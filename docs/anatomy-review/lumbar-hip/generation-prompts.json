@@ -1,0 +1,117 @@
+[
+  {
+    "key": "lumbar",
+    "view": "posterior",
+    "prompt": "Use case: scientific-educational. Original medical textbook illustration, fine dark-gray ink contours and delicate LIGHT GRAYSCALE hatching, white background, portrait aspect 1000:1300. Bones only plus faint joint cartilage as specified; NO muscles, NO tendons, NO ligaments, NO nerves. No text, labels, arrows, numerals, leader lines, watermarks, frame, or other panels. Do not copy any published illustration. A single anatomical view, centered and uncropped, whitespace margin. Clean low-noise shading suitable for a small grayscale WebP. TRUE POSTERIOR view of adult lower lumbar spine and BOTH sides of pelvis. Exactly FIVE lumbar vertebrae from L1 at top to L5 just above sacrum, with distinct posterior spinous processes and transverse processes, no additional thoracic vertebrae or ribs. Entire sacrum and coccyx, paired iliac wings, both sacroiliac clefts, both proximal femora. Symmetric posterior anatomy: patient's LEFT is viewer RIGHT. Lumbar column along x50%, from y12% to y53%, vertebra centers at y17,25,33,41,49%; sacrum y55-78%; iliac wings y45-70%; hip joints y77%; proximal femora end y92%. Pelvis spans x14-86%. Schematic but anatomically credible posterior bony landmarks.",
+    "layer": "bone",
+    "transparent_background": false
+  },
+  {
+    "key": "lumbar",
+    "view": "lateral",
+    "prompt": "Use case: scientific-educational. Original medical textbook illustration, fine dark-gray ink contours and delicate LIGHT GRAYSCALE hatching, white background, portrait aspect 1000:1300. Bones only plus faint joint cartilage as specified; NO muscles, NO tendons, NO ligaments, NO nerves. No text, labels, arrows, numerals, leader lines, watermarks, frame, or other panels. Do not copy any published illustration. A single anatomical view, centered and uncropped, whitespace margin. Clean low-noise shading suitable for a small grayscale WebP. TRUE RIGHT LATERAL view of adult lumbar spine, sacrum and right hemipelvis. Anterior is viewer LEFT, posterior viewer RIGHT. Exactly FIVE lumbar vertebral bodies, no thoracic vertebrae or ribs. Lumbar lordosis with bodies anterior and posterior spinous processes to viewer right. Right ilium and acetabulum, partial proximal femur. Schematic cutaway through upper iliac wing ONLY as needed to show L5 and sacral base clearly, retain external right pelvic outline. Lumbar vertebrae centers at y17,25,33,41,49%, spine x45-62%; sacrum y55-78%; iliac crest y48%; hip joint y76%, proximal femur ends y92%. Entire subject x20-80%, same lumbar vertebral scale as posterior.",
+    "layer": "bone",
+    "transparent_background": false
+  },
+  {
+    "key": "hip",
+    "view": "anterior",
+    "prompt": "Use case: scientific-educational. Original medical textbook illustration, fine dark-gray ink contours and delicate LIGHT GRAYSCALE hatching, white background, portrait aspect 1000:1300. Bones only plus faint joint cartilage as specified; NO muscles, NO tendons, NO ligaments, NO nerves. No text, labels, arrows, numerals, leader lines, watermarks, frame, or other panels. Do not copy any published illustration. A single anatomical view, centered and uncropped, whitespace margin. Clean low-noise shading suitable for a small grayscale WebP. TRUE ANTERIOR view of adult RIGHT hip: right hemipelvis and proximal right femur, small adjacent portion of sacrum medially. Lateral/greater trochanter is viewer LEFT; pubic symphysis and sacrum are viewer RIGHT. NOT a left hip. Show iliac crest, ASIS, acetabulum, spherical femoral head, neck, greater and lesser trochanters, obturator foramen and pubis. Thin faint acetabular labral rim at socket, no soft tissue. Right ilium x23-62% y12-42%; hip joint centered x47% y54%; greater trochanter x25% y59%; femoral shaft x31% ends y92%; medial pubic bone to x78%. Iliac crest y12%, same proximal femur scale for all hip views.",
+    "layer": "bone",
+    "transparent_background": false
+  },
+  {
+    "key": "hip",
+    "view": "posterior",
+    "prompt": "Use case: scientific-educational. Original medical textbook illustration, fine dark-gray ink contours and delicate LIGHT GRAYSCALE hatching, white background, portrait aspect 1000:1300. Bones only plus faint joint cartilage as specified; NO muscles, NO tendons, NO ligaments, NO nerves. No text, labels, arrows, numerals, leader lines, watermarks, frame, or other panels. Do not copy any published illustration. A single anatomical view, centered and uncropped, whitespace margin. Clean low-noise shading suitable for a small grayscale WebP. TRUE POSTERIOR view of adult RIGHT hip: right hemipelvis and proximal right femur, adjacent right half of sacrum medially. Lateral/greater trochanter is viewer RIGHT; sacrum and ischium viewer LEFT. NOT a left hip. Show posterior iliac wing, posterior sacrum with foramina at medial left, greater sciatic notch, ischial spine/tuberosity, acetabulum, posterior femoral head/neck, greater trochanter and proximal shaft. Thin pale cartilage at acetabular rim, no soft tissues. Ilium x38-77% y12-42%; hip joint centered x53% y54%; greater trochanter x75% y59%; femoral shaft x69% ends y92%; sacrum at x24% y37-55%. Same proximal femur scale for all hip views.",
+    "layer": "bone",
+    "transparent_background": false
+  },
+  {
+    "key": "hip",
+    "view": "lateral",
+    "prompt": "Use case: scientific-educational. Original medical textbook illustration, fine dark-gray ink contours and delicate LIGHT GRAYSCALE hatching, white background, portrait aspect 1000:1300. Bones only plus faint joint cartilage as specified; NO muscles, NO tendons, NO ligaments, NO nerves. No text, labels, arrows, numerals, leader lines, watermarks, frame, or other panels. Do not copy any published illustration. A single anatomical view, centered and uncropped, whitespace margin. Clean low-noise shading suitable for a small grayscale WebP. TRUE RIGHT LATERAL view of adult right hip, looking medially onto lateral surface of right hemipelvis. ANTERIOR viewer LEFT, POSTERIOR viewer RIGHT. Show iliac crest, ASIS toward left, external iliac fossa, acetabular socket with thin faint labral rim, ischial region posterior-right, proximal femur with large greater trochanter over lateral hip. Femoral head and neck lightly translucent/cutaway ONLY near socket to make labral rim locatable. Iliac crest y12%, ilium x25-75% y12-45%; socket centered x47% y54%; greater trochanter x54% y60%; femoral shaft x53% ends y92%. Same proximal femur scale for all hip views.",
+    "layer": "bone",
+    "transparent_background": false
+  },
+  {
+    "key": "lumbar",
+    "view": "posterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE posterior, bilateral. ONLY paired posterior sacroiliac ligament bands over the SI clefts: on viewer left at x330-405 y640-825 and on viewer right x595-670 y640-825. Short diagonal fine fibers bridge sacral edge to adjacent posterior iliac margin, not vertical strips on the sacral foramina. Include small iliolumbar fans from L5 transverse tips (x355,580) to iliac crest (x330,650) and mirrored. No other tissues, no muscles, no vertebrae. Leave entire rest of frame empty transparent.",
+    "reference": "public/anatomy/lumbar/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "lumbar",
+    "view": "lateral",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE RIGHT lateral, anterior LEFT. ONLY thin interspinous/supraspinous ligaments at posterior spinal process tips x680-740 y190-600; a small iliolumbar fan from (595,585) to (510,690); and a faint posterior right sacroiliac band around x610-675 y720-825 over upper sacral-iliac margin in the cutaway, not the acetabulum. No muscles, no nerves, no skeleton. Leave rest of frame transparent.",
+    "reference": "public/anatomy/lumbar/lateral-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "hip",
+    "view": "anterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE ANTERIOR RIGHT hip, lateral LEFT. ONLY pale Y-shaped iliofemoral ligament/anterior capsule from AIIS (345,535) spanning femoral neck (370,670) to intertrochanteric region (270,775); subtle pubofemoral ligament from pubic side (610,705) toward (375,790). Separate broad longitudinal iliotibial band along OUTER LEFT femur from (210,470) past lateral greater trochanter (180,730), descending x155-205 to y1210. Keep IT band distinctly lateral to shaft, no muscles, no bones.",
+    "reference": "public/anatomy/hip/anterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "hip",
+    "view": "posterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE POSTERIOR RIGHT hip, lateral RIGHT. ONLY pale posterior ischiofemoral capsule fibers from (420,710) across posterior neck (585,740) toward (715,775). Separate broad iliotibial band on far lateral RIGHT, from outer ilium (815,445) past greater trochanter (825,775) descending x755-820 to y1210. No muscle, nerve or skeleton. Transparent rest of canvas.",
+    "reference": "public/anatomy/hip/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "hip",
+    "view": "lateral",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE RIGHT LATERAL hip, anterior LEFT. ONLY broad pale iliotibial band running from anterolateral iliac crest near (320,300), gradually curving down to (450,560), then across lateral greater trochanter (570,700), then vertical along lateral femoral shaft x545-620 from y800 to y1210. Fine parallel longitudinal fibers; a separate faint superior capsular strip near x390-510 y545-595. No muscle or bone. Preserve bone reference registration.",
+    "reference": "public/anatomy/hip/lateral-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "lumbar",
+    "view": "posterior",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE posterior bilateral paraspinal and gluteal muscles ONLY. Left-of-image RIGHT erector-spinae/multifidus longitudinal bundle runs x290-445 y145-700, narrowing toward upper origin, broadening toward posterior iliac crest. Right-of-image LEFT paraspinal bundle runs x555-710 y145-700, symmetric. Preserve an EMPTY midline corridor x450-550 with no muscle so all five spinous levels remain clearly locatable. Bilateral pale gluteal fan muscle masses over posterior iliac wings and buttock: viewer left x95-390 y660-1050; viewer right x610-905 y660-1050. Oblique gluteal fibers from posterior medial origin toward lateral proximal femur, faint fanlike gluteus medius superiorly. Leave sacrum midline clear. NO ligaments, bones, joint rims, or fascia; tissue fill pale so skeleton below can be seen.",
+    "reference": "public/anatomy/lumbar/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "lumbar",
+    "view": "lateral",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE RIGHT LATERAL view; anterior LEFT, posterior RIGHT. ONLY RIGHT paraspinal muscles as a long gently curved longitudinal bundle behind processes, x630-795 y150-750, anchored toward posterior sacral/iliac region. Leave the five vertebral body regions x420-585 clear. A broad RIGHT gluteal muscle fan over outer iliac surface from crest x300-590 y675 to hip greater trochanter x325-465 y1020, continuing faint posterior buttock margin toward x665 y930. Fibers converge inferolaterally. NO left-sided separate muscle, no bones, ligaments or fascia. Pale semi-transparent tissue.",
+    "reference": "public/anatomy/lumbar/lateral-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "hip",
+    "view": "anterior",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE ANTERIOR RIGHT hip, lateral LEFT and medial RIGHT. ONLY iliacus fan within right iliac fossa x245-610 y210-480, converging toward (460,570); psoas long narrow belly descends from medial superior x640 y190 to (500,555); the combined iliopsoas crosses anterior hip to LESSER trochanter (370,865), not greater trochanter. Also adductor muscle group begins at pubis x680-760 y745 and fans downward medially to femoral shaft x370-500 y1170. Keep a gap so groin/iliopsoas is distinct from adductors. Omit sartorius/quadriceps and all other muscles. No bone, capsule, ligaments, IT band. Pale translucent muscle bellies, delicate fiber lines.",
+    "reference": "public/anatomy/hip/anterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "hip",
+    "view": "posterior",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE POSTERIOR RIGHT hip, lateral RIGHT, sacrum LEFT. ONLY gluteal muscles and piriformis plus sciatic nerve. Gluteus medius large fan x340-805 y180-585 converges to upper greater trochanter (740,700). Gluteus maximus largely omitted/reflected to reveal the deeper structures, show only a faint lateral/posterior strip x780-875 y520-910. Piriformis is a distinct narrow horizontal/oblique muscle from lateral sacral region (255,570) across sciatic notch (380,605) to superior greater trochanter (710,695), muscle width about 65px. Sciatic nerve emerges INFERIOR to piriformis at (395,680), runs between greater trochanter and ischial tuberosity at x450 y850 and then posterior thigh x470-515 to y1190. Nerve drawn as a separate pale double-contour fasciculated cord about 28px wide, no arrows. Do not draw bone or ligaments; leave a deep dissection window around piriformis and nerve.",
+    "reference": "public/anatomy/hip/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "hip",
+    "view": "lateral",
+    "layer": "muscle",
+    "prompt": "Use case: precise-object-edit / scientific-educational overlay. Input image is ONLY a spatial registration guide: independently draw the specified soft tissues at the SAME positions and SAME scale on the SAME 1000:1300 portrait canvas, then OMIT ALL reference bones completely from output. Output ONLY the requested tissues on true alpha transparency; everything else transparent. NO bone silhouettes, NO bone outlines, NO shadow/background or checkerboard painted into pixels. Do not crop, zoom, recenter, or rearrange isolated structures. Grayscale textbook fine ink/graphite linework with sparse pale hatching and pale semi-transparent tissue fill. No color, text, numbers, arrows, leader lines, labels, watermark, or frame. TRUE RIGHT LATERAL hip, anterior LEFT, posterior RIGHT. ONLY gluteus medius fan spanning lateral iliac fossa x295-735 y220-490, converging on superior greater trochanter (555,650); pale gluteus maximus posterior strip x665-820 y420-900 leaving the greater trochanter clear. A small distinct piriformis muscle from posterior notch (655,520) toward (590,630), and sciatic nerve cord posterior to joint/femur x680-715 y670-1130, emerges BELOW piriformis, not through it. Nerve narrow pale double contour, no arrows. No bones, ligament, fascia or IT band. Pale semi-transparent tissue.",
+    "reference": "public/anatomy/hip/lateral-bone.webp",
+    "transparent_background": true
+  }
+]

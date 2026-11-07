@@ -1,7 +1,7 @@
 // 納品画像の実寸・alpha・合成差分と、重なった部位の押せる範囲を確認する。
 // node tools/review-anatomy-layers.mjs [出力先]
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -15,6 +15,7 @@ const definitions = new Map([...canonical.matchAll(/id:\s*'([^']+)',\s*label:\s*
 const report = []
 const palette = ['#d97706', '#0891b2', '#9333ea', '#dc2626', '#16a34a', '#2563eb', '#a16207', '#db2777']
 const svg = (body) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1300">${body}</svg>`)
+const layerForType = { bone: 'bone', cartilage: 'bone', meniscus: 'bone', ligament: 'ligament', tendon: 'ligament', bursa: 'ligament', muscle: 'muscle', nerve: 'muscle' }
 
 function contains([x, y], poly) {
   let inside = false
@@ -37,10 +38,18 @@ async function contact(filename, images, columns, headings) {
   await sharp({ create: { width: w * columns, height: Math.ceil(images.length / columns) * (h + head), channels: 3, background: '#fff' } }).composite(overlays).webp({ quality: 80, effort: 6 }).toFile(resolve(out, filename))
 }
 
-for (const key of ['knee', 'ankle', 'shoulder']) {
-  const spec = JSON.parse(readFileSync(resolve(root, `src/lib/anatomy/zones/${key}.json`), 'utf8'))
+const zoneDirectory = resolve(root, 'src/lib/anatomy/zones')
+for (const file of readdirSync(zoneDirectory).filter(name => name.endsWith('.json')).sort()) {
+  const spec = JSON.parse(readFileSync(resolve(zoneDirectory, file), 'utf8'))
+  if (!spec.views.length || !spec.views.some(view => view.layers?.length)) continue
+  const key = spec.key
+  const layerKeys = [...new Set(spec.views.flatMap(view => view.layers.map(layer => layer.key)))]
+  if (key === 'lumbar') assert.equal(spec.mirrorForLeft, false, '腰部は反転しない')
+  if (key === 'hip') assert.equal(spec.mirrorForLeft, true, '股関節は反転する')
   const comparisons = [], comparisonTitles = [], isolated = [], isolatedTitles = [], zoneImages = [], zoneTitles = []
   for (const view of spec.views) {
+    assert.equal(view.layers[0].key, 'bone', `${key}/${view.view}: 最下層はbone`)
+    assert.deepEqual(view.layers.map(layer => layer.key), layerKeys, `${key}/${view.view}: 層の順序が不一致`)
     const images = [view.image, ...view.layers.map(l => l.image)]
     const sizes = {}
     for (const path of images) {
@@ -52,16 +61,20 @@ for (const key of ['knee', 'ankle', 'shoulder']) {
       assert.ok(statSync(file).size <= 400000, `${path}: 400KB超過`)
     }
     const bone = publicPath(view.layers.find(l => l.key === 'bone').image)
-    const tissue = publicPath(view.layers.find(l => l.key === 'ligament').image)
-    const pixels = await sharp(tissue).ensureAlpha().raw().toBuffer()
-    assert.ok((await sharp(tissue).metadata()).hasAlpha, `${tissue}: alphaなし`)
-    let transparent = 0, visible = 0
-    for (let i = 3; i < pixels.length; i += 4) {
-      if (pixels[i] === 0) transparent++
-      else visible++
+    const alphaByLayer = {}
+    for (const layer of view.layers.filter(l => l.key !== 'bone')) {
+      const tissue = publicPath(layer.image)
+      const pixels = await sharp(tissue).ensureAlpha().raw().toBuffer()
+      assert.ok((await sharp(tissue).metadata()).hasAlpha, `${tissue}: alphaなし`)
+      let transparent = 0, visible = 0
+      for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] === 0) transparent++
+        else visible++
+      }
+      assert.ok(transparent > 130000 && visible > 1000, `${tissue}: 透過/描画範囲が不正`)
+      for (const [x, y] of [[0, 0], [999, 0], [0, 1299], [999, 1299]]) assert.equal(pixels[(y * 1000 + x) * 4 + 3], 0, '角が透過でない')
+      alphaByLayer[layer.key] = { transparentPixels: transparent, visiblePixels: visible }
     }
-    assert.ok(transparent > 130000 && visible > 1000, `${tissue}: 透過/描画範囲が不正`)
-    for (const [x, y] of [[0, 0], [999, 0], [0, 1299], [999, 1299]]) assert.equal(pixels[(y * 1000 + x) * 4 + 3], 0, '角が透過でない')
     const bp = await sharp(bone).ensureAlpha().raw().toBuffer()
     for (let i = 3; i < bp.length; i += 4) assert.equal(bp[i], 255, `${bone}: 不透明でない`)
     for (const [x, y] of [[0, 0], [999, 0], [0, 1299], [999, 1299]]) assert.deepEqual([...bp.subarray((y * 1000 + x) * 4, (y * 1000 + x) * 4 + 3)], [255, 255, 255], '角が白でない')
@@ -88,14 +101,21 @@ for (const key of ['knee', 'ankle', 'shoulder']) {
     const blendPNG = await sharp(blend, { raw: { width: 1000, height: 1300, channels: 3 } }).png().toBuffer()
     comparisons.push(flat, stack, blendPNG, diffPNG)
     comparisonTitles.push(`${view.view} / original`, 'layers combined', '50% overlay', 'absolute difference x5')
-    const tissuePreview = await sharp(tissue).flatten({ background: '#dce6e8' }).png().toBuffer()
-    isolated.push(bone, tissuePreview)
-    isolatedTitles.push(`${view.view} / bone`, 'ligament on blue-gray')
+    isolated.push(bone)
+    isolatedTitles.push(`${view.view} / bone`)
+    for (const layer of view.layers.filter(l => l.key !== 'bone')) {
+      isolated.push(await sharp(publicPath(layer.image)).flatten({ background: '#dce6e8' }).png().toBuffer())
+      isolatedTitles.push(`${layer.key} on blue-gray`)
+    }
 
     const hitSamples = {}
     const hit = (point, zones) => [...zones].reverse().find(z => contains(point, z.polygon))?.id
     for (const z of view.zones) {
       assert.deepEqual({ label: z.label, type: z.type }, definitions.get(z.id), `${z.id}: label/typeが不一致`)
+      assert.ok(layerKeys.includes(layerForType[z.type]), `${z.id}: 対応する層がない`)
+      if (key === 'lumbar' && view.view === 'posterior' && /_(l|r)$/.test(z.id)) {
+        assert.ok(z.polygon.every(([x]) => z.id.endsWith('_l') ? x > 500 : x < 500), `${z.id}: 後面の患者左右が不正`)
+      }
       const xs = z.polygon.map(p => p[0]), ys = z.polygon.map(p => p[1])
       assert.ok(Math.max(...xs) - Math.min(...xs) >= 60 && Math.max(...ys) - Math.min(...ys) >= 60, `${z.id}: 外接寸法60px未満`)
       let sample
@@ -106,21 +126,21 @@ for (const key of ['knee', 'ankle', 'shoulder']) {
       }
       assert.ok(sample, `${view.view}/${z.id}: 他の領域に覆われて押せない`)
       hitSamples[z.id] = sample
-      const mirrored = view.zones.map(zz => ({ ...zz, polygon: zz.polygon.map(([x, y]) => [1000 - x, y]) }))
-      assert.equal(hit([1000 - sample[0], sample[1]], mirrored), z.id, '反転時のIDが不一致')
+      const forLeft = view.zones.map(zz => ({ ...zz, polygon: zz.polygon.map(([x, y]) => [spec.mirrorForLeft ? 1000 - x : x, y]) }))
+      assert.equal(hit([spec.mirrorForLeft ? 1000 - sample[0] : sample[0], sample[1]], forLeft), z.id, '左選択時のIDが不一致')
     }
     const polygons = view.zones.map((z, i) => {
       const p = z.labelAt ?? z.polygon[0], color = palette[i % palette.length]
       return `<polygon points="${z.polygon.map(a => a.join(',')).join(' ')}" fill="${color}" fill-opacity=".18" stroke="${color}" stroke-width="3"/><text x="${p[0]}" y="${p[1]}" font-size="20" text-anchor="middle" fill="#122" stroke="white" stroke-width="3" paint-order="stroke">${z.id}</text>`
     }).join('')
     const zonePNG = await sharp(stack).composite([{ input: svg(polygons) }]).png().toBuffer()
-    zoneImages.push(zonePNG, await sharp(zonePNG).flop().png().toBuffer())
-    zoneTitles.push(`${view.view} / right`, `${view.view} / mirrored (QA)`)
-    report.push({ joint: key, view: view.view, sizes, transparentPixels: transparent, visiblePixels: visible, maxChannelDifference: max, meanChannelDifference: Number((total / actual.length).toFixed(6)), pixelsDifferentByMoreThan2: changedPixels, exactCompositeMatch: max === 0, hitSamples })
-    console.log(`${key}/${view.view}: max Δ=${max}, mean Δ=${(total / actual.length).toFixed(4)} / 255; alpha・実寸・容量・押せる領域・反転 OK`)
+    zoneImages.push(zonePNG, spec.mirrorForLeft ? await sharp(zonePNG).flop().png().toBuffer() : zonePNG)
+    zoneTitles.push(`${view.view} / ${spec.mirrorForLeft ? 'right' : 'trunk'}`, spec.mirrorForLeft ? `${view.view} / mirrored (QA)` : `${view.view} / unchanged for left`)
+    report.push({ joint: key, view: view.view, mirrorForLeft: spec.mirrorForLeft, sizes, alphaByLayer, maxChannelDifference: max, meanChannelDifference: Number((total / actual.length).toFixed(6)), pixelsDifferentByMoreThan2: changedPixels, exactCompositeMatch: max === 0, hitSamples })
+    console.log(`${key}/${view.view}: max Δ=${max}, mean Δ=${(total / actual.length).toFixed(4)} / 255; 全層alpha・実寸・容量・押せる領域・左右設定 OK`)
   }
   await contact(`${key}-comparison.webp`, comparisons, 4, comparisonTitles)
-  await contact(`${key}-isolated.webp`, isolated, 2, isolatedTitles)
+  await contact(`${key}-isolated.webp`, isolated, layerKeys.length, isolatedTitles)
   await contact(`${key}-zones.webp`, zoneImages, 2, zoneTitles)
 }
 writeFileSync(resolve(out, 'metrics.json'), JSON.stringify(report, null, 2) + '\n')
