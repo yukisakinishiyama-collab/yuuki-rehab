@@ -22,6 +22,7 @@ export interface CarriedForward {
   painLocations: string[]
   jointDetailLocations: Record<string, string[]>
   anatomyMarks: Record<string, AnatomyMarks>
+  bodyMarks: NonNullable<SOAPNote['bodyMarks']>
   treatmentAreas: string[]
   currentPhase: SOAPNote['currentPhase']
   homeExercise: string
@@ -51,6 +52,7 @@ export function carryForward(last: SOAPNote): CarriedForward {
     painLocations: [...(last.painLocations ?? [])],
     jointDetailLocations: Object.fromEntries(Object.entries(last.jointDetailLocations ?? {}).map(([k, v]) => [k, [...v]])),
     anatomyMarks: JSON.parse(JSON.stringify(last.anatomyMarks ?? {})) as Record<string, AnatomyMarks>,
+    bodyMarks: JSON.parse(JSON.stringify(last.bodyMarks ?? {})) as NonNullable<SOAPNote['bodyMarks']>,
     treatmentAreas: [...(last.treatmentAreas ?? [])],
     currentPhase: last.currentPhase,
     homeExercise: last.homeExercise ?? '',

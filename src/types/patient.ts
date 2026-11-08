@@ -1,4 +1,4 @@
-import type { AnatomyMarks } from '@/lib/anatomy/types'
+import type { AnatomyMarks, AnatomyViewMarks } from '@/lib/anatomy/types'
 // ──────────────────────────────────────────────
 // リハビリ患者管理システム - 型定義
 // ──────────────────────────────────────────────
@@ -265,6 +265,7 @@ export interface SOAPNote {
   painLocations?: string[]   // この日の痛み部位（人体図）
   jointDetailLocations?: Record<string, string[]>  // 関節別詳細部位
   anatomyMarks?: Record<string, AnatomyMarks>     // 解剖図に直接描いたマーク（関節ごと）
+  bodyMarks?: Partial<Record<'front' | 'back', AnatomyViewMarks>>  // 人体図に直接描いたマーク（前面・背面）
   painToday: number
   changeFromLast: string
   adlDifficulty: string

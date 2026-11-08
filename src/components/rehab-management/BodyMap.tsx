@@ -1,14 +1,22 @@
 'use client'
 // 人体図コンポーネント - 痛み部位チェック（前面・背面）
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { AnatomyViewMarks } from '@/lib/anatomy/types'
+import { EMPTY_MARKS, MarkToolbar, MarksLayer, markHint, useSvgMarks, viewHasMarks, type MarkTool } from './svg-marks'
 
 type View = 'front' | 'back'
+
+/** 人体図に直接描いたマーク（前面・背面ごと） */
+export type BodyMarks = Partial<Record<View, AnatomyViewMarks>>
 
 export interface BodyMapProps {
   selected: string[]
   onChange: (regions: string[]) => void
   readOnly?: boolean
+  /** 名前の付いていない場所にも印を付けられるように、ペン・×印で直接描く。渡すと道具が出る */
+  marks?: BodyMarks
+  onMarksChange?: (marks: BodyMarks) => void
 }
 
 interface Reg {
@@ -122,9 +130,25 @@ function RegionShape({
   return <rect x={reg.x} y={reg.y} width={reg.w} height={reg.h} rx={3} {...common} />
 }
 
-export default function BodyMap({ selected, onChange, readOnly = false }: BodyMapProps) {
-  const [view, setView] = useState<View>('front')
+export default function BodyMap({ selected, onChange, readOnly = false, marks, onMarksChange }: BodyMapProps) {
+  const [view, setView] = useState<View>(() => (viewHasMarks(marks?.back) && !viewHasMarks(marks?.front) ? 'back' : 'front'))
   const [hovered, setHovered] = useState<string | null>(null)
+  // ── 直接描くマーク ──
+  const canDraw = !readOnly && Boolean(onMarksChange)
+  const [tool, setTool] = useState<MarkTool>('zone')
+  const svgRef = useRef<SVGSVGElement>(null)
+  const viewMarks = marks?.[view] ?? EMPTY_MARKS
+  function setViewMarks(next: AnatomyViewMarks) {
+    if (!onMarksChange) return
+    const all: BodyMarks = { ...(marks ?? {}) }
+    if (next.pins.length === 0 && next.strokes.length === 0) delete all[view]
+    else all[view] = next
+    onMarksChange(all)
+  }
+  const pen = useSvgMarks({ svgRef, width: 200, height: 400, marks: viewMarks, onChange: canDraw ? setViewMarks : undefined, tool, markScale: 1.8 })
+  const hasAnyMarks = viewHasMarks(marks?.front) || viewHasMarks(marks?.back)
+  // 描けるときは少し大きく出す（指で描きやすい）
+  const svgW = canDraw ? 200 : 160
 
   function toggle(id: string) {
     onChange(selected.includes(id)
@@ -155,32 +179,42 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
           </button>
         ))}
         <span className="text-xs text-gray-500 ml-1">
-          {readOnly ? '選択済み部位' : '痛い部位をタップ'}
+          {readOnly ? '選択済み部位' : pen.drawMode ? markHint(tool) : '痛い部位をタップ'}
         </span>
       </div>
+
+      {canDraw && (
+        <MarkToolbar tool={tool} onTool={setTool} hasMarks={viewHasMarks(viewMarks)} onUndo={pen.undo} onClear={pen.clear} clearLabel="この面のマークを消す" zoneLabel="部位をタップ" />
+      )}
 
       <div className="flex gap-4 items-start">
         {/* SVG 人体図 */}
         <div className="relative flex-shrink-0">
           <svg
+            ref={svgRef}
             viewBox="0 0 200 400"
-            width={160}
-            height={320}
+            width={svgW}
+            height={svgW * 2}
             xmlns="http://www.w3.org/2000/svg"
             className="border border-gray-200 rounded-xl bg-gray-50"
+            style={pen.svgStyle}
+            {...pen.handlers}
           >
             <BodySilhouette view={view} />
-            {visibleRegs.map(reg => (
-              <RegionShape
-                key={reg.id}
-                reg={reg}
-                selected={selected.includes(reg.id)}
-                hovered={hovered === reg.id}
-                readOnly={readOnly}
-                onToggle={() => toggle(reg.id)}
-                onHover={setHovered}
-              />
-            ))}
+            <g pointerEvents={pen.drawMode ? 'none' : undefined}>
+              {visibleRegs.map(reg => (
+                <RegionShape
+                  key={reg.id}
+                  reg={reg}
+                  selected={selected.includes(reg.id)}
+                  hovered={hovered === reg.id}
+                  readOnly={readOnly}
+                  onToggle={() => toggle(reg.id)}
+                  onHover={setHovered}
+                />
+              ))}
+            </g>
+            <MarksLayer marks={viewMarks} liveStroke={pen.liveStroke} width={200} markScale={1.8} />
             {/* ホバーラベル（この図は幅 200 を 160px で出す＝0.8倍。15 で 12px。色は灰色の地でも読める teal-700） */}
             {hoveredLabel && (
               <text
@@ -200,7 +234,7 @@ export default function BodyMap({ selected, onChange, readOnly = false }: BodyMa
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-500 mb-2">選択中の部位</p>
           {selectedLabels.length === 0 ? (
-            <p className="text-xs text-gray-500 italic">なし</p>
+            <p className="text-xs text-gray-500 italic">{hasAnyMarks ? '（図に直接の印あり）' : 'なし'}</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {selectedLabels.map(label => (
