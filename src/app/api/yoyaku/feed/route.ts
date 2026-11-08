@@ -22,7 +22,8 @@ function clampParam(raw: string | null, fallback: number, min: number, max: numb
 
 export async function GET(request: NextRequest) {
   const key = request.nextUrl.searchParams.get('key') ?? ''
-  const days = clampParam(request.nextUrl.searchParams.get('days'), 2, 1, 14)
+  // 予約システム側（GAS）の上限が 14 日のままなら 14 日分だけ返る。「次の予約を調べる」は 90 日先まで頼む
+  const days = clampParam(request.nextUrl.searchParams.get('days'), 2, 1, 90)
   // back … 過去にさかのぼる日数（カルテへのキャンセル取り込み用）
   const back = clampParam(request.nextUrl.searchParams.get('back'), 0, 0, 60)
   if (!key) {
