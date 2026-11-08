@@ -554,10 +554,10 @@ function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferr
               </div>
             )}
 
-            {note.painLocations && note.painLocations.length > 0 && (
+            {((note.painLocations && note.painLocations.length > 0) || (note.bodyMarks && Object.values(note.bodyMarks).some(m => m && (m.pins.length > 0 || m.strokes.length > 0)))) && (
               <div className="mb-3">
                 <p className="text-xs text-gray-500 font-medium mb-1">この日の痛み部位</p>
-                <BodyMap selected={note.painLocations} onChange={() => {}} readOnly />
+                <BodyMap selected={note.painLocations ?? []} onChange={() => {}} readOnly marks={note.bodyMarks} />
               </div>
             )}
             {note.jointDetailLocations && Object.values(note.jointDetailLocations).some(v => v.length > 0) && (

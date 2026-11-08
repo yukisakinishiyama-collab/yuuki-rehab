@@ -14,7 +14,7 @@ import {
   Card, CardHeader, CardContent, FormLabel, Input, Textarea,
   ToggleSwitch, SaveButton, SectionTitle, NRSInput,
 } from './shared'
-import BodyMap from './BodyMap'
+import BodyMap, { type BodyMarks } from './BodyMap'
 import AnatomyMap from './AnatomyMap'
 import { SUPPORTED_JOINTS } from './JointDetailMap'
 import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
@@ -39,6 +39,8 @@ interface FormState {
   jointDetailLocations: Record<string, string[]>
   /** 解剖図に直接描いたマーク（関節ごと） */
   anatomyMarks: Record<string, AnatomyMarks>
+  /** 人体図に直接描いたマーク（前面・背面） */
+  bodyMarks: BodyMarks
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -360,6 +362,7 @@ const defaultForm: FormState = {
   painLocations: [],
   jointDetailLocations: {},
   anatomyMarks: {},
+  bodyMarks: {},
   painToday: 3,
   changeFromLast: '',
   adlDifficulty: '',
@@ -410,6 +413,7 @@ function initialForm(patientId: string): { form: FormState; previousNrs: Record<
       painLocations: c.painLocations,
       jointDetailLocations: c.jointDetailLocations,
       anatomyMarks: c.anatomyMarks,
+      bodyMarks: c.bodyMarks,
       treatmentAreas: c.treatmentAreas,
       currentPhase: c.currentPhase,
       homeExercise: c.homeExercise,
@@ -512,6 +516,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       painLocations: form.painLocations,
       jointDetailLocations: Object.keys(form.jointDetailLocations).length > 0 ? form.jointDetailLocations : undefined,
       anatomyMarks: Object.values(form.anatomyMarks).some(hasAnatomyMarks) ? form.anatomyMarks : undefined,
+      bodyMarks: Object.keys(form.bodyMarks).length > 0 ? form.bodyMarks : undefined,
       painToday: derivedNrs,
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
@@ -652,6 +657,8 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 <BodyMap
                   selected={form.painLocations}
                   onChange={v => setForm(f => ({ ...f, painLocations: v }))}
+                  marks={form.bodyMarks}
+                  onMarksChange={m => setForm(f => ({ ...f, bodyMarks: m }))}
                 />
               </div>
             </div>

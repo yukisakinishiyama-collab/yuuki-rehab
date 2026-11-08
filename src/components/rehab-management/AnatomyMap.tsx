@@ -6,6 +6,7 @@
 // 右側の図だけ持ち、左を選んだときは左右反転して出す。
 // ──────────────────────────────────────────────
 import { useMemo, useRef, useState } from 'react'
+import { EMPTY_MARKS, MarkToolbar, MarksLayer, markCount, markHint, useSvgMarks, viewHasMarks, type MarkTool } from './svg-marks'
 import type { Side } from '@/types/patient'
 import { ANATOMY_LAYER_LABELS, ANATOMY_LAYER_ORDER, ANATOMY_VIEW_LABELS, getAnatomySpec, polygonCenter, ZONE_LAYER, type AnatomyLayerKey, type AnatomyMarks, type AnatomyViewMarks, type AnatomyViewSpec, type ZoneType } from '@/lib/anatomy'
 import JointDetailMap from './JointDetailMap'
@@ -22,11 +23,6 @@ export interface AnatomyMapProps {
   onMarksChange?: (marks: AnatomyMarks) => void
 }
 
-type Tool = 'zone' | 'pen' | 'pin' | 'erase'
-const TOOL_LABELS: Record<Tool, string> = { zone: '部位を押す', pen: 'ペン', pin: '×印', erase: '消しゴム' }
-const MARK_COLOR = '#dc2626'
-const EMPTY_MARKS: AnatomyViewMarks = { pins: [], strokes: [] }
-const viewHasMarks = (m?: AnatomyViewMarks) => Boolean(m && (m.pins.length > 0 || m.strokes.length > 0))
 
 const ZONE_TEXT = '#0f172a'
 const TYPE_COLORS: Record<ZoneType, { idle: string; hover: string; selected: string; stroke: string }> = {
@@ -65,10 +61,8 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   // ── 直接描くマーク ──
   const canDraw = !readOnly && Boolean(onMarksChange)
-  const [tool, setTool] = useState<Tool>('zone')
+  const [tool, setTool] = useState<MarkTool>('zone')
   const svgRef = useRef<SVGSVGElement>(null)
-  const drawing = useRef<Array<[number, number]> | null>(null)
-  const [liveStroke, setLiveStroke] = useState<Array<[number, number]> | null>(null)
   // 外した層（骨は外せない）。向きを変えても引き継ぐ
   const [hiddenLayers, setHiddenLayers] = useState<Set<AnatomyLayerKey>>(() => {
     const init = new Set<AnatomyLayerKey>()
@@ -104,10 +98,6 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
   const transform = mirror ? `translate(${view.width} 0) scale(-1 1)` : undefined
 
   const viewMarks: AnatomyViewMarks = marks?.[view.view] ?? EMPTY_MARKS
-  const markCount = (m?: AnatomyViewMarks) => (m ? m.pins.length + m.strokes.length : 0)
-  const pinR = view.width / 45
-  const penW = view.width / 110
-
   function setViewMarks(next: AnatomyViewMarks) {
     if (!onMarksChange) return
     const all: AnatomyMarks = { ...(marks ?? {}) }
@@ -115,68 +105,8 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
     else all[view.view] = next
     onMarksChange(all)
   }
-
-  /** 画面の座標 → 図の座標（左は反転して、右側の図の座標で持つ） */
-  function toImagePoint(e: React.PointerEvent): [number, number] | null {
-    const svg = svgRef.current
-    if (!svg) return null
-    const ctm = svg.getScreenCTM()
-    if (!ctm) return null
-    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse())
-    const x = mirror ? view.width - pt.x : pt.x
-    return [Math.round(Math.max(0, Math.min(view.width, x))), Math.round(Math.max(0, Math.min(view.height, pt.y)))]
-  }
-
-  function onPointerDown(e: React.PointerEvent) {
-    if (!canDraw || tool === 'zone') return
-    const p = toImagePoint(e)
-    if (!p) return
-    e.preventDefault()
-    if (tool === 'pin') {
-      setViewMarks({ ...viewMarks, pins: [...viewMarks.pins, p] })
-      return
-    }
-    if (tool === 'erase') {
-      const r = pinR * 1.6
-      const near = (q: [number, number]) => Math.hypot(q[0] - p[0], q[1] - p[1]) <= r
-      const pinIdx = viewMarks.pins.findIndex(near)
-      if (pinIdx >= 0) { setViewMarks({ ...viewMarks, pins: viewMarks.pins.filter((_, i) => i !== pinIdx) }); return }
-      const strokeIdx = viewMarks.strokes.findIndex(st => st.some(near))
-      if (strokeIdx >= 0) setViewMarks({ ...viewMarks, strokes: viewMarks.strokes.filter((_, i) => i !== strokeIdx) })
-      return
-    }
-    // ペン
-    ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
-    drawing.current = [p]
-    setLiveStroke([p])
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!drawing.current) return
-    const p = toImagePoint(e)
-    if (!p) return
-    const last = drawing.current[drawing.current.length - 1]
-    if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 3) return
-    drawing.current.push(p)
-    setLiveStroke([...drawing.current])
-  }
-
-  function onPointerUp() {
-    if (!drawing.current) return
-    const stroke = drawing.current
-    drawing.current = null
-    setLiveStroke(null)
-    // 点だけの線は小さな丸として残す（2点にして描ける形にする）
-    setViewMarks({ ...viewMarks, strokes: [...viewMarks.strokes, stroke.length === 1 ? [stroke[0], [stroke[0][0] + 1, stroke[0][1]]] : stroke] })
-  }
-
-  function undoMark() {
-    if (viewMarks.strokes.length > 0) setViewMarks({ ...viewMarks, strokes: viewMarks.strokes.slice(0, -1) })
-    else if (viewMarks.pins.length > 0) setViewMarks({ ...viewMarks, pins: viewMarks.pins.slice(0, -1) })
-  }
-
-  const drawMode = canDraw && tool !== 'zone'
-  const strokePath = (pts: Array<[number, number]>) => pts.map(([x, y]) => `${x},${y}`).join(' ')
+  const pen = useSvgMarks({ svgRef, width: view.width, height: view.height, mirror, marks: viewMarks, onChange: canDraw ? setViewMarks : undefined, tool })
+  const drawMode = pen.drawMode
 
   return (
     <div className="space-y-2">
@@ -225,26 +155,7 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
 
       {/* 直接描く道具 */}
       {canDraw && (
-        <div className="flex flex-wrap items-center gap-1.5 px-1">
-          <span className="text-xs text-gray-500">道具：</span>
-          {(Object.keys(TOOL_LABELS) as Tool[]).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTool(t)}
-              aria-pressed={tool === t}
-              className={`px-2.5 py-1 text-xs rounded-full border max-lg:min-h-10 ${tool === t ? (t === 'zone' ? 'bg-teal-700 text-white border-teal-700' : 'bg-red-600 text-white border-red-600') : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}
-            >
-              {TOOL_LABELS[t]}
-            </button>
-          ))}
-          {markCount(viewMarks) > 0 && (
-            <>
-              <button type="button" onClick={undoMark} className="ml-auto px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-white text-gray-600 hover:border-teal-300 max-lg:min-h-10">ひとつ戻す</button>
-              <button type="button" onClick={() => setViewMarks(EMPTY_MARKS)} className="px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-700 max-lg:min-h-10">この向きのマークを消す</button>
-            </>
-          )}
-        </div>
+        <MarkToolbar tool={tool} onTool={setTool} hasMarks={viewHasMarks(viewMarks)} onUndo={pen.undo} onClear={pen.clear} />
       )}
 
       {/* 凡例 */}
@@ -269,13 +180,10 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
           ref={svgRef}
           viewBox={`0 0 ${view.width} ${view.height}`}
           className="w-full max-w-[360px]"
-          style={{ userSelect: 'none', touchAction: drawMode ? 'none' : 'auto', cursor: drawMode ? 'crosshair' : undefined }}
+          style={pen.svgStyle}
           role="img"
           aria-label={`${joint}の${ANATOMY_VIEW_LABELS[view.view]}`}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+          {...pen.handlers}
         >
           <g transform={transform}>
             {layers.length > 0 ? (
@@ -309,19 +217,7 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
               )
             })}
             {/* 直接描いたマーク（図の座標で持つので、左の反転にもそのまま乗る） */}
-            <g pointerEvents="none" data-anatomy-marks>
-              {viewMarks.strokes.map((st, i) => (
-                <polyline key={`s-${i}`} points={strokePath(st)} fill="none" stroke={MARK_COLOR} strokeWidth={penW} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
-              ))}
-              {liveStroke && <polyline points={strokePath(liveStroke)} fill="none" stroke={MARK_COLOR} strokeWidth={penW} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />}
-              {viewMarks.pins.map(([x, y], i) => (
-                <g key={`p-${i}`} stroke={MARK_COLOR} strokeWidth={penW * 1.2} strokeLinecap="round">
-                  <circle cx={x} cy={y} r={pinR} fill="rgba(220,38,38,0.12)" />
-                  <line x1={x - pinR * 0.6} y1={y - pinR * 0.6} x2={x + pinR * 0.6} y2={y + pinR * 0.6} />
-                  <line x1={x - pinR * 0.6} y1={y + pinR * 0.6} x2={x + pinR * 0.6} y2={y - pinR * 0.6} />
-                </g>
-              ))}
-            </g>
+            <MarksLayer marks={viewMarks} liveStroke={pen.liveStroke} width={view.width} />
           </g>
           {/* 選んだ部位の名札（反転しても文字は読める向きに） */}
           {visibleZones.filter(z => selected.includes(z.id)).map(z => {
@@ -356,7 +252,7 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
       {!readOnly && (
         <p className="text-xs text-gray-500 px-1">
           {drawMode
-            ? tool === 'pen' ? '指やペンでイラストの上をなぞると赤い線を描けます' : tool === 'pin' ? '押した場所に ×印 を置きます' : 'マークを押すと消えます'
+            ? markHint(tool)
             : `向きを切り替えて、部位を押して選択・解除できます${layers.length > 1 ? '。「層」を押すと筋や靭帯を外して下の構造を見られます' : ''}${canDraw ? '。「ペン」「×印」でイラストに直接描けます' : ''}`}
         </p>
       )}
