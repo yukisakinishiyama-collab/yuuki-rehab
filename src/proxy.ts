@@ -17,7 +17,8 @@
  *           /api/line-link は連携した患者さんの氏名・電話・生年月日を返すため必ず守る（2026-10-31 まで守られていなかった）。
  *           動画の保存（/api/upload）も保護する。ただし Vercel Blob からの保存完了の通知
  *           （x-vercel-signature 付き。中身は handleUpload が署名で確かめる）だけは通す。
- * 保護しないもの: 公開ホームページ、患者さんが使う LIFF（/liff・/api/liff）
+ * 保護しないもの: 公開ホームページ、患者さんが使う LIFF（/liff・/api/liff）、
+ *   ホームページに出す Instagram の公開投稿（/api/public/instagram-feed。院の公開投稿だけを返す。matcher の対象外）
  * 除外（外部から呼ばれる必要があるもの）:
  * - /api/marketing/line/webhook       … LINEサーバーからの通知（署名検証で保護）
  * - /api/marketing/go                 … 患者がタップする計測リンク
