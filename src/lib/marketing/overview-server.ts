@@ -9,6 +9,8 @@
  * 取れないものは value を null にして「未取得／未連携」と理由を返す（0 にしない）。売上・利益は扱わない。
  */
 import { listEvents, type AnalyticsEvent } from './analytics-store-server'
+import { sumHpStats } from './hp-stats-server'
+import { totalOf } from './hp-measure'
 import { listContacts } from './line-store-server'
 import { fetchHubStatsFast } from './booking-stats-fast'
 import { sourceLabel } from './booking-stats'
@@ -54,7 +56,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   const daysInMonthSoFar = Number(today.slice(8, 10))
 
   // ── 取りに行く（どれかが失敗しても、ほかは出す） ─────────────────
-  const [contactsResult, eventsResult, statsResult, proposalsResult, igResult, gbpResult] = await Promise.allSettled([
+  const [contactsResult, eventsResult, statsResult, proposalsResult, igResult, gbpResult, hpResult] = await Promise.allSettled([
     listContacts(),
     // 計測リンクが使われているかを見るため、90日分を読む（今月分はこの中から絞る）
     listEvents(new Date(now.getTime() - 90 * DAY_MS).toISOString()),
@@ -63,6 +65,8 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
     listProposals(),
     isInstagramConnected(),
     isGbpConnected(),
+    // ホームページの閲覧数・電話タップ（今月分。日本時間の日付）
+    sumHpStats(monthStart),
   ])
   const contacts: LineContact[] | null = contactsResult.status === 'fulfilled' ? contactsResult.value : null
   const events90: AnalyticsEvent[] | null = eventsResult.status === 'fulfilled' ? eventsResult.value : null
@@ -71,6 +75,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   const lineConfigured = Boolean(process.env.LINE_CHANNEL_SECRET && process.env.LINE_CHANNEL_ACCESS_TOKEN)
 
   const monthEvents = events90?.filter((e) => e.at >= monthStartIso) ?? null
+  const hp = hpResult.status === 'fulfilled' ? hpResult.value : null
   const clicks = (pred: (e: AnalyticsEvent) => boolean, list: AnalyticsEvent[] | null) =>
     list ? list.filter((e) => e.kind === 'link_click' && pred(e)) : null
   const tracked = (pred: (e: AnalyticsEvent) => boolean) => (clicks(pred, events90)?.length ?? 0) > 0
@@ -188,6 +193,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   const follows = monthEvents ? uniqueActors(monthEvents.filter((e) => e.kind === 'line_follow')) : null
   const unfollows = monthEvents ? uniqueActors(monthEvents.filter((e) => e.kind === 'line_unfollow')) : null
   const hpReserve = clicks((e) => e.meta.dest === 'reserve' && e.meta.source === 'website', monthEvents)
+  const hpBots = monthEvents ? monthEvents.filter((e) => e.kind === 'link_bot' && e.meta.source === 'website').length : null
   const hpLine = clicks((e) => e.meta.dest === 'line' && e.meta.source === 'website', monthEvents)
   const igClicks = clicks((e) => e.meta.source === 'instagram', monthEvents)
   const lineClickTracked = tracked((e) => e.meta.dest === 'line' && e.meta.source === 'website')
@@ -227,8 +233,8 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
       unit: '回',
       state: hpReserve ? 'ok' : 'unavailable',
       period,
-      basis: 'ホームページの予約ボタン（計測リンク）が押された回数。同じ方が2回押すと2回',
-      note: hpReserve ? undefined : eventsNote,
+      basis: 'ホームページの予約ボタン（計測リンク）が押された回数。同じ方が2回押すと2回。検索エンジンなどの自動アクセスは数えない',
+      note: hpReserve ? (hpBots ? `自動アクセス ${hpBots}回（予約・LINE ボタンの合計）は数えていません` : undefined) : eventsNote,
     },
     {
       key: 'hp_line_click',
@@ -254,6 +260,34 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
         ? 'この90日、Instagram の計測リンクが押された記録がありません（プロフィールのリンクが計測リンクか確認してください）'
         : igClicks ? undefined : eventsNote,
       href: '/marketing/tools',
+    },
+    {
+      key: 'hp_views',
+      label: 'HP の閲覧（ページ表示）',
+      value: hp && hp.days > 0 ? totalOf(hp.total.v) : null,
+      unit: '回',
+      state: hp ? (hp.days > 0 ? 'ok' : 'not_connected') : 'unavailable',
+      period: hp?.firstDay && hp.firstDay > monthStart ? `${md(hp.firstDay)}〜今日` : period,
+      basis: 'ホームページのページが開かれた回数（全ページの合計）。同じ方が2ページ見ると2回。検索エンジンなどの自動アクセスは数えない',
+      note: !hp
+        ? '記録を読めませんでした'
+        : hp.days === 0
+          ? 'ホームページの計測（js/site.js）がまだ公開されていません'
+          : `はじめての方へ ${hp.total.v['/first-visit'] ?? 0}回・料金 ${hp.total.v['/price'] ?? 0}回・トップ ${hp.total.v['/'] ?? 0}回`,
+    },
+    {
+      key: 'hp_tel_tap',
+      label: 'HP の電話タップ',
+      value: hp && hp.days > 0 ? totalOf(hp.total.t) : null,
+      unit: '回',
+      state: hp ? (hp.days > 0 ? 'ok' : 'not_connected') : 'unavailable',
+      period: hp?.firstDay && hp.firstDay > monthStart ? `${md(hp.firstDay)}〜今日` : period,
+      basis: 'ホームページの電話番号が押された回数。実際に電話がつながったかは分からない',
+      note: !hp
+        ? '記録を読めませんでした'
+        : hp.days === 0
+          ? 'ホームページの計測（js/site.js）がまだ公開されていません'
+          : `スマホの下のバー ${hp.total.tw.bar ?? 0}回・本文 ${(hp.total.tw.main ?? 0) + (hp.total.tw.cta ?? 0)}回・ヘッダー ${hp.total.tw.header ?? 0}回・フッター ${hp.total.tw.footer ?? 0}回`,
     },
     {
       key: 'hp_visits',

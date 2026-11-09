@@ -5,6 +5,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://yuuki-rehab.vercel
 // 院内アプリ（予約・カルテ・経営・集客）と管理系は検索・AIクロールの対象外
 // （以前の動作解析・プロトコルなどの機能は削除済み。古いURLも念のため除外しておく）
 const DISALLOW = [
+  // API（計測リンク /api/marketing/go を含む）はクロールしない。ホームページの全ページに計測リンクがあり、
+  // クローラーがたどるたびに予約ボタンの「クリック」として数えられていたため（2026-11）
+  '/api/',
   '/dashboard/',
   '/patients/',
   '/yoyaku/',
