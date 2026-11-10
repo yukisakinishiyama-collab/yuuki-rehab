@@ -35,6 +35,22 @@ export interface SourceRow {
   clicks: number
 }
 
+export interface HpEntryRow {
+  key: string
+  label: string
+  count: number
+}
+
+/** ホームページの入口（外から入ってきた回数を、来たところ・入口のページごとに） */
+export interface HpEntries {
+  period: string
+  total: number
+  /** 来たところ（Google 検索・マップ・Instagram など）。多い順 */
+  sources: HpEntryRow[]
+  /** 入口になったページ。多い順に最大8 */
+  pages: HpEntryRow[]
+}
+
 export type ConnectionState = 'connected' | 'not_set' | 'error'
 
 export interface ConnectionRow {
@@ -54,6 +70,9 @@ export interface OverviewData {
   /** 流入元別（予約システムから取れないときは null） */
   sources: SourceRow[] | null
   sourcesNote: string
+  /** ホームページの入口（まだ記録が無い・読めないときは null） */
+  hpEntries: HpEntries | null
+  hpEntriesNote: string
   pending: {
     /** 院長の承認待ちの投稿案（この先の予定のもの） */
     approvals: number

@@ -8,13 +8,13 @@
  * 売上などの経営の数字は出さない（院長・スタッフとも同じ画面）。
  */
 import Link from 'next/link'
-import { AlertTriangle, CalendarRange, Inbox, Link2, RefreshCw, Sun } from 'lucide-react'
+import { AlertTriangle, CalendarRange, Globe, Inbox, Link2, RefreshCw, Sun } from 'lucide-react'
 import { IconButton, MoreLink, Panel } from '@/components/clinic/Panel'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useApi } from '@/lib/marketing/use-api'
-import { METRIC_STATE_LABELS, type ConnectionRow, type Metric, type OverviewData } from '@/lib/marketing/overview-types'
+import { METRIC_STATE_LABELS, type ConnectionRow, type HpEntryRow, type Metric, type OverviewData } from '@/lib/marketing/overview-types'
 
 function formatValue(m: Metric): string {
   if (m.value === null) return ''
@@ -22,6 +22,30 @@ function formatValue(m: Metric): string {
 }
 
 /** 数字1つ。取れなかったときは「未取得／未連携」と理由。期間と数え方は開いて見る */
+function EntryTable({ caption, rows, total }: { caption: string; rows: HpEntryRow[]; total: number }) {
+  return (
+    <table className="w-full text-sm">
+      <caption className="pb-1 text-left text-xs font-bold text-slate-600">{caption}</caption>
+      <thead>
+        <tr className="border-b border-slate-200 text-left text-xs text-slate-600">
+          <th className="py-2 pr-2 font-bold">名前</th>
+          <th className="py-2 pr-2 text-right font-bold">回数</th>
+          <th className="py-2 text-right font-bold">割合</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.key} className="border-b border-slate-100 last:border-0">
+            <td className="py-2 pr-2 font-medium text-slate-800">{r.label}</td>
+            <td className="py-2 pr-2 text-right tabular-nums">{r.count}</td>
+            <td className="py-2 text-right tabular-nums text-slate-600">{total > 0 ? Math.round((r.count / total) * 100) : 0}%</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 function MetricTile({ m }: { m: Metric }) {
   const missing = m.value === null
   const body = (
@@ -185,6 +209,27 @@ export default function MarketingOverview() {
                   </table>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">{data.sourcesNote}。数の変化は、投稿や季節など多くの理由が重なるため、1つの原因とは決めつけません。</p>
+              </>
+            )}
+          </Panel>
+
+          <Panel title="ホームページへの入口" icon={Globe} meta={data.hpEntries ? `${data.hpEntries.period}・外から来た回数` : undefined}>
+            {data.hpEntries === null ? (
+              <p className="text-sm text-slate-600">
+                <Badge variant="warning" className="mr-2">未取得</Badge>
+                {data.hpEntriesNote}
+              </p>
+            ) : data.hpEntries.total === 0 ? (
+              <p className="text-sm text-slate-600">この期間に外から来た記録はまだありません。</p>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <EntryTable caption="来たところ" rows={data.hpEntries.sources} total={data.hpEntries.total} />
+                  <EntryTable caption="入口になったページ（多い順）" rows={data.hpEntries.pages} total={data.hpEntries.total} />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {data.hpEntriesNote}。Google マップのアプリや LINE から開くと、来たところが分からず「直接」に入ることがあります。
+                </p>
               </>
             )}
           </Panel>

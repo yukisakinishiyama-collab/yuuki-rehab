@@ -3,7 +3,12 @@
 import assert from 'node:assert/strict'
 import {
   addHpEvent,
+  classifySource,
   HP_DAY_LIMIT,
+  HP_SOURCE_LABELS,
+  HP_SOURCES,
+  pageLabel,
+  topEntries,
   isBotUserAgent,
   isPrefetch,
   normalizePage,
@@ -116,6 +121,87 @@ test('何日分かを合計する', () => {
   assert.equal(totalOf(total.v), 10)
   assert.equal(totalOf(total.t), 3)
   assert.deepEqual(total.tw, { bar: 1, main: 2 })
+})
+
+// ── 入口（どこから来たか） ─────────────────────────────────
+
+test('来たところを分ける（検索・地図・SNS・AI・口コミサイト）', () => {
+  const cases = [
+    ['www.google.com', 'google'],
+    ['www.google.co.jp', 'google'],
+    ['com.google.android.googlequicksearchbox', 'google'],
+    ['maps.google.com', 'maps'],
+    ['maps.google.co.jp', 'maps'],
+    ['com.google.android.apps.maps', 'maps'],
+    ['maps.app.goo.gl', 'maps'],
+    ['gemini.google.com', 'ai'],
+    ['chatgpt.com', 'ai'],
+    ['www.perplexity.ai', 'ai'],
+    ['search.yahoo.co.jp', 'yahoo'],
+    ['www.bing.com', 'search'],
+    ['duckduckgo.com', 'search'],
+    ['l.instagram.com', 'instagram'],
+    ['www.instagram.com', 'instagram'],
+    ['liff.line.me', 'line'],
+    ['jp.naver.line.android', 'line'],
+    ['l.facebook.com', 'facebook'],
+    ['t.co', 'x'],
+    ['www.ekiten.jp', 'portal'],
+    ['bonbone.jp', 'portal'],
+    ['peraichi.com', 'other'],
+    ['example.com', 'other'],
+    ['', 'direct'],
+    [null, 'direct'],
+  ]
+  for (const [host, want] of cases) assert.equal(classifySource(host), want, String(host))
+})
+
+test('サイトの中の移動は入口に数えない', () => {
+  assert.equal(classifySource('shimonoseki-yuuki.com'), null)
+  assert.equal(classifySource('www.shimonoseki-yuuki.com'), null)
+  assert.equal(classifySource('SHIMONOSEKI-YUUKI.COM.'), null)
+  // utm_source が付いていても、サイトの中の移動なら数えない
+  assert.equal(classifySource('shimonoseki-yuuki.com', 'gbp'), null)
+})
+
+test('utm_source が決まった名前なら優先する（マップのアプリは前のサイトを教えないことが多い）', () => {
+  assert.equal(classifySource('', 'gbp'), 'maps')
+  assert.equal(classifySource('www.google.com', 'google_business_profile'), 'maps')
+  assert.equal(classifySource('', 'Instagram'), 'instagram')
+  assert.equal(classifySource('', 'line'), 'line')
+  // 決まっていない名前は前のサイトで分ける
+  assert.equal(classifySource('www.google.com', 'newsletter'), 'google')
+  assert.equal(classifySource('', 'whatever'), 'direct')
+})
+
+test('おかしなホスト名は「ほかのサイト」にまとめ、そのままは残さない', () => {
+  assert.equal(classifySource('<script>'), 'other')
+  assert.equal(classifySource('a'.repeat(101)), 'other')
+  assert.equal(classifySource('evil.example/path'), 'other')
+  for (const s of HP_SOURCES) assert.ok(HP_SOURCE_LABELS[s], s)
+})
+
+test('入口のときだけ、来たところと入口のページを足す', () => {
+  let d = addHpEvent(null, 'view', '/sym-acl', undefined, 'google')
+  d = addHpEvent(d, 'view', '/first-visit') // サイトの中の移動
+  d = addHpEvent(d, 'view', '/', undefined, 'maps')
+  d = addHpEvent(d, 'view', '/', undefined, 'evil') // 決まっていない名前は数えない
+  d = addHpEvent(d, 'tel', '/', 'bar', 'google') // 電話タップは入口に数えない
+  assert.equal(totalOf(d.v), 4)
+  assert.deepEqual(d.s, { google: 1, maps: 1 })
+  assert.deepEqual(d.lp, { '/sym-acl': 1, '/': 1 })
+})
+
+test('入口の記録が無い古い日とも合計できる', () => {
+  const total = sumHpDays([
+    { v: { '/': 3 }, t: {}, tw: {} },
+    { v: { '/': 1 }, t: {}, tw: {}, s: { google: 2, direct: 1 }, lp: { '/': 3 } },
+    { v: {}, t: {}, tw: {}, s: { google: 1 }, lp: { '/sym-acl': 1 } },
+  ])
+  assert.deepEqual(total.s, { google: 3, direct: 1 })
+  assert.deepEqual(topEntries(total.lp), [['/', 3], ['/sym-acl', 1]])
+  assert.equal(pageLabel('/first-visit'), 'はじめての方へ')
+  assert.equal(pageLabel('/unknown-page'), '/unknown-page')
 })
 
 console.log(`\n${passed} 件 OK`)

@@ -10,7 +10,7 @@
  */
 import { listEvents, type AnalyticsEvent } from './analytics-store-server'
 import { sumHpStats } from './hp-stats-server'
-import { totalOf } from './hp-measure'
+import { HP_SOURCE_LABELS, pageLabel, topEntries, totalOf, type HpSource } from './hp-measure'
 import { listContacts } from './line-store-server'
 import { fetchHubStatsFast } from './booking-stats-fast'
 import { sourceLabel } from './booking-stats'
@@ -19,7 +19,7 @@ import { isInstagramConnected } from './instagram-token'
 import { isGbpConnected } from './gbp-token'
 import { inquiredOn, inquiryStatusOf, isInquiry } from './inquiry'
 import type { LineContact } from './line-types'
-import type { ConnectionRow, Metric, OverviewData, SourceRow } from './overview-types'
+import type { ConnectionRow, HpEntries, Metric, OverviewData, SourceRow } from './overview-types'
 
 /** ブロックの記録を始めた日（これより前のブロックは数えられていない） */
 export const UNFOLLOW_TRACKED_SINCE = '2026-11-04'
@@ -195,6 +195,26 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   const hpReserve = clicks((e) => e.meta.dest === 'reserve' && e.meta.source === 'website', monthEvents)
   const hpBots = monthEvents ? monthEvents.filter((e) => e.kind === 'link_bot' && e.meta.source === 'website').length : null
   const hpLine = clicks((e) => e.meta.dest === 'line' && e.meta.source === 'website', monthEvents)
+  // ホームページの入口（どこから来たか）。記録を始める前の日は数えていないので、始めた日からの期間にする
+  const firstSourceDay = hp?.firstSourceDay ?? null
+  const hpEntries: HpEntries | null =
+    hp && firstSourceDay
+      ? {
+          period: firstSourceDay > monthStart ? `${md(firstSourceDay)}〜今日` : period,
+          total: totalOf(hp.total.s),
+          sources: topEntries(hp.total.s).map(([key, count]) => ({
+            key,
+            label: HP_SOURCE_LABELS[key as HpSource] ?? key,
+            count,
+          })),
+          pages: topEntries(hp.total.lp, 8).map(([key, count]) => ({ key, label: pageLabel(key), count })),
+        }
+      : null
+  const hpEntriesNote = !hp
+    ? '記録を読めませんでした'
+    : !firstSourceDay
+      ? 'ホームページの入口の記録（js/site.js の更新）がまだ公開されていません'
+      : '前のサイトの名前から分けた件数だけを残しています（Cookie・IP アドレス・検索した言葉は使いません）'
   const igClicks = clicks((e) => e.meta.source === 'instagram', monthEvents)
   const lineClickTracked = tracked((e) => e.meta.dest === 'line' && e.meta.source === 'website')
   const igTracked = tracked((e) => e.meta.source === 'instagram')
@@ -291,13 +311,19 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
     },
     {
       key: 'hp_visits',
-      label: 'ホームページ訪問',
-      value: null,
+      label: 'ホームページ訪問（外から）',
+      value: hpEntries ? hpEntries.total : null,
       unit: '回',
-      state: 'not_connected',
-      period,
-      basis: 'GA4 のセッション数',
-      note: 'GA4 と未連携です（ホームページに GA4 のタグを入れ、接続したら出ます）',
+      state: hp ? (hpEntries ? 'ok' : 'not_connected') : 'unavailable',
+      period: hpEntries?.period ?? period,
+      basis:
+        '検索・地図・SNS・ブックマークなど、外からホームページに入ってきた回数。サイトの中のページ移動・再読み込みは数えない。同じ方が2回来ると2回。検索エンジンなどの自動アクセスは数えない',
+      note: hpEntries
+        ? hpEntries.sources
+            .slice(0, 3)
+            .map((r) => `${r.label} ${r.count}回`)
+            .join('・') || 'この期間に外から来た記録はまだありません'
+        : hpEntriesNote,
     },
     {
       key: 'cpa',
@@ -385,7 +411,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
       key: 'ga4',
       label: 'GA4（ホームページのアクセス）',
       state: 'not_set',
-      note: '未連携（ページ別アクセス・流入元別の訪問数はここから取ります）',
+      note: '未連携（ページの閲覧・外からの訪問・来たところは、ホームページの計測で数えています）',
     },
     {
       key: 'gsc',
@@ -404,6 +430,8 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
     today: todayMetrics,
     month: monthMetrics,
     sources,
+    hpEntries,
+    hpEntriesNote,
     sourcesNote: rows
       ? '件数は予約システムの流入元（予約ボタンのリンクに付けた印）から。押した回数は計測リンクを通ったものだけ'
       : bookingNote,
