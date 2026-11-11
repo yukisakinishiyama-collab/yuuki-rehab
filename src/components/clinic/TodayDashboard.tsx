@@ -32,6 +32,7 @@ import { useKeieiOpen } from '@/lib/clinic/keiei-mode'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MoreLink, Panel } from './Panel'
+import BackupReminder from './BackupReminder'
 
 function todayLabel(): string {
   try {
@@ -381,6 +382,7 @@ export default function TodayDashboard() {
 
   return (
     <div className="space-y-5">
+      <BackupReminder />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-base font-bold text-teal-800" suppressHydrationWarning>

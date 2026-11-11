@@ -20,7 +20,8 @@ const META_KEY = 'sync_meta'
 // featureFlags は「この端末だけ機能を止める」ための避難ハッチなので同期しない
 // （同期すると起動時プルでOFFが巻き戻る／1端末のOFFが全端末へ波及してしまう）
 // contractStaffName は「この端末で契約書の説明をした担当者」の覚え（端末ごとに違うので同期しない）
-const EXCLUDE_KEYS = ['rehabStore_session', 'pt_initialized', 'featureFlags', 'contractStaffName', META_KEY]
+// backupLastPcAt は「この端末でパソコンに保存した時刻」（端末ごと）
+const EXCLUDE_KEYS = ['rehabStore_session', 'pt_initialized', 'featureFlags', 'contractStaffName', 'backupLastPcAt', META_KEY]
 
 export const LIVE_SYNC_INTERVAL_MS = 15_000
 export const SYNCED_EVENT = 'karte-synced'

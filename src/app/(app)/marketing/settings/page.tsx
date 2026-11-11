@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { loadAuditLog, loadClinicProfile, saveClinicProfile } from '@/lib/marketing/store'
 import type { AuditLogEntry, ClinicProfile } from '@/lib/marketing/types'
+import BackupPanel from '@/components/clinic/BackupPanel'
 
 const FIELDS: Array<{ key: keyof ClinicProfile; label: string; rows?: number }> = [
   { key: 'name', label: '院名' },
@@ -43,6 +44,10 @@ export default function SettingsPage() {
       <p className="text-sm text-slate-600">
         ここで設定した情報が、すべてのAI生成コンテンツに反映されます。料金や営業時間を変更したら必ず更新してください。
       </p>
+
+      <div id="backup" className="scroll-mt-20">
+        <BackupPanel />
+      </div>
 
       <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
         {FIELDS.map(({ key, label, rows }) => (
