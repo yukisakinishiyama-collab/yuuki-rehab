@@ -3,6 +3,7 @@
  *
  * POST { record, html } → 署名したときの本文をクラウドに保存（kcdoc:<id>）。一度保存したものは書きかえない
  * GET  ?id=…           → { snapshot }（印刷・控えの再発行に使う）
+ * POST { report }       → 端末で送れなかったときの知らせ（状態の番号・端末の種類だけ。原因を調べるため記録に残す）
  * 一覧（日付・書類名・会員の手続き）は端末の pt_contracts に持ち、カルテの同期でほかの端末へ届く。
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -60,8 +61,28 @@ const bodySchema = z.object({
   html: z.string().min(1).max(MAX_SNAPSHOT_CHARS),
 })
 
+/** 端末で送れなかったときの知らせ（中身・お名前は来ない。原因を調べるため記録に残すだけ） */
+const reportSchema = z.object({
+  report: z
+    .object({
+      stage: text(20),
+      status: z.number().int().min(0).max(999),
+      message: text(200),
+      bytes: z.number().int().min(0).max(100_000_000),
+      standalone: z.boolean().optional(),
+      online: z.boolean().optional(),
+      ua: text(200),
+    })
+    .strict(),
+})
+
 export async function POST(request: NextRequest) {
   const json = await request.json().catch(() => null)
+  const rep = reportSchema.safeParse(json)
+  if (rep.success) {
+    console.warn('[karte/contracts] 端末で送れなかった', rep.data.report)
+    return NextResponse.json({ ok: true })
+  }
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) {
     // 値は出さず、どの項目かだけを残す（患者さんの情報をログに出さない）

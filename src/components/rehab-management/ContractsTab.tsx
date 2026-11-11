@@ -12,16 +12,18 @@
  * 会員プランの書類（入会・休会・解約）に署名すると、会員の状態と日付（最低利用期間・契約終了日）が自動で変わる。
  * 兄弟・親子プラン（2名まで）は契約者（代表）のカルテで手続きし、もう1名の方のカルテにも会員の状態が出る。
  */
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { nanoid } from 'nanoid'
-import { CheckCircle2, ChevronLeft, FileSignature, Printer } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, CloudUpload, FileDown, FileSignature, Printer } from 'lucide-react'
 import type { Patient } from '@/types/patient'
 import type { ContractRecord, MemberStatus } from '@/types/contracts'
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templates'
 import { parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
 import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
 import { CLINIC_STAFF } from '@/data/clinic-staff'
+import { dropPending, getPendingContracts, keepPending, sendContract, sendErrorText, type PendingContract } from '@/lib/contracts/send'
+import { buildContractPdfFile, isStandaloneApp, shareOrOpenPdf } from '@/lib/contracts/share-pdf'
 import {
   addMonthsYm,
   buildMemberEvent,
@@ -125,35 +127,18 @@ export default function ContractsTab({
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-teal-200 bg-white p-6 text-center shadow-sm">
         <CheckCircle2 className="mx-auto h-12 w-12 text-teal-700" aria-hidden />
-        <p className="mt-2 text-lg font-black text-slate-900">署名が完了しました</p>
+        <p className="mt-2 text-lg font-black text-slate-900">署名が完了しました（クラウドに保存しました）</p>
         <p className="mt-1 text-sm text-slate-600">
           {view.record.title}・{jaDate(view.record.signedDate)}（記録ID {view.record.id}）
         </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => printSigned(view.html, view.record.id, 'both')}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-teal-700 px-4 font-bold text-white hover:bg-teal-800"
-          >
-            <Printer className="h-4 w-4" aria-hidden />
-            印刷する（院保管用＋患者様控え）
-          </button>
-          <button
-            type="button"
-            onClick={() => printSigned(view.html, view.record.id, 'patient')}
-            className="min-h-11 rounded-xl border border-slate-300 px-4 font-medium text-slate-700 hover:bg-slate-50"
-          >
-            患者様控えだけ印刷
-          </button>
-          <button
-            type="button"
-            onClick={() => setView({ kind: 'list' })}
-            className="min-h-11 rounded-xl border border-slate-300 px-4 font-medium text-slate-700 hover:bg-slate-50"
-          >
-            書類の一覧へ
-          </button>
-        </div>
-        <p className="mt-3 text-xs text-slate-500">印刷の画面で「PDFに保存」を選ぶと、PDFでも残せます。</p>
+        <CopyActions html={view.html} record={view.record} />
+        <button
+          type="button"
+          onClick={() => setView({ kind: 'list' })}
+          className="mt-4 min-h-11 rounded-xl border border-slate-300 px-4 font-medium text-slate-700 hover:bg-slate-50"
+        >
+          書類の一覧へ
+        </button>
       </div>
     )
   }
@@ -213,6 +198,8 @@ export default function ContractsTab({
         </section>
       )}
 
+      <PendingList patientId={patient.id} onUpdate={onUpdate} />
+
       {/* 書類をえらぶ */}
       <section>
         <h3 className="mb-2 text-sm font-bold text-slate-700">書類をえらぶ</h3>
@@ -265,14 +252,17 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
   const [voiding, setVoiding] = useState(false)
   const [reason, setReason] = useState('')
 
-  async function print(copies: 'both' | 'patient') {
+  const [html, setHtml] = useState<string | null>(null)
+
+  /** 署名入りの本文をクラウドから読む（読んでから印刷のボタンを出す。iPad は押したその場でないと印刷の画面が出ないため） */
+  async function load() {
     setBusy(true)
     setError('')
     try {
       const res = await fetch(`/api/karte/contracts?id=${encodeURIComponent(record.id)}`, { cache: 'no-store' })
       const body = (await res.json().catch(() => ({}))) as { snapshot?: { html: string }; error?: string }
-      if (!res.ok || !body.snapshot) throw new Error(body.error ?? '署名済みの本文を読めませんでした')
-      printSigned(body.snapshot.html, record.id, copies)
+      if (!res.ok || !body.snapshot) throw new Error(body.error ?? `署名済みの本文を読めませんでした（${res.status}）`)
+      setHtml(body.snapshot.html)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -295,23 +285,17 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
           {record.voided && <p className="text-xs text-slate-600">取り消しの理由：{record.voided.reason}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => print('both')}
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 text-sm font-medium text-teal-800 hover:bg-teal-50 disabled:opacity-60"
-          >
-            <Printer className="h-4 w-4" aria-hidden />
-            印刷（院保管用＋控え）
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => print('patient')}
-            className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            控えだけ
-          </button>
+          {!html && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={load}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 text-sm font-medium text-teal-800 hover:bg-teal-50 disabled:opacity-60"
+            >
+              <Printer className="h-4 w-4" aria-hidden />
+              {busy ? '読み込んでいます…' : '控えを印刷する'}
+            </button>
+          )}
           {!record.voided && (
             <button
               type="button"
@@ -346,8 +330,205 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
           </button>
         </div>
       )}
+      {html && (
+        <div className="mt-2 rounded-lg bg-slate-50 p-2">
+          <CopyActions html={html} record={record} compact />
+        </div>
+      )}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </li>
+  )
+}
+
+/** 署名済みの書類の控えを印刷する（印刷は患者様の控えが基本。院の分はクラウドに残る） */
+function CopyActions({ html, record, compact = false }: { html: string; record: ContractRecord; compact?: boolean }) {
+  const standalone = isStandaloneApp()
+  return (
+    <div className={compact ? 'space-y-2' : 'mt-5 space-y-3'}>
+      <div className={`flex flex-wrap gap-2 ${compact ? '' : 'justify-center'}`}>
+        <button
+          type="button"
+          onClick={() => printSigned(html, record.id, 'patient')}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-teal-700 px-4 font-bold text-white hover:bg-teal-800"
+        >
+          <Printer className="h-4 w-4" aria-hidden />
+          患者様控えを印刷
+        </button>
+        <button
+          type="button"
+          onClick={() => printSigned(html, record.id, 'both')}
+          className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          院保管用も印刷（2部）
+        </button>
+        <PdfButton html={html} record={record} />
+      </div>
+      <p className={`text-xs text-slate-600 ${compact ? '' : 'text-center'}`}>
+        {standalone
+          ? 'ホーム画面のアイコンから開いているときは、印刷の画面が出ないことがあります。そのときは「PDFにして印刷」→ 出てきた共有の画面で「プリント」を選んでください。'
+          : '印刷の画面が出ないときは「PDFにして印刷」を使ってください。'}
+      </p>
+    </div>
+  )
+}
+
+/** 患者様控えを PDF にして、共有の画面（プリント・ファイルに保存）を出す。作る→出す の2回押し（Safari の決まりのため） */
+function PdfButton({ html, record }: { html: string; record: ContractRecord }) {
+  const [state, setState] = useState<'idle' | 'building' | 'ready' | 'error'>('idle')
+  const [file, setFile] = useState<File | null>(null)
+  const [msg, setMsg] = useState('')
+
+  async function build() {
+    setState('building')
+    setMsg('')
+    try {
+      setFile(await buildContractPdfFile(html, record.id, ['患者様控え'], record.title))
+      setState('ready')
+    } catch (e) {
+      setMsg(`PDFを作れませんでした（${e instanceof Error ? e.message : String(e)}）`)
+      setState('error')
+    }
+  }
+
+  async function share() {
+    if (!file) return
+    const r = await shareOrOpenPdf(file)
+    if (r === 'opened') setMsg('PDFを開きました。開いた画面の共有ボタンから「プリント」を選んでください。')
+  }
+
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      {state === 'ready' ? (
+        <button
+          type="button"
+          onClick={share}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border-2 border-teal-700 bg-white px-4 font-bold text-teal-800 hover:bg-teal-50"
+        >
+          <FileDown className="h-4 w-4" aria-hidden />
+          PDFを開く（プリント・保存）
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={build}
+          disabled={state === 'building'}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          <FileDown className="h-4 w-4" aria-hidden />
+          {state === 'building' ? 'PDFを作っています…' : 'PDFにして印刷'}
+        </button>
+      )}
+      {msg && <span className={`text-xs ${state === 'error' ? 'text-red-700' : 'text-slate-600'}`}>{msg}</span>}
+    </span>
+  )
+}
+
+/** クラウドに送れなかった書類（この端末に残っているもの）。開いたときに自動で送り直す */
+function PendingList({ patientId, onUpdate }: { patientId: string; onUpdate: () => void }) {
+  const [items, setItems] = useState<PendingContract[]>(() => getPendingContracts(patientId))
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [open, setOpen] = useState<string | null>(null)
+  const onUpdateRef = useRef(onUpdate)
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+  })
+
+  const resend = useCallback(
+    async (stage: string) => {
+      const list = getPendingContracts(patientId)
+      let saved = 0
+      let lastError = ''
+      for (const p of list) {
+        const r = await sendContract(p.record, p.html, stage)
+        if (r.ok) {
+          try {
+            addContract(p.record)
+          } catch {
+            // 一覧は次の同期で入る
+          }
+          dropPending(p.record.id)
+          saved += 1
+        } else {
+          lastError = sendErrorText(r)
+          keepPending({ ...p, error: lastError })
+        }
+      }
+      return { saved, lastError, tried: list.length }
+    },
+    [patientId],
+  )
+
+  // 開いたときに、残っている分を自動で送り直す
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      await Promise.resolve()
+      if (getPendingContracts(patientId).length === 0) return
+      const r = await resend('auto-retry')
+      if (!alive) return
+      setItems(getPendingContracts(patientId))
+      if (r.saved > 0) {
+        setMsg(`送れていなかった書類 ${r.saved}件を、クラウドに保存しました。`)
+        onUpdateRef.current()
+      } else if (r.lastError) setMsg(r.lastError)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [patientId, resend])
+
+  async function resendNow() {
+    setBusy(true)
+    setMsg('')
+    const r = await resend('retry')
+    setBusy(false)
+    setItems(getPendingContracts(patientId))
+    if (r.saved > 0) {
+      setMsg(`${r.saved}件をクラウドに保存しました。`)
+      onUpdate()
+    } else if (r.lastError) setMsg(r.lastError)
+  }
+
+  if (items.length === 0) return msg ? <p className="rounded-xl bg-teal-50 p-3 text-sm font-medium text-teal-800">{msg}</p> : null
+  return (
+    <section className="space-y-2 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+      <h3 className="text-sm font-bold text-slate-900">クラウドに送れていない書類（この端末に残っています）</h3>
+      <ul className="space-y-2">
+        {items.map((p) => (
+          <li key={p.record.id} className="rounded-lg bg-white p-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <b>{p.record.title}</b>・{jaDate(p.record.signedDate)}
+                {p.error && <span className="block text-xs text-slate-600">{p.error}</span>}
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(open === p.record.id ? null : p.record.id)}
+                className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                控えを印刷
+              </button>
+            </div>
+            {open === p.record.id && (
+              <div className="mt-2">
+                <CopyActions html={p.html} record={p.record} compact />
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={resendNow}
+        disabled={busy}
+        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-teal-700 px-4 font-bold text-white hover:bg-teal-800 disabled:opacity-60"
+      >
+        <CloudUpload className="h-4 w-4" aria-hidden />
+        {busy ? '送っています…' : 'クラウドに送り直す'}
+      </button>
+      {msg && <p className="text-sm font-medium text-slate-800">{msg}</p>}
+    </section>
   )
 }
 
@@ -407,6 +588,8 @@ function SignFlow({
   const [saving, setSaving] = useState(false)
   /** 「署名して完了する」を一度押した（まだのものを赤で知らせる） */
   const [attempted, setAttempted] = useState(false)
+  /** クラウドに送れなかった書類（端末に残してある。送り直し・控えの印刷に使う） */
+  const [failed, setFailed] = useState<{ record: ContractRecord; html: string } | null>(null)
 
   // ── 記入欄の自動入力（署名とチェック以外） ──
   const partnerPatient = useMemo(
@@ -490,15 +673,8 @@ function SignFlow({
     printPages([copyPage(html, '', `${tpl.title}（版 ${tpl.version}）`)])
   }
 
-  async function sign() {
-    setError('')
-    setAttempted(true)
-    if (!ready || !sigPatient || !sigStaff) {
-      // 何がまだかは、ボタンの上の赤い枠に出る。いちばん上のものへ飛ぶ
-      if (missing[0]) jumpTo(missing[0].id)
-      return
-    }
-    setSaving(true)
+  /** 署名した内容から、保存する記録と本文を作る */
+  function buildSigned(): { record: ContractRecord; html: string } {
     const now = new Date()
     const id = `c${now.getTime().toString(36)}${nanoid(6)}`
     const record: ContractRecord = {
@@ -534,46 +710,70 @@ function SignFlow({
         sigStaff,
       }) +
       `<p class="meta">記録ID ${escapeHtml(id)}／署名日時 ${escapeHtml(now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }))}／書類の版 ${escapeHtml(tpl.version)}／本文の指紋 ${escapeHtml(record.bodyHash)}</p>`
-    let res: Response
-    try {
-      res = await fetch('/api/karte/contracts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ record, html }),
-      })
-    } catch (e) {
-      setSaving(false)
-      setError(
-        `インターネットにつながらず、保存できませんでした。Wi-Fi を確かめて、もう一度「署名して完了する」を押してください（書いた署名は消えていません）。（${e instanceof Error ? e.message : String(e)}）`,
-      )
-      return
-    }
-    const body = (await res.json().catch(() => ({}))) as { error?: string }
-    if (!res.ok) {
-      setSaving(false)
-      setError(
-        res.status === 401
-          ? 'ログインが切れています。いったん画面を読み込み直し、院長かスタッフのパスワードで入り直してから、もう一度書いてください。'
-          : res.status === 413
-            ? '送る量が大きすぎて保存できませんでした。「書き直す」で署名を書き直してから、もう一度押してください。'
-            : `保存できませんでした（${res.status}${body.error ? `：${body.error}` : ''}）。もう一度「署名して完了する」を押してください。続くときは院長に知らせてください。`,
-      )
-      return
-    }
-    // クラウドには保存できた。端末の一覧に入れる（入らなくても、署名入りの本文はクラウドに残っている）
+    return { record, html }
+  }
+
+  /** クラウドに保存できた：端末の一覧に入れて、完了の画面へ */
+  function finish(record: ContractRecord, html: string) {
     try {
       addContract(record)
     } catch {
       console.warn('[contracts] 端末の一覧に入れられませんでした', record.id)
     }
+    dropPending(record.id)
     try {
       localStorage.setItem(STAFF_NAME_KEY, record.staffName)
     } catch {
       // 端末の担当者名を覚えられないだけ
     }
-    setSaving(false)
     onDone(record, html)
+  }
+
+  /** 送れなかった：端末に残して、送り直し・控えの印刷を出す */
+  function keepFailed(record: ContractRecord, html: string, message: string) {
+    const kept = keepPending({ record, html, at: new Date().toISOString(), error: message })
+    setFailed({ record, html })
+    setError(
+      kept
+        ? `${message} 署名した書類はこの端末に残しました。`
+        : `${message} この端末に残すこともできませんでした。下の「患者様控えを印刷」で控えを渡し、院長に知らせてください。`,
+    )
+  }
+
+  async function sign() {
+    setError('')
+    setAttempted(true)
+    if (!ready || !sigPatient || !sigStaff) {
+      // 何がまだかは、ボタンの上の赤い枠に出る。いちばん上のものへ飛ぶ
+      if (missing[0]) jumpTo(missing[0].id)
+      return
+    }
+    setSaving(true)
+    let signed: { record: ContractRecord; html: string }
+    try {
+      signed = buildSigned()
+    } catch (e) {
+      setSaving(false)
+      setError(`書類を作れませんでした（${e instanceof Error ? e.message : String(e)}）。院長に知らせてください。`)
+      return
+    }
+    // 前に送れなかった分は、作りなおした今回の分に置きかえる
+    if (failed) dropPending(failed.record.id)
+    const r = await sendContract(signed.record, signed.html)
+    setSaving(false)
+    if (r.ok) finish(signed.record, signed.html)
+    else keepFailed(signed.record, signed.html, sendErrorText(r))
+  }
+
+  /** 送れなかった同じ書類を、もう一度送る（記録IDは変えない） */
+  async function retry() {
+    if (!failed) return
+    setError('')
+    setSaving(true)
+    const r = await sendContract(failed.record, failed.html, 'retry')
+    setSaving(false)
+    if (r.ok) finish(failed.record, failed.html)
+    else keepFailed(failed.record, failed.html, sendErrorText(r))
   }
 
   const fieldTone = (id: string) => (isMissing(id) ? 'border-red-500 bg-red-50/40' : 'border-slate-300')
@@ -712,6 +912,22 @@ function SignFlow({
           <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-800">
             {error}
           </p>
+        )}
+        {failed && !saving && (
+          <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-slate-800">
+            <p>
+              通信が戻ったら「もう一度送る」を押してください（カルテの「契約・同意書」を開いたときにも、自動で送り直します）。患者様の控えは、先に印刷できます。
+            </p>
+            <button
+              type="button"
+              onClick={retry}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-teal-700 px-4 font-bold text-white hover:bg-teal-800"
+            >
+              <CloudUpload className="h-4 w-4" aria-hidden />
+              もう一度送る
+            </button>
+            <CopyActions html={failed.html} record={failed.record} compact />
+          </div>
         )}
         <button
           type="button"
