@@ -36,6 +36,14 @@ export interface AutopilotSettings {
   /** 週のはじめにGoogle投稿で「今週の予約の空き状況」を出す（予約システムから自動集計） */
   availabilityPost: boolean
   /**
+   * Google検索向けの投稿（「下関市彦島＋症状」の検索ワードと院の強みを入れた決まった文＋院の写真の画像）を、
+   * 毎週決まった曜日に自動で出す（src/data/gbp-seo-posts.ts を順にくり返す）。
+   * 文面は院長が確認した決まった文なので、この設定をオンにしたことを毎回の承認の代わりにする（2026-11-11 院長の依頼）
+   */
+  googleSeo: boolean
+  /** Google検索向けの投稿の本数（週1＝月曜、週2＝月曜と金曜） */
+  googleSeoPerWeek: number
+  /**
    * 空き状況を Instagram のストーリーにも出す（週のはじめ＝今週の空き・空きが多い日の朝＝本日の空き）。
    * 画像は投稿する時刻の空きで作り直し、空きが無くなっていたら出さない。承認されるまで出さない
    */
@@ -78,6 +86,8 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   instagram: 'instagram_carousel',
   google: true,
   availabilityPost: true,
+  googleSeo: true,
+  googleSeoPerWeek: 2,
   availabilityStory: true,
   // キャンセルのストーリーは院長がオンにするまで出さない
   cancelStory: false,

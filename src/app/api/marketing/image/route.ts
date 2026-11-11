@@ -3,6 +3,7 @@
  *
  * テンプレート：/api/marketing/image?title=足首の捻挫&subtitle=応急処置のポイント&size=instagram
  * AI画像（写真＋見出し）：上に &photo=<下書きに付いた写真のURL（自分たちの Vercel Blob のものだけ）> を足す
+ * Google検索向けの投稿：/api/marketing/image?kind=gbp-seo&id=<src/data/gbp-seo-posts.ts の id>
  * ストーリー（空き状況）：/api/marketing/image?kind=story&scope=day&dates=2026-10-26
  *   または kind=story&range=today|next|week（本日・次の診療日・今週。fresh=1 で予約システムから取り直す）
  *   いまの予約システムの空きで作る（投稿するときも、その時刻の空きで作り直す）。
@@ -10,7 +11,8 @@
  * 生成ロジックは lib/marketing/image-template.tsx（Instagram自動投稿と共通）。
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { IMAGE_SIZES, loadPhotoDataUrl, renderPhotoPostImage, renderStoryImage, renderTemplateImage } from '@/lib/marketing/image-template'
+import { IMAGE_SIZES, loadPhotoDataUrl, renderPhotoPostImage, renderSeoPostImage, renderStoryImage, renderTemplateImage } from '@/lib/marketing/image-template'
+import { GBP_SEO_CHIPS, getGbpSeoPost } from '@/data/gbp-seo-posts'
 import { addDays, jstParts, storyHasOpening, storyRange, storyRows, storyText, type OpeningDay } from '@/lib/marketing/autopilot-planner'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
 import { sanitizeStoryEdits, storyEditsProblem } from '@/lib/marketing/story-server'
@@ -33,6 +35,13 @@ function png(buf: Buffer, name: string) {
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   try {
+    // Google検索向けの投稿の画像（投稿で使うのと同じ描き方）：?kind=gbp-seo&id=ankle-sprain
+    if (params.get('kind') === 'gbp-seo') {
+      const post = getGbpSeoPost(params.get('id') ?? '')
+      if (!post) return NextResponse.json({ error: '投稿が見つかりません' }, { status: 404 })
+      const buf = await renderSeoPostImage({ photo: post.photo, photoPosition: post.photoPosition, title: post.title, subtitle: post.subtitle, chips: GBP_SEO_CHIPS })
+      return png(buf, `google-${post.id}.png`)
+    }
     if (params.get('kind') === 'story') {
       const now = jstParts(new Date())
       const asOfLabel = `${Number(now.local.slice(5, 7))}/${Number(now.local.slice(8, 10))} ${now.local.slice(11, 16)} 時点`

@@ -106,6 +106,8 @@ export interface GeneratedContent {
   imagePrompt?: string
   /** AIで作った投稿画像（文字なしの写真）。投稿するときに見出しの文字を重ねる。無ければテンプレ画像 */
   image?: PostImage
+  /** Google検索向けの投稿（src/data/gbp-seo-posts.ts の id）。画像は院の写真＋見出し・強み（renderSeoPostImage） */
+  seoPostId?: string
   warnings: string[]
   /**
    * Instagramストーリーの空き状況（instagram_story のときだけ）。
