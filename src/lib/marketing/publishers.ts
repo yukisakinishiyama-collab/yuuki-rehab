@@ -42,6 +42,10 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
         reason: 'noteは公式投稿APIが提供されていないため手動投稿です。本文をコピーして投稿してください。',
         manualUrl: 'https://note.com/notes/new',
       }
+    case 'youtube_short':
+      return publishYoutubeShort(content)
+    case 'tiktok':
+      return publishTiktokVideo(content)
     default:
       return { kind: 'error', message: '未対応の媒体です' }
   }
@@ -85,6 +89,79 @@ async function uploadSeoImage(postId: string): Promise<string> {
   const png = await renderSeoPostImage({ photo: post.photo, photoPosition: post.photoPosition, title: post.title, subtitle: post.subtitle, chips: GBP_SEO_CHIPS })
   const blob = await put(`marketing/gbp-seo-${post.id}-${Date.now()}.jpg`, await toJpeg(png), { access: 'public', contentType: 'image/jpeg' })
   return blob.url
+}
+
+/** 宣伝の短い動画の作りおき（無ければ組み立てる）。外に渡せるURLで返す */
+async function promoVideoFor(content: GeneratedContent): Promise<{ url: string; posterUrl: string } | { error: string }> {
+  if (!content.promoVideoId) return { error: '出す動画が決まっていません' }
+  try {
+    const { absolutePromoUrl, ensurePromoVideo } = await import('./promo-video-server')
+    const stored = await ensurePromoVideo(content.promoVideoId)
+    return { url: absolutePromoUrl(stored.url), posterUrl: absolutePromoUrl(stored.posterUrl) }
+  } catch (error) {
+    console.error('[publishers] 動画を作れませんでした', error)
+    return { error: `動画を作れませんでした（${error instanceof Error ? error.message.slice(0, 200) : '不明'}）` }
+  }
+}
+
+/**
+ * YouTube ショート（院の写真＋文字の短い動画）。
+ * 連携（自動投稿の設定の「YouTubeとつなぐ」）と、審査（設定の「YouTubeの審査に通った」）の両方が済んでいれば自動で公開する。
+ * どちらかがまだなら手動（動画と題名・説明を院長のLINEへ届ける。nudgeManualPosts）。
+ * 審査の前にアプリから送ると、動画が「非公開」に固定されて公開に直せない（YouTube の決まり）ので、送らない。
+ */
+async function publishYoutubeShort(content: GeneratedContent): Promise<PublishOutcome> {
+  const video = await promoVideoFor(content)
+  if ('error' in video) return { kind: 'error', message: video.error }
+  const { getYoutubeCredentials, uploadYoutubeVideo, youtubeAccessToken, YoutubeAuthError } = await import('./youtube-server')
+  const { getAutopilotSettings } = await import('./autopilot-store-server')
+  const [creds, settings] = await Promise.all([getYoutubeCredentials(), getAutopilotSettings()])
+  if (!creds) {
+    return {
+      kind: 'action_required',
+      reason: 'YouTubeとの連携がまだのため手動投稿です。動画を保存して、YouTubeアプリの「＋」→「動画をアップロード」から投稿してください（題名・説明はコピーして貼れます）。',
+      manualUrl: video.url,
+    }
+  }
+  if (!settings.youtubeAudited) {
+    return {
+      kind: 'action_required',
+      reason: 'YouTubeの審査（APIの利用確認）がまだのため手動投稿です。審査の前にアプリから送ると、動画が非公開のまま固定されてしまうためです。動画を保存して、YouTubeアプリから投稿してください。',
+      manualUrl: video.url,
+    }
+  }
+  try {
+    const token = await youtubeAccessToken(creds)
+    const res = await fetch(video.url, { cache: 'no-store', signal: AbortSignal.timeout(60_000) })
+    if (!res.ok) return { kind: 'error', message: `作りおきの動画を読めませんでした（HTTP ${res.status}）` }
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    const tags = (content.body.match(/#[^\s#]+/g) ?? []).map((t) => t.slice(1)).filter((t) => t !== 'Shorts')
+    const uploaded = await uploadYoutubeVideo(token, { title: content.title, description: content.body, tags, bytes })
+    if (uploaded.privacyStatus && uploaded.privacyStatus !== 'public') {
+      return { kind: 'published', url: uploaded.url, message: `YouTubeに送りましたが、公開の状態が「${uploaded.privacyStatus}」です。YouTube Studio で確かめてください` }
+    }
+    return { kind: 'published', url: uploaded.url, message: 'YouTubeにショート動画を公開しました' }
+  } catch (error) {
+    if (error instanceof YoutubeAuthError) {
+      return { kind: 'action_required', reason: `${error.message}。今回は手で投稿し、自動投稿の設定の「YouTubeとつなぐ」をやり直してください。`, manualUrl: video.url }
+    }
+    return { kind: 'error', message: `YouTubeのエラー: ${error instanceof Error ? error.message : '不明'}` }
+  }
+}
+
+/**
+ * TikTok（同じ短い動画）。動画と説明を院長のLINEへ届けて、TikTokアプリから投稿してもらう（アプリの中で音楽を足せる）。
+ * TikTok に外のアプリから公開で出すには、TikTok の開発者登録と審査（数週間）が要る。通るまでは、
+ * 外のアプリから出した動画は「自分だけ」に固定される。そのため、いまは自動では送らない。
+ */
+async function publishTiktokVideo(content: GeneratedContent): Promise<PublishOutcome> {
+  const video = await promoVideoFor(content)
+  if ('error' in video) return { kind: 'error', message: video.error }
+  return {
+    kind: 'action_required',
+    reason: 'TikTokは手動投稿です。動画を保存して、TikTokアプリの「＋」→「アップロード」から投稿してください（説明はコピーして貼れます。音楽はアプリの中で足せます）。',
+    manualUrl: video.url,
+  }
 }
 
 /**

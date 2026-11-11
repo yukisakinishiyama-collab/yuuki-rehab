@@ -55,7 +55,8 @@ function loadFonts(): Promise<Font[]> {
   return fontsPromise
 }
 
-async function render(node: React.ReactElement, w: number, h: number): Promise<Buffer> {
+/** next/og（Satori）で PNG にする。背景を塗らなければ透明のまま（動画に重ねる文字の面にも使う） */
+export async function render(node: React.ReactElement, w: number, h: number): Promise<Buffer> {
   const fonts = await loadFonts()
   const res = new ImageResponse(node, { width: w, height: h, fonts })
   return Buffer.from(await res.arrayBuffer())
@@ -257,7 +258,7 @@ export async function renderPhotoPostImage(
 // ── Google検索向けの投稿（院の写真＋地域・見出し・院の強み） ───────────────────
 
 /** 院の写真（assets/gbp-photos/<name>.jpg）を data URL で */
-async function loadClinicPhoto(name: string): Promise<string> {
+export async function loadClinicPhoto(name: string): Promise<string> {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error('写真の名前が正しくありません')
   const bytes = await readFile(join(process.cwd(), 'assets/gbp-photos', `${name}.jpg`))
   return `data:image/jpeg;base64,${bytes.toString('base64')}`

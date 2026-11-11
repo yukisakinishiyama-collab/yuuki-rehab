@@ -15,6 +15,7 @@ import { CHANNEL_LABELS, type Channel, type ContentVariant } from '@/lib/marketi
 import { postImageUrl, usesAiImage } from '@/lib/marketing/post-image'
 import { GBP_SEO_POSTS } from '@/data/gbp-seo-posts'
 import { seoImageUrl } from '@/lib/marketing/gbp-seo'
+import PromoVideoFields, { type PromoPlanItem, type YoutubeConnection } from './PromoVideoFields'
 import {
   activeVariants,
   approvalBlocker,
@@ -36,6 +37,8 @@ interface Connections {
   ownerLine: boolean
   bookingStats: boolean
   mock: boolean
+  /** YouTube（ショート動画）の連携 */
+  youtube?: YoutubeConnection
 }
 
 const STATUS_TONE: Record<ProposalItem['status'], string> = {
@@ -384,11 +387,17 @@ function ItemCard({
 function SettingsPanel({
   initial,
   isAdmin,
+  youtube,
+  promoPlan,
   onSaved,
+  onChanged,
 }: {
   initial: AutopilotSettings
   isAdmin: boolean
+  youtube?: YoutubeConnection
+  promoPlan?: PromoPlanItem[]
   onSaved: (message: string) => void
+  onChanged: () => void
 }) {
   // 保存のたびに親が key を変えて作り直す（初期値は props から）
   const [s, setS] = useState<AutopilotSettings>(initial)
@@ -549,6 +558,8 @@ function SettingsPanel({
         </details>
       </fieldset>
 
+      <PromoVideoFields s={s} setS={setS} disabled={disabled} isAdmin={isAdmin} youtube={youtube} plan={promoPlan} onChanged={onChanged} />
+
       <fieldset className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3">
         <legend className="px-1 text-sm font-bold text-slate-900">キャンセルが出たら、ストーリーですぐ知らせる</legend>
         <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
@@ -699,7 +710,9 @@ function AutopilotInner() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [showSettings, setShowSettings] = useState(false)
+  // LINE のお知らせや「YouTubeとつなぐ」の戻りからは、設定を開いた状態で（?open=settings）
+  const [showSettings, setShowSettings] = useState(params.get('open') === 'settings')
+  const [promoPlan, setPromoPlan] = useState<PromoPlanItem[]>([])
 
   const refresh = useCallback(
     () =>
@@ -710,6 +723,7 @@ function AutopilotInner() {
           setSettings(data.settings)
           setProposals(data.proposals ?? [])
           setConn(data.connections)
+          setPromoPlan(data.promoPlan ?? [])
           setError('')
         })
         .catch((e: unknown) => setError(`読み込みに失敗しました（${e instanceof Error ? e.message : '不明'}）`)),
@@ -900,10 +914,13 @@ function AutopilotInner() {
             key={settings.updatedAt ?? 'default'}
             initial={settings}
             isAdmin={isAdmin}
+            youtube={conn?.youtube}
+            promoPlan={promoPlan}
             onSaved={(m) => {
               setMessage(m)
               refresh()
             }}
+            onChanged={refresh}
           />
         </section>
       )}

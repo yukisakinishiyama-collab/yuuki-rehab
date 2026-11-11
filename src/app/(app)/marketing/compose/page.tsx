@@ -23,6 +23,7 @@ import {
   CHANNEL_LABELS,
   OBJECTIVES,
   STATUS_LABELS,
+  VIDEO_CHANNELS,
   type Channel,
   type ContentProject,
   type ContentVariant,
@@ -30,7 +31,8 @@ import {
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import { postImageUrl, sceneFromVariants, usesAiImage } from '@/lib/marketing/post-image'
 
-const ALL_CHANNELS = Object.keys(CHANNEL_LABELS) as Channel[]
+// 決まった動画を出す媒体（YouTubeショート・TikTok）は、ここでは作らない（自動投稿の設定から）
+const ALL_CHANNELS = (Object.keys(CHANNEL_LABELS) as Channel[]).filter((c) => !VIDEO_CHANNELS.includes(c))
 
 /** 入力のたびに画像を描き直さないよう、少し待ってから値を変える */
 function useDebounced<T>(value: T, ms: number): T {

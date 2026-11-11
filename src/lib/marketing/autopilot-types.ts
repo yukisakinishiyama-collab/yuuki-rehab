@@ -44,6 +44,21 @@ export interface AutopilotSettings {
   /** Google検索向けの投稿の本数（週1＝月曜、週2＝月曜と金曜） */
   googleSeoPerWeek: number
   /**
+   * 宣伝の短い動画（院の写真＋文字・約16秒。src/data/promo-videos.ts を順にくり返す）を、毎週 YouTube ショートに出す。
+   * 連携と審査（youtubeAudited）が済むと自動で公開。それまでは、時間になると動画と文を院長のLINEへ届ける（2026-11-11 院長の依頼）
+   */
+  youtubeShorts: boolean
+  /** 同じ動画を TikTok にも出す（時間になると動画と文を院長のLINEへ届ける。アプリの中で音楽を足して投稿する） */
+  tiktokVideo: boolean
+  /** 動画の本数（週1＝水曜、週2＝水曜と土曜） */
+  promoVideoPerWeek: number
+  /**
+   * YouTube の審査（YouTube API サービスの利用確認）に通った。
+   * 通る前にアプリから送った動画は「非公開」に固定され、あとから公開に直せない（YouTube の決まり）。
+   * そのため、ここをオンにするまではアプリからは送らず、手で投稿してもらう
+   */
+  youtubeAudited: boolean
+  /**
    * 空き状況を Instagram のストーリーにも出す（週のはじめ＝今週の空き・空きが多い日の朝＝本日の空き）。
    * 画像は投稿する時刻の空きで作り直し、空きが無くなっていたら出さない。承認されるまで出さない
    */
@@ -88,6 +103,10 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   availabilityPost: true,
   googleSeo: true,
   googleSeoPerWeek: 2,
+  youtubeShorts: true,
+  tiktokVideo: true,
+  promoVideoPerWeek: 1,
+  youtubeAudited: false,
   availabilityStory: true,
   // キャンセルのストーリーは院長がオンにするまで出さない
   cancelStory: false,

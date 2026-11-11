@@ -228,6 +228,29 @@ export default function JobsPage() {
                         >
                           本文をコピー
                         </button>
+                        {(job.channel === 'youtube_short' || job.channel === 'tiktok') && (
+                          <>
+                            {job.channel === 'youtube_short' && (
+                              <button
+                                type="button"
+                                onClick={() => navigator.clipboard.writeText(job.content.title)}
+                                className="rounded border border-slate-300 px-2 py-1 text-xs font-bold max-lg:min-h-10"
+                              >
+                                題名をコピー
+                              </button>
+                            )}
+                            {job.manualUrl && (
+                              <a
+                                href={job.manualUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center rounded border border-teal-600 bg-teal-50 px-2 py-1 text-xs font-bold text-teal-800 max-lg:min-h-10"
+                              >
+                                動画を開く
+                              </a>
+                            )}
+                          </>
+                        )}
                         {isAdmin && (
                           <button
                             type="button"

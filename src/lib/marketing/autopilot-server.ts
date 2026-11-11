@@ -65,6 +65,7 @@ import {
 } from './types'
 import { postImageUrl, usesAiImage } from './post-image'
 import { seoImageUrl } from './gbp-seo'
+import { promoGroupKey } from './promo-video'
 import { aiPostImageConfigured, createPostPhotoWithin, sceneFromVariants, withPostImage } from './post-image-server'
 
 export const AUTOPILOT_URL = `${SITE_URL}/marketing/autopilot`
@@ -529,6 +530,8 @@ export interface RunSummary {
   skippedReason?: string
   /** Google検索向けの投稿を予約した結果 */
   seo?: { scheduled: number; weeks: string[]; skipped?: string }
+  /** YouTubeショート・TikTokの動画を予約した結果 */
+  promo?: { scheduled: number; weeks: string[]; skipped?: string }
 }
 
 /** 定期実行。重い処理（AI生成）は週1回だけ */
@@ -592,6 +595,14 @@ export async function runAutopilot(now = new Date()): Promise<RunSummary> {
     summary.seo = await scheduleSeoPosts(now)
   } catch (error) {
     console.error('[autopilot] Google検索向けの投稿を予約できませんでした', error)
+  }
+
+  // 1.6) YouTubeショート・TikTokの動画（院の写真＋文字の決まった動画）も、今週・来週の分だけ予約する（設定でオン・オフ）
+  try {
+    const { schedulePromoVideos } = await import('./promo-video-server')
+    summary.promo = await schedulePromoVideos(now)
+  } catch (error) {
+    console.error('[autopilot] 動画の投稿を予約できませんでした', error)
   }
 
   // 2) 週に1回の下書き作成
@@ -872,6 +883,16 @@ export async function applyProposalAction(week: string, input: ProposalAction, a
 
 // ── 手動投稿のお知らせ（Google・未接続のInstagram） ─────────────────
 
+/** 動画の見本の絵（作りおきのもの。外に渡せる https のURLだけ） */
+async function promoPosterUrl(videoId: string): Promise<string> {
+  try {
+    const { getStoredPromoVideo } = await import('./promo-video-server')
+    return (await getStoredPromoVideo(videoId))?.posterUrl ?? ''
+  } catch {
+    return ''
+  }
+}
+
 /** 自動投稿のジョブか（idempotencyKey = autopilot:<週>:<案ID>:<媒体>） */
 function autopilotItemKey(job: PublishJob): string | null {
   const parts = job.idempotencyKey.split(':')
@@ -903,6 +924,49 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       { label: '投稿ジョブ画面', uri: `${SITE_URL}/marketing/jobs` },
     ]
     const result = await notifyOwner([head, job.content.body, ownerCard('Google投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons)])
+    if (result.delivered) seoSent += 1
+  }
+  // YouTubeショート・TikTokの動画：同じ動画の分を1通にまとめ、動画そのもの（LINEの中で保存できる）と、貼る文を届ける
+  const promoGroups = new Map<string, PublishJob[]>()
+  for (const job of jobs) {
+    const key = promoGroupKey(job.idempotencyKey)
+    if (key) promoGroups.set(key, [...(promoGroups.get(key) ?? []), job])
+  }
+  for (const group of promoGroups.values()) {
+    const youtube = group.find((j) => j.channel === 'youtube_short')
+    const tiktok = group.find((j) => j.channel === 'tiktok')
+    const first = youtube ?? tiktok
+    if (!first) continue
+    const videoUrl = first.manualUrl ?? ''
+    const posterUrl = first.content.promoVideoId ? await promoPosterUrl(first.content.promoVideoId) : ''
+    const where = [youtube ? 'YouTube' : null, tiktok ? 'TikTok' : null].filter(Boolean).join('・')
+    const head = [
+      `🎬 動画の投稿の時間です（${formatSlot(first.scheduledAt)}）`,
+      `「${first.content.imageText ?? first.content.title}」→ ${where}`,
+      '',
+      '① 下の動画を開いて保存（長押し、または右上の保存ボタン）',
+      youtube ? '② YouTube：アプリの「＋」→「動画をアップロード」→ 保存した動画を選ぶ（縦の短い動画は自動でショートになります）。題名と説明は、下の吹き出しを長押し→コピー' : null,
+      tiktok ? `${youtube ? '③' : '②'} TikTok：アプリの「＋」→「アップロード」→ 保存した動画を選ぶ。説明は下の吹き出しをコピー。音楽はアプリの中で足せます` : null,
+      '',
+      '投稿したら、いちばん下のボタンを押してください。',
+    ]
+      .filter((x): x is string => x !== null)
+      .join('\n')
+    const messages: OwnerMessage[] = [head]
+    // LINE の動画メッセージは https のURLだけ受け付ける
+    // （院内アプリのURLはパスワードで守られていて LINE からは読めないので、動画の置き場＝Blob のURLのときだけ）
+    const lineCanRead = (u: string) => /^https:\/\//.test(u) && !u.startsWith(SITE_URL)
+    if (lineCanRead(videoUrl) && lineCanRead(posterUrl)) messages.push({ type: 'video', originalContentUrl: videoUrl, previewImageUrl: posterUrl })
+    if (youtube) messages.push(`【YouTube 題名】\n${youtube.content.title}\n\n【YouTube 説明】\n${youtube.content.body}`)
+    if (tiktok) messages.push(`【TikTok 説明】\n${tiktok.content.body}`)
+    const buttons = [
+      ...(youtube ? [{ label: 'YouTubeに投稿した', postback: `ap:done:${youtube.id}`, primary: true }] : []),
+      ...(tiktok ? [{ label: 'TikTokに投稿した', postback: `ap:done:${tiktok.id}`, primary: !youtube }] : []),
+      ...(videoUrl ? [{ label: '動画を開く', uri: videoUrl }] : []),
+      { label: '設定を開く', uri: `${AUTOPILOT_URL}?open=settings` },
+    ].slice(0, 4)
+    messages.push(ownerCard('動画の投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons))
+    const result = await notifyOwner(messages)
     if (result.delivered) seoSent += 1
   }
   const groups = new Map<string, PublishJob[]>()
