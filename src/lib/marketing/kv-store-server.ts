@@ -16,7 +16,8 @@ const TABLE = 'marketing_line_contacts'
 // mkt: … 集客の自動化設定・動いた記録・監査ログ（automation-store-server.ts）
 // linesent: … 「LINEで予約日時を送る」で送った記録（api/line-link/reservation）
 // hpstat: … ホームページの閲覧数・電話タップの日別の件数（hp-stats-server.ts）
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:'] as const
+// kcdoc: … 署名入りの契約書・同意書の本文（karte/contract-storage-server.ts）
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:', 'kcdoc:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')

@@ -58,6 +58,11 @@ import PatientProfileCard from './PatientProfileCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
 import SyncNowButton from '@/components/rehab/SyncNowButton'
+import ContractsTab, { MemberStatusBadge } from './ContractsTab'
+import OutcomeQuickTab from './OutcomeQuickTab'
+import { getContracts, getOutcomes } from '@/lib/contracts/store'
+import { jstToday, memberStatusOf } from '@/lib/contracts/member'
+import type { ContractRecord, OutcomeRecord } from '@/types/contracts'
 import { useKarteSynced } from '@/lib/use-karte-sync'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
@@ -799,10 +804,11 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'cancel'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'contract' | 'cancel'
 /** 「評価・測定」の中の切り替え */
-type EvalKey = 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
+type EvalKey = 'outcome' | 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
 const EVAL_TABS: { key: EvalKey; label: string }[] = [
+  { key: 'outcome', label: 'アウトカム' },
   { key: 'evaluation', label: '初回評価' },
   { key: 'rom', label: 'ROM' },
   { key: 'strength', label: '筋力' },
@@ -816,7 +822,7 @@ interface Props {
 
 export default function PatientDetail({ patient }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('soap')
-  const [evalTab, setEvalTab] = useState<EvalKey>('evaluation')
+  const [evalTab, setEvalTab] = useState<EvalKey>('outcome')
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [romRecords, setRomRecords] = useState<ROMRecord[]>([])
   const [strengthRecords, setStrengthRecords] = useState<StrengthRecord[]>([])
@@ -833,6 +839,8 @@ export default function PatientDetail({ patient }: Props) {
   const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
   const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
+  const [contracts, setContracts] = useState<ContractRecord[]>([])
+  const [outcomes, setOutcomes] = useState<OutcomeRecord[]>([])
 
   useEffect(() => {
     reload()
@@ -857,6 +865,8 @@ export default function PatientDetail({ patient }: Props) {
     setAttendance(getAttendanceRecords(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
+    setContracts(getContracts(patient.id))
+    setOutcomes(getOutcomes(patient.id))
   }
 
   // ── 算出値 ──
@@ -882,6 +892,9 @@ export default function PatientDetail({ patient }: Props) {
         patientSubjective: 60,
       })
     : null
+
+  // 会員プランの状態（契約・同意書タブで署名した入会・休会・解約から）
+  const memberStatus = memberStatusOf(contracts, jstToday())
 
   // キャンセル累計（ヘッダー表示・離脱リスク算出に使用）
   const cancelSummary = summarizeCancellations(cancellations)
@@ -931,6 +944,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'memo', label: '簡易メモ', badge: quickMemos.length || undefined },
     { key: 'question', label: '疑問・AI相談', badge: karteQuestions.filter(q => q.status === 'open').length || undefined },
     { key: 'photo', label: '写真', badge: kartePhotos.length || undefined },
+    { key: 'contract', label: '契約・同意書', badge: contracts.filter(c => !c.voided).length || undefined },
     { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
 
@@ -959,6 +973,7 @@ export default function PatientDetail({ patient }: Props) {
                 {patient.autoCreatedFrom === 'reservation' && soapNotes.length === 0 && (
                   <Badge color="blue">予約から自動で登録</Badge>
                 )}
+                <MemberStatusBadge status={memberStatus} />
                 <RetentionRiskBadge level={retentionRisk.level} />
                 {/* キャンセル累計（0件のときは表示しない）。押すとキャンセルタブへ */}
                 {cancelSummary.total > 0 && (
@@ -1358,6 +1373,11 @@ export default function PatientDetail({ patient }: Props) {
           <PhotosTab patient={patient} photos={kartePhotos} onUpdate={reload} />
         )}
 
+        {/* ── 契約・同意書タブ（文面にチェック・記入 → 指で署名 → 院保管用と患者様控えを印刷） ── */}
+        {activeTab === 'contract' && (
+          <ContractsTab patient={patient} contracts={contracts} onUpdate={reload} />
+        )}
+
         {/* ── キャンセルタブ ── */}
         {activeTab === 'cancel' && (
           <CancellationTab
@@ -1662,6 +1682,10 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 進捗タブ ── */}
+        {activeTab === 'eval' && evalTab === 'outcome' && (
+          <OutcomeQuickTab patient={patient} outcomes={outcomes} onUpdate={reload} />
+        )}
+
         {activeTab === 'eval' && evalTab === 'progress' && (
           <div className="space-y-6">
             {improvementScore && (
