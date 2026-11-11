@@ -13,6 +13,7 @@ const root = new URL('../', import.meta.url)
 const { CONTRACT_TEMPLATES } = await import(new URL('src/data/contract-templates.ts', root).href)
 const { parseTemplate, renderTemplateHtml } = await import(new URL('src/lib/contracts/template.ts', root).href)
 const member = await import(new URL('src/lib/contracts/member.ts', root).href)
+const autofill = await import(new URL('src/lib/contracts/autofill.ts', root).href)
 
 let passed = 0
 function test(name, fn) {
@@ -196,6 +197,138 @@ test('書類の文面：兄弟・親子プランの欄と、休会・解約・�
   const without = parseTemplate(body.slice(0, start) + body.slice(end))
   assert.equal(full.blankCount - without.blankCount, 4)
   assert.equal(full.checkCount - without.checkCount, 5)
+})
+
+test('表の中の「　　　年　　　月　　　日」も日付の記入欄になる（全角の空白を落とさない）', () => {
+  const p = parseTemplate('# 題\n| **開始日** | 　　　年　　　月　　　日 |\n| **予約** | 　　　年　　　月　　　日　　時間　　　時　　　分 |\n| 全角だけ | 　 |')
+  const blanks = p.blocks[1].rows.flat(2).filter((x) => x.t === 'blank')
+  assert.deepEqual(blanks.map((x) => x.kind), ['date', 'date', 'time', 'text'])
+  // 医療連携の書類：開始日・初回再評価・1か月・3か月・受診予定日・結果確認予約日が日付の欄
+  const med = parseTemplate(CONTRACT_TEMPLATES.find((t) => t.id === 'medical-cooperation').body)
+  const { blanks: info } = autofill.describeTemplate(med)
+  const dates = info.filter((b) => b.kind === 'date').map((b) => b.label)
+  assert.deepEqual(dates, ['開始日', '初回再評価予定日', '1か月評価予定日', '3か月評価予定日', '受診予定日', '結果確認予約日'])
+})
+
+const tplOf = (id) => {
+  const t = CONTRACT_TEMPLATES.find((x) => x.id === id)
+  return { t, p: parseTemplate(t.body) }
+}
+const byLabel = (p, auto, pred) => {
+  const { blanks } = autofill.describeTemplate(p)
+  const b = blanks.find(pred)
+  assert.ok(b, '欄が見つからない')
+  return auto[b.i]
+}
+const pt = { mainComplaint: '走ると右膝が痛い', diagnosisLabel: '膝蓋腱炎', occupation: '下関市立彦島中学校' }
+
+test('自動入力：入会書（学校名・利用開始日・目的・兄弟・親子プランのもう1名）', () => {
+  const { p } = tplOf('member-contract')
+  const m = { plan: '学生会員', start: '2026-11-20' }
+  let auto = autofill.autofillContract(p, { docId: 'member-contract', today: '2026-11-11', patient: pt, member: m })
+  assert.equal(byLabel(p, auto, (b) => b.label === '学校名').value, '下関市立彦島中学校')
+  assert.deepEqual(byLabel(p, auto, (b) => b.label === '利用開始日'), { value: '2026年11月20日', source: 'member', locked: true })
+  assert.equal(byLabel(p, auto, (b) => b.label.startsWith('主な目的') && !/もう1名/.test(b.section)).value, '膝蓋腱炎（走ると右膝が痛い）')
+  // 一般会員なら学校名は入れない・もう1名の欄も空のまま
+  auto = autofill.autofillContract(p, { docId: 'member-contract', today: '2026-11-11', patient: pt, member: { plan: '一般会員', start: '2026-11-20' } })
+  assert.equal(byLabel(p, auto, (b) => b.label === '学校名'), null)
+  assert.equal(byLabel(p, auto, (b) => b.row === '氏名'), null)
+  // 職業が学校でなければ入れない
+  auto = autofill.autofillContract(p, { docId: 'member-contract', today: '2026-11-11', patient: { ...pt, occupation: '会社員' }, member: m })
+  assert.equal(byLabel(p, auto, (b) => b.label === '学校名'), null)
+  // 兄弟・親子プラン：もう1名の欄は下の欄から（読むだけ）、目的はその方のカルテから
+  auto = autofill.autofillContract(p, {
+    docId: 'member-contract',
+    today: '2026-11-11',
+    patient: pt,
+    member: { plan: '兄弟・親子プラン', start: '2026-11-20', partnerName: '山田 次郎', partnerRelation: '弟', partnerBirthDate: '2014-05-03' },
+    partnerPatient: { mainComplaint: '投げると肘が痛い', diagnosisLabel: '' },
+  })
+  assert.deepEqual(byLabel(p, auto, (b) => b.row === '氏名'), { value: '山田 次郎', source: 'member', locked: true })
+  assert.equal(byLabel(p, auto, (b) => b.row === '生年月日').value, '2014年5月3日')
+  assert.equal(byLabel(p, auto, (b) => b.row.startsWith('続柄')).value, '弟')
+  assert.deepEqual(byLabel(p, auto, (b) => b.row.startsWith('主な目的') && /もう1名/.test(b.section)), { value: '投げると肘が痛い', source: 'karte' })
+  // 「その他（　）」は自動にしない
+  assert.equal(byLabel(p, auto, (b) => b.label === 'その他'), null)
+})
+
+test('自動入力：休会届・解約届（利用開始日・提出日・休会の月・契約終了日・最後の決済月）', () => {
+  const status = { state: 'active', start: '2026-08-05', pausedMonths: 0 }
+  let { p } = tplOf('member-pause')
+  let auto = autofill.autofillContract(p, { docId: 'member-pause', today: '2026-11-11', patient: pt, member: { pauseFrom: '2026-12', pauseMonths: 2 }, status })
+  assert.equal(byLabel(p, auto, (b) => b.label === '利用開始日').value, '2026年8月5日')
+  assert.deepEqual(byLabel(p, auto, (b) => b.label === '休会届の提出日'), { value: '2026年11月11日', source: 'today' })
+  assert.equal(byLabel(p, auto, (b) => b.label === '休会の開始月').value, '2026年12月')
+  assert.equal(byLabel(p, auto, (b) => b.label === '再開予定月').value, '2027年2月')
+  assert.equal(byLabel(p, auto, (b) => b.row === '休会の月数').value, '')
+  auto = autofill.autofillContract(p, { docId: 'member-pause', today: '2026-11-11', patient: pt, member: { pauseFrom: '2026-12', pauseMonths: 5 }, status })
+  assert.equal(byLabel(p, auto, (b) => b.row === '休会の月数').value, '5か月')
+  ;({ p } = tplOf('member-cancel'))
+  auto = autofill.autofillContract(p, { docId: 'member-cancel', today: '2026-11-16', patient: pt, member: {}, status })
+  assert.equal(byLabel(p, auto, (b) => b.label === '解約届の提出日').value, '2026年11月16日')
+  assert.equal(byLabel(p, auto, (b) => b.label === '契約終了日').value, '2026年12月31日')
+  assert.equal(byLabel(p, auto, (b) => b.label === '最後の決済月').value, '2026年12月')
+  // 契約が無い（アプリより前に入会した方など）なら、利用開始日は空欄のまま
+  auto = autofill.autofillContract(p, { docId: 'member-cancel', today: '2026-11-16', patient: pt, member: {}, status: { state: 'none', pausedMonths: 0 } })
+  assert.equal(byLabel(p, auto, (b) => b.label === '利用開始日'), null)
+})
+
+test('自動入力：通院頻度の変更・医療連携（部位・変更日・開始日から1か月後と3か月後）', () => {
+  let { p } = tplOf('visit-frequency')
+  let auto = autofill.autofillContract(p, { docId: 'visit-frequency', today: '2026-11-11', patient: pt })
+  assert.equal(byLabel(p, auto, (b) => b.label.startsWith('部位')).value, '膝蓋腱炎（走ると右膝が痛い）')
+  assert.equal(byLabel(p, auto, (b) => b.label === '変更日').value, '2026/11/11')
+  assert.equal(byLabel(p, auto, (b) => b.label === '次回の再評価予定日'), null)
+  ;({ p } = tplOf('medical-cooperation'))
+  auto = autofill.autofillContract(p, { docId: 'medical-cooperation', today: '2026-11-30', patient: pt })
+  assert.equal(byLabel(p, auto, (b) => b.label === '開始日').value, '2026-11-30')
+  assert.equal(byLabel(p, auto, (b) => b.label === '1か月評価予定日').value, '2026-12-30')
+  assert.equal(byLabel(p, auto, (b) => b.label === '3か月評価予定日').value, '2027-02-28')
+  assert.equal(byLabel(p, auto, (b) => b.label === '初回再評価予定日'), null)
+  assert.equal(byLabel(p, auto, (b) => b.label === '医療機関名'), null)
+  // 開始日を手で直すと、1か月後・3か月後もそれに合わせる
+  const { blanks } = autofill.describeTemplate(p)
+  const inputs = Array(p.blankCount).fill(null)
+  inputs[blanks.find((b) => b.label === '開始日').i] = '2026-12-01'
+  auto = autofill.autofillContract(p, { docId: 'medical-cooperation', today: '2026-11-30', patient: pt, inputs })
+  assert.equal(byLabel(p, auto, (b) => b.label === '1か月評価予定日').value, '2027-01-01')
+  // 画面の値：手で入れたものが先、会員の手続きの欄から入るものは手で入れても変わらない
+  assert.deepEqual(
+    autofill.effectiveInputs(['手', null, null, 'x'], [{ value: '自動', source: 'karte' }, { value: '自動2', source: 'today' }, null, { value: '会員', source: 'member', locked: true }]),
+    ['手', '自動2', '', '会員'],
+  )
+})
+
+test('自動入力：署名・お名前の欄・□ のチェックは入れない（料金案内は記入欄なし）', () => {
+  for (const t of CONTRACT_TEMPLATES) {
+    const p = parseTemplate(t.body)
+    const auto = autofill.autofillContract(p, {
+      docId: t.id,
+      today: '2026-11-11',
+      patient: pt,
+      member: { plan: '兄弟・親子プラン', start: '2026-11-20', partnerName: '山田 次郎', partnerRelation: '弟', pauseFrom: '2026-12', pauseMonths: 1 },
+      status: { state: 'active', start: '2026-08-05', pausedMonths: 0 },
+    })
+    assert.equal(auto.length, p.blankCount, t.id)
+    const { blanks } = autofill.describeTemplate(p)
+    for (const b of blanks) {
+      // お名前を入れてよいのは、兄弟・親子プランのもう1名（下の欄で入れたもの）だけ
+      if (/氏名|名前/.test(b.label + b.row) && auto[b.i]) assert.ok(auto[b.i].locked && /もう1名/.test(b.section), `${t.id} ${b.label}`)
+    }
+  }
+  assert.equal(parseTemplate(CONTRACT_TEMPLATES.find((t) => t.id === 'fee-cancel-policy').body).blankCount, 0)
+})
+
+test('入会書の「□ 申し込む」で会員の種別、休会届の「□ ○か月」で月数が分かる', () => {
+  let { p } = tplOf('member-contract')
+  const { checks } = autofill.describeTemplate(p)
+  const plans = checks.map((c) => autofill.planOfCheck(c)).filter(Boolean)
+  assert.deepEqual(plans, ['一般会員', '学生会員', '兄弟・親子プラン'])
+  ;({ p } = tplOf('member-pause'))
+  const months = autofill.describeTemplate(p).checks.map((c) => autofill.pauseMonthsOfCheck(c)).filter(Boolean)
+  assert.deepEqual(months, [1, 2, 3])
+  assert.equal(autofill.addMonthsYmd('2026-01-31', 1), '2026-02-28')
+  assert.equal(autofill.schoolOf({ occupation: '会社員' }), '')
 })
 
 console.log(`\n${passed} 件 OK`)
