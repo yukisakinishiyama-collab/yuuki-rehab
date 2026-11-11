@@ -72,7 +72,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         ? 'クラウドに届きませんでした'
         : result.changedKeys.length > 0
           ? 'ほかの端末の記録を取り込みました'
-          : 'クラウドとそろっています',
+          : result.sent > 0
+            ? 'この端末の記録を反映しました'
+            : 'クラウドとそろっています',
     )
   }
 

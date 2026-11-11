@@ -21,7 +21,15 @@ export default function SyncNowButton({ className = '' }: { className?: string }
     const { syncNow } = await import('@/lib/sync-service')
     const result = await syncNow()
     setBusy(false)
-    setNote(!result.ok ? '届きませんでした' : result.changedKeys.length > 0 ? '取り込みました' : 'そろっています')
+    setNote(
+      !result.ok
+        ? '届きませんでした'
+        : result.changedKeys.length > 0
+          ? 'ほかの端末の記録を取り込みました'
+          : result.sent > 0
+            ? '反映しました'
+            : 'そろっています',
+    )
     setTimeout(() => setNote(''), 4000)
   }
 
