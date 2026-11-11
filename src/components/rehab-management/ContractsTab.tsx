@@ -8,8 +8,10 @@
  *    → 署名入りの本文をクラウドに保存（あとから変えない）、一覧（pt_contracts）に1行
  * 4. 「印刷する」で院保管用と患者様控えの2部（控えだけ・白紙も印刷できる）
  * 会員プランの書類（入会・休会・解約）に署名すると、会員の状態と日付（最低利用期間・契約終了日）が自動で変わる。
+ * 兄弟・親子プラン（2名まで）は契約者（代表）のカルテで手続きし、もう1名の方のカルテにも会員の状態が出る。
  */
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { nanoid } from 'nanoid'
 import { CheckCircle2, ChevronLeft, FileSignature, Printer } from 'lucide-react'
 import type { Patient } from '@/types/patient'
@@ -24,10 +26,13 @@ import {
   MEMBER_FEES,
   MEMBER_PLANS,
   memberEventHtml,
+  memberStatusForPatient,
   memberStatusOf,
   minEndOf,
+  PAIR_PLAN,
   type MemberInput,
 } from '@/lib/contracts/member'
+import { getPatients } from '@/lib/patient-store'
 import { printPages, printSigned, signatureBlockHtml, copyPage } from '@/lib/contracts/print'
 import { addContract, voidContract } from '@/lib/contracts/store'
 import { fingerprint } from '@/lib/sync-merge'
@@ -64,6 +69,7 @@ export function MemberStatusBadge({ status }: { status: MemberStatus }) {
     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold ${style[status.state]}`}>
       {status.label}
       {status.plan && status.state !== 'ended' ? `・${status.plan}` : ''}
+      {status.via ? `（代表 ${status.via.name}さん）` : ''}
       {extra}
     </span>
   )
@@ -74,15 +80,21 @@ type View = { kind: 'list' } | { kind: 'doc'; tpl: ContractTemplate } | { kind: 
 export default function ContractsTab({
   patient,
   contracts,
+  allContracts,
   onUpdate,
 }: {
   patient: Patient
   contracts: ContractRecord[]
+  /** すべての患者さんの署名済みの書類（兄弟・親子プランのもう1名の状態を出すため） */
+  allContracts?: ContractRecord[]
   onUpdate: () => void
 }) {
   const today = jstToday()
   const [view, setView] = useState<View>({ kind: 'list' })
-  const status = useMemo(() => memberStatusOf(contracts, today), [contracts, today])
+  /** この方ご自身の契約からの状態（休会・解約の書類の計算に使う） */
+  const ownStatus = useMemo(() => memberStatusOf(contracts, today), [contracts, today])
+  /** 画面に出す状態（兄弟・親子プランのもう1名なら、代表の方の契約から） */
+  const status = useMemo(() => memberStatusForPatient(patient.id, allContracts ?? contracts, today), [patient.id, allContracts, contracts, today])
   const active = contracts.filter((c) => !c.voided)
   const lastSigned = (id: string) => active.find((c) => c.docId === id)
 
@@ -93,7 +105,8 @@ export default function ContractsTab({
         tpl={view.tpl}
         patient={patient}
         contracts={contracts}
-        status={status}
+        status={ownStatus}
+        covered={status.via ? status : undefined}
         today={today}
         onBack={() => setView({ kind: 'list' })}
         onDone={(record, html) => {
@@ -171,6 +184,28 @@ export default function ContractsTab({
               <dd className="font-bold text-slate-800">{status.end ? jaDate(status.end) : '自動更新'}</dd>
             </div>
           </dl>
+          {status.partner && !status.via && (
+            <p className="mt-3 text-sm text-slate-700">
+              兄弟・親子プランのもう1名：
+              {status.partner.patientId ? (
+                <Link href={`/patients/${status.partner.patientId}`} className="font-bold text-teal-700 underline underline-offset-2">
+                  {status.partner.name}さん
+                </Link>
+              ) : (
+                <b>{status.partner.name}さん</b>
+              )}
+              {status.partner.relation ? `（${status.partner.relation}）` : ''}
+              。1部位施術料は来院した方ごとにかかります。
+            </p>
+          )}
+          {status.via && (
+            <p className="mt-3 text-sm text-slate-700">
+              <Link href={`/patients/${status.via.patientId}`} className="font-bold text-teal-700 underline underline-offset-2">
+                {status.via.name}さん
+              </Link>
+              の兄弟・親子プランのもう1名として利用しています。休会・解約の届は、{status.via.name}さんのカルテで手続きします。
+            </p>
+          )}
         </section>
       )}
 
@@ -317,6 +352,7 @@ function SignFlow({
   patient,
   contracts,
   status,
+  covered,
   today,
   onBack,
   onDone,
@@ -325,6 +361,8 @@ function SignFlow({
   patient: Patient
   contracts: ContractRecord[]
   status: MemberStatus
+  /** 兄弟・親子プランのもう1名として登録されているときの状態 */
+  covered?: MemberStatus
   today: string
   onBack: () => void
   onDone: (record: ContractRecord, html: string) => void
@@ -350,6 +388,10 @@ function SignFlow({
   const [member, setMember] = useState<MemberInput>(() => ({
     plan: '一般会員',
     start: today,
+    partnerName: '',
+    partnerRelation: '',
+    partnerBirthDate: '',
+    partnerPatientId: '',
     pauseFrom: today.slice(0, 7),
     pauseMonths: 1,
     special: false,
@@ -358,7 +400,7 @@ function SignFlow({
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const memberCheck = tpl.member ? buildMemberEvent(tpl.member, member, contracts, today) : null
+  const memberCheck = tpl.member ? buildMemberEvent(tpl.member, member, contracts, today, covered) : null
   const ready =
     patientName.trim() && staffName.trim() && sigPatient && sigStaff && (!minor || (guardianName.trim() && sigGuardian)) && (!memberCheck || memberCheck.ok)
 
@@ -465,7 +507,7 @@ function SignFlow({
       </article>
 
       {tpl.member && (
-        <MemberForm kind={tpl.member} member={member} setMember={setMember} status={status} today={today} check={memberCheck} />
+        <MemberForm kind={tpl.member} member={member} setMember={setMember} status={status} today={today} check={memberCheck} selfId={patient.id} />
       )}
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -529,6 +571,7 @@ function MemberForm({
   status,
   today,
   check,
+  selfId,
 }: {
   kind: 'join' | 'pause' | 'cancel'
   member: MemberInput
@@ -536,6 +579,7 @@ function MemberForm({
   status: MemberStatus
   today: string
   check: ReturnType<typeof buildMemberEvent> | null
+  selfId: string
 }) {
   const set = (patch: Partial<MemberInput>) => setMember((m) => ({ ...m, ...patch }))
   const cancelEnd = cancelEndOf(today)
@@ -571,6 +615,7 @@ function MemberForm({
               最低利用期間の満了日：<b>{jaDate(minEndOf(member.start))}</b>（以後は1か月ごとの自動更新）
             </p>
           )}
+          {member.plan === PAIR_PLAN && <PartnerFields member={member} set={set} selfId={selfId} />}
         </div>
       )}
 
@@ -638,3 +683,67 @@ function MemberForm({
     </section>
   )
 }
+
+/** 兄弟・親子プランの、もう1名の利用者（カルテから選ぶか、名前を入れる） */
+function PartnerFields({ member, set, selfId }: { member: MemberInput; set: (patch: Partial<MemberInput>) => void; selfId: string }) {
+  const patients = useMemo(
+    () =>
+      getPatients()
+        .filter((p) => p.id !== selfId)
+        .sort((a, b) => (a.kana || a.name).localeCompare(b.kana || b.name, 'ja')),
+    [selfId],
+  )
+  return (
+    <div className="space-y-3 rounded-xl border border-teal-200 bg-white p-3 sm:col-span-2">
+      <p className="text-sm font-bold text-slate-800">もう1名の利用者（兄弟姉妹・親子）</p>
+      <label className="block text-sm">
+        <span className="font-bold text-slate-700">カルテから選ぶ</span>
+        <select
+          value={member.partnerPatientId ?? ''}
+          onChange={(e) => {
+            const p = patients.find((x) => x.id === e.target.value)
+            set(p ? { partnerPatientId: p.id, partnerName: p.name, partnerBirthDate: p.birthDate || '' } : { partnerPatientId: '' })
+          }}
+          className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"
+        >
+          <option value="">カルテがない方（下にお名前を入れる）</option>
+          {patients.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+              {p.kana ? `（${p.kana}）` : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block text-sm">
+          <span className="font-bold text-slate-700">お名前</span>
+          <input value={member.partnerName ?? ''} onChange={(e) => set({ partnerName: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3" />
+        </label>
+        <label className="block text-sm">
+          <span className="font-bold text-slate-700">続柄（契約者との関係）</span>
+          <input
+            value={member.partnerRelation ?? ''}
+            onChange={(e) => set({ partnerRelation: e.target.value })}
+            list="partner-relations"
+            placeholder="弟・姉・母 など"
+            className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3"
+          />
+          <datalist id="partner-relations">
+            {['兄', '弟', '姉', '妹', '父', '母', '子'].map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
+        </label>
+        <label className="block text-sm">
+          <span className="font-bold text-slate-700">生年月日</span>
+          <input type="date" value={member.partnerBirthDate ?? ''} onChange={(e) => set({ partnerBirthDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3" />
+        </label>
+      </div>
+      <p className="text-xs text-slate-600">
+        カルテから選ぶと、その方のカルテにも「会員（代表 この方）」と出ます。1部位施術料は来院した方ごとにかかります。休会・解約はこのカルテで2名分まとめて手続きします。
+      </p>
+    </div>
+  )
+}
+

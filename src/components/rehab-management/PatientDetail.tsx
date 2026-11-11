@@ -60,8 +60,8 @@ import ReferralLetterModal from './ReferralLetterModal'
 import SyncNowButton from '@/components/rehab/SyncNowButton'
 import ContractsTab, { MemberStatusBadge } from './ContractsTab'
 import OutcomeQuickTab from './OutcomeQuickTab'
-import { getContracts, getOutcomeSport, getOutcomes } from '@/lib/contracts/store'
-import { jstToday, memberStatusOf } from '@/lib/contracts/member'
+import { getAllContracts, getContracts, getOutcomeSport, getOutcomes } from '@/lib/contracts/store'
+import { jstToday, memberStatusForPatient } from '@/lib/contracts/member'
 import type { ContractRecord, OutcomeRecord, SportKey } from '@/types/contracts'
 import { useKarteSynced } from '@/lib/use-karte-sync'
 import { nanoid } from 'nanoid'
@@ -840,6 +840,7 @@ export default function PatientDetail({ patient }: Props) {
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
   const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
   const [contracts, setContracts] = useState<ContractRecord[]>([])
+  const [allContracts, setAllContracts] = useState<ContractRecord[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeRecord[]>([])
   const [outcomeSport, setOutcomeSportState] = useState<SportKey | null>(null)
 
@@ -867,6 +868,7 @@ export default function PatientDetail({ patient }: Props) {
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
     setContracts(getContracts(patient.id))
+    setAllContracts(getAllContracts())
     setOutcomes(getOutcomes(patient.id))
     setOutcomeSportState(getOutcomeSport(patient.id))
   }
@@ -896,7 +898,7 @@ export default function PatientDetail({ patient }: Props) {
     : null
 
   // 会員プランの状態（契約・同意書タブで署名した入会・休会・解約から）
-  const memberStatus = memberStatusOf(contracts, jstToday())
+  const memberStatus = memberStatusForPatient(patient.id, allContracts, jstToday())
 
   // キャンセル累計（ヘッダー表示・離脱リスク算出に使用）
   const cancelSummary = summarizeCancellations(cancellations)
@@ -1377,7 +1379,7 @@ export default function PatientDetail({ patient }: Props) {
 
         {/* ── 契約・同意書タブ（文面にチェック・記入 → 指で署名 → 院保管用と患者様控えを印刷） ── */}
         {activeTab === 'contract' && (
-          <ContractsTab patient={patient} contracts={contracts} onUpdate={reload} />
+          <ContractsTab patient={patient} contracts={contracts} allContracts={allContracts} onUpdate={reload} />
         )}
 
         {/* ── キャンセルタブ ── */}
