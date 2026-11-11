@@ -73,22 +73,57 @@ export interface MemberStatus {
 
 export type OutcomeMetricKey =
   | 'nrs'
+  | 'throw_nrs'
+  | 'run_nrs'
   | 'rom_knee_flex'
   | 'rom_knee_ext'
   | 'rom_other'
+  | 'gird'
   | 'koos'
   | 'lysholm'
   | 'ikdc'
+  | 'kjoc'
+  | 'hagos_sport'
+  | 'hagos_pain'
+  | 'visa_a'
+  | 'visa_p'
+  | 'acl_rsi'
   | 'lsi_quad'
   | 'lsi_ham'
   | 'lsi_hop'
+  | 'lsi_hop_triple'
+  | 'lsi_hop_cross'
+  | 'lsi_hop_timed'
+  | 'lsi_hip_add'
+  | 'lsi_hip_abd'
+  | 'lsi_calf'
+  | 'add_squeeze'
+  | 'ybal_ant'
+  | 'run_minutes'
+  | 'throw_distance'
+
+/** 競技ごとの評価セット（患者さんごとに1つ選ぶ） */
+export type SportKey = 'none' | 'baseball' | 'soccer' | 'running' | 'jump' | 'acl'
+
+/** 患者さんごとのアウトカムの設定（pt_outcome_settings。id は患者さんの ID） */
+export interface OutcomeSetting {
+  id: string
+  sport: SportKey
+  updatedAt: string
+}
 
 export interface OutcomeRecord {
   id: string
   patientId: string
   date: string // YYYY-MM-DD
   metric: OutcomeMetricKey
+  /** グラフに出す値（左右を入れた指標は、LSI・左右差などの計算した値） */
   value: number
+  /** 左右を入れた指標：患側（投球側）と健側（非投球側）の値 */
+  involved?: number
+  uninvolved?: number
+  /** 肩の回旋（内旋・外旋を左右で4つ）の元の値と、計算した TRM 差（trm） */
+  detail?: Record<string, number>
   /** 部位・左右（例「右膝」「左」） */
   side?: string
   note?: string

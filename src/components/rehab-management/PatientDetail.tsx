@@ -60,9 +60,9 @@ import ReferralLetterModal from './ReferralLetterModal'
 import SyncNowButton from '@/components/rehab/SyncNowButton'
 import ContractsTab, { MemberStatusBadge } from './ContractsTab'
 import OutcomeQuickTab from './OutcomeQuickTab'
-import { getContracts, getOutcomes } from '@/lib/contracts/store'
+import { getContracts, getOutcomeSport, getOutcomes } from '@/lib/contracts/store'
 import { jstToday, memberStatusOf } from '@/lib/contracts/member'
-import type { ContractRecord, OutcomeRecord } from '@/types/contracts'
+import type { ContractRecord, OutcomeRecord, SportKey } from '@/types/contracts'
 import { useKarteSynced } from '@/lib/use-karte-sync'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
@@ -841,6 +841,7 @@ export default function PatientDetail({ patient }: Props) {
   const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
   const [contracts, setContracts] = useState<ContractRecord[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeRecord[]>([])
+  const [outcomeSport, setOutcomeSportState] = useState<SportKey | null>(null)
 
   useEffect(() => {
     reload()
@@ -867,6 +868,7 @@ export default function PatientDetail({ patient }: Props) {
     setReturnAssessments(getReturnAssessments(patient.id))
     setContracts(getContracts(patient.id))
     setOutcomes(getOutcomes(patient.id))
+    setOutcomeSportState(getOutcomeSport(patient.id))
   }
 
   // ── 算出値 ──
@@ -1683,7 +1685,13 @@ export default function PatientDetail({ patient }: Props) {
 
         {/* ── 進捗タブ ── */}
         {activeTab === 'eval' && evalTab === 'outcome' && (
-          <OutcomeQuickTab patient={patient} outcomes={outcomes} onUpdate={reload} />
+          <OutcomeQuickTab
+            patient={patient}
+            outcomes={outcomes}
+            sport={outcomeSport}
+            suggestText={[patient.diagnosisLabel, patient.mainComplaint, ...evaluations.map((e) => e.sportType), ...intakes.map((i) => i.sportsActivity)].filter(Boolean).join(' ')}
+            onUpdate={reload}
+          />
         )}
 
         {activeTab === 'eval' && evalTab === 'progress' && (
