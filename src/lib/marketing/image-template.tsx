@@ -254,6 +254,110 @@ export async function renderPhotoPostImage(
   )
 }
 
+// ── Google検索向けの投稿（院の写真＋地域・見出し・院の強み） ───────────────────
+
+/** 院の写真（assets/gbp-photos/<name>.jpg）を data URL で */
+async function loadClinicPhoto(name: string): Promise<string> {
+  if (!/^[a-z0-9-]+$/.test(name)) throw new Error('写真の名前が正しくありません')
+  const bytes = await readFile(join(process.cwd(), 'assets/gbp-photos', `${name}.jpg`))
+  return `data:image/jpeg;base64,${bytes.toString('base64')}`
+}
+
+export interface SeoImageInput {
+  photo: string
+  photoPosition?: string
+  title: string
+  subtitle: string
+  chips: string[]
+  area?: string
+}
+
+/**
+ * Google検索向けの投稿の画像（1200×900）。院の本物の写真に、左上「下関市・彦島」、
+ * 下に見出し・小見出し・院の強み（柔道整復師3名など）・院名と電話番号を重ねる。
+ * 写真は本物なので「画像はイメージです」は付けない
+ */
+export async function renderSeoPostImage(input: SeoImageInput): Promise<Buffer> {
+  const { w, h } = IMAGE_SIZES.google
+  const photo = await loadClinicPhoto(input.photo)
+  const title = input.title.slice(0, 30)
+  const subtitle = input.subtitle.slice(0, 40)
+  const titleSize = title.length > 18 ? 50 : title.length > 13 ? 58 : 66
+  const shadow = '0 2px 12px rgba(0,0,0,0.5)'
+  return render(
+    <div style={{ width: w, height: h, display: 'flex', position: 'relative', background: NAVY, fontFamily: FONT, color: '#ffffff' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- next/og（Satori）で描く画像の中 */}
+      <img
+        src={photo}
+        width={w}
+        height={h}
+        alt=""
+        style={{ position: 'absolute', left: 0, top: 0, width: w, height: h, objectFit: 'cover', objectPosition: input.photoPosition ?? '50% 50%' }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          bottom: 0,
+          width: w,
+          height: Math.round(h * 0.66),
+          display: 'flex',
+          background: 'linear-gradient(180deg, rgba(22,35,61,0) 0%, rgba(22,35,61,0.8) 36%, rgba(22,35,61,0.96) 100%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: 48,
+          top: 44,
+          display: 'flex',
+          alignItems: 'center',
+          padding: '10px 28px',
+          borderRadius: 999,
+          background: '#ea580c',
+          fontSize: 34,
+          fontWeight: 700,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+        }}
+      >
+        {input.area ?? '下関市・彦島'}
+      </div>
+      <div style={{ position: 'absolute', left: 56, right: 56, bottom: 46, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', width: 72, height: 6, background: MINT, marginBottom: 18 }} />
+        <div style={{ display: 'flex', fontSize: titleSize, fontWeight: 700, lineHeight: 1.25, textShadow: shadow }}>{title}</div>
+        <div style={{ display: 'flex', marginTop: 14, fontSize: 32, color: '#dbeafe', lineHeight: 1.45, textShadow: shadow }}>{subtitle}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 24 }}>
+          {input.chips.slice(0, 4).map((c) => (
+            <div
+              key={c}
+              style={{
+                display: 'flex',
+                marginRight: 12,
+                marginBottom: 8,
+                padding: '7px 18px',
+                borderRadius: 999,
+                border: '2px solid rgba(94,234,212,0.85)',
+                background: 'rgba(22,35,61,0.55)',
+                fontSize: 26,
+                fontWeight: 700,
+                color: '#ccfbf1',
+              }}
+            >
+              {c}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 16 }}>
+          <div style={{ display: 'flex', fontSize: 40, fontWeight: 700, color: MINT }}>{DEFAULT_CLINIC_PROFILE.name}</div>
+          <div style={{ display: 'flex', fontSize: 28, color: '#e2e8f0' }}>{DEFAULT_CLINIC_PROFILE.phone}</div>
+        </div>
+      </div>
+    </div>,
+    w,
+    h,
+  )
+}
+
 // ── Instagramストーリー（予約の空き状況） ─────────────────────────────
 
 /** 画像のなかの短い表示（文字が折り返さないように） */

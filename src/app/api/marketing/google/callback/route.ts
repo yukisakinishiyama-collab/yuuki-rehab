@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         `Googleの許可は受け取りましたが、投稿先の店舗が見つかりませんでした${lookupError ? `（${lookupError}）` : ''}。ビジネスプロフィールのオーナーのアカウントでつなぎ直してください。`,
       )
     } else {
-      const more = locations.length > 1 ? `（${locations.length}件のうち「${picked.title}」を選びました）` : ''
+      const more = locations.length > 1 ? `（${locations.length}件のうち、${picked.canPost ? '投稿できる' : ''}「${picked.title}」を選びました${picked.duplicate ? '。重複として扱われている店舗のため、投稿できないことがあります' : ''}）` : ''
       await recordGbpOAuthResult(true, `Googleビジネスプロフィール「${picked.title || '店舗'}」とつながりました${more}。承認した投稿は予定の時刻に自動で公開されます。`)
     }
   } catch (error) {

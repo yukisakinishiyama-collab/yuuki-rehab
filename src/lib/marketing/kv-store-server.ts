@@ -18,7 +18,8 @@ const TABLE = 'marketing_line_contacts'
 // hpstat: … ホームページの閲覧数・電話タップの日別の件数（hp-stats-server.ts）
 // kcdoc: … 署名入りの契約書・同意書の本文（karte/contract-storage-server.ts）
 // backup: / backupidx: … 院内アプリの毎月の控えとその一覧（backup/backup-server.ts）
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:', 'kcdoc:', 'backup:', 'backupidx:'] as const
+// gbpseo: … Google検索向けの投稿の週ごとの予定と出した順（gbp-seo-server.ts）。gbp:perf … Googleの成果のとっておき
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:', 'kcdoc:', 'backup:', 'backupidx:', 'gbpseo:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { CHANNEL_LABELS, type Channel } from '@/lib/marketing/types'
 import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
 import { useMarketingRole } from '@/lib/marketing/use-role'
+import { GBP_DAILY_METRICS, GBP_METRIC_LABELS, impressionsOf, type GbpPerformance } from '@/lib/marketing/gbp-performance'
 
 interface Analytics {
   days: number
@@ -23,6 +24,142 @@ interface Analytics {
     posts: Array<{ campaign: string; theme: string; scheduledAt: string; bookings: number }>
     generatedAt: string
   }
+  seoPosts?: Array<{ id: string; scheduledAt: string; title: string; status: string; url: string | null; campaign: string; taps: number; bookings: number }>
+}
+
+const SEO_STATUS: Record<string, string> = {
+  published: '投稿済み',
+  pending: '予約中',
+  processing: '投稿中',
+  action_required: '手動待ち',
+  failed: '失敗',
+}
+
+const ymdLabel = (ymd: string) => `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`
+const monthLabel = (ym: string) => `${ym.slice(0, 4)}年${Number(ym.slice(5, 7))}月`
+
+/** Googleビジネスプロフィールの成果（表示・電話・ルート・ウェブサイト・予約）と「検索された言葉」 */
+function GooglePerformance() {
+  const [data, setData] = useState<GbpPerformance | null>(null)
+  const [loading, setLoading] = useState(false)
+  const load = useCallback(async (refresh: boolean) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/marketing/google/performance${refresh ? '?refresh=1' : ''}`, { cache: 'no-store' })
+      setData((await res.json()) as GbpPerformance)
+    } catch {
+      setData({ connected: true, error: '読み込めませんでした' })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    // 最初は6時間とっておいた値を読む（読み込み中の表示は data が無いことで出す）
+    let alive = true
+    fetch('/api/marketing/google/performance', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: GbpPerformance) => {
+        if (alive) setData(d)
+      })
+      .catch(() => {
+        if (alive) setData({ connected: true, error: '読み込めませんでした' })
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const cur = data?.current?.totals
+  const prev = data?.previous?.totals
+  const diff = (a: number, b: number | undefined) => (b === undefined ? '' : a - b > 0 ? `+${a - b}` : `${a - b}`)
+  const keywords = data?.keywords?.items ?? []
+  const before = new Map((data?.keywordsBefore?.items ?? []).map((k) => [k.keyword, k]))
+  const hits = keywords.filter((k) => k.target)
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">Googleビジネスプロフィール（検索・マップ）</h2>
+        {data?.connected && (
+          <button type="button" onClick={() => load(true)} disabled={loading} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50">
+            {loading ? '取り直し中…' : 'Googleから取り直す'}
+          </button>
+        )}
+      </div>
+      {!data ? (
+        <p className="mt-2 text-sm text-slate-500">読み込み中…</p>
+      ) : !data.connected ? (
+        <p className="mt-2 text-sm text-slate-600">
+          Googleとつなぐと、検索・マップでの表示回数、電話・ルート・ウェブサイトのタップ、実際に「検索された言葉」がここに出ます。
+          <Link href="/marketing/jobs" className="ml-1 font-bold text-teal-700 underline">
+            投稿ジョブ画面の「Googleとつなぐ」へ
+          </Link>
+        </p>
+      ) : data.error ? (
+        <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">{data.error}</p>
+      ) : (
+        <>
+          {cur && data.current && (
+            <>
+              <p className="mt-1 text-xs text-slate-500">
+                直近28日（{ymdLabel(data.current.start)}〜{ymdLabel(data.current.end)}）。カッコはその前の28日とのちがい。Googleの数字は2〜3日遅れて入ります。
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {[
+                  ['検索・マップで表示', impressionsOf(cur), prev ? impressionsOf(prev) : undefined],
+                  ['電話のタップ', cur.CALL_CLICKS, prev?.CALL_CLICKS],
+                  ['ルートの検索', cur.BUSINESS_DIRECTION_REQUESTS, prev?.BUSINESS_DIRECTION_REQUESTS],
+                  ['ウェブサイトへ', cur.WEBSITE_CLICKS, prev?.WEBSITE_CLICKS],
+                  ['Googleからの予約', cur.BUSINESS_BOOKINGS, prev?.BUSINESS_BOOKINGS],
+                ].map(([label, value, before]) => (
+                  <div key={label as string} className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-bold text-slate-500">{label}</p>
+                    <p className="mt-1 text-2xl font-black text-teal-900">
+                      {value as number}
+                      <span className="ml-1 text-xs font-bold text-slate-500">{diff(value as number, before as number | undefined) && `(${diff(value as number, before as number | undefined)})`}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <details className="mt-2 text-sm">
+                <summary className="flex min-h-10 cursor-pointer items-center text-xs font-bold text-slate-600">表示の内訳</summary>
+                <ul className="grid grid-cols-2 gap-1 text-xs text-slate-600 sm:grid-cols-4">
+                  {GBP_DAILY_METRICS.slice(0, 4).map((m) => (
+                    <li key={m}>
+                      {GBP_METRIC_LABELS[m]}：<b>{cur[m]}</b>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </>
+          )}
+          <div className="mt-4">
+            <p className="text-sm font-bold text-slate-700">
+              検索された言葉{data.keywords ? `（${monthLabel(data.keywords.month)}）` : ''}
+              {hits.length > 0 && <span className="ml-2 text-xs font-bold text-orange-700">投稿で狙っている言葉：{hits.length}件</span>}
+            </p>
+            {keywords.length === 0 ? (
+              <p className="mt-1 text-sm text-slate-500">先月の分はまだありません（月が終わってから数日で入ります）。</p>
+            ) : (
+              <ol className="mt-1 divide-y divide-slate-100 text-sm">
+                {keywords.slice(0, 25).map((k) => {
+                  const b = before.get(k.keyword)
+                  return (
+                    <li key={k.keyword} className="flex flex-wrap items-center gap-2 py-1.5">
+                      <span className="flex-1">{k.keyword}</span>
+                      {k.target && <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-800">狙い：{k.target}</span>}
+                      <span className="w-20 text-right font-bold text-teal-900 tabular-nums">{k.value !== null ? `${k.value}回` : `${k.threshold ?? ''}回未満`}</span>
+                      <span className="w-16 text-right text-xs text-slate-500 tabular-nums">{b ? `前月 ${b.value ?? `<${b.threshold ?? ''}`}` : '新しく'}</span>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  )
 }
 
 const FUNNEL_STEPS: Array<{ key: keyof Analytics['funnel']; label: string }> = [
@@ -194,6 +331,34 @@ export default function AnalyticsPage() {
           </div>
         ))}
       </div>
+
+      <GooglePerformance />
+
+      {/* Google検索向けの投稿（1本ごと） */}
+      {data.seoPosts && data.seoPosts.length > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="font-bold">Google検索向けの投稿（1本ごと・直近{data.days}日のタップと予約）</h2>
+          <ul className="mt-2 divide-y divide-slate-100 text-sm">
+            {data.seoPosts.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-2 py-1.5">
+                <span className="w-24 font-mono text-xs text-slate-500">{p.scheduledAt.slice(5, 16).replace('-', '/').replace('T', ' ')}</span>
+                <span className="flex-1 truncate">
+                  {p.url ? (
+                    <a href={p.url} target="_blank" rel="noreferrer" className="text-teal-700 underline">
+                      {p.title}
+                    </a>
+                  ) : (
+                    p.title
+                  )}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{SEO_STATUS[p.status] ?? p.status}</span>
+                <span className="w-20 text-right text-xs text-slate-600 tabular-nums">予約ボタン {p.taps}</span>
+                <span className="w-14 text-right font-bold text-teal-900 tabular-nums">予約 {p.bookings}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <InstagramFollowers />
 

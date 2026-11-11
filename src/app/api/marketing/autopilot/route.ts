@@ -27,6 +27,8 @@ const SettingsSchema = z.object({
   instagram: z.enum(['instagram_feed', 'instagram_carousel', 'off']),
   google: z.boolean(),
   availabilityPost: z.boolean(),
+  googleSeo: z.boolean().default(true),
+  googleSeoPerWeek: z.number().int().min(1).max(2).default(2),
   availabilityStory: z.boolean().default(true),
   cancelStory: z.boolean().default(false),
   cancelStoryDays: z.enum(['today', 'tomorrow']).default('tomorrow'),
@@ -76,6 +78,11 @@ export async function PUT(request: NextRequest) {
   const current = await getAutopilotSettings()
   const next = { ...DEFAULT_AUTOPILOT_SETTINGS, ...current, ...input }
   await saveAutopilotSettings(next)
+  // Google検索向けの投稿をオフにしたら、予約済みでまだ出していない分も取り消す（すぐに止まるように）
+  if (!next.googleSeo) {
+    const { cancelPendingSeoPosts } = await import('@/lib/marketing/gbp-seo-server')
+    await cancelPendingSeoPosts()
+  }
   return NextResponse.json({ ok: true, settings: next })
 }
 

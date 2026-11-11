@@ -54,7 +54,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@anthropic-ai/sdk', 'ffmpeg-static'],
   // 投稿画像（Instagramストーリーの空き状況・テンプレート画像）を作るサーバーの処理に、日本語フォントを同梱する
   outputFileTracingIncludes: {
-    '/api/marketing/**': ['./assets/fonts/**/*'],
+    // Google検索向けの投稿の画像に使う院の写真（assets/gbp-photos）も同梱する
+    '/api/marketing/**': ['./assets/fonts/**/*', './assets/gbp-photos/**/*'],
     // AI動画（画像をつないだスライド動画）を組み立てる ffmpeg 本体
     '/api/marketing/videos/ai': ['./node_modules/ffmpeg-static/ffmpeg*'],
     '/api/marketing/jobs/run': ['./node_modules/ffmpeg-static/ffmpeg*'],

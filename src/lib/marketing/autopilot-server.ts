@@ -64,6 +64,7 @@ import {
   type PostImage,
 } from './types'
 import { postImageUrl, usesAiImage } from './post-image'
+import { seoImageUrl } from './gbp-seo'
 import { aiPostImageConfigured, createPostPhotoWithin, sceneFromVariants, withPostImage } from './post-image-server'
 
 export const AUTOPILOT_URL = `${SITE_URL}/marketing/autopilot`
@@ -526,6 +527,8 @@ export interface RunSummary {
   expired: number
   reminded: boolean
   skippedReason?: string
+  /** Google検索向けの投稿を予約した結果 */
+  seo?: { scheduled: number; weeks: string[]; skipped?: string }
 }
 
 /** 定期実行。重い処理（AI生成）は週1回だけ */
@@ -581,6 +584,14 @@ export async function runAutopilot(now = new Date()): Promise<RunSummary> {
       changed = true
     }
     if (changed) await saveProposal(proposal)
+  }
+
+  // 1.5) Google検索向けの投稿（決まった文＋院の写真）を今週・来週の分だけ予約する（承認は不要。設定でオン・オフ）
+  try {
+    const { scheduleSeoPosts } = await import('./gbp-seo-server')
+    summary.seo = await scheduleSeoPosts(now)
+  } catch (error) {
+    console.error('[autopilot] Google検索向けの投稿を予約できませんでした', error)
   }
 
   // 2) 週に1回の下書き作成
@@ -872,6 +883,28 @@ function autopilotItemKey(job: PublishJob): string | null {
  * 送る内容: やり方 → 各媒体の本文（長押しでコピー） → 「投稿した」ボタン
  */
 export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
+  let seoSent = 0
+  // Google検索向けの投稿（Googleと未接続のとき）：本文と画像のリンクを1通に
+  for (const job of jobs.filter((j) => j.idempotencyKey.startsWith('gbpseo:'))) {
+    const imageUrl = job.content.seoPostId ? seoImageUrl(job.content.seoPostId, SITE_URL) : ''
+    const head = [
+      `📌 Google投稿の時間です（${formatSlot(job.scheduledAt)}）`,
+      `「${job.content.title}」（検索向けの投稿）`,
+      '',
+      '▶ 「画像を開く」で画像を保存 → 次の吹き出しを長押し→コピー。Googleマップアプリ（またはビジネスプロフィール）の「投稿を追加」に画像と本文を入れ、ボタンは「予約」・リンクは',
+      job.content.cta?.url ?? '',
+      '',
+      'Googleとつなぐと、次からは自動で投稿されます（投稿ジョブ画面の「Googleとつなぐ」）。',
+    ].join('\n')
+    const buttons = [
+      { label: 'Googleに投稿した', postback: `ap:done:${job.id}`, primary: true },
+      ...(imageUrl ? [{ label: '画像を開く', uri: imageUrl }] : []),
+      { label: 'Googleを開く', uri: GOOGLE_MANAGE_URL },
+      { label: '投稿ジョブ画面', uri: `${SITE_URL}/marketing/jobs` },
+    ]
+    const result = await notifyOwner([head, job.content.body, ownerCard('Google投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons)])
+    if (result.delivered) seoSent += 1
+  }
   const groups = new Map<string, PublishJob[]>()
   for (const job of jobs) {
     const key = autopilotItemKey(job)
@@ -919,7 +952,7 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
     const result = await notifyOwner(messages)
     if (result.delivered) sent += 1
   }
-  return sent
+  return sent + seoSent
 }
 
 /** 院長のLINEのボタン（webhookで送り主が院長本人と確認済みのときだけ呼ぶ） */

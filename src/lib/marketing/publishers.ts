@@ -75,6 +75,18 @@ async function uploadPostImage(
   return blob.url
 }
 
+/** Google検索向けの投稿の画像（院の写真＋見出し・院の強み）を作って Vercel Blob に公開する */
+async function uploadSeoImage(postId: string): Promise<string> {
+  const { GBP_SEO_CHIPS, getGbpSeoPost } = await import('@/data/gbp-seo-posts')
+  const post = getGbpSeoPost(postId)
+  if (!post) throw new Error('Google検索向けの投稿が見つかりません')
+  const { renderSeoPostImage, toJpeg } = await import('./image-template')
+  const { put } = await import('@vercel/blob')
+  const png = await renderSeoPostImage({ photo: post.photo, photoPosition: post.photoPosition, title: post.title, subtitle: post.subtitle, chips: GBP_SEO_CHIPS })
+  const blob = await put(`marketing/gbp-seo-${post.id}-${Date.now()}.jpg`, await toJpeg(png), { access: 'public', contentType: 'image/jpeg' })
+  return blob.url
+}
+
 /**
  * Instagramストーリー（予約の空き状況）。
  * 投稿する時刻に予約システムから空きを取り直して画像を作る（取り直せなければ下書きのときの空き）。
@@ -345,7 +357,9 @@ async function publishGoogleBusiness(content: GeneratedContent): Promise<Publish
     // 投稿画像（4:3。AI画像があれば写真＋見出し、無ければテンプレート）。画像が作れなくても文章だけで投稿する
     let media: Array<{ mediaFormat: 'PHOTO'; sourceUrl: string }> | undefined
     try {
-      const url = await uploadPostImage(imageTextFor(content, 'google_business'), `marketing/gbp-${Date.now()}.png`, 'google', content.image?.photoUrl)
+      const url = content.seoPostId
+        ? await uploadSeoImage(content.seoPostId)
+        : await uploadPostImage(imageTextFor(content, 'google_business'), `marketing/gbp-${Date.now()}.png`, 'google', content.image?.photoUrl)
       media = [{ mediaFormat: 'PHOTO', sourceUrl: url }]
     } catch {
       media = undefined

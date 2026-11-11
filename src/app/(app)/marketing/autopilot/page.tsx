@@ -13,6 +13,8 @@ import { loadClinicProfile } from '@/lib/marketing/store'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import { CHANNEL_LABELS, type Channel, type ContentVariant } from '@/lib/marketing/types'
 import { postImageUrl, usesAiImage } from '@/lib/marketing/post-image'
+import { GBP_SEO_POSTS } from '@/data/gbp-seo-posts'
+import { seoImageUrl } from '@/lib/marketing/gbp-seo'
 import {
   activeVariants,
   approvalBlocker,
@@ -502,6 +504,50 @@ function SettingsPanel({
           空き状況をInstagramのストーリーにも出す（週のはじめ・空きが多い日の朝。投稿の時刻の空きで画像を作り、空きが無ければ出しません）
         </label>
       </div>
+
+      <fieldset className="space-y-3 rounded-xl border border-orange-200 bg-orange-50/40 p-3">
+        <legend className="px-1 text-sm font-bold text-slate-900">Google検索向けの投稿（院の写真＋検索ワードを絞った決まった文）</legend>
+        <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
+          <input
+            type="checkbox"
+            checked={s.googleSeo}
+            disabled={disabled}
+            onChange={(e) => setS({ ...s, googleSeo: e.target.checked })}
+            className="mt-0.5 h-5 w-5"
+          />
+          毎週、自動でGoogleに投稿する（承認は不要です。院長が確認した決まった文を、下の一覧の順にくり返します）
+        </label>
+        <label className="block text-sm">
+          <span className="font-bold text-slate-700">本数</span>
+          <select
+            value={s.googleSeoPerWeek}
+            disabled={disabled || !s.googleSeo}
+            onChange={(e) => setS({ ...s, googleSeoPerWeek: Number(e.target.value) })}
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+          >
+            <option value={1}>週1本（月曜 12:00）</option>
+            <option value={2}>週2本（月曜 12:00・金曜 18:00）</option>
+          </select>
+        </label>
+        <p className="text-xs text-slate-600">
+          「下関市彦島＋症状」で探す人に見つかりやすいよう、1本ごとに検索ワードを1つに絞り、エコーでの状態の確認・柔道整復師3名・平日20時まで受付・駐車場などの強みを入れています。年末年始（12/29〜1/3）は出しません。Googleとつながっていないときは、時間になると本文と画像のリンクを院長のLINEへ送ります。
+        </p>
+        <details className="rounded-lg bg-white p-2">
+          <summary className="flex min-h-10 cursor-pointer items-center text-sm font-bold text-slate-700">投稿の一覧（{GBP_SEO_POSTS.length}本）</summary>
+          <ol className="mt-2 space-y-1 text-sm">
+            {GBP_SEO_POSTS.map((p, i) => (
+              <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="tabular-nums text-slate-500">{i + 1}.</span>
+                <span className="font-bold text-slate-800">{p.title}</span>
+                <span className="text-xs text-slate-500">検索ワード：{p.keyword}</span>
+                <a href={seoImageUrl(p.id, '')} target="_blank" rel="noreferrer" className="text-xs font-bold text-teal-700 underline">
+                  画像
+                </a>
+              </li>
+            ))}
+          </ol>
+        </details>
+      </fieldset>
 
       <fieldset className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3">
         <legend className="px-1 text-sm font-bold text-slate-900">キャンセルが出たら、ストーリーですぐ知らせる</legend>

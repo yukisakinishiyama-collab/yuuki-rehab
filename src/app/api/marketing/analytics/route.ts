@@ -7,6 +7,9 @@ import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
 import { sourceLabel } from '@/lib/marketing/booking-stats'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
 import { listProposals } from '@/lib/marketing/autopilot-store-server'
+import { kvList } from '@/lib/marketing/kv-store-server'
+import { getGbpSeoPost } from '@/data/gbp-seo-posts'
+import type { SeoWeekPlan } from '@/lib/marketing/gbp-seo-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,14 +48,31 @@ async function bookingsBySource(days: number, since: string, clicks: Array<{ met
   } catch {
     // テーマが引けなくても計測名で表示する
   }
+  // Google検索向けの投稿（計測名 seo… → 投稿の見出し）
+  try {
+    for (const { value: plan } of await kvList<SeoWeekPlan>('gbpseo:week:')) {
+      for (const item of plan.items ?? []) {
+        themeByCampaign.set(item.campaign, { theme: `Google検索向け：${getGbpSeoPost(item.postId)?.title ?? item.postId}`, scheduledAt: item.scheduledAt })
+      }
+    }
+  } catch {
+    // 見出しが引けなくても計測名で表示する
+  }
   const byCampaign = new Map<string, number>()
-  rows.filter((r) => r.campaign.startsWith('ap')).forEach((r) => byCampaign.set(r.campaign, (byCampaign.get(r.campaign) ?? 0) + 1))
+  rows.filter((r) => r.campaign.startsWith('ap') || r.campaign.startsWith('seo')).forEach((r) => byCampaign.set(r.campaign, (byCampaign.get(r.campaign) ?? 0) + 1))
   const posts = [...byCampaign.entries()]
     .map(([campaign, bookings]) => ({ campaign, bookings, ...(themeByCampaign.get(campaign) ?? { theme: campaign, scheduledAt: '' }) }))
     .sort((a, b) => b.bookings - a.bookings)
     .slice(0, 10)
 
-  return { total: rows.length, firstVisit: rows.filter((r) => r.visitType.startsWith('初')).length, sources, posts, generatedAt: stats.generatedAt }
+  return {
+    total: rows.length,
+    firstVisit: rows.filter((r) => r.visitType.startsWith('初')).length,
+    sources,
+    posts,
+    campaignBookings: Object.fromEntries(byCampaign),
+    generatedAt: stats.generatedAt,
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -138,10 +158,31 @@ export async function GET(request: NextRequest) {
     bookings = null
   }
 
+  // Google検索向けの投稿：1本ごとの予約ボタンのタップと予約（予定の新しい順・最大12本）
+  const allJobs = await listJobs()
+  const seoPosts = allJobs
+    .filter((j) => j.idempotencyKey.startsWith('gbpseo:') && j.status !== 'cancelled')
+    .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt))
+    .slice(0, 12)
+    .map((j) => {
+      const campaign = new URL(j.content.cta?.url ?? 'https://x/').searchParams.get('campaign') ?? ''
+      return {
+        id: j.id,
+        scheduledAt: j.scheduledAt,
+        title: j.content.title,
+        status: j.status,
+        url: j.publishedUrl ?? null,
+        campaign,
+        taps: campaign ? events.filter((e) => e.kind === 'link_click' && e.meta.campaign === campaign).length : 0,
+        bookings: campaign ? (bookings?.campaignBookings[campaign] ?? 0) : 0,
+      }
+    })
+
   return NextResponse.json({
     ok: true,
     days,
     bookings,
+    seoPosts,
     funnel,
     counts: {
       urgent: count('line_urgent'),
