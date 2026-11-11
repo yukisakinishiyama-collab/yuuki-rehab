@@ -24,7 +24,7 @@ npm run lint     # ESLint
 
 - 今日（ホーム）: `/dashboard` → `src/components/clinic/TodayDashboard.tsx`
 - 予約: `/yoyaku`（GAS の予約管理画面を常駐 iframe で表示。`src/components/rehab/YoyakuFrame.tsx`）
-- カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・来院カレンダー・評価・問診・メモ・疑問・AI相談・患部の写真・キャンセル・紹介状）
+- カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・来院カレンダー・評価・アウトカム・問診・メモ・疑問・AI相談・患部の写真・契約・同意書（指で署名・院保管用と患者様控えの印刷・会員プランの状態）・キャンセル・紹介状）
 - 経営: `/marketing/sales`（NOAH の売上・来院）、`/marketing/analytics`（集客の効果）
 - 集客: `/marketing/**`（自動投稿・投稿づくり・LINE導線・口コミ返信など。`src/lib/marketing/`）
 
@@ -32,7 +32,8 @@ npm run lint     # ESLint
 
 ### データ層
 
-- カルテ: `src/lib/patient-store.ts` 経由で端末の `localStorage`（`pt_*`）に保存。`/api/sync` でクラウド（Supabase の KV）へ控えを保存・取り込み
+- カルテ: `src/lib/patient-store.ts` 経由で端末の `localStorage`（`pt_*`）に保存。`/api/sync` でクラウド（Supabase の KV）と同期（`src/lib/sync-service.ts`・`sync-merge.ts`。変わった記録だけを id ごとに送って重ねる。カルテの画面では15秒ごとに取り込み、「すぐに反映する」ボタンで今すぐ）
+- 契約書・同意書: ひな形は `src/data/contract-templates.ts`（もとはドライブ「ゆうき整骨院_契約書テンプレート」）。署名済みの一覧は `pt_contracts`、署名入りの本文は KV の `kcdoc:<id>`（`/api/karte/contracts`。一度保存したら書きかえない）。会員の日付の決まりは `src/lib/contracts/member.ts`。アウトカムは `pt_outcomes`
 - 端末ログイン: `src/lib/rehab-store.ts`（院内専用のため未ログインなら自動ログイン）
 - 集客・経営: `src/lib/marketing/kv-store-server.ts`（Supabase 設定時は KV テーブル）
 - 予約: GAS の予約システム（`?api=feed` / `?api=hubstats` / `?api=noahstats`）と連携
