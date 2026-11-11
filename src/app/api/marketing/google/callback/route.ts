@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { exchangeGbpCode, findGbpLocations, GBP_STATE_COOKIE, gbpOAuthConfig, GSC_SCOPE, pickClinicLocation } from '@/lib/marketing/gbp-oauth-server'
 import { recordGbpOAuthResult, saveGbpConnection } from '@/lib/marketing/gbp-token'
+import { handleYoutubeCallback } from '@/lib/marketing/youtube-callback'
+import { YOUTUBE_STATE_PREFIX } from '@/lib/marketing/youtube-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +20,8 @@ function back(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  // 「YouTubeとつなぐ」の戻りも、Google Cloud に登録済みのこの戻り先で受ける（state の頭が "yt." のとき）
+  if (request.nextUrl.searchParams.get('state')?.startsWith(YOUTUBE_STATE_PREFIX)) return handleYoutubeCallback(request)
   const params = request.nextUrl.searchParams
   const expected = request.cookies.get(GBP_STATE_COOKIE)?.value
   const state = params.get('state')

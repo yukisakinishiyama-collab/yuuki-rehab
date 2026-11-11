@@ -14,6 +14,9 @@ export type Channel =
   | 'google_business'
   | 'line_broadcast'
   | 'note'
+  /** 宣伝の短い動画（院の写真＋文字。src/data/promo-videos.ts）。投稿づくりの画面では選ばない */
+  | 'youtube_short'
+  | 'tiktok'
 
 export const CHANNEL_LABELS: Record<Channel, string> = {
   instagram_feed: 'Instagramフィード',
@@ -23,7 +26,12 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
   google_business: 'Google投稿',
   line_broadcast: '公式LINE配信',
   note: 'note記事',
+  youtube_short: 'YouTubeショート',
+  tiktok: 'TikTok',
 }
+
+/** 決まった動画を出す媒体（AIで文を書く「投稿づくり」には出さない） */
+export const VIDEO_CHANNELS: Channel[] = ['youtube_short', 'tiktok']
 
 /** 投稿の目的 */
 export const OBJECTIVES = [
@@ -108,6 +116,8 @@ export interface GeneratedContent {
   image?: PostImage
   /** Google検索向けの投稿（src/data/gbp-seo-posts.ts の id）。画像は院の写真＋見出し・強み（renderSeoPostImage） */
   seoPostId?: string
+  /** 宣伝の短い動画（src/data/promo-videos.ts の id）。YouTubeショート・TikTok に同じ動画を出す */
+  promoVideoId?: string
   warnings: string[]
   /**
    * Instagramストーリーの空き状況（instagram_story のときだけ）。
