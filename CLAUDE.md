@@ -26,7 +26,7 @@ npm run lint     # ESLint
 - 予約: `/yoyaku`（GAS の予約管理画面を常駐 iframe で表示。`src/components/rehab/YoyakuFrame.tsx`）
 - カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・来院カレンダー・評価・アウトカム・問診・メモ・疑問・AI相談・患部の写真・契約・同意書（指で署名・院保管用と患者様控えの印刷・会員プランの状態）・キャンセル・紹介状）
 - 経営: `/marketing/sales`（NOAH の売上・来院）、`/marketing/analytics`（集客の効果）
-- 集客: `/marketing/**`（自動投稿・投稿づくり・LINE導線・口コミ返信など。`src/lib/marketing/`）。Google検索向けの投稿（「下関市彦島＋症状」に絞った決まった文＋院の写真の画像。`src/data/gbp-seo-posts.ts`・`src/lib/marketing/gbp-seo*.ts`・写真は `assets/gbp-photos/`）は、自動投稿の設定でオンにすると毎週（既定は月12時・金18時）承認なしで予約される。`node tools/test-gbp-seo.mjs`
+- 集客: `/marketing/**`（自動投稿・投稿づくり・LINE導線・口コミ返信など。`src/lib/marketing/`）。Google検索向けの投稿（「下関市彦島＋症状」に絞った決まった文＋院の写真の画像。`src/data/gbp-seo-posts.ts`・`src/lib/marketing/gbp-seo*.ts`・写真は `assets/gbp-photos/`）は、自動投稿の設定でオンにすると毎週（既定は月12時・金18時）承認なしで予約される。投稿ごとの予約ボタンのタップ・予約と、Googleの成果（Business Profile Performance API：表示・電話・ルート・ウェブサイト・「検索された言葉」。`gbp-performance*.ts`・`/api/marketing/google/performance`）は 経営 → 集客の効果 に出る。`node tools/test-gbp-seo.mjs`
 
 院内アプリと院内用のAPIは `src/proxy.ts` の Basic 認証（院長／スタッフのパスワード）で守る。以前あった動作解析（動画・姿勢）、プロトコル立案・疾患/文献ライブラリ、患者さん向けの説明・問診・カラダマップの画面は削除済み。
 

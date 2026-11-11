@@ -99,6 +99,67 @@ test('投稿の中身：予約ボタンは計測リンク（流入元 google_pos
   assert.equal(seo.seoImageUrl(p.id), `https://yuuki-rehab.vercel.app/api/marketing/image?kind=gbp-seo&id=${p.id}`)
 })
 
+const perf = await import(new URL('src/lib/marketing/gbp-performance.ts', root).href)
+const oauth = await import(new URL('src/lib/marketing/gbp-oauth-server.ts', root).href)
+
+test('Googleの成果：期間（3日前まで28日・その前28日・先月と先々月）', () => {
+  const r = perf.performanceRanges('2026-11-11')
+  assert.deepEqual(r.current, { start: '2026-10-12', end: '2026-11-08' })
+  assert.deepEqual(r.previous, { start: '2026-09-14', end: '2026-10-11' })
+  assert.equal(r.lastMonth, '2026-10')
+  assert.equal(r.monthBefore, '2026-09')
+  const jan = perf.performanceRanges('2027-01-20')
+  assert.equal(jan.lastMonth, '2026-12')
+  assert.equal(jan.monthBefore, '2026-11')
+})
+
+test('Googleの成果：日ごとの数字を期間で合計（期間の外・値の無い日は数えない）', () => {
+  const json = {
+    multiDailyMetricTimeSeries: [
+      {
+        dailyMetricTimeSeries: [
+          { dailyMetric: 'CALL_CLICKS', timeSeries: { datedValues: [{ date: { year: 2026, month: 10, day: 12 }, value: '2' }, { date: { year: 2026, month: 10, day: 11 }, value: '5' }, { date: { year: 2026, month: 11, day: 8 } }] } },
+          { dailyMetric: 'BUSINESS_IMPRESSIONS_MOBILE_MAPS', timeSeries: { datedValues: [{ date: { year: 2026, month: 11, day: 1 }, value: '40' }] } },
+          { dailyMetric: 'BUSINESS_IMPRESSIONS_MOBILE_SEARCH', timeSeries: { datedValues: [{ date: { year: 2026, month: 11, day: 1 }, value: '10' }] } },
+        ],
+      },
+    ],
+  }
+  const t = perf.sumDaily(json, { start: '2026-10-12', end: '2026-11-08' })
+  assert.equal(t.CALL_CLICKS, 2)
+  assert.equal(perf.impressionsOf(t), 50)
+  assert.equal(perf.sumDaily(json, { start: '2026-09-14', end: '2026-10-11' }).CALL_CLICKS, 5)
+})
+
+test('検索された言葉：多い順、少ない言葉は「15未満」、狙っている言葉に印', () => {
+  const rows = perf.parseKeywords({
+    searchKeywordsCounts: [
+      { searchKeyword: '整骨院 下関', insightsValue: { value: '120' } },
+      { searchKeyword: '下関 捻挫', insightsValue: { threshold: '15' } },
+      { searchKeyword: 'ゆうき整骨院', insightsValue: { value: '300' } },
+      { searchKeyword: 'オスグット 下関', insightsValue: { value: '20' } },
+      { searchKeyword: '彦島 むち打ち', insightsValue: { threshold: '15' } },
+    ],
+  })
+  assert.deepEqual(rows.map((r) => r.keyword), ['ゆうき整骨院', '整骨院 下関', 'オスグット 下関', '下関 捻挫', '彦島 むち打ち'])
+  assert.equal(rows[0].target, null)
+  assert.equal(rows[1].target, null)
+  assert.equal(rows[2].target, '成長期の膝の痛み（オスグッド）')
+  assert.equal(rows[3].value, null)
+  assert.equal(rows[3].threshold, 15)
+  assert.equal(rows[3].target, '足首の捻挫のリハビリ')
+  assert.equal(rows[4].target, '交通事故のケガ・むち打ちの相談')
+})
+
+test('Googleとつなぐ：同じ名前の店舗が重複していても、投稿できる本物を選ぶ', () => {
+  const dup = { name: 'accounts/1/locations/11', title: 'ゆうき整骨院', canPost: false, verified: false, duplicate: true }
+  const real = { name: 'accounts/1/locations/22', title: 'ゆうき整骨院', canPost: true, verified: true, duplicate: false }
+  assert.equal(oauth.pickClinicLocation([dup, real]).name, real.name)
+  assert.equal(oauth.pickClinicLocation([real, dup]).name, real.name)
+  assert.equal(oauth.pickClinicLocation([{ name: 'accounts/1/locations/3', title: '別の店' }, dup]).name, dup.name)
+  assert.equal(oauth.pickClinicLocation([]), null)
+})
+
 console.log(`\nGoogle検索向けの投稿：${passed} 件すべて通りました。`)
 
 // ── 予約の動き（KV は一時フォルダのファイル） ──
@@ -123,6 +184,10 @@ console.log(`\nGoogle検索向けの投稿：${passed} 件すべて通りまし�
   }
   // 2026-11-11（水）15:00 JST
   const wed = new Date('2026-11-11T06:00:00Z')
+  await atest('予定の記録（gbpseo:）は KV の予約プレフィックス（LINEの友だち一覧に混ざらない）', async () => {
+    assert.ok(kv.KV_PREFIXES.includes('gbpseo:'))
+    assert.ok(kv.KV_PREFIXES.includes('gbp:'))
+  })
   await atest('水曜に動くと、今週は金曜の1本・来週は月と金の2本を予約。続きの順で選ぶ', async () => {
     const r = await server.scheduleSeoPosts(wed)
     assert.equal(r.scheduled, 3)

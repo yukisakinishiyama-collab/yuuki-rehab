@@ -77,3 +77,24 @@ export async function lastGbpOAuthResult(): Promise<GbpOAuthResult | null> {
     return null
   }
 }
+
+/** 接続情報からアクセストークンを取る（失敗したら院長に見せる言葉で投げる） */
+export async function gbpAccessToken(credentials: GbpCredentials): Promise<string> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+      refresh_token: credentials.refreshToken,
+      grant_type: 'refresh_token',
+    }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10000),
+  })
+  const data = (await res.json().catch(() => ({}))) as { access_token?: string; error_description?: string; error?: string }
+  if (!res.ok || !data.access_token) {
+    throw new Error(`Googleの接続が切れています（${data.error_description ?? data.error ?? res.status}）。「Googleとつなぐ」からつなぎ直してください。`)
+  }
+  return data.access_token
+}
