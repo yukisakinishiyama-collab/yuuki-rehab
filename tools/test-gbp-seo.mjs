@@ -33,7 +33,21 @@ test('id は重ならず、写真のファイルがあり、リンク先は公�
   assert.ok(GBP_SEO_POSTS.length >= 12, '投稿は12本以上')
   for (const p of GBP_SEO_POSTS) {
     assert.ok(fs.existsSync(new URL(`assets/gbp-photos/${p.photo}.jpg`, root)), `${p.id} の写真 ${p.photo}`)
+    // 人物が特定されない写真だけ（スタッフ・患者さん・選手・観客が写っているものは使わない）
+    assert.ok(data.GBP_SAFE_PHOTOS.includes(p.photo), `${p.id} の写真 ${p.photo} は使ってよい写真ではない`)
     assert.ok(SITE_PAGES.has(p.sitePath), `${p.id} のリンク先 ${p.sitePath}`)
+  }
+})
+
+test('写真：置いてあるのは人物の写っていない5枚だけ。続けて出る2本は、同じ写真なら切り抜く場所を変える', () => {
+  const files = fs.readdirSync(new URL('assets/gbp-photos/', root)).filter((f) => f.endsWith('.jpg')).map((f) => f.replace('.jpg', '')).sort()
+  assert.deepEqual(files, [...data.GBP_SAFE_PHOTOS].sort())
+  assert.deepEqual(files, ['clinic', 'echo-hero', 'echo-machine', 'exercise-tools', 'exterior'])
+  const n = GBP_SEO_POSTS.length
+  for (let i = 0; i < n; i++) {
+    const a = GBP_SEO_POSTS[i]
+    const b = GBP_SEO_POSTS[(i + 1) % n]
+    if (a.photo === b.photo) assert.notEqual(a.photoPosition ?? '50% 50%', b.photoPosition ?? '50% 50%', `${a.id} → ${b.id} が同じ絵`)
   }
 })
 

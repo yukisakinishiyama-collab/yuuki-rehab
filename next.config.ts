@@ -59,6 +59,8 @@ const nextConfig: NextConfig = {
     // AI動画（画像をつないだスライド動画）を組み立てる ffmpeg 本体
     '/api/marketing/videos/ai': ['./node_modules/ffmpeg-static/ffmpeg*'],
     '/api/marketing/jobs/run': ['./node_modules/ffmpeg-static/ffmpeg*'],
+    // 宣伝の短い動画（YouTubeショート・TikTok）を院内アプリで見るとき（作りおきが無ければここで組み立てる）
+    '/api/marketing/promo-video': ['./node_modules/ffmpeg-static/ffmpeg*'],
   },
   async redirects() {
     return [

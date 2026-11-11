@@ -6,24 +6,19 @@
 // 柔道整復師3名・平日20時まで受付・駐車場・急なケガは予約不要）を本文と画像に入れる。
 //
 // 文面は院長が確認した決まった文（AIで毎回書かない）。表現チェック（compliance.ts）を通ることをテストで確かめる。
-// 画像は院の本物の写真（assets/gbp-photos/。患者さんの顔は写っていないもの）に見出しを重ねる。
+// 画像は院の本物の写真（assets/gbp-photos/。人物が特定されないもの＝GBP_SAFE_PHOTOS だけ）に見出しを重ねる。
 // 事実（受付時間・駐車場・自賠責など）は公開中のホームページの記載に合わせる。変わったらここも直す。
 // ──────────────────────────────────────────────
 
-/** 画像に使う院の写真（assets/gbp-photos/<name>.jpg） */
-export type GbpPhoto =
-  | 'echo-hero'
-  | 'echo-scene'
-  | 'echo-machine'
-  | 'exterior'
-  | 'clinic'
-  | 'room-staff'
-  | 'exercise-tools'
-  | 'treat-foot'
-  | 'act-seminar'
-  | 'act-trainer'
-  | 'act-taping'
-  | 'stadium'
+/**
+ * 画像に使う院の写真（assets/gbp-photos/<name>.jpg）。人物が特定されないものだけ（2026-11-11 院長の指示）:
+ * 足首とエコー・エコーの機械・運動の器具・外観（縦と横）。
+ * スタッフ・患者さん・選手・観客が写っている写真（院内・セミナー・体育館・競技場・エコーを当てている場面・
+ * 足の施術・太もものテーピング）は外し、ファイルも置いていない。写真を足すときは、人物が写っていないことを確かめてから
+ */
+export type GbpPhoto = 'echo-hero' | 'echo-machine' | 'exercise-tools' | 'exterior' | 'clinic'
+
+export const GBP_SAFE_PHOTOS: GbpPhoto[] = ['echo-hero', 'echo-machine', 'exercise-tools', 'exterior', 'clinic']
 
 export interface GbpSeoPost {
   id: string
@@ -85,6 +80,7 @@ export const GBP_SEO_POSTS: GbpSeoPost[] = [
     title: 'ACL（前十字靭帯）術後のリハビリ',
     subtitle: '手術の前から競技復帰まで、段階を追って',
     photo: 'exercise-tools',
+    photoPosition: '50% 45%',
     sitePath: '/sym-acl',
     body: `【下関市彦島｜ACL（前十字靭帯）の術前・術後リハビリ】
 ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚での動きを、時期に合わせて取り戻していくことが大切です。
@@ -98,8 +94,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 半月板 術後 リハビリ',
     title: '半月板のケガ・術後のリハビリ',
     subtitle: '膝の引っかかり・曲げると痛いときに',
-    photo: 'room-staff',
-    photoPosition: '50% 35%',
+    photo: 'exercise-tools',
+    photoPosition: '50% 92%',
     sitePath: '/sym-meniscus',
     body: `【下関市彦島｜半月板のケガ・術後のリハビリ】
 膝をひねってから「曲げると痛い」「引っかかる感じがある」「腫れがひかない」という方へ。
@@ -113,7 +109,7 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 オスグッド 成長期 膝',
     title: '成長期の膝の痛み（オスグッド）',
     subtitle: '練習との付き合い方を、保護者の方と一緒に',
-    photo: 'act-trainer',
+    photo: 'echo-machine',
     sitePath: '/sym-osgood',
     body: `【下関市彦島｜成長期の膝の痛み（オスグッド）】
 ジャンプやダッシュのあと、膝のお皿の下が痛む小・中学生は少なくありません。成長期の骨は、筋肉に引っぱられる負担を受けやすい時期です。
@@ -127,8 +123,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 子ども かかと 痛み シーバー病',
     title: '子どものかかとの痛み（シーバー病）',
     subtitle: '走るとかかとが痛い小学生・中学生に',
-    photo: 'treat-foot',
-    photoPosition: '50% 40%',
+    photo: 'echo-hero',
+    photoPosition: '50% 75%',
     sitePath: '/sym-severs',
     body: `【下関市彦島｜子どものかかとの痛み（シーバー病）】
 走ったあとや朝の一歩目に、かかとを痛がる小学生・中学生はいませんか。成長期のかかとの骨は、ふくらはぎ・アキレス腱に引っぱられる負担を受けやすく、サッカーや陸上などで痛みが出ることがあります。
@@ -143,6 +139,7 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     title: '野球ひじ・野球肩の相談',
     subtitle: '投げ方と体全体の使い方まで確認します',
     photo: 'echo-machine',
+    photoPosition: '50% 30%',
     sitePath: '/sym-baseball',
     body: `【下関市彦島｜野球ひじ・野球肩の相談】
 投げたあとにひじが痛い、ひじが伸びにくい、肩が重い——そんなサインは早めに相談してください。
@@ -156,7 +153,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 肉離れ リハビリ',
     title: '肉離れのリハビリ',
     subtitle: '復帰を急ぎすぎないために、段階を追って',
-    photo: 'act-taping',
+    photo: 'exercise-tools',
+    photoPosition: '50% 55%',
     sitePath: '/sym-strain',
     body: `【下関市彦島｜肉離れ（太もも裏・ふくらはぎ）のリハビリ】
 ダッシュや踏み込みの瞬間に、太ももの裏やふくらはぎに痛みが走った——肉離れは、痛みが軽くなっても筋肉の回復は途中のことがあり、早く戻りすぎると繰り返しやすいケガです。
@@ -170,7 +168,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 シンスプリント ランナー すね',
     title: 'すねの内側の痛み（シンスプリント）',
     subtitle: '走る量・足のつき方まで一緒に見直します',
-    photo: 'stadium',
+    photo: 'echo-hero',
+    photoPosition: '70% 40%',
     sitePath: '/sym-shin',
     body: `【下関市彦島｜すねの内側の痛み（シンスプリント）】
 走るとすねの内側が痛む、走り始めは痛いが途中で軽くなる——陸上部やランナーに多い痛みです。
@@ -213,7 +212,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 整骨院 エコー',
     title: 'エコーで状態を確かめてから施術します',
     subtitle: '画面を一緒に見ながら、いまの状態を説明します',
-    photo: 'echo-scene',
+    photo: 'echo-machine',
+    photoPosition: '60% 40%',
     sitePath: '/',
     body: `【下関市彦島｜エコー（超音波）で状態を確かめる整骨院】
 「どこが、どうなっているのか分からない」まま通い続けるのは不安なものです。
@@ -245,8 +245,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 ぎっくり腰 当日',
     title: 'ぎっくり腰（急な腰の痛み）の相談',
     subtitle: '急なケガ・急な痛みは予約なしで受付',
-    photo: 'echo-scene',
-    photoPosition: '30% 50%',
+    photo: 'exercise-tools',
+    photoPosition: '50% 62%',
     sitePath: '/sym-gikkuri',
     body: `【下関市彦島｜ぎっくり腰（急な腰の痛み）のご相談】
 物を持ち上げた、くしゃみをした、その瞬間から腰が動かない——急な腰の痛みは、予約なしで受け付けています。
@@ -260,8 +260,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 アキレス腱 術後 リハビリ',
     title: 'アキレス腱のケガ・術後のリハビリ',
     subtitle: '歩く・走る・跳ぶを段階的に取り戻す',
-    photo: 'stadium',
-    photoPosition: '50% 70%',
+    photo: 'echo-hero',
+    photoPosition: '40% 30%',
     sitePath: '/sym-achilles',
     body: `【下関市彦島｜アキレス腱の痛み・断裂後のリハビリ】
 走るとアキレス腱が痛む、朝の一歩目がつらい、アキレス腱を切って手術・固定をした——そんな方のご相談を受けています。
@@ -275,8 +275,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 整骨院 女性スタッフ 柔道整復師',
     title: '柔道整復師3名で担当します',
     subtitle: '女性スタッフも在籍しています',
-    photo: 'room-staff',
-    photoPosition: '50% 30%',
+    photo: 'clinic',
+    photoPosition: '50% 40%',
     sitePath: '/about',
     body: `【下関市彦島の整骨院｜柔道整復師3名で担当します】
 ゆうき整骨院は、院長の西山と、スタッフの濱谷・中尾の3名とも柔道整復師（国家資格）です。評価から施術・運動療法、復帰の考え方まで、同じ方針で担当します。
@@ -290,7 +290,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 股関節 痛み 術後 リハビリ',
     title: '股関節の痛み・術後のリハビリ',
     subtitle: 'お尻・体幹・脚の使い方まで含めて',
-    photo: 'act-seminar',
+    photo: 'exercise-tools',
+    photoPosition: '50% 70%',
     sitePath: '/sym-hip',
     body: `【下関市彦島｜股関節の痛み・術後のリハビリ】
 走る・しゃがむ・脚を上げると股関節が痛む、股関節の手術のあとに動きや筋力を取り戻したい——そんな方のご相談を受けています。
@@ -304,8 +305,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 部活 ケガ 保護者 相談',
     title: '部活のケガ、保護者の方だけの相談もOK',
     subtitle: '来院前に、LINEで写真や動画を送って相談できます',
-    photo: 'act-trainer',
-    photoPosition: '50% 40%',
+    photo: 'exterior',
+    photoPosition: '50% 22%',
     sitePath: '/first-visit',
     body: `【下関市彦島｜部活のケガのご相談（保護者の方へ）】
 「この痛み、休ませるべき？」「病院と整骨院、どちらに行けばいい？」——お子さんのケガで迷ったときは、保護者の方だけでもご相談いただけます。
@@ -319,8 +320,8 @@ ACL再建術の前後は、膝の曲げ伸ばし・太ももの筋力・片脚�
     keyword: '下関 足底筋膜炎 かかと 足裏',
     title: 'かかと・足の裏の痛み',
     subtitle: '朝の一歩目が痛い方へ（足底腱膜炎）',
-    photo: 'treat-foot',
-    photoPosition: '50% 60%',
+    photo: 'echo-hero',
+    photoPosition: '50% 95%',
     sitePath: '/sym-plantar',
     body: `【下関市彦島｜かかと・足の裏の痛み（足底腱膜炎）】
 朝起きて一歩目にかかとが痛む、歩き始めや走り始めがつらい——足の裏の膜（足底腱膜）に負担がかかっていることがあります。
