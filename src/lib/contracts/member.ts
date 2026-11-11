@@ -5,13 +5,20 @@
 // - 解約：15日までに解約届を出すと当月末、16日以降は翌月末で終了
 // - 最低利用期間の途中の解約は、特別な事情（入院・転居・災害・医師の運動制限など）があるときだけ
 // - 休会：月初めから。休会中は月額の請求を止める（開始月から再開予定月の前月まで）
+// - 兄弟・親子プラン（2名まで・月額30,000円）：契約・休会・解約は契約者（代表）のカルテで行い、
+//   もう1名の方のカルテにも、代表の方の契約から会員の状態を出す
 // ──────────────────────────────────────────────
-import type { ContractRecord, MemberEvent, MemberPlan, MemberStatus } from '@/types/contracts'
+import type { ContractRecord, MemberEvent, MemberPartner, MemberPlan, MemberStatus } from '@/types/contracts'
 import { escapeHtml, jaDate } from './template'
 
 export const MIN_MONTHS = 3
-export const MEMBER_PLANS: MemberPlan[] = ['一般会員', '学生会員']
-export const MEMBER_FEES: Record<MemberPlan, string> = { 一般会員: '月額23,000円', 学生会員: '月額19,000円' }
+export const PAIR_PLAN: MemberPlan = '兄弟・親子プラン'
+export const MEMBER_PLANS: MemberPlan[] = ['一般会員', '学生会員', PAIR_PLAN]
+export const MEMBER_FEES: Record<MemberPlan, string> = {
+  一般会員: '月額23,000円',
+  学生会員: '月額19,000円',
+  '兄弟・親子プラン': '月額30,000円・2名まで',
+}
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/
 const YM = /^\d{4}-\d{2}$/
@@ -75,10 +82,10 @@ export function memberStatusOf(records: ContractRecord[], today: string): Member
     .sort((a, b) => a.signedAt.localeCompare(b.signedAt))
     .map((r) => r.member as MemberEvent)
 
-  let cur: { plan?: MemberPlan; start: string; pauses: Array<{ from: string; months: number }>; end?: string } | null = null
+  let cur: { plan?: MemberPlan; start: string; partner?: MemberPartner; pauses: Array<{ from: string; months: number }>; end?: string } | null = null
   for (const ev of events) {
     if (ev.kind === 'join' && ev.start && YMD.test(ev.start)) {
-      cur = { plan: ev.plan, start: ev.start, pauses: [] }
+      cur = { plan: ev.plan, start: ev.start, partner: ev.plan === PAIR_PLAN ? ev.partner : undefined, pauses: [] }
     } else if (ev.kind === 'pause' && cur && ev.pauseFrom && YM.test(ev.pauseFrom) && ev.pauseMonths) {
       cur.pauses.push({ from: ev.pauseFrom, months: ev.pauseMonths })
     } else if (ev.kind === 'cancel' && cur && ev.end && YMD.test(ev.end)) {
@@ -88,7 +95,7 @@ export function memberStatusOf(records: ContractRecord[], today: string): Member
   if (!cur) return { state: 'none', label: LABELS.none, pausedMonths: 0 }
 
   const pausedMonths = cur.pauses.reduce((s, p) => s + p.months, 0)
-  const base = { plan: cur.plan, start: cur.start, minEnd: minEndOf(cur.start, pausedMonths), end: cur.end, pausedMonths }
+  const base = { plan: cur.plan, start: cur.start, minEnd: minEndOf(cur.start, pausedMonths), end: cur.end, pausedMonths, partner: cur.partner }
   const ym = today.slice(0, 7)
   if (cur.end && cur.end < today) return { state: 'ended', label: LABELS.ended, ...base }
   if (cur.start > today) return { state: 'upcoming', label: LABELS.upcoming, ...base }
@@ -100,10 +107,44 @@ export function memberStatusOf(records: ContractRecord[], today: string): Member
   return { state: 'active', label: LABELS.active, ...base }
 }
 
+/**
+ * ある患者さんの会員の状態。ご自身の契約が無い（または終わっている）ときは、
+ * 兄弟・親子プランの「もう1名」として登録されている契約者（代表）の契約から状態を出す（via に代表の方）
+ */
+export function memberStatusForPatient(patientId: string, allRecords: ContractRecord[], today: string): MemberStatus {
+  const own = memberStatusOf(
+    allRecords.filter((r) => r.patientId === patientId),
+    today,
+  )
+  if (own.state !== 'none' && own.state !== 'ended') return own
+  const reps = new Map<string, string>()
+  for (const r of allRecords) {
+    if (!r.voided && r.member?.kind === 'join' && r.member.partner?.patientId === patientId && r.patientId !== patientId) reps.set(r.patientId, r.patientName)
+  }
+  const order: MemberStatus['state'][] = ['active', 'paused', 'ending', 'upcoming', 'ended']
+  let best: MemberStatus | null = null
+  for (const [repId, repName] of reps) {
+    const st = memberStatusOf(
+      allRecords.filter((r) => r.patientId === repId),
+      today,
+    )
+    // 代表の方のいまの契約で、この方がもう1名になっているときだけ
+    if (st.state === 'none' || st.partner?.patientId !== patientId) continue
+    if (!best || order.indexOf(st.state) < order.indexOf(best.state)) best = { ...st, via: { patientId: repId, name: repName } }
+  }
+  if (best && (own.state === 'none' || best.state !== 'ended')) return best
+  return own
+}
+
 /** 画面で入れる会員の手続きの内容 */
 export interface MemberInput {
   plan?: string
   start?: string
+  /** 兄弟・親子プランのもう1名 */
+  partnerName?: string
+  partnerRelation?: string
+  partnerBirthDate?: string
+  partnerPatientId?: string
   pauseFrom?: string
   pauseMonths?: number
   special?: boolean
@@ -118,16 +159,34 @@ export function buildMemberEvent(
   input: MemberInput,
   records: ContractRecord[],
   today: string,
+  /** 兄弟・親子プランのもう1名として登録されているときの状態（memberStatusForPatient の via つき） */
+  covered?: MemberStatus,
 ): { ok: true; event: MemberEvent } | { ok: false; error: string } {
   const st = memberStatusOf(records, today)
+  if (covered?.via && covered.state !== 'ended' && (st.state === 'none' || st.state === 'ended')) {
+    return {
+      ok: false,
+      error:
+        kind === 'join'
+          ? `${covered.via.name}さんの兄弟・親子プランのもう1名として登録されています（${covered.label}）。別に入会するときは、先に${covered.via.name}さんのプランの手続きを確かめてください。`
+          : `兄弟・親子プランの休会・解約は、契約者の${covered.via.name}さんのカルテで手続きしてください（2名分まとめての扱いです）。`,
+    }
+  }
   if (kind === 'join') {
     if (st.state === 'active' || st.state === 'paused' || st.state === 'upcoming' || st.state === 'ending') {
       return { ok: false, error: `すでに「${st.label}」です。プランを変えるときは、解約届のあとで入会してください。` }
     }
     const plan = MEMBER_PLANS.find((p) => p === input.plan)
-    if (!plan) return { ok: false, error: '会員の種別（一般会員・学生会員）を選んでください。' }
+    if (!plan) return { ok: false, error: '会員の種別（一般会員・学生会員・兄弟・親子プラン）を選んでください。' }
     if (!input.start || !YMD.test(input.start)) return { ok: false, error: '利用開始日（最初の決済日）を入れてください。' }
-    return { ok: true, event: { kind, plan, start: input.start } }
+    if (plan !== PAIR_PLAN) return { ok: true, event: { kind, plan, start: input.start } }
+    const name = String(input.partnerName ?? '').trim().slice(0, 40)
+    if (!name) return { ok: false, error: '兄弟・親子プランの、もう1名の利用者のお名前を入れてください。' }
+    const relation = String(input.partnerRelation ?? '').trim().slice(0, 20)
+    if (!relation) return { ok: false, error: 'もう1名の方の続柄（契約者との関係）を入れてください。' }
+    const birthDate = input.partnerBirthDate && YMD.test(input.partnerBirthDate) ? input.partnerBirthDate : undefined
+    const patientId = input.partnerPatientId && /^[A-Za-z0-9_-]{1,64}$/.test(input.partnerPatientId) ? input.partnerPatientId : undefined
+    return { ok: true, event: { kind, plan, start: input.start, partner: { name, relation, birthDate, patientId } } }
   }
   if (kind === 'pause') {
     if (st.state !== 'active') {
@@ -168,10 +227,18 @@ export function memberEventHtml(ev: MemberEvent, before: MemberStatus): string {
   const rows: Array<[string, string]> = []
   if (ev.kind === 'join' && ev.start && ev.plan) {
     rows.push(['会員の種別', `${ev.plan}（${MEMBER_FEES[ev.plan]}）`])
+    if (ev.partner) {
+      rows.push([
+        'もう1名の利用者',
+        `${ev.partner.name}（${ev.partner.relation ?? ''}${ev.partner.birthDate ? `・${jaDate(ev.partner.birthDate)}生` : ''}）`,
+      ])
+      rows.push(['1部位施術料', '来院した方ごと・施術した部位ごとに1,000円'])
+    }
     rows.push(['利用開始日（最初の決済日）', jaDate(ev.start)])
     rows.push(['最低利用期間の満了日', jaDate(minEndOf(ev.start))])
     rows.push(['満了後', '解約のお申し出がない場合は1か月ごとに自動更新'])
   } else if (ev.kind === 'pause' && ev.pauseFrom && ev.pauseMonths) {
+    if (before.partner) rows.push(['対象', `兄弟・親子プラン（契約者と ${before.partner.name}さんの2名分）`])
     const resume = addMonthsYm(ev.pauseFrom, ev.pauseMonths)
     const [y, m] = ev.pauseFrom.split('-').map(Number)
     const [ry, rm] = resume.split('-').map(Number)
@@ -180,6 +247,7 @@ export function memberEventHtml(ev: MemberEvent, before: MemberStatus): string {
     if (before.start) rows.push(['最低利用期間の満了日（休会分を延長）', jaDate(minEndOf(before.start, before.pausedMonths + ev.pauseMonths))])
   } else if (ev.kind === 'cancel' && ev.submitted && ev.end) {
     const day = Number(ev.submitted.slice(8, 10))
+    if (before.partner) rows.push(['対象', `兄弟・親子プラン（契約者と ${before.partner.name}さんの2名分）`])
     rows.push(['解約届の提出日', jaDate(ev.submitted)])
     rows.push(['契約終了日', `${jaDate(ev.end)}（${day <= 15 ? '15日までの提出のため当月末' : '16日以降の提出のため翌月末'}）`])
     const [y, m] = ev.end.split('-').map(Number)

@@ -2,7 +2,17 @@
 // 契約書・同意書・会員の状態・アウトカム（カルテの「契約・同意書」「アウトカム」）
 // ──────────────────────────────────────────────
 
-export type MemberPlan = '一般会員' | '学生会員'
+export type MemberPlan = '一般会員' | '学生会員' | '兄弟・親子プラン'
+
+/** 兄弟・親子プラン（2名まで）の、もう1名の利用者 */
+export interface MemberPartner {
+  name: string
+  /** 契約者との関係（弟・姉・母 など） */
+  relation?: string
+  birthDate?: string // YYYY-MM-DD
+  /** カルテがある方なら、その方の患者 ID（その方のカルテにも会員の状態が出る） */
+  patientId?: string
+}
 
 /** 会員プランの書類に署名したときの手続きの内容 */
 export interface MemberEvent {
@@ -10,6 +20,8 @@ export interface MemberEvent {
   /** 入会：プランと利用開始日（最初の決済日） */
   plan?: MemberPlan
   start?: string // YYYY-MM-DD
+  /** 兄弟・親子プランのもう1名 */
+  partner?: MemberPartner
   /** 休会：開始月と月数 */
   pauseFrom?: string // YYYY-MM
   pauseMonths?: number
@@ -67,6 +79,10 @@ export interface MemberStatus {
   /** 休会中なら再開予定月（YYYY-MM） */
   resumeMonth?: string
   pausedMonths: number
+  /** 兄弟・親子プランのもう1名 */
+  partner?: MemberPartner
+  /** この方が兄弟・親子プランの「もう1名」のとき、契約者（代表）の方 */
+  via?: { patientId: string; name: string }
 }
 
 // ── アウトカム（痛み・可動域・機能スコア・筋力 LSI の経過） ───────────

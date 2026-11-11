@@ -19,8 +19,12 @@ const text = (max: number) => z.string().max(max)
 const memberSchema = z
   .object({
     kind: z.enum(['join', 'pause', 'cancel']),
-    plan: z.enum(['一般会員', '学生会員']).optional(),
+    plan: z.enum(['一般会員', '学生会員', '兄弟・親子プラン']).optional(),
     start: YMD.optional(),
+    partner: z
+      .object({ name: text(40).min(1), relation: text(20).optional(), birthDate: YMD.optional(), patientId: ID.optional() })
+      .strict()
+      .optional(),
     pauseFrom: z.string().regex(/^\d{4}-\d{2}$/).optional(),
     pauseMonths: z.number().int().min(1).max(6).optional(),
     submitted: YMD.optional(),

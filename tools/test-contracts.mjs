@@ -128,4 +128,74 @@ test('印刷に入れる「会員の手続き」の枠', () => {
   assert.match(html, /満了（2026年10月31日）/)
 })
 
+test('兄弟・親子プラン：もう1名の名前と続柄が要る・印刷の枠にもう1名が出る', () => {
+  assert.deepEqual(member.MEMBER_PLANS, ['一般会員', '学生会員', '兄弟・親子プラン'])
+  assert.equal(member.MEMBER_FEES['兄弟・親子プラン'], '月額30,000円・2名まで')
+  const noName = member.buildMemberEvent('join', { plan: '兄弟・親子プラン', start: '2026-11-20' }, [], '2026-11-20')
+  assert.equal(noName.ok, false)
+  assert.match(noName.error, /もう1名/)
+  const noRel = member.buildMemberEvent('join', { plan: '兄弟・親子プラン', start: '2026-11-20', partnerName: '山田 次郎' }, [], '2026-11-20')
+  assert.equal(noRel.ok, false)
+  const ok = member.buildMemberEvent(
+    'join',
+    { plan: '兄弟・親子プラン', start: '2026-11-20', partnerName: ' 山田 次郎 ', partnerRelation: '弟', partnerBirthDate: '2012-04-01', partnerPatientId: 'p2' },
+    [],
+    '2026-11-20',
+  )
+  assert.equal(ok.ok, true)
+  assert.deepEqual(ok.event.partner, { name: '山田 次郎', relation: '弟', birthDate: '2012-04-01', patientId: 'p2' })
+  // 一般会員では、もう1名を入れても残さない
+  const single = member.buildMemberEvent('join', { plan: '一般会員', start: '2026-11-20', partnerName: 'x', partnerRelation: '弟' }, [], '2026-11-20')
+  assert.equal(single.event.partner, undefined)
+  const html = member.memberEventHtml(ok.event, { state: 'none', label: '', pausedMonths: 0 })
+  assert.match(html, /兄弟・親子プラン（月額30,000円・2名まで）/)
+  assert.match(html, /山田 次郎（弟・2012年4月1日生）/)
+  assert.match(html, /来院した方ごと/)
+})
+
+test('兄弟・親子プラン：もう1名の方のカルテにも、代表の方の契約から状態が出る', () => {
+  const r = (id, patientId, patientName, signedAt, m) => ({ ...rec(signedAt, m), id, patientId, patientName })
+  const join = r('j1', 'p1', '山田 太郎', '2026-11-20T01:00:00Z', { kind: 'join', plan: '兄弟・親子プラン', start: '2026-11-20', partner: { name: '山田 次郎', relation: '弟', patientId: 'p2' } })
+  const all = [join]
+  const rep = member.memberStatusForPatient('p1', all, '2026-12-01')
+  assert.equal(rep.state, 'active')
+  assert.equal(rep.partner.name, '山田 次郎')
+  assert.equal(rep.via, undefined)
+  const sib = member.memberStatusForPatient('p2', all, '2026-12-01')
+  assert.equal(sib.state, 'active')
+  assert.deepEqual(sib.via, { patientId: 'p1', name: '山田 太郎' })
+  assert.equal(member.memberStatusForPatient('p3', all, '2026-12-01').state, 'none')
+  // 代表の方の休会・解約は、もう1名の方にも出る
+  const pause = r('pz', 'p1', '山田 太郎', '2026-12-05T01:00:00Z', { kind: 'pause', pauseFrom: '2027-01', pauseMonths: 1 })
+  assert.equal(member.memberStatusForPatient('p2', [join, pause], '2027-01-10').state, 'paused')
+  const cancel = r('c1', 'p1', '山田 太郎', '2027-03-01T01:00:00Z', { kind: 'cancel', submitted: '2027-03-01', end: '2027-03-31' })
+  assert.equal(member.memberStatusForPatient('p2', [join, pause, cancel], '2027-03-10').state, 'ending')
+  // 代表の方が一般会員で入りなおしたら、もう1名ではなくなる
+  const rejoin = r('j2', 'p1', '山田 太郎', '2027-05-01T01:00:00Z', { kind: 'join', plan: '一般会員', start: '2027-05-01' })
+  assert.equal(member.memberStatusForPatient('p2', [join, pause, cancel, rejoin], '2027-05-10').state, 'none')
+  // もう1名の方のカルテで休会・解約・別の入会をしようとすると、代表の方のカルテへ案内する
+  const covered = member.memberStatusForPatient('p2', all, '2026-12-01')
+  const p = member.buildMemberEvent('pause', { pauseFrom: '2027-01', pauseMonths: 1 }, [], '2026-12-01', covered)
+  assert.equal(p.ok, false)
+  assert.match(p.error, /山田 太郎さんのカルテ/)
+  assert.equal(member.buildMemberEvent('join', { plan: '一般会員', start: '2026-12-01' }, [], '2026-12-01', covered).ok, false)
+})
+
+test('書類の文面：兄弟・親子プランの欄と、休会・解約・料金案内の種別', async () => {
+  const get = (id) => CONTRACT_TEMPLATES.find((t) => t.id === id)
+  assert.match(get('member-contract').body, /\| 兄弟・親子プラン（2名まで） \| 30,000円 \| □ 申し込む \|/)
+  assert.match(get('member-contract').body, /3名以上での利用や、届け出た方以外の利用はできません/)
+  for (const id of ['member-pause', 'member-cancel']) assert.match(get(id).body, /□ 兄弟・親子プラン（月額30,000円・2名分）/)
+  assert.match(get('fee-cancel-policy').body, /\| 兄弟・親子プラン（2名まで・月額） \| 30,000円 \|/)
+  for (const id of ['member-contract', 'member-pause', 'member-cancel', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-11.2')
+  // もう1名の欄（氏名・生年月日・続柄・目的）は4つの記入欄、確認のチェックは5つ
+  const body = get('member-contract').body
+  const start = body.indexOf('### 兄弟・親子プランを申し込む場合')
+  const end = body.indexOf('## 3. 会員プランに含まれる内容')
+  const full = parseTemplate(body)
+  const without = parseTemplate(body.slice(0, start) + body.slice(end))
+  assert.equal(full.blankCount - without.blankCount, 4)
+  assert.equal(full.checkCount - without.checkCount, 5)
+})
+
 console.log(`\n${passed} 件 OK`)
