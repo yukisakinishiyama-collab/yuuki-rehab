@@ -231,8 +231,8 @@ export function getPromoVideo(id: string): PromoVideo | undefined {
 
 /**
  * 動画に使ってよい院の写真（人物が特定されないもの）：足首とエコー・エコーの機械・運動の器具・外観。
- * スタッフ・患者さん・選手・観客が写っている写真（room-staff・act-seminar・act-trainer・stadium・echo-scene・
- * treat-foot・act-taping）は使わない（2026-11-11 院長の指示。体の一部だけの写真も、念のため外している）
+ * スタッフ・患者さん・選手・観客が写っている写真は使わない（2026-11-11 院長の指示。体の一部だけの写真も、念のため外している）。
+ * Google投稿と同じ置き場（GBP_SAFE_PHOTOS）から、縦の動画に使える大きさのものを選んでいる（横長の外観 clinic は小さいので使わない）
  */
 export const PROMO_SAFE_PHOTOS: GbpPhoto[] = ['echo-hero', 'echo-machine', 'exercise-tools', 'exterior']
 

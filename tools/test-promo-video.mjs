@@ -85,10 +85,13 @@ await test('場面は5つ（つかみ→こんなときに→当院では→強�
   assert.ok(aiScenes >= PROMO_VIDEOS.length * 2 - 2, `AIの絵 ${aiScenes}枚`)
 })
 
-await test('院の写真：人物が特定されない写真だけ（足首とエコー・エコーの機械・運動の器具・外観）。代わりの絵も同じ', () => {
+await test('院の写真：人物が特定されない写真だけ（足首とエコー・エコーの機械・運動の器具・外観）。代わりの絵も同じ', async () => {
   assert.deepEqual([...PROMO_SAFE_PHOTOS].sort(), ['echo-hero', 'echo-machine', 'exercise-tools', 'exterior'])
   // スタッフ・患者さん・選手・観客が写っている写真は入れない
   for (const banned of ['room-staff', 'act-seminar', 'act-trainer', 'stadium', 'echo-scene', 'treat-foot', 'act-taping']) assert.ok(!PROMO_SAFE_PHOTOS.includes(banned), banned)
+  // Google投稿で使ってよい写真（GBP_SAFE_PHOTOS）の中から選んでいる
+  const gbp = await import(new URL('src/data/gbp-seo-posts.ts', root).href)
+  for (const photo of PROMO_SAFE_PHOTOS) assert.ok(gbp.GBP_SAFE_PHOTOS.includes(photo), photo)
   for (const v of PROMO_VIDEOS) {
     for (const s of promoScenes(v)) {
       assert.ok(PROMO_SAFE_PHOTOS.includes(s.photo), `${v.id} の写真 ${s.photo}`)
