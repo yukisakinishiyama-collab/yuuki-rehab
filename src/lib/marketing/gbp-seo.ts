@@ -20,10 +20,18 @@ export const GBP_SEO_SLOTS: AutopilotSlot[] = [
   { weekday: 5, time: '18:00' }, // 金 夕方（週末の部活・試合の前）
 ]
 
-/** その週（月曜 YYYY-MM-DD）の投稿の時刻 'YYYY-MM-DDTHH:MM'（日本時間） */
+/** 年末年始（12/29〜1/3）。休みの時期なので投稿しない（順番は次の回へ持ち越す） */
+export function isYearEndBreak(ymd: string): boolean {
+  const md = ymd.slice(5, 10)
+  return md >= '12-29' || md <= '01-03'
+}
+
+/** その週（月曜 YYYY-MM-DD）の投稿の時刻 'YYYY-MM-DDTHH:MM'（日本時間）。年末年始は除く */
 export function seoSlotsForWeek(weekStart: string, perWeek: number): string[] {
   const n = Math.min(Math.max(Math.floor(perWeek), 1), GBP_SEO_SLOTS.length)
-  return GBP_SEO_SLOTS.slice(0, n).map((s) => `${addDays(weekStart, (s.weekday + 6) % 7)}T${s.time}`)
+  return GBP_SEO_SLOTS.slice(0, n)
+    .map((s) => `${addDays(weekStart, (s.weekday + 6) % 7)}T${s.time}`)
+    .filter((slot) => !isYearEndBreak(slot.slice(0, 10)))
 }
 
 /**

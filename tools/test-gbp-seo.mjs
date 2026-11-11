@@ -68,10 +68,16 @@ test('院の情報（受付時間・駐車場・資格者の数）はホーム�
   assert.deepEqual(GBP_SEO_CHIPS, ['柔道整復師3名', 'エコーで状態を確認', '平日20時まで受付', '駐車場あり'])
 })
 
-test('予定：週1は月曜12時、週2は月曜12時と金曜18時', () => {
+test('予定：週1は月曜12時、週2は月曜12時と金曜18時（年末年始は出さない）', () => {
   assert.deepEqual(seo.seoSlotsForWeek('2026-11-16', 2), ['2026-11-16T12:00', '2026-11-20T18:00'])
   assert.deepEqual(seo.seoSlotsForWeek('2026-11-16', 1), ['2026-11-16T12:00'])
   assert.deepEqual(seo.seoSlotsForWeek('2026-11-16', 9), ['2026-11-16T12:00', '2026-11-20T18:00'])
+  // 年末年始（12/29〜1/3）は出さない
+  assert.deepEqual(seo.seoSlotsForWeek('2026-12-28', 2), ['2026-12-28T12:00'])
+  assert.deepEqual(seo.seoSlotsForWeek('2027-01-04', 2), ['2027-01-04T12:00', '2027-01-08T18:00'])
+  assert.equal(seo.isYearEndBreak('2026-12-29'), true)
+  assert.equal(seo.isYearEndBreak('2027-01-03'), true)
+  assert.equal(seo.isYearEndBreak('2027-01-04'), false)
 })
 
 test('順番：前回の続きから一覧の順にくり返す（一覧から消した id は飛ばす）', () => {

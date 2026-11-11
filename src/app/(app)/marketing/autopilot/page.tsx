@@ -530,7 +530,7 @@ function SettingsPanel({
           </select>
         </label>
         <p className="text-xs text-slate-600">
-          「下関市彦島＋症状」で探す人に見つかりやすいよう、1本ごとに検索ワードを1つに絞り、エコーでの状態の確認・柔道整復師3名・平日20時まで受付・駐車場などの強みを入れています。Googleとつながっていないときは、時間になると本文と画像のリンクを院長のLINEへ送ります。
+          「下関市彦島＋症状」で探す人に見つかりやすいよう、1本ごとに検索ワードを1つに絞り、エコーでの状態の確認・柔道整復師3名・平日20時まで受付・駐車場などの強みを入れています。年末年始（12/29〜1/3）は出しません。Googleとつながっていないときは、時間になると本文と画像のリンクを院長のLINEへ送ります。
         </p>
         <details className="rounded-lg bg-white p-2">
           <summary className="flex min-h-10 cursor-pointer items-center text-sm font-bold text-slate-700">投稿の一覧（{GBP_SEO_POSTS.length}本）</summary>
