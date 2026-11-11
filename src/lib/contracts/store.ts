@@ -3,11 +3,13 @@
 // 端末の localStorage に持ち、ほかのカルテと同じようにクラウドと同期する（15秒ごと・「すぐに反映する」）。
 // 署名入りの本文そのものは、クラウドの kcdoc:<id> に保存する（/api/karte/contracts）。
 // ──────────────────────────────────────────────
-import type { ContractRecord, OutcomeRecord } from '@/types/contracts'
+import type { ContractRecord, OutcomeRecord, OutcomeSetting, SportKey } from '@/types/contracts'
 import { notifyCloudSync } from '@/lib/store-sync'
 
 export const CONTRACTS_KEY = 'pt_contracts'
 export const OUTCOMES_KEY = 'pt_outcomes'
+/** 患者さんごとのアウトカムの設定（競技の評価セット）。id は患者さんの ID */
+export const OUTCOME_SETTINGS_KEY = 'pt_outcome_settings'
 
 function read<T>(key: string): T[] {
   if (typeof window === 'undefined') return []
@@ -70,4 +72,17 @@ export function deleteOutcome(id: string): void {
     OUTCOMES_KEY,
     read<OutcomeRecord>(OUTCOMES_KEY).filter((o) => o.id !== id),
   )
+}
+
+// ── 競技の評価セット（患者さんごと） ───────────────────
+
+export function getOutcomeSport(patientId: string): SportKey | null {
+  const hit = read<OutcomeSetting>(OUTCOME_SETTINGS_KEY).find((s) => s.id === patientId)
+  return hit?.sport ?? null
+}
+
+export function setOutcomeSport(patientId: string, sport: SportKey): void {
+  const list = read<OutcomeSetting>(OUTCOME_SETTINGS_KEY).filter((s) => s.id !== patientId)
+  list.push({ id: patientId, sport, updatedAt: new Date().toISOString() })
+  write(OUTCOME_SETTINGS_KEY, list)
 }
