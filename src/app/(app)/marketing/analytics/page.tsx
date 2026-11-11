@@ -7,6 +7,7 @@ import { CHANNEL_LABELS, type Channel } from '@/lib/marketing/types'
 import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import { GBP_DAILY_METRICS, GBP_METRIC_LABELS, impressionsOf, type GbpPerformance } from '@/lib/marketing/gbp-performance'
+import type { GscReport } from '@/lib/marketing/gsc'
 
 interface Analytics {
   days: number
@@ -37,6 +38,139 @@ const SEO_STATUS: Record<string, string> = {
 
 const ymdLabel = (ymd: string) => `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`
 const monthLabel = (ym: string) => `${ym.slice(0, 4)}年${Number(ym.slice(5, 7))}月`
+
+/** Search Console：ホームページ（shimonoseki-yuuki.com）の Google 検索でのクリック・表示・掲載順位とキーワード */
+function SearchConsole() {
+  const [data, setData] = useState<GscReport | null>(null)
+  const [loading, setLoading] = useState(false)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/marketing/google/search-console', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: GscReport) => {
+        if (alive) setData(d)
+      })
+      .catch(() => {
+        if (alive) setData({ connected: true, error: '読み込めませんでした' })
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  async function refresh() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/marketing/google/search-console?refresh=1', { cache: 'no-store' })
+      setData((await res.json()) as GscReport)
+    } finally {
+      setLoading(false)
+    }
+  }
+  const cur = data?.current?.totals
+  const prev = data?.previous?.totals
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`
+  const queries = data?.queries ?? []
+  const targeted = queries.filter((q) => q.target)
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">ホームページの検索（Search Console）</h2>
+        {data?.connected && !data.error && (
+          <button type="button" onClick={refresh} disabled={loading} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50">
+            {loading ? '取り直し中…' : 'Googleから取り直す'}
+          </button>
+        )}
+      </div>
+      {!data ? (
+        <p className="mt-2 text-sm text-slate-500">読み込み中…</p>
+      ) : !data.connected ? (
+        <p className="mt-2 text-sm text-slate-600">
+          「Googleとつなぐ」をもう一度押し、Search Console の項目にもチェックを入れると、ホームページがどんな言葉で検索され、何位に出ているかがここに出ます。
+          <Link href="/marketing/jobs" className="ml-1 font-bold text-teal-700 underline">
+            投稿ジョブ画面へ
+          </Link>
+        </p>
+      ) : data.error ? (
+        <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">{data.error}</p>
+      ) : (
+        <>
+          {cur && data.current && (
+            <>
+              <p className="mt-1 text-xs text-slate-500">
+                直近28日（{ymdLabel(data.current.start)}〜{ymdLabel(data.current.end)}）。カッコはその前の28日。掲載順位は小さいほど上です。
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  ['クリック', `${cur.clicks}`, prev ? `前 ${prev.clicks}` : ''],
+                  ['検索で表示', `${cur.impressions}`, prev ? `前 ${prev.impressions}` : ''],
+                  ['平均掲載順位', `${cur.position}位`, prev ? `前 ${prev.position}位` : ''],
+                  ['クリック率', pct(cur.ctr), prev ? `前 ${pct(prev.ctr)}` : ''],
+                ].map(([label, value, before]) => (
+                  <div key={label} className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-bold text-slate-500">{label}</p>
+                    <p className="mt-1 text-2xl font-black text-teal-900">
+                      {value}
+                      <span className="ml-1 text-xs font-bold text-slate-500">{before && `(${before})`}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          <p className="mt-4 text-sm font-bold text-slate-700">
+            検索キーワード（表示の多い順）
+            {targeted.length > 0 && <span className="ml-2 text-xs font-bold text-orange-700">投稿で狙っている言葉：{targeted.length}件</span>}
+          </p>
+          {queries.length === 0 ? (
+            <p className="mt-1 text-sm text-slate-500">まだありません。</p>
+          ) : (
+            <div className="mt-1 overflow-x-auto">
+              <table className="w-full min-w-[34rem] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs whitespace-nowrap text-slate-600">
+                    <th className="py-1.5 pr-2 font-bold">キーワード</th>
+                    <th className="py-1.5 pr-2 text-right font-bold">クリック</th>
+                    <th className="py-1.5 pr-2 text-right font-bold">表示</th>
+                    <th className="py-1.5 text-right font-bold">掲載順位（前）</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {queries.slice(0, 30).map((q) => (
+                    <tr key={q.key} className="border-b border-slate-100">
+                      <td className="py-1.5 pr-2">
+                        {q.key}
+                        {q.target && <span className="ml-2 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold whitespace-nowrap text-orange-800">狙い：{q.target}</span>}
+                      </td>
+                      <td className="py-1.5 pr-2 text-right font-bold text-teal-900 tabular-nums">{q.clicks}</td>
+                      <td className="py-1.5 pr-2 text-right tabular-nums">{q.impressions}</td>
+                      <td className="py-1.5 text-right whitespace-nowrap tabular-nums">
+                        {q.position}位
+                        <span className="ml-1 text-xs text-slate-500">{q.prevPosition !== null ? `(${q.prevPosition}位)` : '(新しく)'}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {(data.pages ?? []).length > 0 && (
+            <details className="mt-3 text-sm">
+              <summary className="flex min-h-10 cursor-pointer items-center text-xs font-bold text-slate-600">よく見られたページ（上位10）</summary>
+              <ul className="divide-y divide-slate-100">
+                {(data.pages ?? []).map((p) => (
+                  <li key={p.key} className="flex items-center gap-2 py-1.5">
+                    <span className="flex-1 truncate">{p.key.replace(/^https?:\/\/[^/]+/, '') || '/'}</span>
+                    <span className="text-xs text-slate-600 tabular-nums">クリック {p.clicks}・表示 {p.impressions}・{p.position}位</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
 
 /** Googleビジネスプロフィールの成果（表示・電話・ルート・ウェブサイト・予約）と「検索された言葉」 */
 function GooglePerformance() {
@@ -333,6 +467,8 @@ export default function AnalyticsPage() {
       </div>
 
       <GooglePerformance />
+
+      <SearchConsole />
 
       {/* Google検索向けの投稿（1本ごと） */}
       {data.seoPosts && data.seoPosts.length > 0 && (

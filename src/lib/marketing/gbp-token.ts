@@ -18,6 +18,8 @@ type StoredGbp = {
   refreshToken: string
   locationName?: string
   locationTitle?: string
+  /** Googleで許可された権限（ビジネスプロフィール・Search Console など）。古い接続には無い */
+  scopes?: string[]
   connectedAt: string
 }
 
@@ -29,7 +31,7 @@ async function readStored(): Promise<StoredGbp | null> {
   }
 }
 
-export async function saveGbpConnection(input: { refreshToken: string; locationName?: string; locationTitle?: string }) {
+export async function saveGbpConnection(input: { refreshToken: string; locationName?: string; locationTitle?: string; scopes?: string[] }) {
   await kvSet(KEY, { ...input, connectedAt: new Date().toISOString() } satisfies StoredGbp)
 }
 
@@ -97,4 +99,21 @@ export async function gbpAccessToken(credentials: GbpCredentials): Promise<strin
     throw new Error(`Googleの接続が切れています（${data.error_description ?? data.error ?? res.status}）。「Googleとつなぐ」からつなぎ直してください。`)
   }
   return data.access_token
+}
+
+/** 「Googleとつなぐ」で、その権限（例：Search Console を読む）も許可されているか */
+export async function hasGoogleScope(scope: string): Promise<boolean> {
+  if (process.env.GBP_REFRESH_TOKEN) return false
+  const stored = await readStored()
+  return Boolean(stored?.refreshToken && stored.scopes?.includes(scope))
+}
+
+/** Search Console などを読むためのアクセストークン（「Googleとつなぐ」で保存したリフレッシュトークンを使う） */
+export async function googleAccessTokenFor(scope: string): Promise<string | null> {
+  const clientId = process.env.GBP_CLIENT_ID ?? ''
+  const clientSecret = process.env.GBP_CLIENT_SECRET ?? ''
+  if (!clientId || !clientSecret || !(await hasGoogleScope(scope))) return null
+  const stored = await readStored()
+  if (!stored) return null
+  return gbpAccessToken({ clientId, clientSecret, refreshToken: stored.refreshToken, location: stored.locationName ?? '' })
 }

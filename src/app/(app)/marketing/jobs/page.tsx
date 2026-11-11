@@ -163,7 +163,7 @@ export default function JobsPage() {
         {/* Googleとつなぐ（OAuth）: 院長が許可するだけで接続。トークンや店舗IDのコピーは不要 */}
         <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-sm">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="font-bold">Googleの自動投稿</span>
+            <span className="font-bold">Googleの自動投稿・Search Console</span>
             {isAdmin && conn?.googleOAuth?.ready ? (
               <a href="/api/marketing/google/connect" className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white max-lg:min-h-10 max-lg:inline-flex max-lg:items-center">
                 {conn?.connections?.googleBusiness ? 'Googleとつなぎ直す' : 'Googleとつなぐ'}
@@ -184,7 +184,7 @@ export default function JobsPage() {
             </p>
           ) : (
             <p className="mt-2 text-xs text-slate-500">
-              ボタンを押すとGoogleの画面に移ります。ビジネスプロフィールのオーナーのアカウント（yukisakinishiyama@gmail.com）を選び、「このアプリはGoogleで確認されていません」と出たら「詳細」→「ゆうき整骨院 投稿連携（安全ではないページ）に移動」→「続行」で許可してください。この画面に戻って接続済みになります。
+              ボタンを押すとGoogleの画面に移ります。ビジネスプロフィールのオーナーのアカウント（yukisakinishiyama@gmail.com）を選び、「このアプリはGoogleで確認されていません」と出たら「詳細」→「ゆうき整骨院 投稿連携（安全ではないページ）に移動」→ 許可の項目（ビジネスプロフィールの管理・Search Console のデータの表示）の両方にチェックを入れて「続行」で許可してください。この画面に戻って接続済みになります。
             </p>
           )}
         </div>

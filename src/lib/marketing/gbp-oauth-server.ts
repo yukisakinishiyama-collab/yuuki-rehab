@@ -15,6 +15,9 @@
  * Vercelの環境変数を変えたら、再デプロイして初めて反映される。
  */
 export const GBP_SCOPE = 'https://www.googleapis.com/auth/business.manage'
+/** Search Console（ホームページの検索キーワード・掲載順位）を読む権限。2026-11-11 から一緒にもらう */
+export const GSC_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly'
+export const GOOGLE_SCOPES = [GBP_SCOPE, GSC_SCOPE]
 export const GBP_STATE_COOKIE = 'gbp_oauth_state'
 export const GBP_CALLBACK_PATH = '/api/marketing/google/callback'
 
@@ -31,7 +34,9 @@ export function gbpAuthorizeUrl(clientId: string, redirectUri: string, state: st
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: GBP_SCOPE,
+    scope: GOOGLE_SCOPES.join(' '),
+    // 前にもらった権限も引きつぐ
+    include_granted_scopes: 'true',
     // リフレッシュトークンを必ず受け取るため（つなぎ直しでも毎回発行される）
     access_type: 'offline',
     prompt: 'consent',
@@ -40,7 +45,7 @@ export function gbpAuthorizeUrl(clientId: string, redirectUri: string, state: st
   return `https://accounts.google.com/o/oauth2/v2/auth?${qs.toString()}`
 }
 
-type TokenResponse = { access_token?: string; refresh_token?: string; error?: string; error_description?: string }
+type TokenResponse = { access_token?: string; refresh_token?: string; scope?: string; error?: string; error_description?: string }
 
 /** 認可コード → リフレッシュトークン＋アクセストークン */
 export async function exchangeGbpCode(input: { code: string; clientId: string; clientSecret: string; redirectUri: string }) {
@@ -64,7 +69,7 @@ export async function exchangeGbpCode(input: { code: string; clientId: string; c
   if (!data.refresh_token) {
     throw new Error('Googleからリフレッシュトークンが届きませんでした。もう一度「Googleとつなぐ」から始めてください。')
   }
-  return { accessToken: data.access_token, refreshToken: data.refresh_token }
+  return { accessToken: data.access_token, refreshToken: data.refresh_token, scopes: (data.scope ?? '').split(/\s+/).filter(Boolean) }
 }
 
 export type GbpLocation = {
