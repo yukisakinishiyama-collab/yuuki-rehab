@@ -3,8 +3,10 @@
  * カルテの「契約・同意書」タブ
  *
  * 1. 書類をえらぶ（6種類。署名済みのものには日付が出る）
- * 2. 文面をいっしょに読み、□ をタップ・空欄に記入
+ * 2. 文面をいっしょに読み、□ をタップ（チェックは患者様ご自身で）。記入欄は、署名のほかはカルテ・今日の日付・
+ *    会員の手続きの欄から自動で入る（緑の欄。lib/contracts/autofill.ts）
  * 3. 患者さん（未成年なら保護者も）と担当者が指で署名 →「署名して完了する」
+ *    （まだのものがあれば、ボタンの上に「あと○つ」を出し、押すとそこへ飛ぶ。2026-11-11「登録できない」の見直し）
  *    → 署名入りの本文をクラウドに保存（あとから変えない）、一覧（pt_contracts）に1行
  * 4. 「印刷する」で院保管用と患者様控えの2部（控えだけ・白紙も印刷できる）
  * 会員プランの書類（入会・休会・解約）に署名すると、会員の状態と日付（最低利用期間・契約終了日）が自動で変わる。
@@ -18,6 +20,8 @@ import type { Patient } from '@/types/patient'
 import type { ContractRecord, MemberStatus } from '@/types/contracts'
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templates'
 import { parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
+import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
+import { CLINIC_STAFF } from '@/data/clinic-staff'
 import {
   addMonthsYm,
   buildMemberEvent,
@@ -32,7 +36,7 @@ import {
   PAIR_PLAN,
   type MemberInput,
 } from '@/lib/contracts/member'
-import { getPatients } from '@/lib/patient-store'
+import { getPatient, getPatients } from '@/lib/patient-store'
 import { printPages, printSigned, signatureBlockHtml, copyPage } from '@/lib/contracts/print'
 import { addContract, voidContract } from '@/lib/contracts/store'
 import { fingerprint } from '@/lib/sync-merge'
@@ -368,8 +372,10 @@ function SignFlow({
   onDone: (record: ContractRecord, html: string) => void
 }) {
   const parsed = useMemo(() => parseTemplate(tpl.body), [tpl.body])
+  const described = useMemo(() => describeTemplate(parsed), [parsed])
   const [checks, setChecks] = useState<boolean[]>(() => Array(parsed.checkCount).fill(false))
-  const [inputs, setInputs] = useState<string[]>(() => Array(parsed.blankCount).fill(''))
+  /** 手で入れた値（null はまだ触っていない＝自動の値を使う） */
+  const [inputs, setInputs] = useState<Array<string | null>>(() => Array(parsed.blankCount).fill(null))
   const age = ageOf(patient.birthDate, today)
   const [patientName, setPatientName] = useState(patient.name)
   const [minor, setMinor] = useState(age !== null && age < 18)
@@ -399,10 +405,83 @@ function SignFlow({
   }))
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  /** 「署名して完了する」を一度押した（まだのものを赤で知らせる） */
+  const [attempted, setAttempted] = useState(false)
+
+  // ── 記入欄の自動入力（署名とチェック以外） ──
+  const partnerPatient = useMemo(
+    () => (member.partnerPatientId ? (getPatient(member.partnerPatientId) ?? null) : null),
+    [member.partnerPatientId],
+  )
+  const auto = useMemo(
+    () =>
+      autofillContract(parsed, {
+        docId: tpl.id,
+        today,
+        patient,
+        member: tpl.member ? member : undefined,
+        status,
+        partnerPatient,
+        inputs,
+      }),
+    [parsed, tpl.id, tpl.member, today, patient, member, status, partnerPatient, inputs],
+  )
+  const values = useMemo(() => effectiveInputs(inputs, auto), [inputs, auto])
+  const edited = useMemo(() => inputs.map((v) => v !== null), [inputs])
+  const labels = useMemo(() => {
+    const out: string[] = Array(parsed.blankCount).fill('')
+    for (const b of described.blanks) out[b.i] = b.label || b.row
+    return out
+  }, [described, parsed.blankCount])
+  const autoCount = auto.filter((a, i) => a && values[i]).length
+
+  /** 前に署名した書類の保護者（同じ日に何枚も書くときに、ひと押しで入れる） */
+  const lastGuardian = useMemo(() => {
+    const hit = contracts.find((c) => !c.voided && c.guardianName)
+    return hit ? { name: hit.guardianName as string, relation: hit.relation ?? '' } : null
+  }, [contracts])
+
+  // 会員プランの書類：文面の □ と、下の「会員の手続き」の欄が食いちがわないように
+  const checkedPlans = tpl.member === 'join' ? described.checks.filter((c) => checks[c.i] && planOfCheck(c)).map((c) => planOfCheck(c) as string) : []
+  const checkedMonths = tpl.member === 'pause' ? described.checks.filter((c) => checks[c.i] && pauseMonthsOfCheck(c)).map((c) => pauseMonthsOfCheck(c) as number) : []
+
+  function onCheck(i: number, v: boolean) {
+    setChecks((prev) => prev.map((x, k) => (k === i ? v : x)))
+    if (!v) return
+    const info = described.checks.find((c) => c.i === i)
+    const plan = tpl.member === 'join' ? planOfCheck(info) : null
+    if (plan) setMember((m) => ({ ...m, plan }))
+    const months = tpl.member === 'pause' ? pauseMonthsOfCheck(info) : null
+    if (months) setMember((m) => ({ ...m, pauseMonths: months }))
+  }
 
   const memberCheck = tpl.member ? buildMemberEvent(tpl.member, member, contracts, today, covered) : null
-  const ready =
-    patientName.trim() && staffName.trim() && sigPatient && sigStaff && (!minor || (guardianName.trim() && sigGuardian)) && (!memberCheck || memberCheck.ok)
+
+  /** 署名して完了する前に、まだのもの（押したら、そこへ飛ぶ） */
+  const missing: Array<{ id: string; text: string }> = []
+  if (!patientName.trim()) missing.push({ id: 'cf-patient-name', text: '患者様氏名' })
+  if (!sigPatient) missing.push({ id: 'cf-sig-patient', text: '患者様の署名' })
+  if (minor && !guardianName.trim()) missing.push({ id: 'cf-guardian-name', text: '保護者氏名' })
+  if (minor && !sigGuardian) missing.push({ id: 'cf-sig-guardian', text: '保護者の署名' })
+  if (!staffName.trim()) missing.push({ id: 'cf-staff-name', text: `${tpl.staffLabel}の氏名` })
+  if (!sigStaff) missing.push({ id: 'cf-sig-staff', text: `${tpl.staffLabel}の署名` })
+  if (memberCheck && !memberCheck.ok) missing.push({ id: 'cf-member', text: memberCheck.error })
+  if (checkedPlans.length > 1) missing.push({ id: 'cf-doc', text: '文面の「申し込む」のチェックが2つ以上あります。申し込むプランを1つにしてください。' })
+  else if (checkedPlans.length === 1 && checkedPlans[0] !== member.plan)
+    missing.push({ id: 'cf-member', text: `文面で選んだプラン（${checkedPlans[0]}）と、下の「会員の種別」（${member.plan}）がちがいます。` })
+  if (checkedMonths.length > 1) missing.push({ id: 'cf-doc', text: '文面の「休会の月数」のチェックが2つ以上あります。1つにしてください。' })
+  else if (checkedMonths.length === 1 && checkedMonths[0] !== Number(member.pauseMonths))
+    missing.push({ id: 'cf-member', text: `文面の休会の月数（${checkedMonths[0]}か月）と、下の「休会の月数」（${member.pauseMonths}か月）がちがいます。` })
+  const ready = missing.length === 0
+  const isMissing = (id: string) => attempted && missing.some((m) => m.id === id)
+
+  function jumpTo(id: string) {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const input = el.querySelector('input') ?? (el instanceof HTMLInputElement ? el : null)
+    if (input && input.type === 'text') setTimeout(() => input.focus({ preventScroll: true }), 300)
+  }
 
   function printBlank() {
     const html =
@@ -413,12 +492,10 @@ function SignFlow({
 
   async function sign() {
     setError('')
-    if (!ready) {
-      setError('署名とお名前がそろっているか確かめてください。')
-      return
-    }
-    if (memberCheck && !memberCheck.ok) {
-      setError(memberCheck.error)
+    setAttempted(true)
+    if (!ready || !sigPatient || !sigStaff) {
+      // 何がまだかは、ボタンの上の赤い枠に出る。いちばん上のものへ飛ぶ
+      if (missing[0]) jumpTo(missing[0].id)
       return
     }
     setSaving(true)
@@ -433,17 +510,17 @@ function SignFlow({
       bodyHash: fingerprint(tpl.body),
       signedAt: now.toISOString(),
       signedDate: today,
-      patientName: patientName.trim(),
-      guardianName: minor ? guardianName.trim() : undefined,
-      relation: minor && relation.trim() ? relation.trim() : undefined,
+      patientName: patientName.trim().slice(0, 40),
+      guardianName: minor ? guardianName.trim().slice(0, 40) : undefined,
+      relation: minor && relation.trim() ? relation.trim().slice(0, 20) : undefined,
       staffLabel: tpl.staffLabel,
-      staffName: staffName.trim(),
+      staffName: staffName.trim().slice(0, 40),
       checked: checks.filter(Boolean).length,
-      written: inputs.filter((v) => v.trim()).length,
+      written: values.filter((v) => v.trim()).length,
       member: memberCheck && memberCheck.ok ? memberCheck.event : undefined,
     }
     const html =
-      renderTemplateHtml(parsed, checks, inputs) +
+      renderTemplateHtml(parsed, checks, values) +
       (record.member ? memberEventHtml(record.member, status) : '') +
       signatureBlockHtml({
         date: today,
@@ -457,27 +534,49 @@ function SignFlow({
         sigStaff,
       }) +
       `<p class="meta">記録ID ${escapeHtml(id)}／署名日時 ${escapeHtml(now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }))}／書類の版 ${escapeHtml(tpl.version)}／本文の指紋 ${escapeHtml(record.bodyHash)}</p>`
+    let res: Response
     try {
-      const res = await fetch('/api/karte/contracts', {
+      res = await fetch('/api/karte/contracts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ record, html }),
       })
-      const body = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) throw new Error(body.error ?? '保存できませんでした')
-      addContract(record)
-      try {
-        localStorage.setItem(STAFF_NAME_KEY, record.staffName)
-      } catch {
-        // 端末の担当者名を覚えられないだけ
-      }
-      onDone(record, html)
     } catch (e) {
-      setError(`クラウドに保存できませんでした。通信を確かめて、もう一度「署名して完了する」を押してください（${e instanceof Error ? e.message : String(e)}）`)
-    } finally {
       setSaving(false)
+      setError(
+        `インターネットにつながらず、保存できませんでした。Wi-Fi を確かめて、もう一度「署名して完了する」を押してください（書いた署名は消えていません）。（${e instanceof Error ? e.message : String(e)}）`,
+      )
+      return
     }
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    if (!res.ok) {
+      setSaving(false)
+      setError(
+        res.status === 401
+          ? 'ログインが切れています。いったん画面を読み込み直し、院長かスタッフのパスワードで入り直してから、もう一度書いてください。'
+          : res.status === 413
+            ? '送る量が大きすぎて保存できませんでした。「書き直す」で署名を書き直してから、もう一度押してください。'
+            : `保存できませんでした（${res.status}${body.error ? `：${body.error}` : ''}）。もう一度「署名して完了する」を押してください。続くときは院長に知らせてください。`,
+      )
+      return
+    }
+    // クラウドには保存できた。端末の一覧に入れる（入らなくても、署名入りの本文はクラウドに残っている）
+    try {
+      addContract(record)
+    } catch {
+      console.warn('[contracts] 端末の一覧に入れられませんでした', record.id)
+    }
+    try {
+      localStorage.setItem(STAFF_NAME_KEY, record.staffName)
+    } catch {
+      // 端末の担当者名を覚えられないだけ
+    }
+    setSaving(false)
+    onDone(record, html)
   }
+
+  const fieldTone = (id: string) => (isMissing(id) ? 'border-red-500 bg-red-50/40' : 'border-slate-300')
 
   return (
     <div className="space-y-4">
@@ -489,33 +588,49 @@ function SignFlow({
         <button
           type="button"
           onClick={printBlank}
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
+          className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
         >
           <Printer className="h-4 w-4" aria-hidden />
           白紙を印刷
         </button>
       </div>
 
-      <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      {parsed.blankCount > 0 && (
+        <p className="flex items-start gap-2 rounded-xl bg-teal-50 px-3 py-2 text-sm text-slate-700">
+          <span className="mt-0.5 inline-block h-4 w-6 shrink-0 rounded border border-teal-400 bg-white" aria-hidden />
+          <span>
+            {autoCount > 0
+              ? `緑の欄（${autoCount}か所）は、カルテ・今日の日付・下の会員の手続きから自動で入れました（カルテ・日付のものはタップして直せます）。□ のチェックと署名は、患者様ご自身でお願いします。`
+              : '□ のチェックと署名は、患者様ご自身でお願いします。'}
+          </span>
+        </p>
+      )}
+
+      <article id="cf-doc" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <ContractDocument
           parsed={parsed}
           checks={checks}
-          inputs={inputs}
-          onCheck={(i, v) => setChecks((prev) => prev.map((x, k) => (k === i ? v : x)))}
+          inputs={values}
+          auto={auto}
+          edited={edited}
+          labels={labels}
+          onCheck={onCheck}
           onInput={(i, v) => setInputs((prev) => prev.map((x, k) => (k === i ? v : x)))}
         />
       </article>
 
       {tpl.member && (
-        <MemberForm kind={tpl.member} member={member} setMember={setMember} status={status} today={today} check={memberCheck} selfId={patient.id} />
+        <div id="cf-member" className="scroll-mt-24">
+          <MemberForm kind={tpl.member} member={member} setMember={setMember} status={status} today={today} check={memberCheck} selfId={patient.id} />
+        </div>
       )}
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h3 className="text-base font-bold text-slate-900">署名欄（{jaDate(today)}）</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
+          <label id="cf-patient-name" className="block scroll-mt-24 text-sm">
             <span className="font-bold text-slate-700">患者様氏名</span>
-            <input value={patientName} onChange={(e) => setPatientName(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3" />
+            <input value={patientName} onChange={(e) => setPatientName(e.target.value)} className={`mt-1 min-h-11 w-full rounded-lg border px-3 ${fieldTone('cf-patient-name')}`} />
           </label>
           <label className="flex items-center gap-2 self-end text-sm max-lg:min-h-10">
             <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="h-6 w-6 accent-teal-700" />
@@ -523,42 +638,89 @@ function SignFlow({
             {age !== null && <span className="text-xs text-slate-500">（{age}歳）</span>}
           </label>
         </div>
-        <SignaturePad label="患者様の署名" onChange={setSigPatient} />
+        <SignaturePad id="cf-sig-patient" label="患者様の署名" onChange={setSigPatient} missing={isMissing('cf-sig-patient')} />
         {minor && (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm">
+              <label id="cf-guardian-name" className="block scroll-mt-24 text-sm">
                 <span className="font-bold text-slate-700">保護者氏名</span>
-                <input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3" />
+                <input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className={`mt-1 min-h-11 w-full rounded-lg border px-3 ${fieldTone('cf-guardian-name')}`} />
               </label>
               <label className="block text-sm">
                 <span className="font-bold text-slate-700">続柄</span>
                 <input value={relation} onChange={(e) => setRelation(e.target.value)} placeholder="母・父 など" className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3" />
               </label>
             </div>
-            <SignaturePad label="保護者の署名" onChange={setSigGuardian} />
+            {lastGuardian && !guardianName.trim() && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGuardianName(lastGuardian.name)
+                  if (!relation.trim()) setRelation(lastGuardian.relation)
+                }}
+                className="min-h-10 rounded-lg border border-teal-300 bg-white px-3 text-sm font-medium text-teal-800 hover:bg-teal-50"
+              >
+                前の書類と同じ保護者（{lastGuardian.name}
+                {lastGuardian.relation ? `・${lastGuardian.relation}` : ''}）を入れる
+              </button>
+            )}
+            <SignaturePad id="cf-sig-guardian" label="保護者の署名" onChange={setSigGuardian} missing={isMissing('cf-sig-guardian')} />
           </>
         )}
-        <label className="block text-sm sm:w-1/2">
-          <span className="font-bold text-slate-700">{tpl.staffLabel}（氏名）</span>
-          <input value={staffName} onChange={(e) => setStaffName(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3" />
-        </label>
-        <SignaturePad label={`${tpl.staffLabel}の署名`} onChange={setSigStaff} />
+        <div id="cf-staff-name" className="scroll-mt-24 space-y-2">
+          <label className="block text-sm sm:w-1/2">
+            <span className="font-bold text-slate-700">{tpl.staffLabel}（氏名）</span>
+            <input value={staffName} onChange={(e) => setStaffName(e.target.value)} className={`mt-1 min-h-11 w-full rounded-lg border px-3 ${fieldTone('cf-staff-name')}`} />
+          </label>
+          <div className="flex flex-wrap gap-2" role="group" aria-label={`${tpl.staffLabel}をえらぶ`}>
+            {CLINIC_STAFF.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setStaffName(n)}
+                aria-pressed={staffName.trim() === n}
+                className={`min-h-10 rounded-lg border px-3 text-sm font-medium ${
+                  staffName.trim() === n ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+        <SignaturePad id="cf-sig-staff" label={`${tpl.staffLabel}の署名`} onChange={setSigStaff} missing={isMissing('cf-sig-staff')} />
 
-        {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {!ready && (
+          <div className={`rounded-lg p-3 text-sm ${attempted ? 'bg-red-50 text-red-800' : 'bg-slate-50 text-slate-700'}`}>
+            <p className="font-bold">完了の前に、あと{missing.length}つ</p>
+            <ul className="mt-1 flex flex-wrap gap-2">
+              {missing.map((m) => (
+                <li key={`${m.id}-${m.text}`}>
+                  <button
+                    type="button"
+                    onClick={() => jumpTo(m.id)}
+                    className="min-h-10 rounded-lg border border-current bg-white px-3 text-left text-sm underline-offset-2 hover:underline"
+                  >
+                    {m.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-800">
+            {error}
+          </p>
+        )}
         <button
           type="button"
           onClick={sign}
-          disabled={saving || !ready}
-          className="min-h-14 w-full rounded-xl bg-teal-700 text-lg font-bold text-white hover:bg-teal-800 disabled:opacity-50"
+          disabled={saving}
+          className={`min-h-14 w-full rounded-xl text-lg font-bold text-white disabled:opacity-60 ${ready ? 'bg-teal-700 hover:bg-teal-800' : 'bg-slate-500'}`}
         >
           {saving ? '保存しています…' : '署名して完了する'}
         </button>
-        {!ready && !saving && (
-          <p className="text-center text-xs text-slate-500">
-            {memberCheck && !memberCheck.ok ? memberCheck.error : 'お名前と署名（患者様・担当者。未成年なら保護者も）がそろうと押せます'}
-          </p>
-        )}
       </section>
     </div>
   )

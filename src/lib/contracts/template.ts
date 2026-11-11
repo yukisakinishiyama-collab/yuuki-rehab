@@ -56,13 +56,17 @@ export function parseTemplate(body: string): ParsedTemplate {
     return parts
   }
 
+  // マスの前後の半角の空白だけを落とす。全角の空白は残す（「　　　年　　　月　　　日」の頭の空白が消えると、
+  // 日付の記入欄として読めなくなるため。2026-11-11 までは表の中の日付が記入欄になっていなかった）。
+  // 空白（全角を含む）だけのマスは、空のマス＝記入欄。
   const cells = (line: string): string[] =>
     line
       .trim()
       .replace(/^\|/, '')
       .replace(/\|$/, '')
       .split('|')
-      .map((x) => x.trim())
+      .map((x) => x.replace(/^[ \t]+|[ \t]+$/g, ''))
+      .map((x) => (x.trim() === '' ? '' : x))
 
   const blocks: Block[] = []
   const lines = body.replace(/\r/g, '').split('\n')
