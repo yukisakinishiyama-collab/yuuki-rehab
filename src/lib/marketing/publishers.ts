@@ -92,12 +92,12 @@ async function uploadSeoImage(postId: string): Promise<string> {
 }
 
 /** 宣伝の短い動画の作りおき（無ければ組み立てる）。外に渡せるURLで返す */
-async function promoVideoFor(content: GeneratedContent): Promise<{ url: string; posterUrl: string } | { error: string }> {
+async function promoVideoFor(content: GeneratedContent): Promise<{ url: string; posterUrl: string; aiImages: number } | { error: string }> {
   if (!content.promoVideoId) return { error: '出す動画が決まっていません' }
   try {
     const { absolutePromoUrl, ensurePromoVideo } = await import('./promo-video-server')
     const stored = await ensurePromoVideo(content.promoVideoId)
-    return { url: absolutePromoUrl(stored.url), posterUrl: absolutePromoUrl(stored.posterUrl) }
+    return { url: absolutePromoUrl(stored.url), posterUrl: absolutePromoUrl(stored.posterUrl), aiImages: stored.aiImages ?? 0 }
   } catch (error) {
     console.error('[publishers] 動画を作れませんでした', error)
     return { error: `動画を作れませんでした（${error instanceof Error ? error.message.slice(0, 200) : '不明'}）` }
@@ -136,7 +136,7 @@ async function publishYoutubeShort(content: GeneratedContent): Promise<PublishOu
     if (!res.ok) return { kind: 'error', message: `作りおきの動画を読めませんでした（HTTP ${res.status}）` }
     const bytes = new Uint8Array(await res.arrayBuffer())
     const tags = (content.body.match(/#[^\s#]+/g) ?? []).map((t) => t.slice(1)).filter((t) => t !== 'Shorts')
-    const uploaded = await uploadYoutubeVideo(token, { title: content.title, description: content.body, tags, bytes })
+    const uploaded = await uploadYoutubeVideo(token, { title: content.title, description: content.body, tags, bytes, synthetic: video.aiImages > 0 })
     if (uploaded.privacyStatus && uploaded.privacyStatus !== 'public') {
       return { kind: 'published', url: uploaded.url, message: `YouTubeに送りましたが、公開の状態が「${uploaded.privacyStatus}」です。YouTube Studio で確かめてください` }
     }

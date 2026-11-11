@@ -388,6 +388,7 @@ function SettingsPanel({
   initial,
   isAdmin,
   youtube,
+  aiImage,
   promoPlan,
   onSaved,
   onChanged,
@@ -395,6 +396,7 @@ function SettingsPanel({
   initial: AutopilotSettings
   isAdmin: boolean
   youtube?: YoutubeConnection
+  aiImage?: boolean
   promoPlan?: PromoPlanItem[]
   onSaved: (message: string) => void
   onChanged: () => void
@@ -558,7 +560,7 @@ function SettingsPanel({
         </details>
       </fieldset>
 
-      <PromoVideoFields s={s} setS={setS} disabled={disabled} isAdmin={isAdmin} youtube={youtube} plan={promoPlan} onChanged={onChanged} />
+      <PromoVideoFields s={s} setS={setS} disabled={disabled} isAdmin={isAdmin} youtube={youtube} aiImage={aiImage} plan={promoPlan} onChanged={onChanged} />
 
       <fieldset className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3">
         <legend className="px-1 text-sm font-bold text-slate-900">キャンセルが出たら、ストーリーですぐ知らせる</legend>
@@ -915,6 +917,7 @@ function AutopilotInner() {
             initial={settings}
             isAdmin={isAdmin}
             youtube={conn?.youtube}
+            aiImage={conn?.aiImage}
             promoPlan={promoPlan}
             onSaved={(m) => {
               setMessage(m)

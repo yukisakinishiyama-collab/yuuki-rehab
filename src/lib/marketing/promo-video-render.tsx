@@ -6,6 +6,8 @@
  *   下・右（説明・いいねのボタン）に部品が重なるので、読ませる文字は上の面だけに置く
  * - 文字の面は next/og（Satori）で透明の PNG にし、ゆっくり寄る写真の上に ffmpeg で重ねる（文字は動かさない）
  * - 場面は5つ（src/data/promo-videos.ts の promoScenes）。場面のあいだは 0.5 秒で切りかえる
+ * - 絵は、前半がAIで作ったイメージ（呼び出し側が中身を渡す。画面に「映像はイメージです」と出す）、
+ *   後半が人物の写っていない院の写真（assets/gbp-photos）。AIの絵が無い場面は、その場面の院の写真で代える
  * ffmpeg は ffmpeg-static（next.config の outputFileTracingIncludes で同梱する）。
  */
 import type { PromoScene, PromoVideo } from '@/data/promo-videos'
@@ -181,9 +183,19 @@ function SceneText({ scene }: { scene: PromoScene }) {
   }
 }
 
-/** 1場面の文字の面（透明の PNG）。photo を渡すと写真も入れた1枚の絵（見本・サムネイル用） */
-export async function renderPromoFrame(scene: PromoScene, index: number, total: number, withPhoto = false): Promise<Buffer> {
-  const photo = withPhoto ? await loadClinicPhoto(scene.photo) : null
+/** その場面に使うAIの絵（中身）。無ければ院の写真（scene.photo）を使う */
+export interface PromoSceneImage {
+  bytes: Buffer
+  type: 'image/png' | 'image/jpeg'
+}
+
+/**
+ * 1場面の文字の面（透明の PNG）。withPhoto なら絵も入れた1枚（見本・サムネイル用）。
+ * aiImage があればAIの絵として扱い、「映像はイメージです」を出す
+ */
+export async function renderPromoFrame(scene: PromoScene, index: number, total: number, withPhoto = false, aiImage?: PromoSceneImage | null): Promise<Buffer> {
+  const photo = !withPhoto ? null : aiImage ? `data:${aiImage.type};base64,${aiImage.bytes.toString('base64')}` : await loadClinicPhoto(scene.photo)
+  const position = aiImage ? '50% 50%' : (scene.position ?? '50% 50%')
   return render(
     <div style={{ width: PROMO_W, height: PROMO_H, display: 'flex', position: 'relative', fontFamily: FONT, color: '#ffffff' }}>
       {photo && (
@@ -193,7 +205,7 @@ export async function renderPromoFrame(scene: PromoScene, index: number, total: 
           width={PROMO_W}
           height={PHOTO_H}
           alt=""
-          style={{ position: 'absolute', left: 0, top: PHOTO_TOP, width: PROMO_W, height: PHOTO_H, objectFit: 'cover', objectPosition: scene.position ?? '50% 50%' }}
+          style={{ position: 'absolute', left: 0, top: PHOTO_TOP, width: PROMO_W, height: PHOTO_H, objectFit: 'cover', objectPosition: position }}
         />
       )}
       <div style={{ position: 'absolute', left: 0, top: 0, width: PROMO_W, height: PHOTO_TOP, display: 'flex', background: NAVY }} />
@@ -224,6 +236,23 @@ export async function renderPromoFrame(scene: PromoScene, index: number, total: 
       <div style={{ position: 'absolute', left: 64, top: TEXT_TOP, width: PROMO_W - 128, height: PHOTO_TOP - TEXT_TOP - 44, display: 'flex', flexDirection: 'column' }}>
         <SceneText scene={scene} />
       </div>
+      {aiImage && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 64,
+            top: PHOTO_TOP + 150,
+            display: 'flex',
+            padding: '6px 18px',
+            borderRadius: 999,
+            background: 'rgba(22,35,61,0.62)',
+            fontSize: 26,
+            color: '#e2e8f0',
+          }}
+        >
+          映像はイメージです
+        </div>
+      )}
       {/* いま何場面めか */}
       <div style={{ position: 'absolute', left: 64, top: PHOTO_TOP - 30, display: 'flex' }}>
         {Array.from({ length: total }, (_, i) => (
@@ -236,11 +265,11 @@ export async function renderPromoFrame(scene: PromoScene, index: number, total: 
   )
 }
 
-/** 見本・サムネイル（1場面めを写真つきで1枚に） */
-export async function renderPromoPoster(video: PromoVideo, sceneIndex = 0): Promise<Buffer> {
+/** 見本・サムネイル（その場面を絵つきで1枚に）。aiImage はその場面のAIの絵（あれば） */
+export async function renderPromoPoster(video: PromoVideo, sceneIndex = 0, aiImage?: PromoSceneImage | null): Promise<Buffer> {
   const scenes = promoScenes(video)
   const i = Math.min(Math.max(sceneIndex, 0), scenes.length - 1)
-  return renderPromoFrame(scenes[i], i, scenes.length, true)
+  return renderPromoFrame(scenes[i], i, scenes.length, true, aiImage)
 }
 
 // ── 動画 ─────────────────────────────────────
@@ -253,7 +282,7 @@ function positionOf(position?: string): { x: number; y: number } {
 }
 
 /** ffmpeg の組み立ての指示（テストでも見られるように分けておく） */
-export function promoFilterGraph(scenes: Array<Pick<PromoScene, 'position'>>): { graph: string; out: string } {
+export function promoFilterGraph(scenes: Array<{ position?: string }>): { graph: string; out: string } {
   const frames = Math.round(SCENE_SECONDS * FPS)
   // 写真は出来上がりの2倍の大きさにしてから寄る（寄るときの細かい揺れを目立たなくする）
   const bw = PROMO_W * 2
@@ -288,8 +317,11 @@ export interface RenderedPromoVideo {
   seconds: number
 }
 
-/** 1本組み立てる（サーバーで20〜60秒ほど） */
-export async function renderPromoVideo(video: PromoVideo): Promise<RenderedPromoVideo> {
+/**
+ * 1本組み立てる（サーバーで20〜60秒ほど）。
+ * images[i] があれば、その場面はAIの絵（中身）を使う。無ければ院の写真
+ */
+export async function renderPromoVideo(video: PromoVideo, images: Array<PromoSceneImage | null | undefined> = []): Promise<RenderedPromoVideo> {
   const scenes = promoScenes(video)
   const [{ default: ffmpegPath }, { spawn }, fs, path, os] = await Promise.all([
     import('ffmpeg-static'),
@@ -304,13 +336,21 @@ export async function renderPromoVideo(video: PromoVideo): Promise<RenderedPromo
     const inputs: string[] = []
     for (const [i, scene] of scenes.entries()) {
       if (!/^[a-z0-9-]+$/.test(scene.photo)) throw new Error('写真の名前が正しくありません')
+      const ai = images[i] ?? null
       const overlay = path.join(dir, `ov${i}.png`)
-      await fs.writeFile(overlay, await renderPromoFrame(scene, i, scenes.length))
-      inputs.push('-i', path.join(process.cwd(), 'assets/gbp-photos', `${scene.photo}.jpg`))
+      await fs.writeFile(overlay, await renderPromoFrame(scene, i, scenes.length, false, ai))
+      if (ai) {
+        const file = path.join(dir, `ai${i}.${ai.type === 'image/jpeg' ? 'jpg' : 'png'}`)
+        await fs.writeFile(file, ai.bytes)
+        inputs.push('-i', file)
+      } else {
+        inputs.push('-i', path.join(process.cwd(), 'assets/gbp-photos', `${scene.photo}.jpg`))
+      }
       inputs.push('-loop', '1', '-t', String(SCENE_SECONDS), '-i', overlay)
     }
     const seconds = promoVideoSeconds(scenes.length)
-    const { graph, out } = promoFilterGraph(scenes)
+    // AIの絵は真ん中で切り抜く（院の写真は場面ごとの位置で）
+    const { graph, out } = promoFilterGraph(scenes.map((scene, i) => ({ position: images[i] ? undefined : scene.position })))
     const outFile = path.join(dir, 'out.mp4')
     const args = [
       '-hide_banner', '-loglevel', 'error', '-y',
@@ -332,7 +372,7 @@ export async function renderPromoVideo(video: PromoVideo): Promise<RenderedPromo
       p.on('error', reject)
       p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`動画の組み立てに失敗しました（${err.slice(-400) || code}）`))))
     })
-    return { mp4: await fs.readFile(outFile), poster: await renderPromoFrame(scenes[0], 0, scenes.length, true), seconds }
+    return { mp4: await fs.readFile(outFile), poster: await renderPromoFrame(scenes[0], 0, scenes.length, true, images[0] ?? null), seconds }
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
   }

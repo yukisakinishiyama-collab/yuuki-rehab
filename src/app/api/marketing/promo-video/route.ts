@@ -3,11 +3,14 @@
  *
  * GET ?id=<動画>&kind=poster[&scene=0〜4] … 場面の絵（PNG。すぐ出る）
  * GET ?id=<動画>&kind=video               … 動画（mp4）。作りおきが無ければ組み立てる（はじめは20〜60秒かかる）
- * GET ?id=<動画>&kind=info                … 作りおきの有無（{ ready, url, posterUrl, seconds }。作らない）
+ * GET ?id=<動画>&kind=info                … 作りおきの有無（{ ready, url, posterUrl, seconds, aiImages }。作らない）
+ * POST { id, action: 'regenerate' }       … AIの絵を作り直して、動画も作り直す（院長のみ。1〜2分かかる）
+ * 場面の絵は、AIの絵がもう作ってあればそれを、まだなら院の写真（代わりの絵）で出す（見るだけではAIの絵は作らない）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getPromoVideo } from '@/data/promo-videos'
-import { ensurePromoVideo, getStoredPromoVideo, isPublicUrl, readLocalPromoFile } from '@/lib/marketing/promo-video-server'
+import { requireAdmin } from '@/lib/marketing/auth'
+import { ensurePromoVideo, getStoredPromoVideo, isPublicUrl, promoAiConfigured, promoSceneAiImage, readLocalPromoFile, resetPromoAi } from '@/lib/marketing/promo-video-server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -22,7 +25,15 @@ export async function GET(request: NextRequest) {
   try {
     if (kind === 'info') {
       const stored = await getStoredPromoVideo(id)
-      return NextResponse.json({ ok: true, ready: Boolean(stored), url: stored?.url ?? null, posterUrl: stored?.posterUrl ?? null, seconds: stored?.seconds ?? null })
+      return NextResponse.json({
+        ok: true,
+        ready: Boolean(stored),
+        url: stored?.url ?? null,
+        posterUrl: stored?.posterUrl ?? null,
+        seconds: stored?.seconds ?? null,
+        aiImages: stored?.aiImages ?? 0,
+        aiConfigured: promoAiConfigured(),
+      })
     }
     if (kind === 'poster') {
       const scene = Number(params.get('scene') ?? '0')
@@ -32,7 +43,8 @@ export async function GET(request: NextRequest) {
         if (local && (await getStoredPromoVideo(id))) return new NextResponse(new Uint8Array(local), { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=300' } })
       }
       const { renderPromoPoster } = await import('@/lib/marketing/promo-video-render')
-      const png = await renderPromoPoster(video, Number.isFinite(scene) ? scene : 0)
+      const index = Number.isFinite(scene) ? scene : 0
+      const png = await renderPromoPoster(video, index, await promoSceneAiImage(id, index))
       return new NextResponse(new Uint8Array(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=300' } })
     }
     const stored = await ensurePromoVideo(id)
@@ -50,5 +62,22 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[promo-video] 作れませんでした', error)
     return NextResponse.json({ error: `動画を作れませんでした（${error instanceof Error ? error.message.slice(0, 200) : '不明'}）` }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request)
+  if (denied) return denied
+  const body = (await request.json().catch(() => ({}))) as { id?: string; action?: string }
+  const id = String(body.id ?? '')
+  if (body.action !== 'regenerate' || !getPromoVideo(id)) return NextResponse.json({ error: '動画が見つかりません' }, { status: 400 })
+  if (!promoAiConfigured()) return NextResponse.json({ error: 'AI画像の設定（OPENAI_API_KEY）が無いため、作り直せません' }, { status: 409 })
+  try {
+    await resetPromoAi(id)
+    const stored = await ensurePromoVideo(id)
+    return NextResponse.json({ ok: true, aiImages: stored.aiImages ?? 0, aiPending: Boolean(stored.aiPending) })
+  } catch (error) {
+    console.error('[promo-video] 作り直せませんでした', error)
+    return NextResponse.json({ error: `作り直せませんでした（${error instanceof Error ? error.message.slice(0, 200) : '不明'}）` }, { status: 500 })
   }
 }

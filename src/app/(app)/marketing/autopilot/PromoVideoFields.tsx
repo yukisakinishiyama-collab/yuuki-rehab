@@ -4,10 +4,11 @@
  *
  * - オン・オフ（媒体ごと）と本数
  * - YouTube の連携（つなぐ・外す）と「審査に通った」の切りかえ
- * - 次に出す予定、動画の一覧（見本の絵・動画を開く）
+ * - 次に出す予定、動画の一覧（見本の絵・動画を開く・AIの絵を作り直す）
+ * 絵は、前半がAIで作ったイメージ、後半が人物の写っていない院の写真（src/data/promo-videos.ts）
  */
 import { useState } from 'react'
-import { PROMO_VIDEOS } from '@/data/promo-videos'
+import { PROMO_VIDEOS, promoUsesAi } from '@/data/promo-videos'
 import { promoVideoUrl } from '@/lib/marketing/promo-video'
 import type { AutopilotSettings } from '@/lib/marketing/autopilot-types'
 
@@ -37,6 +38,7 @@ export default function PromoVideoFields({
   disabled,
   isAdmin,
   youtube,
+  aiImage,
   plan,
   onChanged,
 }: {
@@ -45,12 +47,33 @@ export default function PromoVideoFields({
   disabled: boolean
   isAdmin: boolean
   youtube?: YoutubeConnection
+  /** AI画像（OpenAI）が使える設定か */
+  aiImage?: boolean
   plan?: PromoPlanItem[]
   /** 連携を外したあとなど、読み直してほしいとき */
   onChanged: () => void
 }) {
   const [busy, setBusy] = useState(false)
+  /** AIの絵を作り直している動画と、その結果 */
+  const [remaking, setRemaking] = useState<string | null>(null)
+  const [remakeMsg, setRemakeMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null)
   const anyOn = s.youtubeShorts || s.tiktokVideo
+
+  async function remake(id: string) {
+    setRemaking(id)
+    setRemakeMsg(null)
+    try {
+      const res = await fetch('/api/marketing/promo-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'regenerate' }) })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; aiPending?: boolean }
+      if (!res.ok) setRemakeMsg({ id, ok: false, text: data.error ?? `作り直せませんでした（${res.status}）` })
+      else if (data.aiPending) setRemakeMsg({ id, ok: false, text: 'AIの絵を作れなかったため、院の写真で作りました。少し時間をおいて、もう一度お試しください。' })
+      else setRemakeMsg({ id, ok: true, text: '新しい絵で作り直しました。「動画」を開いて確かめてください。' })
+    } catch (e) {
+      setRemakeMsg({ id, ok: false, text: `作り直せませんでした（${e instanceof Error ? e.message : '通信'}）` })
+    } finally {
+      setRemaking(null)
+    }
+  }
 
   async function disconnect() {
     setBusy(true)
@@ -86,7 +109,7 @@ export default function PromoVideoFields({
         </select>
       </label>
       <p className="text-xs text-slate-600">
-        Google検索向けの投稿と同じ18のテーマ（「下関市彦島＋症状」に絞ったもの）を、院の写真と文字の短い動画にして、順にくり返します。文面は院長が確認した文から抜いた決まった文です。時間になると、動画と貼りつける文（題名・説明）が院長のLINEに届きます。動画を保存して、それぞれのアプリから投稿してください（1〜2分。音楽はアプリの中で足せます）。年末年始（12/29〜1/3）は出しません。
+        Google検索向けの投稿と同じ18のテーマ（「下関市彦島＋症状」に絞ったもの）を、短い動画にして、順にくり返します。絵は、前半（つかみ・こんなときに）がAIで作ったイメージ、後半（当院では・院の強み・ご予約）が院の写真です。院の写真は、足首とエコー・エコーの機械・運動の器具・外観だけを使い、人物が特定できる写真は使いません。文面は院長が確認した文から抜いた決まった文です。時間になると、動画と貼りつける文（題名・説明）が院長のLINEに届きます。動画を保存して、それぞれのアプリから投稿してください（1〜2分。音楽はアプリの中で足せます）。年末年始（12/29〜1/3）は出しません。
       </p>
 
       <div className="space-y-2 rounded-lg bg-white p-3 text-sm">
@@ -148,9 +171,15 @@ export default function PromoVideoFields({
         </div>
       )}
 
+      {aiImage === false && (
+        <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">AI画像の設定（OPENAI_API_KEY）が無いため、いまは院の写真だけで作ります。</p>
+      )}
+
       <details className="rounded-lg bg-white p-2">
         <summary className="flex min-h-10 cursor-pointer items-center text-sm font-bold text-slate-700">動画の一覧（{PROMO_VIDEOS.length}本）</summary>
-        <p className="mt-1 text-xs text-slate-600">「動画」は、はじめて開くときだけ作るのに1分ほどかかります（2回めからはすぐ出ます）。</p>
+        <p className="mt-1 text-xs text-slate-600">
+          「動画」は、はじめて開くときだけ作るのに1〜2分かかります（AIの絵もこのとき作ります。2回めからはすぐ出ます）。AIの絵は一度作ると使い回します。手や足が不自然・内容に合わないときは「絵を作り直す」を押してください（1枚ごとにAIの利用料がかかります）。
+        </p>
         <ol className="mt-2 space-y-1 text-sm">
           {PROMO_VIDEOS.map((v, i) => (
             <li key={v.id} className="flex flex-wrap items-baseline gap-x-2">
@@ -162,6 +191,17 @@ export default function PromoVideoFields({
               <a href={promoVideoUrl(v.id, 'video', '')} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center text-xs font-bold text-teal-700 underline">
                 動画
               </a>
+              {isAdmin && aiImage && promoUsesAi(v) && (
+                <button
+                  type="button"
+                  onClick={() => remake(v.id)}
+                  disabled={remaking !== null}
+                  className="min-h-10 rounded border border-slate-300 px-2 text-xs text-slate-700 disabled:opacity-50"
+                >
+                  {remaking === v.id ? '作り直しています…（1〜2分）' : '絵を作り直す'}
+                </button>
+              )}
+              {remakeMsg?.id === v.id && <span className={`w-full text-xs ${remakeMsg.ok ? 'text-emerald-700' : 'text-red-700'}`}>{remakeMsg.text}</span>}
             </li>
           ))}
         </ol>

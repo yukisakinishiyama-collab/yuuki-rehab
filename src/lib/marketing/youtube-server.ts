@@ -133,10 +133,12 @@ export interface YoutubeUpload {
   tags: string[]
   /** mp4 の中身 */
   bytes: Uint8Array
+  /** AIで作った絵を含む（YouTube に「改変・合成されたコンテンツ」として申告する） */
+  synthetic?: boolean
 }
 
-/** YouTube に送る動画の情報（公開・子ども向けではない・AIで作った映像ではない＝院の本物の写真） */
-export function youtubeVideoResource(input: Pick<YoutubeUpload, 'title' | 'description' | 'tags'>) {
+/** YouTube に送る動画の情報（公開・子ども向けではない。AIで作った絵を含むなら、その申告） */
+export function youtubeVideoResource(input: Pick<YoutubeUpload, 'title' | 'description' | 'tags' | 'synthetic'>) {
   return {
     snippet: {
       title: input.title.replace(/[<>]/g, '').slice(0, 100),
@@ -147,7 +149,7 @@ export function youtubeVideoResource(input: Pick<YoutubeUpload, 'title' | 'descr
       defaultLanguage: 'ja',
       defaultAudioLanguage: 'ja',
     },
-    status: { privacyStatus: 'public', selfDeclaredMadeForKids: false, containsSyntheticMedia: false, embeddable: true },
+    status: { privacyStatus: 'public', selfDeclaredMadeForKids: false, containsSyntheticMedia: Boolean(input.synthetic), embeddable: true },
   }
 }
 

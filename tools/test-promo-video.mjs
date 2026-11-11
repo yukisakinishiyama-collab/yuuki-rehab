@@ -19,7 +19,7 @@ const { findViolations } = await import(new URL('src/lib/marketing/compliance.ts
 const { KV_PREFIXES } = await import(new URL('src/lib/marketing/kv-store-server.ts', root).href)
 const { CHANNEL_LABELS, VIDEO_CHANNELS } = await import(new URL('src/lib/marketing/types.ts', root).href)
 const { DEFAULT_AUTOPILOT_SETTINGS } = await import(new URL('src/lib/marketing/autopilot-types.ts', root).href)
-const { PROMO_VIDEOS, PROMO_VIDEO_TEXTS, PROMO_LIMITS, promoTextWidth, promoScenes, youtubeTitle, youtubeDescription, tiktokCaption, promoTags } = data
+const { PROMO_VIDEOS, PROMO_VIDEO_TEXTS, PROMO_LIMITS, PROMO_SAFE_PHOTOS, PROMO_AI_RULES, PROMO_AI_NOTE, promoAiPrompt, promoUsesAi, promoTextWidth, promoScenes, youtubeTitle, youtubeDescription, tiktokCaption, promoTags } = data
 
 let passed = 0
 async function test(name, fn) {
@@ -60,15 +60,61 @@ await test('表現チェック：動画の文字・題名・説明に NG も 注
   }
 })
 
-await test('場面は5つ（つかみ→こんなときに→当院では→強み→ご予約）。写真のファイルがあり、3〜5場面めは前と同じ写真にしない', () => {
+await test('場面は5つ（つかみ→こんなときに→当院では→強み→ご予約）。前半はAIの絵、後半は院の写真', () => {
+  let aiScenes = 0
   for (const v of PROMO_VIDEOS) {
     const scenes = promoScenes(v)
     assert.deepEqual(scenes.map((s) => s.kind), ['hook', 'worry', 'points', 'strengths', 'cta'])
-    for (const s of scenes) assert.ok(fs.existsSync(new URL(`assets/gbp-photos/${s.photo}.jpg`, root)), `${v.id} の写真 ${s.photo}`)
-    for (let i = 2; i < scenes.length; i++) assert.notEqual(scenes[i].photo, scenes[i - 1].photo, `${v.id} 場面${i + 1}`)
+    // 後半（当院では・強み・ご予約）は院の写真だけ。3つとも別の写真（ご予約は外観）
+    for (const s of scenes.slice(2)) assert.equal(s.ai, undefined, `${v.id} の後半にAIの絵`)
+    assert.equal(scenes[4].photo, 'exterior')
+    assert.notEqual(scenes[2].photo, scenes[3].photo, `${v.id} 場面3・4`)
+    assert.notEqual(scenes[3].photo, scenes[4].photo, `${v.id} 場面4・5`)
+    // 前半は、場面の説明があるものだけAIの絵（slot は 1場面め＝a、2場面め＝b）
+    assert.equal(Boolean(scenes[0].ai), Boolean(v.ai[0]), v.id)
+    assert.equal(Boolean(scenes[1].ai), Boolean(v.ai[1]), v.id)
+    if (scenes[0].ai) assert.equal(scenes[0].ai.slot, 'a')
+    if (scenes[1].ai) assert.equal(scenes[1].ai.slot, 'b')
+    aiScenes += scenes.filter((s) => s.ai).length
     assert.deepEqual(scenes[0].titleLines, v.headline)
     assert.equal(scenes[2].lines.length, 3)
     assert.equal(scenes[3].chips.length, 4)
+  }
+  // 基本はAI：どの動画にもAIの絵が1枚以上、ほとんどは2枚
+  assert.ok(PROMO_VIDEOS.every(promoUsesAi))
+  assert.ok(aiScenes >= PROMO_VIDEOS.length * 2 - 2, `AIの絵 ${aiScenes}枚`)
+})
+
+await test('院の写真：人物が特定されない写真だけ（足首とエコー・エコーの機械・運動の器具・外観）。代わりの絵も同じ', () => {
+  assert.deepEqual([...PROMO_SAFE_PHOTOS].sort(), ['echo-hero', 'echo-machine', 'exercise-tools', 'exterior'])
+  // スタッフ・患者さん・選手・観客が写っている写真は入れない
+  for (const banned of ['room-staff', 'act-seminar', 'act-trainer', 'stadium', 'echo-scene', 'treat-foot', 'act-taping']) assert.ok(!PROMO_SAFE_PHOTOS.includes(banned), banned)
+  for (const v of PROMO_VIDEOS) {
+    for (const s of promoScenes(v)) {
+      assert.ok(PROMO_SAFE_PHOTOS.includes(s.photo), `${v.id} の写真 ${s.photo}`)
+      assert.ok(fs.existsSync(new URL(`assets/gbp-photos/${s.photo}.jpg`, root)), `${v.id} の写真 ${s.photo}`)
+    }
+  }
+})
+
+await test('AIの絵の指示：顔・文字・院や施術・ケガの絵を描かせない決まりを足す。場面の説明にも入れない', () => {
+  assert.match(PROMO_AI_RULES, /No face may be visible/)
+  assert.match(PROMO_AI_RULES, /no text/i)
+  assert.match(PROMO_AI_RULES, /Do not show: a clinic, a therapist, treatment/)
+  for (const v of PROMO_VIDEOS) {
+    for (const scene of promoScenes(v).filter((s) => s.ai)) {
+      const text = scene.ai.scene
+      assert.ok(text.length >= 60 && text.length <= 400, `${v.id}・${scene.ai.slot} の長さ ${text.length}`)
+      // 院・スタッフ・施術・医療の機械・ケガの見た目・顔・実在の名前を、場面の説明に書かない
+      assert.ok(!/clinic|therapist|doctor|nurse|massage|treatment|ultrasound|echo|taping|bandage|cast|crutch|blood|bruise|swell|x-ray|mri|logo|brand|yuuki|shimonoseki|hikoshima/i.test(text), `${v.id}・${scene.ai.slot} に描かせないものがある`)
+      assert.ok(!/\bface (is|clearly) visible|smiling|looking at the camera|portrait/i.test(text), `${v.id}・${scene.ai.slot} に顔`)
+      // 人が出る場面は、顔が写らない撮り方を書いてある
+      if (/person|player|child|student|runner|parent|pitcher|sprinter|athlete/i.test(text)) {
+        assert.ok(/from behind|from the (waist|knees|chest|shoulders|neck) down|seen from the back|away from the camera/i.test(text), `${v.id}・${scene.ai.slot} の撮り方`)
+      }
+      const prompt = promoAiPrompt(scene.ai)
+      assert.ok(prompt.startsWith(text) && prompt.endsWith(PROMO_AI_RULES))
+    }
   }
 })
 
@@ -90,6 +136,9 @@ await test('題名・説明：YouTube は100文字までの題名・予約の計
     assert.ok(!/[？！]、|[？！]。|。。/.test(t.body), `${v.id} TikTokの説明の句読点`)
     assert.match(t.cta.url, /source=tiktok/)
     assert.equal(new Set(promoTags(v)).size, promoTags(v).length)
+    // AIの絵を使う動画は、説明に断り書きを入れる
+    assert.equal(c.body.includes(PROMO_AI_NOTE), promoUsesAi(v), v.id)
+    assert.equal(t.body.includes(PROMO_AI_NOTE), promoUsesAi(v), v.id)
   }
 })
 
@@ -140,6 +189,8 @@ await test('YouTube へ送る情報：公開・子ども向けではない・題
   assert.equal(res.snippet.description, '説明b')
   assert.equal(res.snippet.tags.length, 15)
   assert.deepEqual(res.status, { privacyStatus: 'public', selfDeclaredMadeForKids: false, containsSyntheticMedia: false, embeddable: true })
+  // AIで作った絵を含む動画は、YouTube に申告する
+  assert.equal(yt.youtubeVideoResource({ title: 't', description: 'd', tags: [], synthetic: true }).status.containsSyntheticMedia, true)
 
   const calls = []
   const realFetch = globalThis.fetch
@@ -192,25 +243,54 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     process.env.GBP_CLIENT_SECRET = 'secret'
     delete process.env.MARKETING_MODE
     delete process.env.BLOB_READ_WRITE_TOKEN
-    const { kvSet } = await import(new URL('src/lib/marketing/kv-store-server.ts', root).href)
+    const { kvSet, kvDelete } = await import(new URL('src/lib/marketing/kv-store-server.ts', root).href)
     const server = await import(new URL('src/lib/marketing/promo-video-server.ts', root).href)
     const { publishToChannel } = await import(new URL('src/lib/marketing/publishers.ts', root).href)
     const v = PROMO_VIDEOS[0]
     // 作りおきの動画がある状態（Blob に置いたもの）
-    const stored = { id: v.id, hash: await server.promoVideoHash(v.id), url: 'https://blob.example/promo/a.mp4', posterUrl: 'https://blob.example/promo/a.jpg', seconds: 16, bytes: 4, createdAt: '2026-11-11T00:00:00Z' }
+    // AIの絵が2枚作ってある状態（場面の説明の指紋が合っているものだけ使う）
+    const { fingerprint } = await import(new URL('src/lib/sync-merge.ts', root).href)
+    const scenes = promoScenes(v)
+    const before = await server.promoVideoHash(v.id)
+    for (const sc of scenes.filter((x) => x.ai)) {
+      await kvSet(`promo:ai:${v.id}:${sc.ai.slot}`, { url: `https://store.public.blob.vercel-storage.com/marketing/ai-photos/promo-${v.id}-${sc.ai.slot}-x.png`, promptHash: fingerprint(promoAiPrompt(sc.ai)), model: 'gpt-image-2', createdAt: '2026-11-11T00:00:00Z' })
+    }
+    const withAi = await server.promoVideoHash(v.id)
+    assert.notEqual(withAi, before, 'AIの絵ができたら、動画の指紋が変わる（作り直す）')
+    // 場面の説明を変えたあとの古い絵は使わない
+    await kvSet(`promo:ai:${PROMO_VIDEOS[2].id}:a`, { url: 'https://store.public.blob.vercel-storage.com/marketing/ai-photos/old.png', promptHash: 'old', model: 'm', createdAt: '2026-11-11T00:00:00Z' })
+    const plain = await server.promoVideoHash(PROMO_VIDEOS[2].id)
+    await kvDelete(`promo:ai:${PROMO_VIDEOS[2].id}:a`)
+    assert.equal(await server.promoVideoHash(PROMO_VIDEOS[2].id), plain)
+
+    const stored = { id: v.id, hash: withAi, url: 'https://blob.example/promo/a.mp4', posterUrl: 'https://blob.example/promo/a.jpg', seconds: 16, bytes: 4, createdAt: '2026-11-11T00:00:00Z', aiImages: 2 }
     await kvSet(`promo:video:${v.id}`, stored)
     assert.deepEqual(await server.getStoredPromoVideo(v.id), stored)
+    // AIの絵が作れず院の写真で代えた動画は、AIが使える設定なら6時間たったら作り直す（使えない設定ならそのまま使う）
+    const third = PROMO_VIDEOS[3]
+    const pendingVideo = { ...stored, id: third.id, hash: await server.promoVideoHash(third.id), aiImages: 0, aiPending: true, createdAt: new Date(Date.now() - 7 * 3600 * 1000).toISOString() }
+    await kvSet(`promo:video:${third.id}`, pendingVideo)
+    assert.deepEqual(await server.getStoredPromoVideo(third.id), pendingVideo)
+    process.env.OPENAI_API_KEY = 'sk-test'
+    assert.equal(await server.getStoredPromoVideo(third.id), null)
+    await kvSet(`promo:video:${third.id}`, { ...pendingVideo, createdAt: new Date().toISOString() })
+    assert.ok(await server.getStoredPromoVideo(third.id))
+    delete process.env.OPENAI_API_KEY
     // 文面が変わる（指紋がちがう）と、作りおきは使わない
     await kvSet(`promo:video:${PROMO_VIDEOS[1].id}`, { ...stored, id: PROMO_VIDEOS[1].id, hash: 'old' })
     assert.equal(await server.getStoredPromoVideo(PROMO_VIDEOS[1].id), null)
 
     const calls = []
+    const uploadBodies = []
     globalThis.fetch = async (url, init) => {
       const u = String(url)
       calls.push(u)
       if (u.startsWith('https://oauth2.googleapis.com/token')) return new Response(JSON.stringify({ access_token: 'at' }), { status: 200 })
       if (u.startsWith('https://blob.example/')) return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200 })
-      if (u.includes('/upload/youtube/v3/videos')) return new Response('', { status: 200, headers: { location: 'https://upload.example/s' } })
+      if (u.includes('/upload/youtube/v3/videos')) {
+        uploadBodies.push(JSON.parse(init.body))
+        return new Response('', { status: 200, headers: { location: 'https://upload.example/s' } })
+      }
       if (u === 'https://upload.example/s') return new Response(JSON.stringify({ id: 'vid1', status: { privacyStatus: 'public' } }), { status: 201 })
       if (u.startsWith('https://api.line.me/')) return new Response('{}', { status: 200 })
       throw new Error(`思っていない送り先: ${u} ${init?.method ?? ''}`)
@@ -237,6 +317,10 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     out = await publishToChannel('youtube_short', yt)
     assert.deepEqual(out, { kind: 'published', url: 'https://www.youtube.com/shorts/vid1', message: 'YouTubeにショート動画を公開しました' })
     assert.deepEqual(calls.map((u) => new URL(u).host), ['oauth2.googleapis.com', 'blob.example', 'www.googleapis.com', 'upload.example'])
+    // AIの絵を使った動画なので、YouTube に「合成されたコンテンツ」として申告している
+    assert.equal(uploadBodies.length, 1)
+    assert.equal(uploadBodies[0].status.containsSyntheticMedia, true)
+    assert.equal(uploadBodies[0].status.privacyStatus, 'public')
 
     // 4) TikTok は手動（どこにも送らない）
     calls.length = 0
@@ -265,6 +349,7 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     assert.equal(pushed[0].to, 'Uowner')
     assert.deepEqual(msgs.map((m) => m.type), ['text', 'video', 'text', 'text', 'flex'])
     assert.match(msgs[0].text, /動画の投稿の時間です（11\/18\(水\) 13:30）/)
+    assert.match(msgs[0].text, /前半の絵はAIで作ったイメージです/)
     assert.deepEqual(msgs[1], { type: 'video', originalContentUrl: stored.url, previewImageUrl: stored.posterUrl })
     assert.match(msgs[2].text, /【YouTube 題名】\n足首の捻挫のリハビリ｜下関市彦島 ゆうき整骨院/)
     assert.match(msgs[3].text, /【TikTok 説明】/)

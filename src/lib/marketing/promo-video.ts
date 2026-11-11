@@ -16,7 +16,7 @@ import { APP_URL, isYearEndBreak } from './gbp-seo'
 import type { GeneratedContent } from './types'
 
 /** 動画の描き方（promo-video-render.tsx）を変えたら上げる。作りおきの動画を作り直す目印になる */
-export const PROMO_RENDER_VERSION = 1
+export const PROMO_RENDER_VERSION = 2
 
 export type PromoChannel = 'youtube_short' | 'tiktok'
 export const PROMO_CHANNELS: PromoChannel[] = ['youtube_short', 'tiktok']

@@ -66,6 +66,7 @@ import {
 import { postImageUrl, usesAiImage } from './post-image'
 import { seoImageUrl } from './gbp-seo'
 import { promoGroupKey } from './promo-video'
+import { PROMO_AI_NOTE } from '../../data/promo-videos'
 import { aiPostImageConfigured, createPostPhotoWithin, sceneFromVariants, withPostImage } from './post-image-server'
 
 export const AUTOPILOT_URL = `${SITE_URL}/marketing/autopilot`
@@ -947,6 +948,9 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       '① 下の動画を開いて保存（長押し、または右上の保存ボタン）',
       youtube ? '② YouTube：アプリの「＋」→「動画をアップロード」→ 保存した動画を選ぶ（縦の短い動画は自動でショートになります）。題名と説明は、下の吹き出しを長押し→コピー' : null,
       tiktok ? `${youtube ? '③' : '②'} TikTok：アプリの「＋」→「アップロード」→ 保存した動画を選ぶ。説明は下の吹き出しをコピー。音楽はアプリの中で足せます` : null,
+      first.content.body.includes(PROMO_AI_NOTE)
+        ? '※前半の絵はAIで作ったイメージです。投稿の画面に「AIで作成したコンテンツ」「改変されたコンテンツ」の設定があれば、オンにしてください。'
+        : null,
       '',
       '投稿したら、いちばん下のボタンを押してください。',
     ]
