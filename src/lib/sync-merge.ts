@@ -31,7 +31,7 @@ export function fingerprint(text: string): string {
     const c = text.charCodeAt(i)
     h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0
     h2 = Math.imul(h2 ^ c, 0x5bd1e995) >>> 0
-    h2 ^= h2 >>> 13
+    h2 = (h2 ^ (h2 >>> 13)) >>> 0
   }
   return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')
 }

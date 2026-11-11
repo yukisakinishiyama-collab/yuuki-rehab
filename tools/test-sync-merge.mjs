@@ -12,7 +12,7 @@ register(
       "export async function resolve(s, c, next) { try { return await next(s, c) } catch (e) { if (s.startsWith('.') && !/\\.[a-z]+$/.test(s.split('?')[0])) return next(s + '.ts', c); throw e } }",
     ),
 )
-import { applyOp, applyOps, baseMapOf, baseOf, diffAll, diffKey, sanitizeOps } from '../src/lib/sync-merge.ts'
+import { applyOp, applyOps, baseMapOf, baseOf, diffAll, diffKey, fingerprint, sanitizeOps } from '../src/lib/sync-merge.ts'
 
 let passed = 0
 async function test(name, fn) {
@@ -33,6 +33,13 @@ await test('id つきの配列は1件ずつの差分になる（追加・変更�
   assert.equal(op.type, 'merge')
   assert.deepEqual(op.upserts.map((u) => u.id), ['b', 'd'])
   assert.deepEqual(op.deletes, ['c'])
+})
+
+await test('指紋はいつも16けたの16進数（記号が混ざらない）', () => {
+  for (const t of ['', 'a', 'あいうえお', JSON.stringify({ id: 'x', v: 'y'.repeat(1000) }), '署名'.repeat(500)]) {
+    assert.match(fingerprint(t), /^[0-9a-f]{16}$/)
+  }
+  assert.notEqual(fingerprint('a'), fingerprint('b'))
 })
 
 await test('変わっていなければ送らない', () => {
