@@ -108,6 +108,9 @@ await test('AIの絵の指示：顔・文字・院や施術・ケガの絵を描
   assert.match(PROMO_AI_RULES, /fill the whole square frame from edge to edge/)
   assert.match(PROMO_AI_RULES, /no letterbox, no black or dark bars/)
   assert.ok(!/title panel|covered by app buttons/.test(PROMO_AI_RULES))
+  // 靴や服は無地に（実在のメーカーの印に似た模様を描かせない）
+  assert.match(PROMO_AI_RULES, /must be plain and generic/)
+  assert.match(PROMO_AI_RULES, /resemble any real sports brand/)
   for (const v of PROMO_VIDEOS) {
     for (const scene of promoScenes(v).filter((s) => s.ai)) {
       const text = scene.ai.scene

@@ -270,6 +270,8 @@ export const PROMO_AI_RULES = [
   // 枠・帯なしで画面いっぱいに描かせ、主役を真ん中に置かせるだけにする（上下は動画の側でなじませる）
   'The photograph must fill the whole square frame from edge to edge: no borders, no frames, no letterbox, no black or dark bars, no panels, no vignette. Keep the main subject in the central area of the frame.',
   'Absolutely no text, letters, numbers, captions, signs, logos, brand marks, team names or watermarks anywhere in the image.',
+  // 靴の横の模様が実在のメーカーの印に似て出たことがある（2026-11-11 本番で確認）。持ち物は無地にさせる
+  'Shoes, socks, clothing, bags and balls must be plain and generic: no side stripes, swooshes, emblems or patterns that resemble any real sports brand.',
   "No face may be visible: show people only from behind, from the neck down, or as hands, arms, legs or feet. No children's faces. Natural, anatomically correct hands and feet.",
   'Do not show: a clinic, a therapist, treatment or massage, medical procedures or devices, taping, bandages, casts, crutches, injections, blood, bruises, swelling, wounds, X-ray or MRI images,',
   'before-and-after comparisons, exaggerated pain, or anything that suggests a guaranteed result or a specific real person, team, school or place.',
