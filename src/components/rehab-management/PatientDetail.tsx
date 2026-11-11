@@ -57,6 +57,8 @@ import PatientGoalsBanner from './PatientGoalsBanner'
 import PatientProfileCard from './PatientProfileCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
+import SyncNowButton from '@/components/rehab/SyncNowButton'
+import { useKarteSynced } from '@/lib/use-karte-sync'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
 import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
@@ -836,6 +838,11 @@ export default function PatientDetail({ patient }: Props) {
     reload()
   }, [patient.id])
 
+  // ほかの端末で書いた記録を取り込んだら、一覧を読み直す（入力中のフォームはそのまま）
+  useKarteSynced((keys) => {
+    if (keys.some(k => k.startsWith('pt_'))) reload()
+  })
+
   function reload() {
     setEvaluations(getEvaluations(patient.id))
     setRomRecords(getROMRecords(patient.id))
@@ -932,12 +939,15 @@ export default function PatientDetail({ patient }: Props) {
       {/* ヘッダー（お名前・大事な数字・よく使うボタン・タブ） */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="px-4 pb-4 pt-4 sm:px-6">
-          <Link
-            href="/patients"
-            className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
-          >
-            ← カルテ一覧
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link
+              href="/patients"
+              className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+            >
+              ← カルテ一覧
+            </Link>
+            <SyncNowButton />
+          </div>
           <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {patient.kana && <p className="text-sm text-slate-500">{patient.kana}</p>}

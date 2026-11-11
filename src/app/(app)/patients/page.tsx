@@ -15,6 +15,8 @@ import {
 import type { Patient, SOAPNote, CancellationSummary } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
 import { getPatients, initPatientStore, getSOAPNotes, getCancellations } from '@/lib/patient-store'
+import { useKarteSynced } from '@/lib/use-karte-sync'
+import SyncNowButton from '@/components/rehab/SyncNowButton'
 import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils'
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
@@ -68,6 +70,11 @@ export default function PatientsPage() {
   const [karteMiss, setKarteMiss] = useState('')
   // 予約管理画面から来た方のカルテが無いので、予約の情報から作っているところ
   const [karteCreating, setKarteCreating] = useState('')
+
+  // ほかの端末で増えた・変わったカルテを一覧に出す（15秒ごとの同期・「すぐに反映する」）
+  useKarteSynced((keys) => {
+    if (keys.some(k => k.startsWith('pt_'))) setPatients(getPatients())
+  })
 
   useEffect(() => {
     initPatientStore()
@@ -257,9 +264,12 @@ export default function PatientsPage() {
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">患者管理</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">患者管理</h1>
+            <SyncNowButton />
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-gray-500">{patients.length}名登録中</p>
             {highRiskCount > 0 && (
