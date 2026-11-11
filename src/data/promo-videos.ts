@@ -266,7 +266,9 @@ export type PromoScene = SceneBase &
  */
 export const PROMO_AI_RULES = [
   'Photorealistic photograph, square composition, natural light, calm and clean mood, gentle colors, everyday setting in Japan.',
-  'Keep the main subject in the middle of the frame; the top edge will fade into a dark title panel and the bottom edge will be covered by app buttons, so keep both simple.',
+  // 「上は見出しの面・下はボタンが重なる」と伝えると、AIが上下に黒い帯を描いてしまう（2026-11-11 本番で確認）。
+  // 枠・帯なしで画面いっぱいに描かせ、主役を真ん中に置かせるだけにする（上下は動画の側でなじませる）
+  'The photograph must fill the whole square frame from edge to edge: no borders, no frames, no letterbox, no black or dark bars, no panels, no vignette. Keep the main subject in the central area of the frame.',
   'Absolutely no text, letters, numbers, captions, signs, logos, brand marks, team names or watermarks anywhere in the image.',
   "No face may be visible: show people only from behind, from the neck down, or as hands, arms, legs or feet. No children's faces. Natural, anatomically correct hands and feet.",
   'Do not show: a clinic, a therapist, treatment or massage, medical procedures or devices, taping, bandages, casts, crutches, injections, blood, bruises, swelling, wounds, X-ray or MRI images,',

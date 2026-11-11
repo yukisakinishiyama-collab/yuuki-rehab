@@ -104,6 +104,10 @@ await test('AIの絵の指示：顔・文字・院や施術・ケガの絵を描
   assert.match(PROMO_AI_RULES, /No face may be visible/)
   assert.match(PROMO_AI_RULES, /no text/i)
   assert.match(PROMO_AI_RULES, /Do not show: a clinic, a therapist, treatment/)
+  // 画面いっぱいに描かせる（「上は見出し・下はボタン」と伝えると、AIが上下に黒い帯を描いてしまった）
+  assert.match(PROMO_AI_RULES, /fill the whole square frame from edge to edge/)
+  assert.match(PROMO_AI_RULES, /no letterbox, no black or dark bars/)
+  assert.ok(!/title panel|covered by app buttons/.test(PROMO_AI_RULES))
   for (const v of PROMO_VIDEOS) {
     for (const scene of promoScenes(v).filter((s) => s.ai)) {
       const text = scene.ai.scene
