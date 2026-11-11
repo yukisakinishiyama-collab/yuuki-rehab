@@ -5,8 +5,8 @@
  *   （Google検索向けの投稿＝月12:00・金18:00、Instagram＝火・木・土 と重ねない。
  *    手で投稿する間は、院長が手の空く昼休み・土曜の受付のあとに LINE が届くようにしている）
  * - 動画は src/data/promo-videos.ts の18本を、上から順にくり返す（前回の続きから）
- * - YouTube は、連携と審査（APIの利用確認）が済むと自動で公開。それまでは動画と文を院長のLINEへ届ける
- * - TikTok は、動画と文を院長のLINEへ届ける（アプリの中で音楽を足して投稿する）
+ * - Buffer につないだ媒体は、前日にLINEで院長の承認をもらってから自動で公開（promo-approval.ts・promo-video-server.ts）
+ * - つないでいない媒体は、時間になったら動画と文を院長のLINEへ届けて手で投稿する（アプリの中で音楽も足せる）
  * 型の import だけにしてあるので、node で単体テストできる（tools/test-promo-video.mjs）。
  */
 import { PROMO_VIDEOS, tiktokCaption, youtubeDescription, youtubeTitle, type PromoVideo } from '../../data/promo-videos'

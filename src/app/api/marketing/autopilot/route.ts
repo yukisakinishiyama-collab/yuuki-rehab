@@ -46,23 +46,23 @@ const SettingsSchema = z.object({
   clinicProfile: z.record(z.string(), z.string().max(2000)).optional(),
 })
 
-/** YouTubeショート・TikTokの動画の、これからの予定（今週・来週） */
-async function upcomingPromoPlan(): Promise<Array<{ scheduledAt: string; videoId: string; title: string }>> {
+/** YouTubeショート・TikTokの動画の予定（今週・来週。承認の状態・出し方つき） */
+async function upcomingPromoPlan() {
   try {
-    const [{ getPromoWeekPlan }, { addDays, jstParts, mondayOf }, { getPromoVideo }] = await Promise.all([
-      import('@/lib/marketing/promo-video-server'),
-      import('@/lib/marketing/autopilot-planner'),
-      import('@/data/promo-videos'),
-    ])
-    const jst = jstParts(new Date())
-    const monday = mondayOf(jst.date)
-    const plans = await Promise.all([getPromoWeekPlan(monday), getPromoWeekPlan(addDays(monday, 7))])
-    return plans
-      .flatMap((p) => p?.items ?? [])
-      .filter((x) => x.scheduledAt > jst.local)
-      .map((x) => ({ scheduledAt: x.scheduledAt, videoId: x.videoId, title: getPromoVideo(x.videoId)?.post.title ?? x.videoId }))
-  } catch {
+    const { promoPlanView } = await import('@/lib/marketing/promo-video-server')
+    return await promoPlanView()
+  } catch (error) {
+    console.error('[autopilot] 動画の予定を読めませんでした', error)
     return []
+  }
+}
+
+async function bufferConnection() {
+  try {
+    const { bufferStatus } = await import('@/lib/marketing/buffer-server')
+    return await bufferStatus()
+  } catch {
+    return null
   }
 }
 
@@ -80,6 +80,7 @@ export async function GET() {
         instagram: await isInstagramConnected(),
         googleApi: await isGbpConnected(),
         youtube: await youtubeStatus(),
+        buffer: await bufferConnection(),
         ownerLine: Boolean(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.RESERVATION_NOTIFY_LINE_USER_ID),
         bookingStats: Boolean(process.env.RESERVATION_NOTIFY_SECRET),
         mock: process.env.MARKETING_MODE === 'mock',

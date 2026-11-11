@@ -306,22 +306,37 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     const tt = promo.promoContent(v, 'tiktok', 'pv20261116-1')
 
     // 1) まだつないでいない → 手動。どこにも送らない
-    let out = await publishToChannel('youtube_short', yt)
+    const ytKey = promo.promoJobKey('2026-11-16', 1, 'youtube_short')
+    let out = await publishToChannel('youtube_short', yt, { jobKey: ytKey })
     assert.equal(out.kind, 'action_required')
     assert.equal(out.manualUrl, stored.url)
-    assert.match(out.reason, /連携がまだ/)
+    assert.match(out.reason, /自動で出す連携（Buffer）がまだ/)
     assert.deepEqual(calls, [])
 
     // 2) つないだが、審査はまだ → 手動。YouTube には送らない（非公開に固定されるのを防ぐ）
     await kvSet('yt:oauth', { refreshToken: 'rt', channelId: 'UC1', channelTitle: 'ゆうき整骨院', connectedAt: '2026-11-11T00:00:00Z' })
-    out = await publishToChannel('youtube_short', yt)
+    out = await publishToChannel('youtube_short', yt, { jobKey: ytKey })
     assert.equal(out.kind, 'action_required')
-    assert.match(out.reason, /審査/)
     assert.deepEqual(calls, [])
 
-    // 3) 審査に通った → 自動で公開（トークン → 動画を読む → 受付 → 本体）
+    // 3) 審査に通った → 自動で出せるが、院長の承認が要る
     await kvSet('autopilot:settings', { youtubeAudited: true })
+    const snap = { url: stored.url, posterUrl: stored.posterUrl, hash: stored.hash, aiImages: 2 }
+    // 予定の時刻は、テストを走らせる日の3日後（日本時間）。期限切れにならないように
+    const later = new Date(Date.now() + 9 * 3600e3 + 3 * 24 * 3600e3).toISOString().slice(0, 16)
+    // 3-a) 予定が分からないジョブ（承認のしようがない）は、自動では出さない
     out = await publishToChannel('youtube_short', yt)
+    assert.equal(out.kind, 'action_required')
+    assert.deepEqual(calls, [])
+    // 3-b) 承認待ち → 待つ（どこにも送らない。やり直しの回数にも数えない）
+    await kvSet('promo:week:2026-11-16', { weekStart: '2026-11-16', createdAt: '', items: [{ scheduledAt: later, videoId: v.id, campaign: 'pv20261116-1' }] })
+    out = await publishToChannel('youtube_short', yt, { jobKey: ytKey })
+    assert.equal(out.kind, 'wait')
+    assert.match(out.message, /承認待ち/)
+    assert.deepEqual(calls, [])
+    // 3-c) 承認済み → 承認した動画を自動で公開（トークン → 動画を読む → 受付 → 本体）
+    await kvSet('promo:week:2026-11-16', { weekStart: '2026-11-16', createdAt: '', items: [{ scheduledAt: later, videoId: v.id, campaign: 'pv20261116-1', approval: { status: 'approved', at: '', by: 'テスト', video: snap } }] })
+    out = await publishToChannel('youtube_short', yt, { jobKey: ytKey })
     assert.deepEqual(out, { kind: 'published', url: 'https://www.youtube.com/shorts/vid1', message: 'YouTubeにショート動画を公開しました' })
     assert.deepEqual(calls.map((u) => new URL(u).host), ['oauth2.googleapis.com', 'blob.example', 'www.googleapis.com', 'upload.example'])
     // AIの絵を使った動画なので、YouTube に「合成されたコンテンツ」として申告している
@@ -329,11 +344,20 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     assert.equal(uploadBodies[0].status.containsSyntheticMedia, true)
     assert.equal(uploadBodies[0].status.privacyStatus, 'public')
 
-    // 4) TikTok は手動（どこにも送らない）
+    // 3-d) 見送り → 出さない
+    await kvSet('promo:week:2026-11-16', { weekStart: '2026-11-16', createdAt: '', items: [{ scheduledAt: later, videoId: v.id, campaign: 'pv20261116-1', approval: { status: 'skipped', at: '', by: 'テスト' } }] })
     calls.length = 0
-    out = await publishToChannel('tiktok', tt)
+    out = await publishToChannel('youtube_short', yt, { jobKey: ytKey })
+    assert.equal(out.kind, 'skipped')
+    assert.deepEqual(calls, [])
+    await kvDelete('promo:week:2026-11-16')
+
+    // 4) TikTok は手動（Buffer につないでいない。どこにも送らない）
+    calls.length = 0
+    out = await publishToChannel('tiktok', tt, { jobKey: promo.promoJobKey('2026-11-16', 1, 'tiktok') })
     assert.equal(out.kind, 'action_required')
     assert.equal(out.manualUrl, stored.url)
+    assert.match(out.reason, /TikTokは自動で出す連携（Buffer）がまだ/)
     assert.deepEqual(calls, [])
 
     // 5) 動画が決まっていないジョブはエラー

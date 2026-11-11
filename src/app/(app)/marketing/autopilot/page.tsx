@@ -15,7 +15,7 @@ import { CHANNEL_LABELS, type Channel, type ContentVariant } from '@/lib/marketi
 import { postImageUrl, usesAiImage } from '@/lib/marketing/post-image'
 import { GBP_SEO_POSTS } from '@/data/gbp-seo-posts'
 import { seoImageUrl } from '@/lib/marketing/gbp-seo'
-import PromoVideoFields, { type PromoPlanItem, type YoutubeConnection } from './PromoVideoFields'
+import PromoVideoFields, { PromoApprovalBanner, type BufferConnection, type PromoPlanItem, type YoutubeConnection } from './PromoVideoFields'
 import {
   activeVariants,
   approvalBlocker,
@@ -39,6 +39,8 @@ interface Connections {
   mock: boolean
   /** YouTube（ショート動画）の連携 */
   youtube?: YoutubeConnection
+  /** Buffer（YouTube・TikTok へ自動で出す投稿サービス）の連携 */
+  buffer?: BufferConnection | null
 }
 
 const STATUS_TONE: Record<ProposalItem['status'], string> = {
@@ -388,6 +390,7 @@ function SettingsPanel({
   initial,
   isAdmin,
   youtube,
+  buffer,
   aiImage,
   promoPlan,
   onSaved,
@@ -396,6 +399,7 @@ function SettingsPanel({
   initial: AutopilotSettings
   isAdmin: boolean
   youtube?: YoutubeConnection
+  buffer?: BufferConnection | null
   aiImage?: boolean
   promoPlan?: PromoPlanItem[]
   onSaved: (message: string) => void
@@ -560,7 +564,7 @@ function SettingsPanel({
         </details>
       </fieldset>
 
-      <PromoVideoFields s={s} setS={setS} disabled={disabled} isAdmin={isAdmin} youtube={youtube} aiImage={aiImage} plan={promoPlan} onChanged={onChanged} />
+      <PromoVideoFields s={s} setS={setS} disabled={disabled} isAdmin={isAdmin} youtube={youtube} buffer={buffer} aiImage={aiImage} plan={promoPlan} onChanged={onChanged} />
 
       <fieldset className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3">
         <legend className="px-1 text-sm font-bold text-slate-900">キャンセルが出たら、ストーリーですぐ知らせる</legend>
@@ -865,6 +869,15 @@ function AutopilotInner() {
 
       {message && <p className="rounded-lg bg-white p-3 text-sm whitespace-pre-wrap text-slate-700 ring-1 ring-slate-200">{message}</p>}
 
+      {/* YouTube・TikTok の動画で、承認を待っているもの（2日以内） */}
+      <PromoApprovalBanner
+        plan={promoPlan}
+        onOpen={() => {
+          setShowSettings(true)
+          setTimeout(() => document.getElementById('promo-video')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+        }}
+      />
+
       {proposal ? (
         proposal.status === 'generating' ? (
           <p className="rounded-xl bg-white p-6 text-center text-sm text-slate-600 ring-1 ring-slate-200">AIが投稿案を作成中です…（1〜2分後に画面を更新してください）</p>
@@ -917,6 +930,7 @@ function AutopilotInner() {
             initial={settings}
             isAdmin={isAdmin}
             youtube={conn?.youtube}
+            buffer={conn?.buffer}
             aiImage={conn?.aiImage}
             promoPlan={promoPlan}
             onSaved={(m) => {
