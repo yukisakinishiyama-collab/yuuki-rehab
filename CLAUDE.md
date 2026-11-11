@@ -34,6 +34,7 @@ npm run lint     # ESLint
 
 - カルテ: `src/lib/patient-store.ts` 経由で端末の `localStorage`（`pt_*`）に保存。`/api/sync` でクラウド（Supabase の KV）と同期（`src/lib/sync-service.ts`・`sync-merge.ts`。変わった記録だけを id ごとに送って重ねる。カルテの画面では15秒ごとに取り込み、「すぐに反映する」ボタンで今すぐ）
 - 契約書・同意書: ひな形は `src/data/contract-templates.ts`（もとはドライブ「ゆうき整骨院_契約書テンプレート」）。署名済みの一覧は `pt_contracts`、署名入りの本文は KV の `kcdoc:<id>`（`/api/karte/contracts`。一度保存したら書きかえない）。会員の日付の決まりは `src/lib/contracts/member.ts`。アウトカムは `pt_outcomes`
+- バックアップ: 設定 → バックアップ（`src/components/clinic/BackupPanel.tsx`・`src/lib/backup/`）。クラウドの毎月の控え（KV の `backup:YYYY-MM`、12か月。Cron で毎日確かめて無ければ作る `/api/backup/monthly`）と、院長のパソコンのフォルダへの保存（File System Access。カルテ全部・署名入りの契約書・写真）。`/api/backup` は院長だけ
 - 端末ログイン: `src/lib/rehab-store.ts`（院内専用のため未ログインなら自動ログイン）
 - 集客・経営: `src/lib/marketing/kv-store-server.ts`（Supabase 設定時は KV テーブル）
 - 予約: GAS の予約システム（`?api=feed` / `?api=hubstats` / `?api=noahstats`）と連携

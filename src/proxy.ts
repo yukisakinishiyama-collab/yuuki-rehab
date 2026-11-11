@@ -43,6 +43,8 @@ const PUBLIC_PATHS = [
   '/api/marketing/reservation-notify',
   '/api/marketing/instagram/callback',
   '/api/marketing/google/callback',
+  // クラウドの毎月の控え（Vercel Cron。CRON_SECRET の Bearer をルート側で確かめる）
+  '/api/backup/monthly',
 ]
 
 /** 認証済みの役割を権威的にヘッダー注入し、UI表示用Cookieを添えて通過させる */
@@ -118,5 +120,7 @@ export const config = {
     '/api/voice/:path*',
     // 疑問メモの AI相談（カルテの要約を Claude に送る。外から使われないように）
     '/api/karte/:path*',
+    // バックアップ（カルテ全部を返すので院長だけ。ルート側でも requireAdmin で確かめる）
+    '/api/backup/:path*',
   ],
 }
