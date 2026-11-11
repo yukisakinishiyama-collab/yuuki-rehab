@@ -3,10 +3,10 @@
  *
  * - stateが /connect（院長のみ）で発行したものと一致したときだけ処理する
  * - code をリフレッシュトークンに交換し、投稿先の店舗を自動で探してKVに保存。トークンは画面にもログにも出さない
- * - 結果は投稿ジョブ画面の接続状況に表示し、そこへ戻す
+ * - 結果は「投稿の予定と結果」の画面の接続状況に表示し、そこへ戻す
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { exchangeGbpCode, findGbpLocations, GBP_STATE_COOKIE, gbpOAuthConfig, pickClinicLocation } from '@/lib/marketing/gbp-oauth-server'
+import { exchangeGbpCode, findGbpLocations, GBP_STATE_COOKIE, gbpOAuthConfig, GSC_SCOPE, pickClinicLocation } from '@/lib/marketing/gbp-oauth-server'
 import { recordGbpOAuthResult, saveGbpConnection } from '@/lib/marketing/gbp-token'
 import { handleYoutubeCallback } from '@/lib/marketing/youtube-callback'
 import { YOUTUBE_STATE_PREFIX } from '@/lib/marketing/youtube-server'
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { accessToken, refreshToken } = await exchangeGbpCode({
+    const { accessToken, refreshToken, scopes } = await exchangeGbpCode({
       code,
       clientId: config.clientId,
       clientSecret: config.clientSecret,
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       lookupError = error instanceof Error ? error.message : '店舗を探せませんでした'
     }
     const picked = pickClinicLocation(locations)
-    await saveGbpConnection({ refreshToken, locationName: picked?.name, locationTitle: picked?.title })
+    await saveGbpConnection({ refreshToken, locationName: picked?.name, locationTitle: picked?.title, scopes })
     if (!picked) {
       await recordGbpOAuthResult(
         false,
@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
       )
     } else {
       const more = locations.length > 1 ? `（${locations.length}件のうち、${picked.canPost ? '投稿できる' : ''}「${picked.title}」を選びました${picked.duplicate ? '。重複として扱われている店舗のため、投稿できないことがあります' : ''}）` : ''
-      await recordGbpOAuthResult(true, `Googleビジネスプロフィール「${picked.title || '店舗'}」とつながりました${more}。承認した投稿は予定の時刻に自動で公開されます。`)
+      const gsc = scopes.includes(GSC_SCOPE) ? 'Search Console（ホームページの検索）も読めるようになりました。' : 'Search Console の許可にはチェックが入っていませんでした（検索キーワードを見るときは、つなぎ直して両方にチェックを入れてください）。'
+      await recordGbpOAuthResult(true, `Googleビジネスプロフィール「${picked.title || '店舗'}」とつながりました${more}。投稿は予定の時刻に自動で公開されます。${gsc}`)
     }
   } catch (error) {
     await recordGbpOAuthResult(false, error instanceof Error ? error.message : 'つなぐ処理に失敗しました。')

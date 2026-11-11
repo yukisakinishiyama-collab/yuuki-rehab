@@ -395,7 +395,7 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
  * Google Business Profile（投稿 = localPosts）。
  * APIは利用申請の承認制（2026-10-26 承認済み）。接続すると自動投稿になる（未接続の間は手動投稿モード）:
  *   GBP_CLIENT_ID / GBP_CLIENT_SECRET … Google CloudのOAuthクライアント（Vercelの環境変数）
- *   リフレッシュトークンと投稿先の店舗 … 投稿ジョブ画面の「Googleとつなぐ」で保存（gbp-token.ts）。
+ *   リフレッシュトークンと投稿先の店舗 … 「投稿の予定と結果」の画面の「Googleとつなぐ」で保存（gbp-token.ts）。
  *                                     環境変数 GBP_REFRESH_TOKEN / GBP_LOCATION_NAME を設定した場合はそちらが優先
  */
 async function publishGoogleBusiness(content: GeneratedContent): Promise<PublishOutcome> {

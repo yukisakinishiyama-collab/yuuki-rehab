@@ -16,7 +16,8 @@ import { fetchHubStatsFast } from './booking-stats-fast'
 import { sourceLabel } from './booking-stats'
 import { listProposals } from './autopilot-store-server'
 import { isInstagramConnected } from './instagram-token'
-import { isGbpConnected } from './gbp-token'
+import { hasGoogleScope, isGbpConnected } from './gbp-token'
+import { GSC_SCOPE } from './gbp-oauth-server'
 import { inquiredOn, inquiryStatusOf, isInquiry } from './inquiry'
 import type { LineContact } from './line-types'
 import type { ConnectionRow, HpEntries, Metric, OverviewData, SourceRow } from './overview-types'
@@ -56,7 +57,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   const daysInMonthSoFar = Number(today.slice(8, 10))
 
   // ── 取りに行く（どれかが失敗しても、ほかは出す） ─────────────────
-  const [contactsResult, eventsResult, statsResult, proposalsResult, igResult, gbpResult, hpResult] = await Promise.allSettled([
+  const [contactsResult, eventsResult, statsResult, proposalsResult, igResult, gbpResult, hpResult, gscResult] = await Promise.allSettled([
     listContacts(),
     // 計測リンクが使われているかを見るため、90日分を読む（今月分はこの中から絞る）
     listEvents(new Date(now.getTime() - 90 * DAY_MS).toISOString()),
@@ -67,6 +68,8 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
     isGbpConnected(),
     // ホームページの閲覧数・電話タップ（今月分。日本時間の日付）
     sumHpStats(monthStart),
+    // Search Console を読む許可（「Googleとつなぐ」で一緒にもらう）
+    hasGoogleScope(GSC_SCOPE),
   ])
   const contacts: LineContact[] | null = contactsResult.status === 'fulfilled' ? contactsResult.value : null
   const events90: AnalyticsEvent[] | null = eventsResult.status === 'fulfilled' ? eventsResult.value : null
@@ -367,6 +370,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
   // ── 連携の状態（秘密の値は返さない。有無と、取れたかだけ） ──────────────
   const igConnected = igResult.status === 'fulfilled' && igResult.value
   const gbpConnected = gbpResult.status === 'fulfilled' && gbpResult.value
+  const gscConnected = gscResult.status === 'fulfilled' && gscResult.value
   const connections: ConnectionRow[] = [
     {
       key: 'booking',
@@ -411,13 +415,16 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
       key: 'ga4',
       label: 'GA4（ホームページのアクセス）',
       state: 'not_set',
-      note: '未連携（ページの閲覧・外からの訪問・来たところは、ホームページの計測で数えています）',
+      note: '未連携（Googleアナリティクスのアカウントがまだありません。ページの閲覧・外からの訪問・来たところは、ホームページの計測で数えています）',
     },
     {
       key: 'gsc',
       label: 'Search Console（検索キーワード）',
-      state: 'not_set',
-      note: '未連携（検索キーワード・掲載順位の実測はここから取ります）',
+      state: gscConnected ? 'connected' : 'not_set',
+      note: gscConnected
+        ? 'つながっています（ホームページの検索キーワード・掲載順位は「集客の効果」に出ます）'
+        : '未連携（「投稿の予定と結果」の画面の「Googleとつなぐ」をもう一度押し、Search Console の項目にもチェックを入れると読めます）',
+      href: '/marketing/jobs',
     },
   ]
   // 予約ボタンの計測が一度も記録されていないときは、注意書きを変える

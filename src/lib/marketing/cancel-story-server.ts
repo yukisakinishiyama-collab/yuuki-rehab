@@ -190,7 +190,7 @@ export async function reportCancelStory(job: PublishJob, r: JobRunResult): Promi
     const manual = r.detail?.kind === 'action_required' ? r.detail.manualUrl : ''
     await notifyCancelStory(`キャンセル（${label}）のストーリーは、Instagramとつながっていないため出せませんでした。画像を保存して手で出してください。\n${manual}`)
   } else if (r.job?.status === 'failed') {
-    await notifyCancelStory(`キャンセル（${label}）のストーリーを出せませんでした（何度かやり直しましたが失敗しました。投稿ジョブ画面で理由を確認できます）。`)
+    await notifyCancelStory(`キャンセル（${label}）のストーリーを出せませんでした（何度かやり直しましたが失敗しました。「投稿の予定と結果」の画面で理由を確認できます）。`)
   } else if (r.job?.attempts.length === 1) {
     // 1回目の失敗だけ知らせる（やり直しのたびには送らない）
     await notifyCancelStory(`キャンセル（${label}）のストーリーをまだ出せていません。5分後からやり直します。`)

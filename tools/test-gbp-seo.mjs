@@ -174,6 +174,45 @@ test('Googleとつなぐ：同じ名前の店舗が重複していても、投�
   assert.equal(oauth.pickClinicLocation([]), null)
 })
 
+const gsc = await import(new URL('src/lib/marketing/gsc.ts', root).href)
+
+test('Googleとつなぐ：ビジネスプロフィールと Search Console の両方の許可を求める', () => {
+  const url = new URL(oauth.gbpAuthorizeUrl('cid', 'https://yuuki-rehab.vercel.app/api/marketing/google/callback', 'st'))
+  const scopes = (url.searchParams.get('scope') ?? '').split(' ')
+  assert.ok(scopes.includes('https://www.googleapis.com/auth/business.manage'))
+  assert.ok(scopes.includes('https://www.googleapis.com/auth/webmasters.readonly'))
+  assert.equal(url.searchParams.get('access_type'), 'offline')
+  assert.equal(url.searchParams.get('include_granted_scopes'), 'true')
+})
+
+test('Search Console：ドメイン→https の順で、確認済みのプロパティを選ぶ', () => {
+  assert.equal(gsc.pickGscSite([{ siteUrl: 'https://shimonoseki-yuuki.com/', permissionLevel: 'siteOwner' }]), 'https://shimonoseki-yuuki.com/')
+  assert.equal(
+    gsc.pickGscSite([
+      { siteUrl: 'https://shimonoseki-yuuki.com/', permissionLevel: 'siteOwner' },
+      { siteUrl: 'sc-domain:shimonoseki-yuuki.com', permissionLevel: 'siteFullUser' },
+    ]),
+    'sc-domain:shimonoseki-yuuki.com',
+  )
+  assert.equal(gsc.pickGscSite([{ siteUrl: 'sc-domain:shimonoseki-yuuki.com', permissionLevel: 'siteUnverifiedUser' }]), null)
+  assert.equal(gsc.pickGscSite([{ siteUrl: 'https://nimble-swan-1814a7.netlify.app/', permissionLevel: 'siteOwner' }]), null)
+})
+
+test('Search Console：期間・合計・キーワードに前の順位と狙いの印', () => {
+  assert.deepEqual(gsc.gscRanges('2026-11-11').current, { start: '2026-10-12', end: '2026-11-08' })
+  assert.deepEqual(gsc.gscTotals({ rows: [{ clicks: 30, impressions: 600, ctr: 0.05, position: 10.44 }] }), { clicks: 30, impressions: 600, ctr: 0.05, position: 10.4 })
+  assert.deepEqual(gsc.gscTotals({}), { clicks: 0, impressions: 0, ctr: 0, position: 0 })
+  const cur = gsc.parseGscRows({ rows: [{ keys: ['下関 整骨院'], clicks: 3, impressions: 111, ctr: 0.027, position: 8.26 }, { keys: ['下関 捻挫 リハビリ'], clicks: 0, impressions: 20, ctr: 0, position: 15.5 }, { keys: ['ゆうき整骨院'], clicks: 32, impressions: 188, ctr: 0.17, position: 1.2 }] })
+  const prev = gsc.parseGscRows({ rows: [{ keys: ['下関 整骨院'], clicks: 2, impressions: 90, ctr: 0.02, position: 9.8 }] })
+  const q = gsc.withPrevious(cur, prev)
+  assert.deepEqual(q.map((x) => x.key), ['ゆうき整骨院', '下関 整骨院', '下関 捻挫 リハビリ'])
+  assert.equal(q[1].position, 8.3)
+  assert.equal(q[1].prevPosition, 9.8)
+  assert.equal(q[2].prevPosition, null)
+  assert.equal(q[2].target, '足首の捻挫のリハビリ')
+  assert.equal(q[0].target, null)
+})
+
 console.log(`\nGoogle検索向けの投稿：${passed} 件すべて通りました。`)
 
 // ── 予約の動き（KV は一時フォルダのファイル） ──
