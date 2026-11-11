@@ -2,7 +2,7 @@
  * Googleビジネスプロフィール（投稿）の接続情報
  *
  * 入手方法は2つ:
- * 1. 投稿ジョブ画面の「Googleとつなぐ」ボタン（OAuth）… 院長が許可すると、リフレッシュトークンと投稿先の店舗をKVに保存
+ * 1. 「投稿の予定と結果」の画面の「Googleとつなぐ」ボタン（OAuth）… 院長が許可すると、リフレッシュトークンと投稿先の店舗をKVに保存
  * 2. 環境変数 GBP_REFRESH_TOKEN / GBP_LOCATION_NAME … 手で設定した場合はこちらを優先
  *
  * どちらの場合も GBP_CLIENT_ID / GBP_CLIENT_SECRET（Vercelの環境変数）が必要。

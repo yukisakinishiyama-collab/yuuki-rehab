@@ -749,7 +749,7 @@ export async function applyProposalAction(week: string, input: ProposalAction, a
       }
       if (started.length > 0) {
         await saveProposal(proposal)
-        return { ok: false, message: `${started.join('・')}はすでに投稿処理が始まっているため取り消せません（投稿ジョブ画面で確認してください）`, proposal }
+        return { ok: false, message: `${started.join('・')}はすでに投稿処理が始まっているため取り消せません（「投稿の予定と結果」の画面で確認してください）`, proposal }
       }
       item.status = item.scheduledAt <= nowLocal ? 'expired' : 'proposed'
       item.jobIds = []
@@ -894,13 +894,13 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       '▶ 「画像を開く」で画像を保存 → 次の吹き出しを長押し→コピー。Googleマップアプリ（またはビジネスプロフィール）の「投稿を追加」に画像と本文を入れ、ボタンは「予約」・リンクは',
       job.content.cta?.url ?? '',
       '',
-      'Googleとつなぐと、次からは自動で投稿されます（投稿ジョブ画面の「Googleとつなぐ」）。',
+      'Googleとつなぐと、次からは自動で投稿されます（「投稿の予定と結果」の画面の「Googleとつなぐ」）。',
     ].join('\n')
     const buttons = [
       { label: 'Googleに投稿した', postback: `ap:done:${job.id}`, primary: true },
       ...(imageUrl ? [{ label: '画像を開く', uri: imageUrl }] : []),
       { label: 'Googleを開く', uri: GOOGLE_MANAGE_URL },
-      { label: '投稿ジョブ画面', uri: `${SITE_URL}/marketing/jobs` },
+      { label: '投稿の予定と結果', uri: `${SITE_URL}/marketing/jobs` },
     ]
     const result = await notifyOwner([head, job.content.body, ownerCard('Google投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons)])
     if (result.delivered) seoSent += 1
@@ -946,7 +946,7 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       ...(story?.manualUrl ? [{ label: 'ストーリー画像', uri: story.manualUrl }] : []),
       ...(instagram ? [{ label: '画像を開く', uri: imageUrl }] : []),
       ...(google ? [{ label: 'Googleを開く', uri: GOOGLE_MANAGE_URL }] : []),
-      { label: '投稿ジョブ画面', uri: `${SITE_URL}/marketing/jobs` },
+      { label: '投稿の予定と結果', uri: `${SITE_URL}/marketing/jobs` },
     ].slice(0, 4)
     messages.push(ownerCard('投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons))
     const result = await notifyOwner(messages)
@@ -967,7 +967,7 @@ export async function handleOwnerPostback(data: string): Promise<string[]> {
     const job = await getJob(arg)
     if (!job) return ['投稿ジョブが見つかりませんでした']
     if (job.status === 'published') return ['すでに完了になっています👍']
-    if (job.status !== 'action_required' && job.status !== 'pending') return ['このジョブは完了にできない状態です（投稿ジョブ画面で確認してください）']
+    if (job.status !== 'action_required' && job.status !== 'pending') return ['このジョブは完了にできない状態です（「投稿の予定と結果」の画面で確認してください）']
     await updateJob(job.id, (j) => {
       j.status = 'published'
       j.attempts.push({ at: new Date().toISOString(), ok: true, message: '院長がLINEから手動投稿の完了を記録' })

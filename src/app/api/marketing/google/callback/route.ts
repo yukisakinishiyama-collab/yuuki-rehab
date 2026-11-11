@@ -3,7 +3,7 @@
  *
  * - stateが /connect（院長のみ）で発行したものと一致したときだけ処理する
  * - code をリフレッシュトークンに交換し、投稿先の店舗を自動で探してKVに保存。トークンは画面にもログにも出さない
- * - 結果は投稿ジョブ画面の接続状況に表示し、そこへ戻す
+ * - 結果は「投稿の予定と結果」の画面の接続状況に表示し、そこへ戻す
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { exchangeGbpCode, findGbpLocations, GBP_STATE_COOKIE, gbpOAuthConfig, GSC_SCOPE, pickClinicLocation } from '@/lib/marketing/gbp-oauth-server'

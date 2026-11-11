@@ -423,7 +423,7 @@ export async function buildOverview(now: Date = new Date()): Promise<OverviewDat
       state: gscConnected ? 'connected' : 'not_set',
       note: gscConnected
         ? 'つながっています（ホームページの検索キーワード・掲載順位は「集客の効果」に出ます）'
-        : '未連携（投稿ジョブ画面の「Googleとつなぐ」をもう一度押し、Search Console の項目にもチェックを入れると読めます）',
+        : '未連携（「投稿の予定と結果」の画面の「Googleとつなぐ」をもう一度押し、Search Console の項目にもチェックを入れると読めます）',
       href: '/marketing/jobs',
     },
   ]

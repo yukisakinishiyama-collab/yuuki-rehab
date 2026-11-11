@@ -87,7 +87,7 @@ function SearchConsole() {
         <p className="mt-2 text-sm text-slate-600">
           「Googleとつなぐ」をもう一度押し、Search Console の項目にもチェックを入れると、ホームページがどんな言葉で検索され、何位に出ているかがここに出ます。
           <Link href="/marketing/jobs" className="ml-1 font-bold text-teal-700 underline">
-            投稿ジョブ画面へ
+            「投稿の予定と結果」の画面へ
           </Link>
         </p>
       ) : data.error ? (
@@ -226,7 +226,7 @@ function GooglePerformance() {
         <p className="mt-2 text-sm text-slate-600">
           Googleとつなぐと、検索・マップでの表示回数、電話・ルート・ウェブサイトのタップ、実際に「検索された言葉」がここに出ます。
           <Link href="/marketing/jobs" className="ml-1 font-bold text-teal-700 underline">
-            投稿ジョブ画面の「Googleとつなぐ」へ
+            「投稿の予定と結果」の画面の「Googleとつなぐ」へ
           </Link>
         </p>
       ) : data.error ? (
