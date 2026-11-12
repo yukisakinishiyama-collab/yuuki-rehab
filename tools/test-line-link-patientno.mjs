@@ -34,6 +34,11 @@ const empty = linkNoticeText({ ...base, patientNo: undefined })
 check('番号が無いときも今までどおりの文', empty.includes(base.fallback) && !empty.includes('患者番号：'), empty)
 check('言い切り・誇張の言葉が無い', !/絶対|必ず治|No\.?1|最安|医師が推薦/.test(normal + fixed))
 
+const issued = linkNoticeText({ ...base, patientNo: '2948', phone: '083-000-0000', issued: true })
+check('番号が出せるようになったお知らせ：院長の確認ずみの文面', issued === '試験 花子さんへ。\nゆうき整骨院です。患者番号をお出しできるようになりましたので、お知らせします。\n\n患者番号：2948\nネット予約の「患者番号をお持ちの方」に、この番号と、院にご登録の電話番号の下4桁の2つを入れると、お名前などが自動で入ります。\n\nゆうき整骨院', issued)
+check('そのお知らせに、おわび・「連携が済みました」は入らない', !issued.includes('申し訳') && !issued.includes('連携が済みました'))
+check('番号が無ければ、そのお知らせにはしない', !linkNoticeText({ ...base, patientNo: undefined, issued: true }).includes('お出しできるようになりました'))
+
 console.log('\n【サーバー側のつなぎ】')
 const server = fs.readFileSync(new URL('../src/lib/line-link-server.ts', import.meta.url), 'utf8')
 const resend = fs.readFileSync(new URL('../src/app/api/line-link/resend/route.ts', import.meta.url), 'utf8')
@@ -44,6 +49,8 @@ check('送り直す前に、数字でない控えはもらい直して保存す�
 check('まちがった番号をお知らせ済みの印を、正しい番号を送れるまで控えに残す', server.includes('wrongNoNotified: wrong ? true : undefined') && server.includes('link.wrongNoNotified === true ||'))
 check('その方に正しい番号をもらえなかったときは送らない', resend.includes('if (fresh.wrong && !fresh.corrected) {') && resend.indexOf('if (fresh.wrong && !fresh.corrected) {') < resend.indexOf("fetch('https://api.line.me/v2/bot/message/push'"))
 check('おわびの文を送れたら印を外す', resend.includes('notified: true, notifyError: undefined, wrongNoNotified: undefined'))
+check('お知らせ済みで今回も番号が無い方には、重ねて送らない', resend.includes('if (!isPatientNo(link.patientNo) && stored.notified === true) {') && resend.indexOf('if (!isPatientNo(link.patientNo) && stored.notified === true) {') < resend.indexOf("fetch('https://api.line.me/v2/bot/message/push'"))
+check('前は番号が無かった方に番号が出たら、その文で送る', resend.includes('const issued = fresh.issued && stored.notified === true') && server.includes('issued: !wrong && Boolean(r.patientNo)'))
 check('連携し直すときも、数字でない控えは使わない', liff.includes('isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined'))
 
 console.log(`\n結果: ${passed} 件成功 / ${failed} 件失敗`)

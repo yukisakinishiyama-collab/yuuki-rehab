@@ -6,21 +6,23 @@
  *          どちらも無ければ「送れたことが確かめられていない方」全員に送る
  *          （notified が true の方には送らない。同じ方に二重に送らないため）
  *          控えの患者番号が数字でない方は、送る前に予約システムから番号をもらい直す。
- *          前に文字（「院側手動登録」）を番号としてお知らせしていた方には、おわびと正しい番号の文を送る
+ *          前に文字（「院側手動登録」）を番号としてお知らせしていた方には、おわびと正しい番号の文を送る。
+ *          前は番号を出せなかった方に番号が出たときは「お出しできるようになりました」の文で送る。
+ *          お知らせ済みで今回も番号が無い方には、同じお知らせを重ねて送らない（skipped に数える）
  * 送った結果は連携の記録（notified / notifyError）に残す。
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { unsealUserId } from '@/lib/liff-ticket'
 import { getLineLink, listLineLinks, patientNoErrorText, refreshPatientNo, saveLineLink } from '@/lib/line-link-server'
-import { linkNoticeText } from '@/lib/line-link'
+import { isPatientNo, linkNoticeText } from '@/lib/line-link'
 import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-function noticeText(name: string, patientNo: string | undefined, patientNoError: string | undefined, corrected = false): string {
-  return linkNoticeText({ name, patientNo, fallback: patientNoErrorText(patientNoError), sign: DEFAULT_CLINIC_PROFILE.name, phone: DEFAULT_CLINIC_PROFILE.phone, corrected })
+function noticeText(name: string, patientNo: string | undefined, patientNoError: string | undefined, kind: { corrected?: boolean; issued?: boolean } = {}): string {
+  return linkNoticeText({ name, patientNo, fallback: patientNoErrorText(patientNoError), sign: DEFAULT_CLINIC_PROFILE.name, phone: DEFAULT_CLINIC_PROFILE.phone, ...kind })
 }
 
 async function targets(keys: string[] | undefined, all = false) {
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
   let failed = 0
   const errors: string[] = []
   let corrected = 0
+  let skipped = 0
   for (const summary of await targets(keys, body.all === true)) {
     const stored = await getLineLink(summary.key)
     if (!stored) continue
@@ -69,6 +72,13 @@ export async function POST(request: NextRequest) {
       errors.push('患者番号を取り直せなかったため、送っていません')
       continue
     }
+    // 前に「番号は受付でお渡しします」とお知らせ済みで、今回も番号が無い方には、同じお知らせを重ねて送らない
+    if (!isPatientNo(link.patientNo) && stored.notified === true) {
+      skipped += 1
+      continue
+    }
+    // 前は番号を出せなかった方に、今回はじめて番号が出た → 「お出しできるようになりました」の文で送る
+    const issued = fresh.issued && stored.notified === true
     const userId = unsealUserId(link.sealed, secret)
     if (!userId) {
       failed += 1
@@ -79,7 +89,7 @@ export async function POST(request: NextRequest) {
       const res = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: noticeText(link.name, link.patientNo, link.patientNoError, fresh.corrected) }] }),
+        body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: noticeText(link.name, link.patientNo, link.patientNoError, { corrected: fresh.corrected, issued }) }] }),
       })
       if (res.ok) {
         sent += 1
@@ -99,5 +109,5 @@ export async function POST(request: NextRequest) {
       await saveLineLink({ ...link, notified: false, notifyError: detail })
     }
   }
-  return NextResponse.json({ ok: true, sent, failed, corrected, errors: [...new Set(errors)].slice(0, 5) })
+  return NextResponse.json({ ok: true, sent, failed, corrected, skipped, errors: [...new Set(errors)].slice(0, 5) })
 }
