@@ -70,14 +70,15 @@ export async function fetchPatientNo(name: string, phone: string): Promise<{ pat
 
 /**
  * 控えの患者番号が数字でないとき（空・「院側手動登録」など）は、予約システムからもらい直す。
- * corrected … 前の控えに文字が入っていて、今回は数字の番号に直せた（＝まちがった番号をお知らせ済みの方）
+ * wrong     … まちがった番号（文字）をお知らせ済みの方（おわびと正しい番号を送るまで、控えに印を残す）
+ * corrected … その方に、いま数字の番号がある（＝おわびの文を送れる）
  */
-export async function refreshPatientNo(link: LineLink): Promise<{ link: LineLink; corrected: boolean; refreshed: boolean }> {
-  if (isPatientNo(link.patientNo)) return { link, corrected: false, refreshed: false }
-  const hadWrongText = Boolean(String(link.patientNo ?? '').trim())
+export async function refreshPatientNo(link: LineLink): Promise<{ link: LineLink; wrong: boolean; corrected: boolean; refreshed: boolean }> {
+  const wrong = link.wrongNoNotified === true || (Boolean(String(link.patientNo ?? '').trim()) && !isPatientNo(link.patientNo))
+  if (isPatientNo(link.patientNo)) return { link, wrong, corrected: wrong, refreshed: false }
   const r = await fetchPatientNo(link.name, link.phone)
-  const next: LineLink = { ...link, patientNo: r.patientNo, patientNoError: r.patientNo ? undefined : r.error }
-  return { link: next, corrected: hadWrongText && Boolean(r.patientNo), refreshed: true }
+  const next: LineLink = { ...link, patientNo: r.patientNo, patientNoError: r.patientNo ? undefined : r.error, wrongNoNotified: wrong ? true : undefined }
+  return { link: next, wrong, corrected: wrong && Boolean(r.patientNo), refreshed: true }
 }
 
 /** 番号を発行できなかった理由を、患者さん向けの短い言葉に */

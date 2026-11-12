@@ -62,7 +62,13 @@ export async function POST(request: NextRequest) {
     const fresh = await refreshPatientNo(stored)
     const link = fresh.link
     if (fresh.refreshed) await saveLineLink(link)
-    if (fresh.corrected) corrected += 1
+    // まちがった番号をお知らせ済みの方で、正しい番号をもらえなかったときは送らない
+    // （番号の無いお知らせを重ねて送らない。番号をもらえるようになってから、おわびの文で送る）
+    if (fresh.wrong && !fresh.corrected) {
+      failed += 1
+      errors.push('患者番号を取り直せなかったため、送っていません')
+      continue
+    }
     const userId = unsealUserId(link.sealed, secret)
     if (!userId) {
       failed += 1
@@ -77,7 +83,9 @@ export async function POST(request: NextRequest) {
       })
       if (res.ok) {
         sent += 1
-        await saveLineLink({ ...link, notified: true, notifyError: undefined })
+        if (fresh.corrected) corrected += 1
+        // おわびと正しい番号を送れたら、印を外す
+        await saveLineLink({ ...link, notified: true, notifyError: undefined, wrongNoNotified: undefined })
       } else {
         failed += 1
         const detail = `HTTP ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300)

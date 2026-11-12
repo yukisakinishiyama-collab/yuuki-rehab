@@ -27,6 +27,8 @@ export interface LineLink {
   patientNo?: string
   /** 番号を発行できなかった理由（同じ電話番号で別の方が登録済み、など） */
   patientNoError?: string
+  /** まちがった番号（「院側手動登録」という文字）をお知らせ済みで、おわびと正しい番号をまだ送れていない */
+  wrongNoNotified?: boolean
   /** 結びつけたときの「番号のお知らせ」をLINEへ送れたか */
   notified?: boolean
   /** 送れなかったときの理由（LINEの返事。原因を調べるため） */

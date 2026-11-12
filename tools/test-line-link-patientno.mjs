@@ -41,6 +41,9 @@ const liff = fs.readFileSync(new URL('../src/app/api/liff/link/route.ts', import
 check('予約システムから受け取るのは数字の番号だけ', server.includes("isPatientNo(patientNo) ? { patientNo } : { error: 'bad_number' }"))
 check('一覧には数字の番号だけを出す', server.includes('patientNo: isPatientNo(patientNo) ? patientNo.trim() : undefined'))
 check('送り直す前に、数字でない控えはもらい直して保存する', resend.includes('await refreshPatientNo(stored)') && resend.includes('if (fresh.refreshed) await saveLineLink(link)'))
+check('まちがった番号をお知らせ済みの印を、正しい番号を送れるまで控えに残す', server.includes('wrongNoNotified: wrong ? true : undefined') && server.includes('link.wrongNoNotified === true ||'))
+check('その方に正しい番号をもらえなかったときは送らない', resend.includes('if (fresh.wrong && !fresh.corrected) {') && resend.indexOf('if (fresh.wrong && !fresh.corrected) {') < resend.indexOf("fetch('https://api.line.me/v2/bot/message/push'"))
+check('おわびの文を送れたら印を外す', resend.includes('notified: true, notifyError: undefined, wrongNoNotified: undefined'))
 check('連携し直すときも、数字でない控えは使わない', liff.includes('isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined'))
 
 console.log(`\n結果: ${passed} 件成功 / ${failed} 件失敗`)
