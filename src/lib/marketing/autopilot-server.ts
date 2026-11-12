@@ -65,6 +65,8 @@ import {
 } from './types'
 import { postImageUrl, usesAiImage } from './post-image'
 import { seoImageUrl } from './gbp-seo'
+import { googleButtonUrl, googleSummary } from './gbp-post-rules'
+import { getGbpSeoPost, gbpSeoText } from '../../data/gbp-seo-posts'
 import { promoGroupKey } from './promo-video'
 import { PROMO_AI_NOTE } from '../../data/promo-videos'
 import { aiPostImageConfigured, createPostPhotoWithin, sceneFromVariants, withPostImage } from './post-image-server'
@@ -137,8 +139,7 @@ const COMMON_NOTES = [
   '一般的な情報提供として書き、強い痛み・しびれ・腫れが続くなどの場合は医療機関の受診も案内する。',
 ]
 
-function channelNotesFor(seed: Seed): Partial<Record<Channel, string>> {
-  const site = seed.sitePath ? `${SITE_URL}${seed.sitePath}` : ''
+function channelNotesFor(): Partial<Record<Channel, string>> {
   // フォロワーを増やす型：保存・シェアされる中身 → 「フォローすると続きが届く」理由を示す。
   // 見返りと引き換えのフォロー依頼（割引・プレゼント）はしない
   const instagram = [
@@ -151,9 +152,8 @@ function channelNotesFor(seed: Seed): Partial<Record<Channel, string>> {
   return {
     instagram_feed: instagram,
     instagram_carousel: `${instagram} スライドの構成：1枚目は悩みの言葉と結論が一目でわかる表紙、2〜6枚目は1枚1ポイント（見出し＋短い説明）、最後から2枚目に「保存して見返してください」、最後のスライドは「フォローで毎週のケガ予防情報／ご予約はプロフィールのリンクから（ネット予約24時間）」にする。`,
-    google_business: site
-      ? `予約ボタンは別に付くので、本文の最後に「くわしくはこちら：${site}」を1回だけ載せてよい（ほかのURLは書かない）。`
-      : '予約ボタンは別に付くので、本文にURLは書かない。',
+    // Google は、本文に電話番号を書いた投稿を拒否する。URL も書かない（予約ボタンが院のホームページを開く。gbp-post-rules.ts）
+    google_business: '予約ボタンは別に付くので、本文にURLと電話番号は書かない（Googleに拒否されるため）。最後は「ご予約・くわしい内容は、下の『予約』ボタンから」と案内する。',
   }
 }
 
@@ -177,7 +177,7 @@ async function draftItem(
       notes,
       tone: profile.defaultTone,
       channels,
-      channelNotes: channelNotesFor(seed),
+      channelNotes: channelNotesFor(),
       profile,
     },
     { parallel: true },
@@ -900,6 +900,15 @@ function autopilotItemKey(job: PublishJob): string | null {
   return parts[0] === 'autopilot' && parts.length >= 4 ? `${parts[1]}:${parts[2]}` : null
 }
 
+/** 手で Google に投稿するときの本文とボタンのリンク（アプリが出すときと同じ決まり。Google に拒否されないため。gbp-post-rules.ts） */
+function googleManualParts(job: PublishJob): { body: string; link: string } {
+  const post = job.content.seoPostId ? getGbpSeoPost(job.content.seoPostId) : undefined
+  return {
+    body: googleSummary(post ? gbpSeoText(post) : job.content.body).text,
+    link: googleButtonUrl({ ctaUrl: job.content.cta?.url, seoPostId: job.content.seoPostId, jobKey: job.idempotencyKey }) ?? '',
+  }
+}
+
 /**
  * 投稿の時刻になったが手動対応になったジョブを、案ごとに1通（＝LINE1通分）にまとめて院長へ送る。
  * 送る内容: やり方 → 各媒体の本文（長押しでコピー） → 「投稿した」ボタン
@@ -909,12 +918,14 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
   // Google検索向けの投稿（Googleと未接続のとき）：本文と画像のリンクを1通に
   for (const job of jobs.filter((j) => j.idempotencyKey.startsWith('gbpseo:'))) {
     const imageUrl = job.content.seoPostId ? seoImageUrl(job.content.seoPostId, SITE_URL) : ''
+    const manual = googleManualParts(job)
     const head = [
       `📌 Google投稿の時間です（${formatSlot(job.scheduledAt)}）`,
       `「${job.content.title}」（検索向けの投稿）`,
       '',
       '▶ 「画像を開く」で画像を保存 → 次の吹き出しを長押し→コピー。Googleマップアプリ（またはビジネスプロフィール）の「投稿を追加」に画像と本文を入れ、ボタンは「予約」・リンクは',
-      job.content.cta?.url ?? '',
+      manual.link,
+      '（本文に電話番号やURLを足すと、Googleに拒否されます。ボタンのリンクも、このホームページのアドレスのままにしてください）',
       '',
       'Googleとつなぐと、次からは自動で投稿されます（「投稿の予定と結果」の画面の「Googleとつなぐ」）。',
     ].join('\n')
@@ -924,7 +935,7 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       { label: 'Googleを開く', uri: GOOGLE_MANAGE_URL },
       { label: '投稿の予定と結果', uri: `${SITE_URL}/marketing/jobs` },
     ]
-    const result = await notifyOwner([head, job.content.body, ownerCard('Google投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons)])
+    const result = await notifyOwner([head, manual.body, ownerCard('Google投稿の時間です', '投稿が終わったら押してください（記録が残ります）', buttons)])
     if (result.delivered) seoSent += 1
   }
   // YouTubeショート・TikTokの動画：同じ動画の分を1通にまとめ、動画そのもの（LINEの中で保存できる）と、貼る文を届ける
@@ -994,12 +1005,13 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
     const google = group.find((j) => j.channel === 'google_business')
     const story = group.find((j) => j.channel === 'instagram_story')
     const instagram = group.find((j) => j.channel.startsWith('instagram') && j.channel !== 'instagram_story')
+    const googleManual = google ? googleManualParts(google) : null
     const head = [
       `📌 投稿の時間です（${formatSlot(group[0].scheduledAt)}）`,
       `「${group[0].theme}」`,
       '',
-      google
-        ? `▶ Google：次の吹き出しを長押し→コピー。Googleマップアプリ（またはビジネスプロフィール）の「投稿を追加」に貼り付け、ボタンは「予約」・リンクは\n${google.content.cta?.url ?? ''}`
+      googleManual
+        ? `▶ Google：次の吹き出しを長押し→コピー。Googleマップアプリ（またはビジネスプロフィール）の「投稿を追加」に貼り付け、ボタンは「予約」・リンクは\n${googleManual.link}\n（本文に電話番号やURLを足すと、Googleに拒否されます）`
         : null,
       instagram
         ? '▶ Instagram：連携がまだのため手動です。本文の吹き出しをコピーし、「画像を開く」の画像（または院の写真）と一緒にInstagramアプリから投稿してください。'
@@ -1013,7 +1025,7 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       .filter((x): x is string => x !== null)
       .join('\n')
     const messages: OwnerMessage[] = [head]
-    if (google) messages.push(google.content.body)
+    if (googleManual) messages.push(googleManual.body)
     if (instagram) messages.push(`${instagram.content.body}\n\n${(instagram.content.hashtags ?? []).join(' ')}`.trim())
     // AI画像があれば写真＋見出し（投稿と同じ描き方）、無ければテンプレ画像
     const imageUrl = instagram ? postImageUrl(instagram.content, instagram.channel, instagram.theme, SITE_URL) : ''

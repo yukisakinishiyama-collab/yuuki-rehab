@@ -12,9 +12,11 @@ import type { PublishJob } from './jobs-store-server'
 import type { PromoVideoSnapshot } from './promo-approval'
 import { getGbpCredentials } from './gbp-token'
 import { imageTextFor } from './post-image'
+import { googleButtonUrl, googlePostState, googleSummary } from './gbp-post-rules'
+import { getGbpSeoPost, gbpSeoText } from '../../data/gbp-seo-posts'
 
 export type PublishOutcome =
-  | { kind: 'published'; url?: string; message: string; external?: PublishJob['external'] }
+  | { kind: 'published'; url?: string; message: string; external?: PublishJob['external']; google?: PublishJob['google'] }
   | { kind: 'action_required'; reason: string; manualUrl: string }
   | { kind: 'error'; message: string }
   /** 出す必要がなくなった（例：ストーリーの時刻に空きが無くなっていた）。投稿はしない */
@@ -39,7 +41,7 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
     case 'instagram_story':
       return publishInstagramStory(content)
     case 'google_business':
-      return publishGoogleBusiness(content)
+      return publishGoogleBusiness(content, ctx.jobKey)
     case 'line_broadcast':
       return publishLineBroadcast(content)
     case 'note':
@@ -478,7 +480,7 @@ async function publishInstagram(channel: Channel, content: GeneratedContent): Pr
  *   リフレッシュトークンと投稿先の店舗 … 「投稿の予定と結果」の画面の「Googleとつなぐ」で保存（gbp-token.ts）。
  *                                     環境変数 GBP_REFRESH_TOKEN / GBP_LOCATION_NAME を設定した場合はそちらが優先
  */
-async function publishGoogleBusiness(content: GeneratedContent): Promise<PublishOutcome> {
+async function publishGoogleBusiness(content: GeneratedContent, jobKey?: string): Promise<PublishOutcome> {
   const manualUrl = 'https://business.google.com/'
   const credentials = await getGbpCredentials()
   if (!credentials) {
@@ -522,8 +524,13 @@ async function publishGoogleBusiness(content: GeneratedContent): Promise<Publish
       media = undefined
     }
 
-    const summary = content.body.length > 1500 ? `${content.body.slice(0, 1499)}…` : content.body
-    const ctaUrl = /^https:\/\//.test(content.cta?.url ?? '') ? content.cta.url : undefined
+    // Google に拒否されないための決まり（gbp-post-rules.ts）:
+    // 本文から URL・電話番号を取る／ボタンのリンクは院のホームページか公式LINEだけ（ほかは院のホームページのページに置きかえる）。
+    // Google検索向けの投稿は、いまの決まった文で出す（予約したときの古い文に URL が入っていても出さない）
+    const seoPost = content.seoPostId ? getGbpSeoPost(content.seoPostId) : undefined
+    const cleaned = googleSummary(seoPost ? gbpSeoText(seoPost) : content.body)
+    const summary = cleaned.text.length > 1500 ? `${cleaned.text.slice(0, 1499)}…` : cleaned.text
+    const ctaUrl = googleButtonUrl({ ctaUrl: content.cta?.url, seoPostId: content.seoPostId, jobKey })
     const res = await fetch(`https://mybusiness.googleapis.com/v4/${location}/localPosts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenData.access_token}` },
@@ -535,9 +542,16 @@ async function publishGoogleBusiness(content: GeneratedContent): Promise<Publish
         ...(media ? { media } : {}),
       }),
     })
-    const data = (await res.json().catch(() => ({}))) as { searchUrl?: string; name?: string; error?: { message?: string } }
+    const data = (await res.json().catch(() => ({}))) as { searchUrl?: string; name?: string; state?: string; error?: { message?: string } }
     if (!res.ok) return { kind: 'error', message: `Google投稿APIエラー: ${data.error?.message ?? `HTTP ${res.status}`}` }
-    return { kind: 'published', url: data.searchUrl, message: 'Googleビジネスプロフィールへ投稿しました' }
+    // Google が受け取っただけで、公開されたとは限らない（審査で拒否されることがある）。結果は checkGooglePosts が後で確かめる
+    const fixed = [cleaned.urls > 0 ? 'URL' : '', cleaned.phones > 0 ? '電話番号' : ''].filter(Boolean).join('・')
+    return {
+      kind: 'published',
+      url: data.searchUrl,
+      message: `Googleへ投稿を送りました（Googleの審査の結果は、このあと確かめます）${fixed ? `。本文の${fixed}は取りました` : ''}`,
+      google: { name: data.name, state: googlePostState(data.state), postedAt: new Date().toISOString() },
+    }
   } catch (error) {
     return { kind: 'error', message: `Google投稿APIエラー: ${error instanceof Error ? error.message : '不明'}` }
   }

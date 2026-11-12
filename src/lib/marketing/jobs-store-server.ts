@@ -48,6 +48,22 @@ export interface PublishJob {
     /** 確かめ終わった（出た・出せなかった・2日たった） */
     done?: boolean
   }
+  /**
+   * Google へ出した投稿。Google の審査で「拒否」になっていないかを、出したあとで確かめる（gbp-posts-server の checkGooglePosts）。
+   * 拒否のときは status を failed にし、actionReason に理由を書く
+   */
+  google?: {
+    /** Google の投稿の名前（accounts/…/locations/…/localPosts/…） */
+    name?: string
+    /** Google へ送った時刻（出し直したら新しくなる） */
+    postedAt?: string
+    state?: 'live' | 'rejected' | 'processing' | 'unknown'
+    checkedAt?: string
+    /** 確かめ終わった（拒否・7日たった） */
+    done?: boolean
+    /** 拒否を院長のLINEへ知らせた時刻 */
+    notifiedAt?: string
+  }
   createdAt: string
   updatedAt: string
 }

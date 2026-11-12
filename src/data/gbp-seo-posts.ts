@@ -8,6 +8,8 @@
 // 文面は院長が確認した決まった文（AIで毎回書かない）。表現チェック（compliance.ts）を通ることをテストで確かめる。
 // 画像は院の本物の写真（assets/gbp-photos/。人物が特定されないもの＝GBP_SAFE_PHOTOS だけ）に見出しを重ねる。
 // 事実（受付時間・駐車場・自賠責など）は公開中のホームページの記載に合わせる。変わったらここも直す。
+// 本文に URL・電話番号は書かない。「予約」ボタンのリンクは院のホームページのそのページ（Google に拒否されないため。
+// 予約システムのアドレスをボタンに入れた投稿は拒否された。gbp-post-rules.ts）。
 // ──────────────────────────────────────────────
 
 /**
@@ -31,9 +33,9 @@ export interface GbpSeoPost {
   photo: GbpPhoto
   /** 写真の切り抜きの位置（CSS の object-position。省略は中央） */
   photoPosition?: string
-  /** 公開サイトの関連ページ（本文の最後に1回だけ載せる） */
+  /** 公開サイトの関連ページ（「予約」ボタンのリンク先。本文には URL を書かない） */
   sitePath: string
-  /** 本文（1行目は【下関市彦島｜…】。最後の院の情報は GBP_SEO_FOOTER で足す） */
+  /** 本文（1行目は【下関市彦島｜…】。最後の院の情報は gbpPostFooter で足す。URL・電話番号は書かない） */
   body: string
 }
 
@@ -42,21 +44,31 @@ export const GBP_SITE = 'https://shimonoseki-yuuki.com'
 /** 画像の下に並べる院の強み（どの投稿でも同じ） */
 export const GBP_SEO_CHIPS = ['柔道整復師3名', 'エコーで状態を確認', '平日20時まで受付', '駐車場あり']
 
-/** 本文の最後に足す院の情報（どの投稿でも同じ。くわしくはのURLは投稿ごと） */
+/** 院の情報（どの投稿でも同じ） */
+const GBP_SEO_FACTS = [
+  '――――',
+  'ゆうき整骨院（下関市彦島江の浦町）',
+  '・柔道整復師3名（国家資格）',
+  '・平日20時まで受付（土曜は15時まで・日祝休み）',
+  '・駐車場あり（3〜4台）',
+  '・急なケガは予約不要／リハビリは予約制',
+]
+
+/** YouTube の説明などに足す院の情報（最後に、その投稿のページのURL）。Google の投稿には使わない（下の gbpPostFooter） */
 export function gbpSeoFooter(sitePath: string): string {
-  return [
-    '――――',
-    'ゆうき整骨院（下関市彦島江の浦町）',
-    '・柔道整復師3名（国家資格）',
-    '・平日20時まで受付（土曜は15時まで・日祝休み）',
-    '・駐車場あり（3〜4台）',
-    '・急なケガは予約不要／リハビリは予約制',
-    `くわしくは：${GBP_SITE}${sitePath}`,
-  ].join('\n')
+  return [...GBP_SEO_FACTS, `くわしくは：${GBP_SITE}${sitePath}`].join('\n')
+}
+
+/**
+ * Google の投稿の最後に足す院の情報。本文に URL・電話番号は書かない
+ * （Google に拒否されるため。2026-11-12 に調べた。gbp-post-rules.ts）。くわしいページは「予約」ボタンのリンクで開く
+ */
+export function gbpPostFooter(): string {
+  return [...GBP_SEO_FACTS, 'ご予約・くわしい内容は、下の「予約」ボタンから（ホームページが開きます）。'].join('\n')
 }
 
 export function gbpSeoText(post: GbpSeoPost): string {
-  return `${post.body.trim()}\n\n${gbpSeoFooter(post.sitePath)}`
+  return `${post.body.trim()}\n\n${gbpPostFooter()}`
 }
 
 export const GBP_SEO_POSTS: GbpSeoPost[] = [

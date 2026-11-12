@@ -7,6 +7,7 @@
  * - 自動投稿（autopilot）のジョブが手動対応になったら、本文と「投稿した」ボタンを院長のLINEへ送る
  * - LINE連携の方への前日のお知らせ（日本時間10〜20時。明日の予約の控えの分。送り済みはすぐ終わる）
  * - YouTube・TikTok の動画：Buffer に渡した投稿が出たかを確かめる／前日に見本と「承認して投稿」ボタンを院長のLINEへ
+ * - Google の投稿：Google の審査で拒否されていないかを確かめ、拒否なら「公開失敗」にして院長のLINEへ（gbp-posts-server.ts）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { refreshInstagramTokenIfNeeded } from '@/lib/marketing/instagram-token'
@@ -54,6 +55,17 @@ async function run() {
     console.error('Bufferの投稿の確認に失敗:', error instanceof Error ? error.message : error)
   }
 
+  // Google の投稿：受け取ってもらえても、あとで Google の審査で拒否されることがある。結果を確かめ、拒否は院長のLINEへ
+  let google: unknown = null
+  try {
+    const { checkGooglePosts, notifyGoogleRejections } = await import('@/lib/marketing/gbp-posts-server')
+    const checked = await checkGooglePosts()
+    const notified = await notifyGoogleRejections(checked)
+    google = { checked: checked.checked, live: checked.live, rejected: checked.rejected.length, outside: checked.outside.length, notified }
+  } catch (error) {
+    console.error('Googleの投稿の確認に失敗:', error instanceof Error ? error.message : error)
+  }
+
   // 手動で投稿する媒体は、院長のLINEへ本文を届ける（失敗してもジョブ処理の結果は返す）
   let nudged = 0
   if (manual.length > 0) {
@@ -93,7 +105,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, nudged, lineReminders, buffer, approvals, aiVideos }
+  return { ok: true, processed: results.length, results, nudged, lineReminders, buffer, google, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

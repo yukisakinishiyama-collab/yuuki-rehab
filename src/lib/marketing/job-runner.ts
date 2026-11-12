@@ -21,11 +21,12 @@ export async function runOneJob(job: PublishJob): Promise<JobRunResult> {
     const outcome = await publishToChannel(locked.channel, locked.content, { jobKey: locked.idempotencyKey })
     if (outcome.kind === 'published') {
       let updated = await recordAttempt(locked.id, true, outcome.message, outcome.url)
-      // 投稿サービス（Buffer）に渡した投稿は、出たかを後で確かめる。承認待ちなどの断り書きは消す
-      if (updated && (outcome.external || updated.actionReason)) {
+      // 投稿サービス（Buffer）に渡した投稿・Google へ出した投稿は、出たかを後で確かめる。承認待ちなどの断り書きは消す
+      if (updated && (outcome.external || outcome.google || updated.actionReason)) {
         updated = await updateJob(locked.id, (j) => {
           j.actionReason = undefined
           if (outcome.external) j.external = outcome.external
+          if (outcome.google) j.google = outcome.google
         })
       }
       return { ran: true, outcome: 'published', job: updated, detail: outcome }
