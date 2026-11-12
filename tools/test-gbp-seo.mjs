@@ -67,9 +67,10 @@ test('検索ワード：1行目は【下関市彦島…】、本文に院名・�
     assert.ok(text.length <= 1000, `${p.id} は ${text.length} 字`)
     assert.ok(text.length >= 250, `${p.id} は短すぎる（${text.length} 字）`)
     assert.ok(p.title.length <= 22 && p.subtitle.length <= 30, `${p.id} の見出しが長い`)
-    assert.ok(text.includes(`https://shimonoseki-yuuki.com${p.sitePath}`), p.id)
-    // URL は本文に1回だけ
-    assert.equal((text.match(/https?:\/\//g) ?? []).length, 1, p.id)
+    // 本文に URL・電話番号は書かない（Google に拒否されるため。くわしいページは「予約」ボタンで開く。tools/test-gbp-post-rules.mjs）
+    assert.equal((text.match(/https?:\/\//g) ?? []).length, 0, p.id)
+    assert.ok(!/0\d{1,3}-\d{2,4}-\d{4}/.test(text), `${p.id} に電話番号`)
+    assert.ok(text.endsWith('ご予約・くわしい内容は、下の「予約」ボタンから（ホームページが開きます）。'), p.id)
   }
 })
 
@@ -79,6 +80,10 @@ test('院の情報（受付時間・駐車場・資格者の数）はホーム�
   assert.match(footer, /平日20時まで受付（土曜は15時まで・日祝休み）/)
   assert.match(footer, /駐車場あり（3〜4台）/)
   assert.match(footer, /急なケガは予約不要／リハビリは予約制/)
+  // Google の投稿の最後も、同じ院の情報（URL は無し）
+  const postFooter = data.gbpPostFooter()
+  for (const line of footer.split('\n').slice(0, -1)) assert.ok(postFooter.includes(line), line)
+  assert.ok(!postFooter.includes('http'))
   assert.deepEqual(GBP_SEO_CHIPS, ['柔道整復師3名', 'エコーで状態を確認', '平日20時まで受付', '駐車場あり'])
 })
 
@@ -103,11 +108,12 @@ test('順番：前回の続きから一覧の順にくり返す（一覧から�
   assert.deepEqual(seo.pickSeoPosts([ids[0]], 0), [])
 })
 
-test('投稿の中身：予約ボタンは計測リンク（流入元 google_post・計測名）、画像は院の写真の型', () => {
+test('投稿の中身：予約ボタンは院のホームページのそのページ（どの投稿から来たかの印つき）、画像は院の写真の型', () => {
   const p = GBP_SEO_POSTS[0]
   const c = seo.seoContent(p, seo.seoCampaign('2026-11-16', 2))
   assert.equal(c.cta.label, '予約')
-  assert.match(c.cta.url, /^https:\/\/yuuki-rehab\.vercel\.app\/api\/marketing\/go\?d=reserve&source=google_post&campaign=seo20261116-2$/)
+  // 予約システムのアドレスや転送リンクをボタンに入れると、Google に拒否される（2026-11-12 に調べた）
+  assert.equal(c.cta.url, `https://shimonoseki-yuuki.com${p.sitePath}?utm_source=google_post&utm_campaign=seo20261116-2`)
   assert.equal(c.seoPostId, p.id)
   assert.equal(c.body, gbpSeoText(p))
   assert.equal(seo.seoImageUrl(p.id), `https://yuuki-rehab.vercel.app/api/marketing/image?kind=gbp-seo&id=${p.id}`)

@@ -3,11 +3,13 @@
  *
  * - 週に1〜2本、決まった曜日・時刻（既定は月12:00・金18:00。Instagramと同じテーマの投稿の火・木・土と重ねない）
  * - 投稿は src/data/gbp-seo-posts.ts の決まった文を、上から順にくり返す（前回の続きから）
- * - 予約ボタンは計測リンク（どの投稿から予約が入ったかが予約システムに残る）
+ * - 予約ボタンは院のホームページの、その症状のページ（utm_source=google_post・utm_campaign=計測名 つき。
+ *   予約システムのアドレスや転送リンクをボタンに入れると Google に拒否されるため。gbp-post-rules.ts）
  * 型の import だけにしてあるので、node で単体テストできる（tools/test-gbp-seo.mjs）。
  */
 import { GBP_SEO_POSTS, gbpSeoText, type GbpSeoPost } from '../../data/gbp-seo-posts'
-import { addDays, trackingUrl } from './autopilot-planner'
+import { addDays } from './autopilot-planner'
+import { siteButtonUrl } from './gbp-post-rules'
 import type { AutopilotSlot } from './autopilot-types'
 import type { GeneratedContent } from './types'
 
@@ -51,7 +53,7 @@ export function pickSeoPosts(history: string[], count: number, posts: GbpSeoPost
   return Array.from({ length: count }, (_, k) => posts[(last + 1 + k) % posts.length])
 }
 
-/** 計測名（例: seo20261116-1）。予約システムの「流入元」に残る */
+/** 計測名（例: seo20261116-1）。ホームページの入口の記録（utm_campaign）に残る */
 export function seoCampaign(weekStart: string, index: number): string {
   return `seo${weekStart.replace(/-/g, '')}-${index}`
 }
@@ -62,7 +64,7 @@ export function seoContent(post: GbpSeoPost, campaign: string): GeneratedContent
     title: post.title,
     hook: post.subtitle,
     body: gbpSeoText(post),
-    cta: { label: '予約', url: trackingUrl(APP_URL, 'google_post', campaign) },
+    cta: { label: '予約', url: siteButtonUrl(post.sitePath, campaign) },
     hashtags: [],
     imageText: post.title,
     altText: `${post.title}。${post.subtitle}（下関市彦島 ゆうき整骨院）`,

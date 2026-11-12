@@ -3,6 +3,7 @@
 /** 投稿ジョブ・履歴：予約済みジョブの実行状況、リトライ、手動投稿の完了記録、接続状況 */
 import { useCallback, useEffect, useState } from 'react'
 import type { PublishJob } from '@/lib/marketing/jobs-store-server'
+import type { GooglePostRow, GooglePostsOverview } from '@/lib/marketing/gbp-posts-server'
 import { CHANNEL_LABELS } from '@/lib/marketing/types'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 
@@ -26,6 +27,64 @@ const JOB_STATUS_LABEL: Record<PublishJob['status'], { label: string; tone: stri
   cancelled: { label: '取消済み', tone: 'bg-slate-200 text-slate-500' },
 }
 
+/** Google の審査で拒否された投稿（status は failed。ふつうの「公開失敗」と分けて見せる） */
+const GOOGLE_REJECTED_LABEL = { label: 'Googleが拒否', tone: 'bg-red-100 text-red-800' }
+
+/** Google へ送ったが、公開されたかはまだ確かめていない投稿 */
+const GOOGLE_SENT_LABEL = { label: 'Googleへ送信済み', tone: 'bg-blue-100 text-blue-800' }
+
+const GOOGLE_BUTTON_LABEL: Record<string, string> = {
+  BOOK: '予約',
+  CALL: '今すぐ電話',
+  LEARN_MORE: '詳細',
+  ORDER: 'オンライン注文',
+  SHOP: '購入',
+  SIGN_UP: '登録',
+}
+
+function isGoogleRejected(job: PublishJob): boolean {
+  return job.channel === 'google_business' && job.google?.state === 'rejected'
+}
+
+/** Google へ出したあとの、審査の確認の状態（公開済みの Google の投稿だけ） */
+function googleCheckNote(job: PublishJob): { text: string; tone: string } | null {
+  if (job.channel !== 'google_business' || job.status !== 'published') return null
+  if (job.google?.state === 'live') return { text: 'Googleで公開を確認', tone: 'bg-emerald-50 text-emerald-700' }
+  if (job.google?.done) return { text: 'Googleでの公開は未確認', tone: 'bg-slate-100 text-slate-500' }
+  return { text: 'Googleの審査を確認中', tone: 'bg-amber-50 text-amber-700' }
+}
+
+/** この日数より前の拒否は、たたんで見せる（古い拒否でいつまでも赤くしない） */
+const GOOGLE_RECENT_DAYS = 30
+
+function isRecentRow(row: GooglePostRow, at: string | undefined): boolean {
+  const base = Date.parse(at ?? '')
+  const t = Date.parse(row.createTime)
+  return Number.isFinite(base) && Number.isFinite(t) && base - t <= GOOGLE_RECENT_DAYS * 24 * 60 * 60 * 1000
+}
+
+function GoogleRejectedRow({ row }: { row: GooglePostRow }) {
+  return (
+    <li className="space-y-0.5 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-800">拒否</span>
+        <span>{googleRowText(row)}</span>
+        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{row.fromApp ? '院内アプリから' : 'Googleの画面から'}</span>
+      </div>
+      <p className="text-xs text-slate-600">
+        ボタン：{row.button ? (GOOGLE_BUTTON_LABEL[row.button] ?? row.button) : 'なし'}
+        {row.linkHost ? ` → ${row.linkHost}` : ''}
+        {!row.linkOk ? <span className="font-bold text-red-700">（このリンク先は拒否されやすい）</span> : null}
+      </p>
+    </li>
+  )
+}
+
+function googleRowText(row: GooglePostRow): string {
+  const at = row.createTime ? new Date(row.createTime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+  return `${at}　${row.title || '（本文なし）'}`
+}
+
 const CONNECTION_ITEMS: Array<{ key: string; label: string; hint: string }> = [
   { key: 'anthropic', label: 'AI文章生成（Anthropic）', hint: 'ANTHROPIC_API_KEY' },
   { key: 'openaiImage', label: '画像生成（OpenAI）', hint: 'OPENAI_API_KEY（Phase 5で使用）' },
@@ -42,6 +101,22 @@ export default function JobsPage() {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [jobsError, setJobsError] = useState('')
+  const [googlePosts, setGooglePosts] = useState<GooglePostsOverview | null>(null)
+  const [googleBusy, setGoogleBusy] = useState(false)
+
+  /** Google の投稿の審査の結果（読むだけ）。失敗しても、ほかの表示は生かす */
+  const loadGooglePosts = useCallback(async (force = false) => {
+    setGoogleBusy(true)
+    try {
+      const res = await fetch(`/api/marketing/google/posts${force ? '?refresh=1' : ''}`)
+      const data = (await res.json()) as GooglePostsOverview
+      setGooglePosts(data)
+    } catch {
+      setGooglePosts(null)
+    } finally {
+      setGoogleBusy(false)
+    }
+  }, [])
 
   const refresh = useCallback(async () => {
     // 片方のAPIが失敗しても、もう片方の表示は生かす
@@ -67,11 +142,12 @@ export default function JobsPage() {
     let alive = true
     Promise.resolve().then(() => {
       if (alive) void refresh()
+      if (alive) void loadGooglePosts()
     })
     return () => {
       alive = false
     }
-  }, [refresh])
+  }, [refresh, loadGooglePosts])
 
   async function runNow() {
     setBusy(true)
@@ -193,6 +269,62 @@ export default function JobsPage() {
         </p>
       </section>
 
+      {/* Google の審査の結果（Google の投稿の一覧から。アプリの外で出した投稿も入る） */}
+      {googlePosts?.connected
+        ? (() => {
+            const recent = googlePosts.rejected.filter((row) => isRecentRow(row, googlePosts.at))
+            const older = googlePosts.rejected.filter((row) => !isRecentRow(row, googlePosts.at))
+            return (
+              <section className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="font-bold">Googleの審査の結果</h2>
+                  <span className="text-sm text-slate-600">
+                    新しい{googlePosts.counts.total}本のうち：公開 {googlePosts.counts.live}・拒否 {googlePosts.counts.rejected}
+                    {googlePosts.counts.rejected > 0 ? (
+                      <span className={recent.length > 0 ? 'font-bold text-red-700' : ''}>（この{GOOGLE_RECENT_DAYS}日は {recent.length}）</span>
+                    ) : null}
+                    ・審査中 {googlePosts.counts.processing}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void loadGooglePosts(true)}
+                    disabled={googleBusy}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs font-bold disabled:opacity-50 max-lg:min-h-10"
+                  >
+                    {googleBusy ? '読み込み中…' : '読み直す'}
+                  </button>
+                </div>
+                {googlePosts.error ? <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-700">{googlePosts.error}</p> : null}
+                <p className="mt-2 text-xs text-slate-500">
+                  Googleは、受け取った投稿をあとで審査し、決まりに合わないものを「拒否」にします（拒否された投稿は、一般の方には見えません）。Googleの画面や予約投稿で出したものも、ここに出ます。
+                </p>
+                {recent.length > 0 ? (
+                  <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-red-100 bg-red-50/40 px-3">
+                    {recent.map((row, i) => (
+                      <GoogleRejectedRow key={`${row.createTime}-${i}`} row={row} />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-emerald-700">この{GOOGLE_RECENT_DAYS}日に拒否された投稿はありません。</p>
+                )}
+                {older.length > 0 ? (
+                  <details className="mt-2 text-sm">
+                    <summary className="cursor-pointer text-xs text-slate-500">それより前に拒否された投稿（{older.length}）</summary>
+                    <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-100 px-3">
+                      {older.map((row, i) => (
+                        <GoogleRejectedRow key={`${row.createTime}-${i}`} row={row} />
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+                <p className="mt-2 text-xs text-slate-500">
+                  拒否されにくくする決まり：ボタンのリンクは院のホームページ（shimonoseki-yuuki.com）か公式LINEだけにする／本文に電話番号・URLを書かない／同じ文をくり返さない。院内アプリから出す投稿は、この決まりに自動で合わせます。拒否が見つかったら、院長のLINEにお知らせします。
+                </p>
+              </section>
+            )
+          })()
+        : null}
+
       {/* ジョブ一覧 */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-bold">ジョブ一覧（{jobs.length}）</h2>
@@ -202,12 +334,16 @@ export default function JobsPage() {
         ) : (
           <ul className="mt-2 divide-y divide-slate-100">
             {jobs.map((job) => {
-              const s = JOB_STATUS_LABEL[job.status]
+              const check = googleCheckNote(job)
+              // Google は受け取ったあとで審査する。公開を確かめるまでは「公開済み」と言い切らない
+              const waiting = check !== null && job.google?.state !== 'live' && !job.google?.done
+              const s = isGoogleRejected(job) ? GOOGLE_REJECTED_LABEL : waiting ? GOOGLE_SENT_LABEL : JOB_STATUS_LABEL[job.status]
               return (
                 <li key={job.id} className="space-y-1.5 py-3 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-xs text-slate-500">{job.scheduledAt.replace('T', ' ')}</span>
                     <span className={`rounded px-2 py-0.5 text-xs font-bold ${s.tone}`}>{s.label}</span>
+                    {check ? <span className={`rounded px-2 py-0.5 text-xs ${check.tone}`}>{check.text}</span> : null}
                     <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">{CHANNEL_LABELS[job.channel]}</span>
                     <span className="font-medium">{job.theme}</span>
                     <span className="text-xs text-slate-500">試行 {job.attempts.length}/{job.maxAttempts}</span>
@@ -265,7 +401,8 @@ export default function JobsPage() {
                         )}
                       </>
                     )}
-                    {isAdmin && job.status === 'failed' && (
+                    {/* Google が拒否した投稿は、同じ内容を出し直すとまた拒否されやすいので「再実行」は出さない */}
+                    {isAdmin && job.status === 'failed' && !isGoogleRejected(job) && (
                       <button type="button" onClick={() => patchJob(job.id, { action: 'retry' })} className="rounded border border-blue-400 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800 max-lg:min-h-10">
                         再実行
                       </button>

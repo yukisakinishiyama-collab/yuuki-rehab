@@ -117,7 +117,8 @@ const is = (h: string, domain: string) => h === domain || h.endsWith(`.${domain}
 function sourceFromUtm(raw: string | null | undefined): HpSource | null {
   const u = (raw ?? '').trim().toLowerCase()
   if (!u) return null
-  if (/^(gbp|gmb|google_?business(_profile)?|google_?maps?|maps)$/.test(u)) return 'maps'
+  // google_post … Googleの投稿の「予約」ボタン（院のホームページのページへ。gbp-post-rules.ts）
+  if (/^(gbp|gmb|google_?business(_profile)?|google_?maps?|maps|google_?posts?)$/.test(u)) return 'maps'
   if (/^(ig|instagram)$/.test(u)) return 'instagram'
   if (/^line$/.test(u)) return 'line'
   if (/^(fb|facebook)$/.test(u)) return 'facebook'
