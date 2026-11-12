@@ -6,8 +6,9 @@
  * - 緊急性はルールベース判定を優先（4-3）
  * - 怒り・診断要求などは人へ引き継ぐ（4-7）
  */
-import { DEFAULT_CLINIC_PROFILE } from './clinic'
+import { DEFAULT_CLINIC_PROFILE, HOMEPAGE_URL } from './clinic'
 import { INTENT_LABELS, type BotReply, type IntentKey, type LineContact } from './line-types'
+import type { LineMenuVariant } from './automation-types'
 
 const P = DEFAULT_CLINIC_PROFILE
 
@@ -25,6 +26,23 @@ export function reserveUrlWith(intent?: string): string {
   const sep = base.includes('?') ? '&' : '?'
   return `${base}${sep}${qs}`
 }
+
+/** ホームページの料金・アクセスのページ（計測つき。/api/marketing/go の遷移先の名前） */
+function homepageUrlWith(dest: 'price' | 'access'): string {
+  const app = process.env.APP_URL
+  if (app) return `${app.replace(/\/$/, '')}/api/marketing/go?d=${dest}&source=line&campaign=first_visit`
+  return `${HOMEPAGE_URL}${dest}`
+}
+
+/**
+ * 友だち追加のときの「3つの選択肢」（2026-11 の指示書3-D）。自動化設定で「3つの選択肢」を選んだときだけ使う。
+ * 中身は今までの入口につなぐ（急なケガ → ケガの相談の流れ、リハビリの予約 → 予約の案内、料金・通院方法 → 料金と通い方の案内）
+ */
+export const THREE_MENU: Array<{ label: string; intent: IntentKey }> = [
+  { label: '急なケガについて相談する', intent: 'injury' },
+  { label: 'リハビリを予約する', intent: 'reserve' },
+  { label: '料金・通院方法を確認する', intent: 'price' },
+]
 
 // ── 緊急性判定（ルールベース・指示書4-3） ───────────────────────
 const URGENT_PATTERNS: RegExp[] = [
@@ -61,7 +79,14 @@ export function checkHandoff(text: string): string | null {
 
 // ── 定型メッセージ ──────────────────────────────────────────────
 
-export function intentMenu(): BotReply {
+export function intentMenu(menu: LineMenuVariant = 'classic'): BotReply {
+  if (menu === 'three') {
+    return {
+      type: 'buttons',
+      text: '友だち追加ありがとうございます😊\nゆうき整骨院です。\n\nご用件に近いものを選んでください。\nそれ以外のご相談は、このままメッセージでどうぞ（スタッフがお返事します）。',
+      buttons: THREE_MENU.map((m) => ({ label: m.label, data: `intent:${m.intent}` })),
+    }
+  }
   return {
     type: 'buttons',
     text: '友だち追加ありがとうございます😊\nゆうき整骨院です。\n\nご相談内容に近いものを選択してください。',
@@ -96,7 +121,7 @@ function handoffReply(): BotReply {
   }
 }
 
-function reserveButtons(intent?: IntentKey): BotReply {
+function reserveButtons(intent?: IntentKey, menu: LineMenuVariant = 'classic'): BotReply {
   // 連絡先ボタン: 固定電話に加え、設定があれば携帯（時間外・急ぎ用）も併記する
   const phoneButtons: Array<{ label: string; data?: string; url?: string }> = [
     { label: `電話（固定 ${P.phone}）`, url: `tel:${P.phone.replace(/-/g, '')}` },
@@ -113,14 +138,19 @@ function reserveButtons(intent?: IntentKey): BotReply {
     buttons: [
       { label: 'Web予約へ進む（24時間・即確定）', url: reserveUrlWith(intent) },
       ...phoneButtons,
-      { label: '料金を確認する', data: 'intent:price' },
+      ...(menu === 'three' && intent === 'price'
+        ? [
+            { label: 'ホームページで料金を見る', url: homepageUrlWith('price') },
+            { label: 'ホームページで場所・駐車場を見る', url: homepageUrlWith('access') },
+          ]
+        : [{ label: '料金を確認する', data: 'intent:price' }]),
       { label: 'スタッフに相談する', data: 'handoff' },
     ],
   }
 }
 
 /** 意図別の来院案内（指示書4-4。誇大表現なし・来院を強要しない） */
-function guidance(intent: IntentKey, contact: LineContact): BotReply[] {
+function guidance(intent: IntentKey, contact: LineContact, menu: LineMenuVariant = 'classic'): BotReply[] {
   const flow = `初回の流れ: ${P.firstVisitFlow}（所要45〜60分ほど）`
   const bring = '持ち物: 保険証（急性のケガの場合）／動きやすい服装がおすすめです'
   const access = `場所: ${P.address}（${P.parking}）`
@@ -164,10 +194,13 @@ function guidance(intent: IntentKey, contact: LineContact): BotReply[] {
   }
 
   const replies: BotReply[] = [{ type: 'text', text: bodyByIntent[intent] }]
-  if (intent !== 'price' && intent !== 'lost') {
-    replies.push({ type: 'text', text: [flow, bring, access].join('\n\n') })
+  // 3つの選択肢の「料金・通院方法」は、料金に続けて通い方（時間・流れ・持ち物・場所）も出す
+  const withVisitInfo = menu === 'three' && intent === 'price'
+  if ((intent !== 'price' && intent !== 'lost') || withVisitInfo) {
+    const hours = `診療時間: ${P.hours}（休み: ${P.closedDays}）`
+    replies.push({ type: 'text', text: (withVisitInfo ? [hours, flow, bring, access] : [flow, bring, access]).join('\n\n') })
   }
-  replies.push(reserveButtons(intent))
+  replies.push(reserveButtons(intent, menu))
   return replies
 }
 
@@ -197,7 +230,13 @@ export interface EngineResult {
   notify?: string
 }
 
-export function advanceScenario(contact: LineContact, input: EngineInput): EngineResult {
+export interface EngineOptions {
+  /** 友だち追加のときの選択肢の形（自動化設定。既定は従来の7つ） */
+  menu?: LineMenuVariant
+}
+
+export function advanceScenario(contact: LineContact, input: EngineInput, opts: EngineOptions = {}): EngineResult {
+  const menu = opts.menu ?? 'classic'
   // 明示的な「スタッフに相談する」ボタンは、人対応中でも毎回確認を返す（無反応を防ぐ）。
   // 自由入力への沈黙（スタッフの手動対応を邪魔しない）は下の handoff 判定で維持する。
   if (input.kind === 'postback' && input.data === 'handoff') {
@@ -221,7 +260,7 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
 
   // 友だち追加 → 選択メニュー（4-1）。再追加時は人対応フラグをリセットして通常フローに戻す
   if (input.kind === 'follow') {
-    return { replies: [intentMenu()], patch: { step: 'idle', handoff: false, tags: ['初めての方'] } }
+    return { replies: [intentMenu(menu)], patch: { step: 'idle', handoff: false, tags: ['初めての方'] } }
   }
 
   const text = input.text ?? ''
@@ -256,7 +295,7 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
     if (intent === 'price' || intent === 'reserve' || intent === 'lost') {
       // 質問を挟まず即案内
       return {
-        replies: guidance(intent, contact),
+        replies: guidance(intent, contact, menu),
         patch: { intent, step: 'guide', tags: mergeTags(contact.tags, INTENT_TAGS[intent]) },
       }
     }
@@ -293,7 +332,7 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
   if (contact.step === 'ask_when' && contact.intent) {
     const timing = input.data?.startsWith('when:') ? input.data.slice(5) : text
     return {
-      replies: guidance(contact.intent, contact),
+      replies: guidance(contact.intent, contact, menu),
       patch: { timing, step: 'guide' },
     }
   }
@@ -305,13 +344,27 @@ export function advanceScenario(contact: LineContact, input: EngineInput): Engin
   if (input.kind === 'text' && process.env.LINE_TEXT_FALLBACK === 'off') {
     return { replies: [], patch: {} }
   }
+  // 3つの選択肢のときは、どれにも当てはまらない相談をスタッフへ引き継ぐ（指示書3-D「不明な内容はスタッフに」）
+  if (menu === 'three' && input.kind === 'text' && text.trim()) {
+    return {
+      replies: [
+        {
+          type: 'text',
+          text: `メッセージありがとうございます。スタッフが内容を確認して、こちらのLINEでお返事します。\nお急ぎの場合はお電話（${P.phone}）へお願いします。`,
+        },
+        intentMenu(menu),
+      ],
+      patch: { needsAttention: '選択肢にない相談（内容の確認が必要）', tags: mergeTags(contact.tags, ['要スタッフ対応']) },
+      notify: 'LINE要対応: 選択肢にない相談',
+    }
+  }
   return {
     replies: [
       {
         type: 'text',
         text: 'メッセージありがとうございます。内容はスタッフも確認できます。お急ぎの場合は下のメニューからどうぞ😊',
       },
-      intentMenu(),
+      intentMenu(menu),
     ],
     patch: {},
   }
@@ -324,7 +377,9 @@ function parseIntent(input: EngineInput): IntentKey | null {
   }
   const text = input.text ?? ''
   const found = (Object.entries(INTENT_LABELS) as Array<[IntentKey, string]>).find(([, label]) => text === label)
-  return found ? found[0] : null
+  if (found) return found[0]
+  const three = THREE_MENU.find((m) => m.label === text)
+  return three ? three.intent : null
 }
 
 function mergeTags(current: string[], add: string[]): string[] {

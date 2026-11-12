@@ -1,36 +1,45 @@
 import type { Metadata } from "next";
-import { Sora, IBM_Plex_Sans, IBM_Plex_Mono, Zen_Kaku_Gothic_New } from "next/font/google";
+import localFont from "next/font/local";
+// 日本語（Zen Kaku Gothic New — 均整がとれた和文ゴシック、医療 UI の信頼感に適合）
+// 文字の範囲ごとに分かれたファイルで、使う文字の分だけ読み込まれる。変数 --font-zen-kaku は globals.css で定義
+import "@fontsource/zen-kaku-gothic-new/400.css";
+import "@fontsource/zen-kaku-gothic-new/500.css";
+import "@fontsource/zen-kaku-gothic-new/700.css";
 import "./globals.css";
 
+// フォントはビルド時に Google Fonts から取らず、リポジトリ内のファイルを使う（src/app/fonts/README.md）
+
 // ディスプレイ見出し（欧文）
-const sora = Sora({
-  subsets: ["latin"],
+const sora = localFont({
+  src: [
+    { path: "./fonts/sora-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/sora-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/sora-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/sora-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/sora-latin-800-normal.woff2", weight: "800", style: "normal" },
+  ],
   variable: "--font-sora",
-  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
 
 // 本文・UI（欧文）
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
+const ibmPlexSans = localFont({
+  src: [
+    { path: "./fonts/ibm-plex-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--font-ibm-plex-sans",
-  weight: ["400", "500", "600"],
   display: "swap",
 });
 
 // 数値・臨床指標（等幅）
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
+const ibmPlexMono = localFont({
+  src: [
+    { path: "./fonts/ibm-plex-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-mono-latin-500-normal.woff2", weight: "500", style: "normal" },
+  ],
   variable: "--font-ibm-plex-mono",
-  weight: ["400", "500"],
-  display: "swap",
-});
-
-// 日本語（Zen Kaku Gothic New — 均整がとれた和文ゴシック、医療 UI の信頼感に適合）
-const zenKakuGothicNew = Zen_Kaku_Gothic_New({
-  subsets: ["latin"],
-  variable: "--font-zen-kaku",
-  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -43,9 +52,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "YUUKI REHAB",
   },
+  // アイコンは小さく縮めたもの（元の icon.png.png は 1.3MB あり、どの画面でも読み込まれて遅くしていた）
   icons: {
-    icon: "/icon.png.png?v=20260521",
-    apple: "/icon.png.png?v=20260521",
+    icon: [
+      { url: "/favicon-48.png?v=20261024", sizes: "48x48", type: "image/png" },
+      { url: "/app-icon-192.png?v=20261024", sizes: "192x192", type: "image/png" },
+    ],
+    apple: { url: "/apple-icon-180.png?v=20261024", sizes: "180x180" },
   },
 };
 
@@ -57,11 +70,9 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${sora.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable} ${zenKakuGothicNew.variable}`}
+      className={`${sora.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
     >
       <head>
-        <link rel="icon" href="/icon.png.png?v=20260521" type="image/png" />
-        <link rel="apple-touch-icon" href="/icon.png.png?v=20260521" />
         <meta name="theme-color" content="#0d9488" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

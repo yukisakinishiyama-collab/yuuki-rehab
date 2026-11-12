@@ -9,6 +9,25 @@ import type { ClinicProfile } from './types'
 export const RESERVE_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec'
 
+/** 公式LINEの LIFF（ネット予約のリッチメニューに入れているもの。/link を足すとカルテ連携） */
+export const LIFF_ID = '2010991753-yKKnDDnb'
+/** LINE の中から開くネット予約（LIFF 経由。予約完了の通知が本人の LINE に届く） */
+export const LIFF_RESERVE_URL = `https://liff.line.me/${LIFF_ID}`
+
+/** 院のホームページ（検索に出す本来のサイト。Netlify） */
+export const HOMEPAGE_URL = 'https://shimonoseki-yuuki.com/'
+
+/** はじめての方へ（初回の料金・当日の流れ・駐車場をまとめたページ） */
+export const FIRST_VISIT_URL = 'https://shimonoseki-yuuki.com/first-visit'
+
+/**
+ * 予約のルール（ホームページ・Googleの説明文と同じ）。
+ * 投稿の締めで「完全予約制」「予約は電話で」とだけ書くと、急なケガの方が来られないと誤解するため、
+ * 院情報とは別に必ずプロンプトへ入れる
+ */
+export const BOOKING_RULE =
+  'リハビリは完全予約制、急なケガ（急性外傷）は予約不要（まずお電話で状態をお聞きします）。ネット予約は24時間受付。お電話・公式LINEでも予約・相談できる'
+
 export const DEFAULT_CLINIC_PROFILE: ClinicProfile = {
   name: 'ゆうき整骨院',
   address: '山口県下関市彦島江の浦町9丁目1-14',
@@ -20,7 +39,7 @@ export const DEFAULT_CLINIC_PROFILE: ClinicProfile = {
   lineUrl: 'https://lin.ee/uaGKbfk',
   googleMapUrl: 'https://maps.google.com/?cid=6709983637345638461',
   instagramUrl: 'https://www.instagram.com/yu.ki__seikotsuin',
-  parking: '駐車場あり（院前）',
+  parking: '駐車場あり（院の前・3〜4台）',
   services:
     '外傷治療（捻挫・打撲・挫傷など）／スポーツ外傷／術前術後リハビリ／運動療法／体外衝撃波・超音波などの物理療法',
   notServices:
@@ -41,7 +60,10 @@ export function clinicProfileToPrompt(profile: ClinicProfile): string {
     `所在地: ${profile.address}（${profile.parking}）`,
     `電話: ${profile.phone}`,
     `施術時間: ${profile.hours}／定休日: ${profile.closedDays}`,
+    `ホームページ: ${HOMEPAGE_URL}`,
     `ネット予約（24時間・即時確定）: ${profile.reserveUrl}`,
+    `予約のルール: ${BOOKING_RULE}`,
+    `はじめての方へ（初回の料金・当日の流れ）: ${FIRST_VISIT_URL}`,
     `公式LINE: ${profile.lineUrl}`,
     `Google店舗ページ: ${profile.googleMapUrl}`,
     `Instagram: ${profile.instagramUrl}`,
@@ -51,5 +73,6 @@ export function clinicProfileToPrompt(profile: ClinicProfile): string {
     `初回の流れ: ${profile.firstVisitFlow}`,
     `院の強み: ${profile.strengths}`,
     `トーン: ${profile.defaultTone}`,
+    '締めの案内: 予約に触れるときは「予約のルール」のとおりに書く（「完全予約制」とだけ書かない。「ご予約はお電話で」だけにしない）',
   ].join('\n')
 }

@@ -1,13 +1,16 @@
 import { cn } from '@/lib/utils'
 import { forwardRef, type HTMLAttributes } from 'react'
 
+/**
+ * 院内アプリのカードの「枠」の見た目（白・うすい線・角丸・弱い影）。
+ * Card と、今日の画面の Panel（src/components/clinic/Panel.tsx）が同じものを使う。
+ * 見た目を変えるときはここだけを直す。
+ */
+export const cardSurface = 'rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm'
+
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('rounded-xl border border-gray-200 bg-white text-gray-950 shadow-sm', className)}
-      {...props}
-    />
+    <div ref={ref} className={cn(cardSurface, className)} {...props} />
   )
 )
 Card.displayName = 'Card'
@@ -21,14 +24,14 @@ CardHeader.displayName = 'CardHeader'
 
 const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props} />
+    <h3 ref={ref} className={cn('text-lg font-bold leading-snug text-slate-900', className)} {...props} />
   )
 )
 CardTitle.displayName = 'CardTitle'
 
 const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-sm text-gray-500', className)} {...props} />
+    <p ref={ref} className={cn('text-sm text-slate-600', className)} {...props} />
   )
 )
 CardDescription.displayName = 'CardDescription'

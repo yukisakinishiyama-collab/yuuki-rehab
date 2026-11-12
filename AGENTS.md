@@ -3,20 +3,11 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 
-## 画像アセットの追加ルール（ChatGPT / Codex 等の外部AIエージェント向け）
+## 外部AIエージェント（ChatGPT / Codex など）向けのルール
 
-このリポジトリにイラスト画像を追加する場合は、以下に従うこと:
-
-1. 画像は `public/illustrations/` に **PNG** で追加する
-2. ファイル名は `src/lib/illustrations.ts` の `ILLUSTRATION_SLOTS` に定義された
-   スロット名に一致させる（例: `fracture-cast-forearm.png`）。
-   一致すればコード変更なしで該当画面に自動表示される
-3. **画像追加のためにコード（.ts/.tsx）を変更しないこと**。新しいスロットが必要な場合のみ
-   `ILLUSTRATION_SLOTS` への追記を提案する
-4. `main` へ直接コミットせず **Pull Request を作成**する（最終確認は院長が行う）
-5. `.env*` ファイルは読まない・変更しない
-6. 医療広告ガイドラインに配慮し、治癒を保証するような誇張表現の画像は追加しない
-
-※ 再デプロイなしで反映したい場合は、アプリ内の「イラスト管理」画面（/illustrations）から
-アップロードする方法もある（Vercel Blob 保存・コミット不要）。
+1. `main` へ直接コミットせず **Pull Request を作成**する（最終確認は院長が行う）
+2. `.env*` ファイルは読まない・変更しない
+3. 医療広告ガイドラインに配慮し、治癒を保証するような誇張表現は書かない・載せない
+4. 院内アプリは「予約管理・カルテ・経営・集客」に絞っている。削除済みの機能（動作解析、プロトコル立案、
+   疾患/文献ライブラリ、イラスト管理、患者さん向けの説明・問診・カラダマップ）を戻す変更は、院長の確認なしに行わない
 <!-- END:nextjs-agent-rules -->

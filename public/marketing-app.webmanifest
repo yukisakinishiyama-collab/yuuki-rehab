@@ -1,10 +1,10 @@
 {
-  "name": "ゆうき整骨院 マーケティングハブ",
-  "short_name": "ゆうきマーケ",
-  "description": "院内マーケティング業務（投稿制作・承認・動画資産・効果測定）を一元管理する社内アプリ",
+  "name": "ゆうき整骨院 院内アプリ",
+  "short_name": "ゆうき院内",
+  "description": "ゆうき整骨院の院内アプリ（予約管理・カルテ・経営・集客）",
   "id": "/marketing",
   "start_url": "/marketing",
-  "scope": "/marketing",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#16233d",
@@ -12,9 +12,29 @@
   "lang": "ja",
   "dir": "ltr",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

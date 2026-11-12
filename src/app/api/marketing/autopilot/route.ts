@@ -7,6 +7,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { isInstagramConnected } from '@/lib/marketing/instagram-token'
+import { isGbpConnected } from '@/lib/marketing/gbp-token'
+import { youtubeStatus } from '@/lib/marketing/youtube-server'
 import { z } from 'zod'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { generateNow } from '@/lib/marketing/autopilot-server'
@@ -26,10 +28,43 @@ const SettingsSchema = z.object({
   instagram: z.enum(['instagram_feed', 'instagram_carousel', 'off']),
   google: z.boolean(),
   availabilityPost: z.boolean(),
+  googleSeo: z.boolean().default(true),
+  googleSeoPerWeek: z.number().int().min(1).max(2).default(2),
+  youtubeShorts: z.boolean().default(true),
+  tiktokVideo: z.boolean().default(true),
+  promoVideoPerWeek: z.number().int().min(1).max(2).default(1),
+  youtubeAudited: z.boolean().default(false),
+  availabilityStory: z.boolean().default(true),
+  cancelStory: z.boolean().default(false),
+  cancelStoryDays: z.enum(['today', 'tomorrow']).default('tomorrow'),
+  cancelStoryLeadMinutes: z.number().int().min(0).max(360).default(60),
+  cancelStoryFromHour: z.number().int().min(0).max(23).default(7),
+  cancelStoryToHour: z.number().int().min(1).max(24).default(21),
+  cancelStoryMaxPerDay: z.number().int().min(1).max(10).default(3),
   generateHour: z.number().int().min(6).max(22),
   ownerNote: z.string().max(400),
   clinicProfile: z.record(z.string(), z.string().max(2000)).optional(),
 })
+
+/** YouTubeショート・TikTokの動画の予定（今週・来週。承認の状態・出し方つき） */
+async function upcomingPromoPlan() {
+  try {
+    const { promoPlanView } = await import('@/lib/marketing/promo-video-server')
+    return await promoPlanView()
+  } catch (error) {
+    console.error('[autopilot] 動画の予定を読めませんでした', error)
+    return []
+  }
+}
+
+async function bufferConnection() {
+  try {
+    const { bufferStatus } = await import('@/lib/marketing/buffer-server')
+    return await bufferStatus()
+  } catch {
+    return null
+  }
+}
 
 export async function GET() {
   try {
@@ -38,10 +73,14 @@ export async function GET() {
       ok: true,
       settings,
       proposals: proposals.slice(0, 6),
+      promoPlan: await upcomingPromoPlan(),
       connections: {
         ai: Boolean(process.env.ANTHROPIC_API_KEY) && process.env.MARKETING_MODE !== 'mock',
+        aiImage: Boolean(process.env.OPENAI_API_KEY) && process.env.MARKETING_MODE !== 'mock',
         instagram: await isInstagramConnected(),
-        googleApi: Boolean(process.env.GBP_REFRESH_TOKEN && process.env.GBP_LOCATION_NAME),
+        googleApi: await isGbpConnected(),
+        youtube: await youtubeStatus(),
+        buffer: await bufferConnection(),
         ownerLine: Boolean(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.RESERVATION_NOTIFY_LINE_USER_ID),
         bookingStats: Boolean(process.env.RESERVATION_NOTIFY_SECRET),
         mock: process.env.MARKETING_MODE === 'mock',
@@ -67,6 +106,19 @@ export async function PUT(request: NextRequest) {
   const current = await getAutopilotSettings()
   const next = { ...DEFAULT_AUTOPILOT_SETTINGS, ...current, ...input }
   await saveAutopilotSettings(next)
+  // Google検索向けの投稿をオフにしたら、予約済みでまだ出していない分も取り消す（すぐに止まるように）
+  if (!next.googleSeo) {
+    const { cancelPendingSeoPosts } = await import('@/lib/marketing/gbp-seo-server')
+    await cancelPendingSeoPosts()
+  }
+  // 動画（YouTubeショート・TikTok）：オフにした媒体の予約は取り消し、オンの媒体はすぐ予約する（次の定期実行を待たない）
+  try {
+    const { cancelPendingPromoJobs, enabledPromoChannels, schedulePromoVideos } = await import('@/lib/marketing/promo-video-server')
+    await cancelPendingPromoJobs(enabledPromoChannels(next))
+    await schedulePromoVideos()
+  } catch (error) {
+    console.error('[autopilot] 動画の投稿の予約を更新できませんでした', error)
+  }
   return NextResponse.json({ ok: true, settings: next })
 }
 

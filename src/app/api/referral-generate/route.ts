@@ -43,8 +43,8 @@ ADL困難: ${latestIntake.adlDifficulty?.join('、') || 'なし'}
 
     if (type === 'patient') {
       prompt = `あなたは柔道整復師の補助AIです。以下の患者情報をもとに、患者さんへ手渡す「治療説明書」の内容を日本語で作成してください。
+患者さんのお名前はお伝えしていません。文中で名前は書かず「患者様」と表記してください。
 
-患者名: ${patient.name}
 疾患・部位: ${patient.diagnosis || patient.bodyRegion}
 
 ${intakeSummary}
@@ -62,10 +62,10 @@ ${soapSummary}
 }`
     } else if (type === 'referral') {
       prompt = `あなたは柔道整復師の補助AIです。以下の患者情報をもとに、整形外科宛の紹介状（御紹介書）の本文を日本語で作成してください。
+患者さんのお名前はお伝えしていません。文中で名前は書かず「患者様」と表記してください。
 
-患者名: ${patient.name}
 疾患・部位: ${patient.diagnosis || patient.bodyRegion}
-紹介先: ${destination.institution} ${destination.department} ${destination.doctor}先生
+紹介先: ${destination.institution} ${destination.department}
 
 ${intakeSummary}
 
@@ -81,10 +81,10 @@ ${soapSummary}
 }`
     } else {
       prompt = `あなたは柔道整復師の補助AIです。以下の患者情報をもとに、整形外科への報告書（御報告書）の本文を日本語で作成してください。
+患者さんのお名前はお伝えしていません。文中で名前は書かず「患者様」と表記してください。
 
-患者名: ${patient.name}
 疾患・部位: ${patient.diagnosis || patient.bodyRegion}
-報告先: ${destination.institution} ${destination.department} ${destination.doctor}先生
+報告先: ${destination.institution} ${destination.department}
 
 ${intakeSummary}
 

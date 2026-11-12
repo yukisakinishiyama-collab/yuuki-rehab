@@ -5,7 +5,7 @@
 // SOAPノートは一度だけ読み込んで患者別にグループ化し、
 // 患者数が増えても検索入力ごとの再パースが起きないようにしている。
 // ──────────────────────────────────────────────
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -15,13 +15,23 @@ import {
 import type { Patient, SOAPNote, CancellationSummary } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
 import { getPatients, initPatientStore, getSOAPNotes, getCancellations } from '@/lib/patient-store'
+import { useKarteSynced } from '@/lib/use-karte-sync'
+import SyncNowButton from '@/components/rehab/SyncNowButton'
 import { groupByPatient, summarizeCancellations } from '@/lib/cancellation-utils'
 import { calculateRetentionRisk, getDaysSinceLastVisit, calcAge } from '@/lib/rehab-algorithms'
 import { getPinnedIds, togglePin, getRecentViews } from '@/lib/patient-ui-prefs'
+import { matchKartePatients } from '@/lib/karte-link'
+import { openOrCreateKarte } from '@/lib/karte-auto-create'
+import { nameKey } from '@/lib/noah-import'
+import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
+import { useLineLinks } from '@/lib/line-link-client'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+
+/** 一覧で一度に描く人数 */
+const PAGE_SIZE = 40
 
 const FILTER_OPTIONS = [
   { label: 'すべて',     value: 'all' },
@@ -32,6 +42,8 @@ const FILTER_OPTIONS = [
   { label: '腰部',       value: 'lumbar' },
   { label: '頚部',       value: 'cervical' },
   { label: '離脱リスク高', value: 'high_risk' },
+  { label: '🎂 誕生日が近い', value: 'birthday' },
+  { label: 'LINE連携済み', value: 'line' },
 ]
 
 const SORT_OPTIONS = [
@@ -54,13 +66,60 @@ export default function PatientsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('visit')
   const [pins, setPins] = useState<string[]>([])
   const [recentIds, setRecentIds] = useState<string[]>([])
+  // 予約管理画面から「カルテを開く」で来たのに見つからなかった方（お名前を出して、登録しやすくする）
+  const [karteMiss, setKarteMiss] = useState('')
+  // 予約管理画面から来た方のカルテが無いので、予約の情報から作っているところ
+  const [karteCreating, setKarteCreating] = useState('')
+
+  // ほかの端末で増えた・変わったカルテを一覧に出す（15秒ごとの同期・「すぐに反映する」）
+  useKarteSynced((keys) => {
+    if (keys.some(k => k.startsWith('pt_'))) setPatients(getPatients())
+  })
 
   useEffect(() => {
     initPatientStore()
-    setPatients(getPatients())
+    const list = getPatients()
+    setPatients(list)
     setPins(getPinnedIds())
     setRecentIds(getRecentViews().map(v => v.id))
-  }, [])
+    const params = new URLSearchParams(window.location.search)
+    // 「今日」の画面の検索から来たとき（/patients?q=お名前）
+    const q = params.get('q')
+    if (q) setSearch(q)
+    // 予約管理画面で氏名を押して来たとき（/patients?karte=お名前&tel=電話番号）
+    const karte = params.get('karte') ?? ''
+    const tel = params.get('tel') ?? ''
+    if (!karte && !tel) return
+    const found = matchKartePatients(list, karte, tel)
+    if (found.length === 1) {
+      router.replace(`/patients/${found[0].id}`)
+      return
+    }
+    setSearch(karte)
+    // 同じお名前のカルテが2つ以上 → 一覧から選んでもらう
+    if (found.length > 1) return
+    // カルテが無い → 予約の情報（お名前・電話）から作って開く（クラウドの控えの取り込みを待ってから、もう一度探す）
+    if (!karte) {
+      setKarteMiss(tel)
+      return
+    }
+    setKarteCreating(karte)
+    let alive = true
+    void openOrCreateKarte({ name: karte, phone: tel }).then(r => {
+      if (!alive) return
+      if (r.kind === 'open' || r.kind === 'created') {
+        router.replace(`/patients/${r.patient.id}`)
+        return
+      }
+      if (r.kind === 'reload') return // 取り込みでカルテが変わり、画面が読み直される（読み直したあと、もう一度探す）
+      setKarteCreating('')
+      setPatients(getPatients())
+      if (r.kind === 'none') setKarteMiss(karte || tel)
+    })
+    return () => {
+      alive = false
+    }
+  }, [router])
 
   // SOAPノートを一度だけ読み込み、患者別にグループ化（来院日の降順）
   const notesByPatient = useMemo(() => {
@@ -111,6 +170,22 @@ export default function PatientsPage() {
     return map
   }, [patients, notesByPatient, cancelByPatient])
 
+  // 公式LINEと結びついている方（サーバーの一覧をキーで引く）
+  const { linkFor } = useLineLinks()
+  const lineLinkedCount = useMemo(() => patients.filter(p => Boolean(linkFor(p))).length, [patients, linkFor])
+
+  // 誕生日が近い方（今日〜BIRTHDAY_SOON_DAYS日以内）
+  const birthdaySoonCount = useMemo(() => patients.filter(p => isBirthdaySoon(p.birthDate)).length, [patients])
+  // 同じお名前のカルテが2つ以上ある名前の数（「重複したカルテの整理」への入口に出す）
+  const sameNameCount = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const p of patients) {
+      const key = nameKey(p.name ?? '')
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return [...counts.values()].filter(n => n > 1).length
+  }, [patients])
+
   const highRiskCount = useMemo(
     () => patients.filter(p => riskByPatient.get(p.id)?.level === 'high').length,
     [patients, riskByPatient],
@@ -128,6 +203,8 @@ export default function PatientsPage() {
       if (!matchSearch) return false
       if (filter === 'all') return true
       if (filter === 'high_risk') return riskByPatient.get(p.id)?.level === 'high'
+      if (filter === 'birthday') return isBirthdaySoon(p.birthDate)
+      if (filter === 'line') return Boolean(linkFor(p))
       return p.bodyRegion === filter
     })
 
@@ -160,12 +237,39 @@ export default function PatientsPage() {
 
   const isEmpty = pinned.length === 0 && others.length === 0
 
+  // ── 一覧は少しずつ描く ──
+  // 数百人ぶんのカードを一度に描くと、スマホで画面が出るまで数秒かかる。
+  // 最初は PAGE_SIZE 件だけ描き、画面の下に近づいたら続きを足す（検索・絞り込みは全員が対象のまま）。
+  const [shown, setShown] = useState(PAGE_SIZE)
+  const listKey = `${search}\u0000${filter}\u0000${sortKey}`
+  const [shownFor, setShownFor] = useState(listKey)
+  if (shownFor !== listKey) {
+    // 条件が変わったら先頭から描き直す（レンダー中の state 更新は React の推奨パターン）
+    setShownFor(listKey)
+    setShown(PAGE_SIZE)
+  }
+  const visibleOthers = others.length > shown ? others.slice(0, shown) : others
+  const hasMore = others.length > shown
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) setShown(n => n + PAGE_SIZE)
+    }, { rootMargin: '600px 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, shown])
+
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">患者管理</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">患者管理</h1>
+            <SyncNowButton />
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-gray-500">{patients.length}名登録中</p>
             {highRiskCount > 0 && (
@@ -174,18 +278,48 @@ export default function PatientsPage() {
                 <AlertTriangle className="w-3 h-3" />離脱リスク高 {highRiskCount}名
               </span>
             )}
+            {birthdaySoonCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('birthday')}
+                title={`${BIRTHDAY_SOON_DAYS}日以内に誕生日の方`}
+                className="inline-flex items-center gap-1 text-xs text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-100 max-lg:min-h-10"
+              >
+                🎂 誕生日が近い {birthdaySoonCount}名
+              </button>
+            )}
+            {lineLinkedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('line')}
+                title="公式LINEと結びついている方"
+                className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 max-lg:min-h-10"
+              >
+                LINE連携済み {lineLinkedCount}名
+              </button>
+            )}
           </div>
         </div>
-        <Link href="/patients/new" className={cn(buttonVariants({ variant: 'default' }))}>
-          <Plus className="w-4 h-4" />
-          新規患者登録
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {sameNameCount > 0 && (
+            <Link href="/patients/duplicates" className={cn(buttonVariants({ variant: 'outline' }), 'border-amber-300 text-amber-900')}>
+              重複の整理（同じお名前 {sameNameCount}人分）
+            </Link>
+          )}
+          <Link href="/patients/import" className={cn(buttonVariants({ variant: 'outline' }))}>
+            NOAHから取り込む
+          </Link>
+          <Link href="/patients/new" className={cn(buttonVariants({ variant: 'default' }))}>
+            <Plus className="w-4 h-4" />
+            新規患者登録
+          </Link>
+        </div>
       </div>
 
       {/* 最近閲覧した患者 */}
       {recentPatients.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
             <History className="w-3.5 h-3.5" />最近閲覧した患者
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -194,13 +328,13 @@ export default function PatientsPage() {
                 key={p.id}
                 href={`/patients/${p.id}`}
                 className="flex items-center gap-2 flex-shrink-0 bg-white border border-gray-200
-                  rounded-full pl-1.5 pr-3 py-1.5 hover:border-teal-300 hover:shadow-sm transition-all"
+                  rounded-full pl-1.5 pr-3 py-1.5 hover:border-teal-300 hover:shadow-sm transition-all max-lg:min-h-10"
               >
                 <span className="w-6 h-6 bg-teal-50 rounded-full flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-teal-600" />
+                  <User className="w-3.5 h-3.5 text-teal-700" />
                 </span>
                 <span className="text-xs font-medium text-gray-700">{p.name}</span>
-                <span className="text-[10px] text-gray-400">{BODY_REGION_LABELS[p.bodyRegion]}</span>
+                <span className="text-xs text-gray-500">{BODY_REGION_LABELS[p.bodyRegion]}</span>
               </Link>
             ))}
           </div>
@@ -210,7 +344,7 @@ export default function PatientsPage() {
       {/* 検索・フィルター・並び替え */}
       <div className="space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             type="text"
             placeholder="氏名・カナ・診断名・ID・主訴で検索..."
@@ -227,9 +361,9 @@ export default function PatientsPage() {
                 type="button"
                 onClick={() => setFilter(opt.value)}
                 className={cn(
-                  'px-3 py-1.5 text-xs rounded-full border font-medium transition-colors',
+                  'px-3 py-1.5 text-xs rounded-full border font-medium transition-colors max-lg:min-h-10',
                   filter === opt.value
-                    ? 'bg-teal-600 text-white border-teal-600'
+                    ? 'bg-teal-700 text-white border-teal-700'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-700'
                 )}
               >
@@ -238,7 +372,7 @@ export default function PatientsPage() {
             ))}
           </div>
           <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
             <select
               value={sortKey}
               onChange={e => setSortKey(e.target.value as SortKey)}
@@ -254,9 +388,31 @@ export default function PatientsPage() {
         </div>
       </div>
 
+      {/* 予約管理画面から来た方のカルテを作っているところ */}
+      {karteCreating && (
+        <div role="status" className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          予約の「{karteCreating}」さんのカルテがまだ無いので、予約の情報から作っています…
+        </div>
+      )}
+
+      {/* 予約管理画面から来たのにカルテが無かったとき */}
+      {karteMiss && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>
+            予約の「{karteMiss}」さんのカルテが見つかりませんでした。お名前を確かめるか、新しく登録してください。
+          </span>
+          <Link href="/patients/new" className={cn(buttonVariants({ size: 'sm' }), 'bg-amber-700 hover:bg-amber-800')}>
+            この方のカルテを作る
+          </Link>
+          <button type="button" onClick={() => setKarteMiss('')} className="ml-auto text-xs text-amber-700 underline max-lg:min-h-10">
+            閉じる
+          </button>
+        </div>
+      )}
+
       {/* 患者リスト */}
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
           <User className="w-12 h-12 mb-3 opacity-30" />
           <p className="text-sm">
             {search || filter !== 'all' ? '条件に一致する患者が見つかりません' : '患者が登録されていません'}
@@ -271,7 +427,7 @@ export default function PatientsPage() {
         <div className="space-y-5">
           {pinned.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
                 <Pin className="w-3.5 h-3.5" />ピン留め
               </div>
               <div className="space-y-2">
@@ -282,6 +438,7 @@ export default function PatientsPage() {
                     notes={notesByPatient.get(patient.id) ?? []}
                     riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
                     cancelSummary={cancelByPatient.get(patient.id)}
+                    lineLinked={Boolean(linkFor(patient))}
                     pinned
                     onTogglePin={() => handleTogglePin(patient.id)}
                     onClick={() => router.push(`/patients/${patient.id}`)}
@@ -291,18 +448,31 @@ export default function PatientsPage() {
             </div>
           )}
           <div className="space-y-2">
-            {others.map(patient => (
+            {visibleOthers.map(patient => (
               <PatientCard
                 key={patient.id}
                 patient={patient}
                 notes={notesByPatient.get(patient.id) ?? []}
                 riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
                 cancelSummary={cancelByPatient.get(patient.id)}
+                lineLinked={Boolean(linkFor(patient))}
                 pinned={false}
                 onTogglePin={() => handleTogglePin(patient.id)}
                 onClick={() => router.push(`/patients/${patient.id}`)}
               />
             ))}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex flex-col items-center gap-2 py-3">
+                <p className="text-xs text-gray-500">{pinned.length + visibleOthers.length} / {pinned.length + others.length}名を表示</p>
+                <button
+                  type="button"
+                  onClick={() => setShown(n => n + PAGE_SIZE)}
+                  className="px-4 py-2 text-sm font-medium text-teal-700 bg-white border border-teal-200 rounded-lg hover:bg-teal-50 max-lg:min-h-10"
+                >
+                  さらに表示
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -310,11 +480,13 @@ export default function PatientsPage() {
   )
 }
 
-function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onTogglePin, onClick }: {
+function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pinned, onTogglePin, onClick }: {
   patient: Patient
   notes: SOAPNote[]
   riskLevel: 'low' | 'medium' | 'high'
   cancelSummary?: CancellationSummary
+  /** 公式LINEと結びついているか */
+  lineLinked?: boolean
   pinned: boolean
   onTogglePin: () => void
   onClick: () => void
@@ -325,9 +497,10 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
     low: 'success', medium: 'warning', high: 'danger',
   }
   const nrsColor = (latestNote?.painToday ?? 0) >= 7 ? 'text-red-600'
-    : (latestNote?.painToday ?? 0) >= 4 ? 'text-yellow-600'
-    : 'text-green-600'
+    : (latestNote?.painToday ?? 0) >= 4 ? 'text-yellow-700'
+    : 'text-green-700'
   const age = calcAge(patient.birthDate)
+  const bday = birthdayLabel(patient.birthDate)
 
   return (
     // ピンボタンを内包するため button ではなく div role="button" を使用
@@ -346,7 +519,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
       <div className="flex items-center gap-4">
         {/* アバター */}
         <div className="w-11 h-11 bg-teal-50 rounded-full flex items-center justify-center flex-shrink-0">
-          <User className="w-5 h-5 text-teal-600" />
+          <User className="w-5 h-5 text-teal-700" />
         </div>
 
         {/* メイン情報 */}
@@ -354,18 +527,28 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{patient.name}</span>
             {/* 生年月日未入力の患者では年齢を表示しない（NaN歳の防止） */}
-            {Number.isFinite(age) && <span className="text-sm text-gray-400">{age}歳</span>}
+            {Number.isFinite(age) && <span className="text-sm text-gray-500">{age}歳</span>}
+            {bday && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-xs font-bold text-pink-700">
+                🎂 {bday}
+              </span>
+            )}
+            {lineLinked && (
+              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700" title="公式LINEと結びついています">
+                LINE
+              </span>
+            )}
             <Badge variant="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
             <Badge variant={riskVariant[riskLevel]}>
               離脱リスク{RISK_LABELS[riskLevel]}
             </Badge>
-            {riskLevel === 'high' && <AlertTriangle className="w-4 h-4 text-red-500" />}
+            {riskLevel === 'high' && <AlertTriangle className="w-4 h-4 text-red-600" />}
             {/* キャンセル累計（0件の患者には出さない。無断ありは赤で強調） */}
             {cancelSummary && cancelSummary.total > 0 && (
               <span
                 title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
                   cancelSummary.no_show > 0
                     ? 'bg-red-50 text-red-700 border-red-200'
                     : 'bg-orange-50 text-orange-700 border-orange-200',
@@ -377,7 +560,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
             )}
           </div>
           <p className="text-xs text-gray-500 mt-1 truncate">{patient.mainComplaint}</p>
-          <p className="text-xs text-gray-400">{patient.diagnosisLabel}</p>
+          <p className="text-xs text-gray-500">{patient.diagnosisLabel}</p>
         </div>
 
         {/* 右側：最新NRS + 来院回数 */}
@@ -387,11 +570,11 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
               <div className={cn('text-lg font-bold tabular-nums', nrsColor)}>
                 NRS {latestNote.painToday}
               </div>
-              <div className="text-xs text-gray-400">{latestNote.visitDate}</div>
+              <div className="text-xs text-gray-500">{latestNote.visitDate}</div>
               <div className="text-xs text-gray-500">{notes.length}回来院</div>
             </>
           ) : (
-            <div className="text-xs text-gray-400 flex items-center gap-1">
+            <div className="text-xs text-gray-500 flex items-center gap-1">
               <Activity className="w-3 h-3" />
               初回評価待ち
             </div>
@@ -403,10 +586,10 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
           type="button"
           onClick={e => { e.stopPropagation(); onTogglePin() }}
           className={cn(
-            'p-1.5 rounded-lg transition-colors flex-shrink-0',
+            'p-1.5 rounded-lg transition-colors flex-shrink-0 max-lg:min-h-10',
             pinned
-              ? 'text-teal-600 hover:text-teal-800 hover:bg-teal-50'
-              : 'text-gray-300 hover:text-teal-500 hover:bg-gray-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+              ? 'text-teal-700 hover:text-teal-800 hover:bg-teal-50'
+              : 'text-gray-500 hover:text-teal-500 hover:bg-gray-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
           )}
           aria-label={pinned ? 'ピン留めを解除' : 'ピン留めする'}
           title={pinned ? 'ピン留めを解除' : 'ピン留めする'}
@@ -414,7 +597,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, pinned, onToggl
           {pinned ? <Pin className="w-4 h-4 fill-current" /> : <PinOff className="w-4 h-4" />}
         </button>
 
-        <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-teal-500 transition-colors flex-shrink-0" />
+        <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-teal-500 transition-colors flex-shrink-0" />
       </div>
     </div>
   )

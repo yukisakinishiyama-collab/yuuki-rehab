@@ -80,7 +80,7 @@ export default function QRLoginModal({ onClose }: Props) {
             <Smartphone className="w-5 h-5" />
             <span className="font-semibold">スマートフォンでアクセス</span>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors max-lg:min-h-10 max-lg:inline-flex max-lg:items-center max-lg:justify-center max-lg:min-w-10">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -90,12 +90,12 @@ export default function QRLoginModal({ onClose }: Props) {
           {/* アクセス方法切替 */}
           {isExternal ? (
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 text-sm text-green-800">
-              <Globe className="w-4 h-4 flex-shrink-0 text-green-500" />
+              <Globe className="w-4 h-4 flex-shrink-0 text-green-700" />
               <span><strong>外部アクセス有効</strong> — どこからでも接続可能</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 text-sm text-blue-800">
-              <Wifi className="w-4 h-4 flex-shrink-0 text-blue-500" />
+              <Wifi className="w-4 h-4 flex-shrink-0 text-blue-600" />
               <span>スマートフォンとPCが<strong>同じWiFi</strong>に接続している必要があります</span>
             </div>
           )}
@@ -104,7 +104,7 @@ export default function QRLoginModal({ onClose }: Props) {
           <div className="flex flex-col items-center gap-3">
             {expired ? (
               <div className="w-48 h-48 flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl gap-2">
-                <Clock className="w-8 h-8 text-gray-400" />
+                <Clock className="w-8 h-8 text-gray-500" />
                 <p className="text-sm text-gray-500">有効期限切れ</p>
               </div>
             ) : qrUrl ? (
@@ -119,18 +119,18 @@ export default function QRLoginModal({ onClose }: Props) {
               </div>
             ) : (
               <div className="w-48 h-48 flex items-center justify-center bg-gray-50 rounded-xl">
-                <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
+                <RefreshCw className="w-6 h-6 text-gray-500 animate-spin" />
               </div>
             )}
 
             {/* 残り時間 */}
             {!expired && (
               <div className="flex items-center gap-1.5 text-sm">
-                <Clock className="w-3.5 h-3.5 text-gray-400" />
-                <span className={`font-mono font-medium ${remaining < 60 ? 'text-red-500' : 'text-gray-600'}`}>
+                <Clock className="w-3.5 h-3.5 text-gray-500" />
+                <span className={`font-mono font-medium ${remaining < 60 ? 'text-red-600' : 'text-gray-600'}`}>
                   {minutes}:{String(seconds).padStart(2, '0')}
                 </span>
-                <span className="text-gray-400 text-xs">で有効期限切れ</span>
+                <span className="text-gray-500 text-xs">で有効期限切れ</span>
               </div>
             )}
           </div>
@@ -138,7 +138,7 @@ export default function QRLoginModal({ onClose }: Props) {
           {/* URL直接表示 */}
           <div className="bg-gray-50 rounded-xl p-3">
             <p className="text-xs text-gray-500 mb-1.5 font-medium">またはURLを直接入力</p>
-            <p className="font-mono text-sm text-[#0d9488] break-all font-semibold">
+            <p className="font-mono text-sm text-teal-700 break-all font-semibold">
               {baseUrl}/dashboard
             </p>
           </div>
@@ -150,9 +150,9 @@ export default function QRLoginModal({ onClose }: Props) {
               onClick={() => setShowNgrok(!showNgrok)}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              <Globe className="w-4 h-4 text-gray-400" />
+              <Globe className="w-4 h-4 text-gray-500" />
               <span className="flex-1 text-left font-medium">外部アクセス（ngrok）を設定</span>
-              {showNgrok ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              {showNgrok ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
             </button>
             {showNgrok && (
               <div className="px-3 pb-3 space-y-2.5 border-t border-gray-100 pt-3">
@@ -169,7 +169,7 @@ export default function QRLoginModal({ onClose }: Props) {
                 {ngrokUrl && (
                   <button
                     onClick={() => { setNgrokUrl(''); localStorage.removeItem('rehabNgrokUrl') }}
-                    className="text-xs text-red-500 hover:text-red-700"
+                    className="text-xs text-red-600 hover:text-red-700 max-lg:min-h-10"
                   >
                     クリア（ローカルIPに戻す）
                   </button>
@@ -198,7 +198,7 @@ export default function QRLoginModal({ onClose }: Props) {
                 '30分以内にスキャンしてください',
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                  <span className="w-4 h-4 rounded-full bg-[#0d9488] text-white flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
+                  <span className="w-4 h-4 rounded-full bg-teal-700 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
                     {i + 1}
                   </span>
                   {step}
@@ -210,7 +210,7 @@ export default function QRLoginModal({ onClose }: Props) {
           {/* 再生成ボタン */}
           <button
             onClick={generate}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#0d9488] hover:bg-[#0b8276] text-white rounded-xl text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-sm font-medium transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             QRコードを再生成

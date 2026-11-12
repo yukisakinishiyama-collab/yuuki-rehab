@@ -2,6 +2,7 @@
 // 関節別詳細解剖マップ - イラスト風解剖図SVGコンポーネント
 
 import { useState } from 'react'
+import { ClearTextButton, CLEARABLE_PADDING } from './shared'
 
 export interface JointDetailMapProps {
   joint: string
@@ -19,6 +20,9 @@ interface Zone {
   d: string
 }
 
+// 部位の種類ごとの色（図の塗り・枠）。チップやラベルの文字は、色の付いた地の上でも読めるよう ZONE_TEXT（slate-900）にする
+// （白い文字や、枠と同じ色の文字では、黄・オレンジ・緑などの地でコントラスト比が 1.6〜3.4 しかないため）
+const ZONE_TEXT = '#0f172a'
 const TYPE_COLORS: Record<ZoneType, { idle: string; hover: string; selected: string; stroke: string }> = {
   ligament:  { idle: 'rgba(245,158,11,0.2)',  hover: 'rgba(245,158,11,0.45)', selected: 'rgba(245,158,11,0.75)', stroke: '#b45309' },
   tendon:    { idle: 'rgba(249,115,22,0.2)',  hover: 'rgba(249,115,22,0.45)', selected: 'rgba(249,115,22,0.75)', stroke: '#c2410c' },
@@ -556,9 +560,18 @@ const IMAGE_MAP: Record<string, string> = {
 
 export const SUPPORTED_JOINTS = Object.keys(JOINT_ZONES)
 
+/** 部位IDの表示名（カルテの一覧で使う）。見つからなければ ID をそのまま */
+export function zoneLabel(joint: string, id: string): string {
+  return JOINT_ZONES[joint]?.find(z => z.id === id)?.label ?? id
+}
+
 export default function JointDetailMap({ joint, selected, onChange, readOnly = false }: JointDetailMapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [freeText, setFreeText] = useState('')
+  function setText(v: string) {
+    setFreeText(v)
+    onChange(v ? [v] : [])
+  }
 
   const zones = JOINT_ZONES[joint]
   const Silhouette = SILHOUETTE_MAP[joint]
@@ -568,14 +581,17 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
     return (
       <div className="mt-2">
         <p className="text-xs text-gray-500 mb-1">{joint}（自由入力）</p>
-        <textarea
-          value={freeText}
-          onChange={e => { setFreeText(e.target.value); onChange(e.target.value ? [e.target.value] : []) }}
-          rows={2}
-          disabled={readOnly}
-          placeholder="詳細な部位を入力してください"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none disabled:bg-gray-50"
-        />
+        <div className="relative">
+          <textarea
+            value={freeText}
+            onChange={e => setText(e.target.value)}
+            rows={2}
+            disabled={readOnly}
+            placeholder="詳細な部位を入力してください"
+            className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none disabled:bg-gray-50 ${CLEARABLE_PADDING}`}
+          />
+          <ClearTextButton value={freeText} onChange={setText} multiline disabled={readOnly} />
+        </div>
       </div>
     )
   }
@@ -596,7 +612,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         {(Object.entries(TYPE_LABELS) as [ZoneType, string][])
           .filter(([type]) => zones.some(z => z.type === type))
           .map(([type, label]) => (
-            <span key={type} className="flex items-center gap-1 text-[10px] text-gray-500">
+            <span key={type} className="flex items-center gap-1 text-xs text-gray-500">
               <span className="inline-block w-3 h-3 rounded-full border" style={{ background: TYPE_COLORS[type].selected, borderColor: TYPE_COLORS[type].stroke }} />
               {label}
             </span>
@@ -608,7 +624,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         <div className="h-7 flex items-center justify-center">
           {hoveredZone ? (
             <span className="text-xs font-medium px-2 py-0.5 rounded-full border"
-              style={{ background: TYPE_COLORS[hoveredZone.type].hover, borderColor: TYPE_COLORS[hoveredZone.type].stroke, color: TYPE_COLORS[hoveredZone.type].stroke }}>
+              style={{ background: TYPE_COLORS[hoveredZone.type].hover, borderColor: TYPE_COLORS[hoveredZone.type].stroke, color: ZONE_TEXT }}>
               {hoveredZone.label}（{TYPE_LABELS[hoveredZone.type]}）
             </span>
           ) : null}
@@ -657,10 +673,10 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
             const c = TYPE_COLORS[zone.type]
             return (
               <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border"
-                style={{ background: c.selected, borderColor: c.stroke, color: '#fff' }}>
+                style={{ background: c.selected, borderColor: c.stroke, color: ZONE_TEXT }}>
                 {zone.label}
                 {!readOnly && (
-                  <button type="button" onClick={() => toggleZone(id)} className="opacity-80 hover:opacity-100 leading-none">×</button>
+                  <button type="button" onClick={() => toggleZone(id)} className="opacity-80 hover:opacity-100 leading-none max-lg:min-h-10 max-lg:min-w-10" aria-label={`${zone.label}を外す`}>×</button>
                 )}
               </span>
             )
@@ -668,7 +684,7 @@ export default function JointDetailMap({ joint, selected, onChange, readOnly = f
         </div>
       )}
 
-      {!readOnly && <p className="text-[10px] text-gray-400 px-1">部位をクリックして選択・解除できます</p>}
+      {!readOnly && <p className="text-xs text-gray-500 px-1">部位をクリックして選択・解除できます</p>}
     </div>
   )
 }

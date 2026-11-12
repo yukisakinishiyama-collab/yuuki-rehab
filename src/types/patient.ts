@@ -1,3 +1,4 @@
+import type { AnatomyMarks, AnatomyViewMarks } from '@/lib/anatomy/types'
 // ──────────────────────────────────────────────
 // リハビリ患者管理システム - 型定義
 // ──────────────────────────────────────────────
@@ -38,6 +39,11 @@ export interface ComplaintEntry {
   diagnosisLabel: string
   nrs: number
   symptoms: ComplaintSymptom[]
+  /** 経過中／軽快・終了（省略＝経過中）。終了した部位は次回のカルテに引き継がない */
+  status?: 'active' | 'resolved'
+  /** この部位の記録を始めた日（経過のカルテに引き継ぐとき、同じ id のまま持ち越す） */
+  startedAt?: string
+  resolvedAt?: string
 }
 
 // ──────────────────────────────────────────────
@@ -60,6 +66,49 @@ export interface Patient {
   therapistNotes: string
   createdAt: string
   updatedAt: string
+  // ── ここから下は NOAH（レセコン）からの取り込みで入る項目（手で作ったカルテには無いことがある） ──
+  postalCode?: string
+  address?: string
+  email?: string
+  occupation?: string
+  /** 保険証の情報（NOAHから写したもの。自費カルテの参考。保険の請求には使わない） */
+  insurance?: PatientInsurance
+  /** NOAHのどの受診者番号から作ったか（同じ方の番号はまとめる）・来院の期間と回数 */
+  noah?: NoahLink
+  /** 予約（お名前・ふりがな・電話）から自動で作ったカルテ（2026-11-02〜。カルテが無い方を開いたとき） */
+  autoCreatedFrom?: 'reservation'
+}
+
+/** 保険証の情報（NOAHの「受診者入力」「ハガキ・名簿」から） */
+export interface PatientInsurance {
+  /** 区分（通常・被爆・母子家庭・交通事故 など） */
+  category?: string
+  /** 種別（社会保険・組合保険・一般国保・後期高齢者 など） */
+  kind?: string
+  insurerNumber?: string
+  insurerName?: string
+  /** 記号・番号（取り込み後に受診者入力の画面から足す） */
+  symbol?: string
+  number?: string
+  /** 負担割合（例 '3割'） */
+  burdenRatio?: string
+  validUntil?: string
+  /** 続柄（本人・家族） */
+  relation?: string
+  insuredName?: string
+  insuredKana?: string
+  insuredBirthDate?: string
+  /** いつの時点の情報か（取り込んだ日） */
+  asOf?: string
+}
+
+export interface NoahLink {
+  /** NOAHの受診者番号（保険証が変わると番号が増えるので複数） */
+  ids: string[]
+  firstVisit?: string
+  lastVisit?: string
+  visitCount?: number
+  importedAt: string
 }
 
 // ──────────────────────────────────────────────
@@ -207,10 +256,16 @@ export interface SOAPNote {
   patientId: string
   visitDate: string
   visitNumber: number
+  /** 初診（空から書く）か経過（前回から引き継いで変わったところだけ直す）か。省略＝従来 */
+  visitKind?: 'first' | 'followup'
+  /** 前回からの変化のひとこと（改善・不変・悪化）。changeFromLast の文章とは別に持つ */
+  trend?: 'better' | 'same' | 'worse'
   // S: Subjective
   complaints?: ComplaintEntry[]           // 部位別NRS・症状（複数対応）
   painLocations?: string[]   // この日の痛み部位（人体図）
   jointDetailLocations?: Record<string, string[]>  // 関節別詳細部位
+  anatomyMarks?: Record<string, AnatomyMarks>     // 解剖図に直接描いたマーク（関節ごと）
+  bodyMarks?: Partial<Record<'front' | 'back', AnatomyViewMarks>>  // 人体図に直接描いたマーク（前面・背面）
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -327,6 +382,58 @@ export interface QuickMemo {
   patientId: string
   memoDate: string
   content: string
+  createdAt: string
+}
+
+// ──────────────────────────────────────────────
+// 疑問メモ・AI相談
+// 患者さんについて「疑問に思ったこと」を残し、必要なときにAIへ相談できる。
+// AIにはお名前などの個人を特定できる情報は送らない（consult-context.ts）。判断は院長。
+// ──────────────────────────────────────────────
+export type KarteQuestionStatus = 'open' | 'resolved'
+
+export interface KarteConsult {
+  id: string
+  askedAt: string
+  /** 送った情報の種類（画面で見せる用。中身は入れない） */
+  sentItems: string[]
+  answer: string
+  model?: string
+}
+
+export interface KarteQuestion {
+  id: string
+  patientId: string
+  /** 疑問に思った日（yyyy-MM-dd） */
+  questionDate: string
+  question: string
+  status: KarteQuestionStatus
+  /** 解決したときの結論・メモ */
+  resolution?: string
+  resolvedAt?: string
+  consults: KarteConsult[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ──────────────────────────────────────────────
+// 患部の写真
+// 写真そのものはクラウド（Supabase Storage の非公開バケット）に置き、ここには場所と説明だけを持つ。
+// 表示・削除は院内アプリの API 経由（Basic 認証の内側）。
+// ──────────────────────────────────────────────
+export interface KartePhoto {
+  id: string
+  patientId: string
+  /** 撮った日（yyyy-MM-dd） */
+  takenDate: string
+  /** クラウド上の場所（patientId/id.jpg） */
+  storagePath: string
+  /** 部位・状態などの説明（任意） */
+  caption: string
+  bodyRegion?: BodyRegion
+  width: number
+  height: number
+  bytes: number
   createdAt: string
 }
 
@@ -448,8 +555,13 @@ export interface PatientGoals {
   patientId: string
   /** 本人の言葉のままの目標。例: 「サッカーの試合に出たい」「孫と旅行に行きたい」 */
   patientGoal: string
-  /** 目標時期（任意・断定的な予後予測には使わない） */
+  /** 目標時期（任意・断定的な予後予測には使わない）。例: 「12月の県大会まで」 */
   targetNote: string
+  /**
+   * 患者さんの希望・配慮してほしいこと（任意。2026-11-02〜 カルテの上に表示）。
+   * 例: 「強い刺激は苦手」「土曜の午前に通いたい」「テーピングでかぶれやすい」
+   */
+  patientWishes?: string
   clinicalGoals: ClinicalGoal[]
   /**
    * 次回来院時に一緒に確認すること（患者説明モードに表示される・患者向けの文で書く）。

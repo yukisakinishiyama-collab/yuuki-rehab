@@ -1,51 +1,72 @@
 'use client'
 // ──────────────────────────────────────────────
-// 患者詳細ページ（タブ構成）
+// カルテ（患者さん1人分）
+// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・疑問・AI相談・写真・キャンセル
 // ──────────────────────────────────────────────
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
-  SpecialTestRecord, SOAPNote, Exercise, PatientExercise, ProgressRecord, RehabPlan,
-  SpecialTestResult, QuickMemo, Intake, CancellationRecord,
+  SpecialTestRecord, SOAPNote, ProgressRecord,
+  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion, KartePhoto, AttendanceRecord,
 } from '@/types/patient'
-import { BODY_REGION_LABELS, PHASE_LABELS, PHASE_SHORT_LABELS } from '@/types/patient'
+import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
-const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-600' : 'text-green-600'
+const NRS_COLOR = (n: number) => n >= 7 ? 'text-red-600' : n >= 4 ? 'text-yellow-700' : 'text-green-700'
 import BodyMap from './BodyMap'
+import { zoneLabel } from './JointDetailMap'
+import AnatomyMap from './AnatomyMap'
+import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
+import { hasAnatomyMarks } from '@/lib/anatomy/types'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
-  getSOAPNotes, getExercises, getPatientExercises, savePatientExercise,
-  deletePatientExercise, getProgressRecords, getRehabPlans,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations,
+  getSOAPNotes, getProgressRecords,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getAttendanceRecords,
+  deleteSOAPNote, deleteROMRecord, deleteStrengthRecord, deleteSpecialTest,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
 import {
   calculateImprovementScore, calculateROMImprovement,
   calculateRetentionRisk, getDaysSinceLastVisit, generatePatientFriendlyMessage,
 } from '@/lib/rehab-algorithms'
-import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle } from './shared'
-import { PainChart, ImprovementChart, ROMChart, StrengthChart, SpecialTestSummary, AdherenceChart } from './charts'
+import { ProgressGauge, PhaseStepper, RetentionRiskBadge, Badge, Card, CardHeader, CardContent, SectionTitle, ClearTextButton, CLEARABLE_PADDING } from './shared'
+// グラフ（recharts）は重いので、使うタブを開いたときだけ読み込む（SOAP タブの表示を軽くする）
+import dynamic from 'next/dynamic'
+const chartLoading = () => <div className="h-40 animate-pulse rounded-xl bg-slate-100" aria-hidden />
+const PainChart = dynamic(() => import('./charts').then(m => m.PainChart), { ssr: false, loading: chartLoading })
+const ImprovementChart = dynamic(() => import('./charts').then(m => m.ImprovementChart), { ssr: false, loading: chartLoading })
+const ROMChart = dynamic(() => import('./charts').then(m => m.ROMChart), { ssr: false, loading: chartLoading })
+const SpecialTestSummary = dynamic(() => import('./charts').then(m => m.SpecialTestSummary), { ssr: false, loading: chartLoading })
+const AdherenceChart = dynamic(() => import('./charts').then(m => m.AdherenceChart), { ssr: false, loading: chartLoading })
 import EvaluationForm from './EvaluationForm'
 import ROMInputForm from './ROMInputForm'
 import StrengthInputForm from './StrengthInputForm'
 import SpecialTestInputForm from './SpecialTestInputForm'
 import SOAPForm from './SOAPForm'
-import ExerciseCard from './ExerciseCard'
-import PatientExplanationSheet from './PatientExplanationSheet'
 import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
+import KarteQuestionsTab from './KarteQuestionsTab'
+import PhotosTab from './PhotosTab'
+import VisitCalendar from './VisitCalendar'
+import ComplaintTimeline from './ComplaintTimeline'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
-import ExplanationMode from './ExplanationMode'
+import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
+import type { VoiceMemoResult } from '@/lib/voice/soap-fields'
 import GoalsProblemsCard from './GoalsProblemsCard'
+import PatientGoalsBanner from './PatientGoalsBanner'
+import PatientProfileCard from './PatientProfileCard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import ReferralLetterModal from './ReferralLetterModal'
+import SyncNowButton from '@/components/rehab/SyncNowButton'
+import ContractsTab, { MemberStatusBadge } from './ContractsTab'
+import OutcomeQuickTab from './OutcomeQuickTab'
+import { getAllContracts, getContracts, getOutcomeSport, getOutcomes } from '@/lib/contracts/store'
+import { jstToday, memberStatusForPatient } from '@/lib/contracts/member'
+import type { ContractRecord, OutcomeRecord, SportKey } from '@/types/contracts'
+import { useKarteSynced } from '@/lib/use-karte-sync'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
 import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
-import DrillsBrowser from '@/components/site/DrillsBrowser'
-import { guessDrillDiseaseSlug } from '@/lib/drill-match'
 
 // ── 月次カルテ印刷 ────────────────────────────────────────────
 function printMonthlyChart(
@@ -164,6 +185,23 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   // 音声入力の認識途中テキスト（確定前のプレビュー表示用）
   const [voiceInterim, setVoiceInterim] = useState('')
+  // 音声で整えたメモを入れるときは、録音中に手で書いた分も含めた「いまの欄」に足す
+  const contentRef = useRef(content)
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
+  /** 口述を整えたメモを欄に入れる（保存はしない。読んで直してから保存） */
+  function applyVoiceMemo(result: VoiceMemoResult): VoiceApplied {
+    if (!result.memo) return { summary: <p>メモに書く内容が見つかりませんでした（雑談だけだった、声が遠かった など）。</p> }
+    const before = contentRef.current
+    const after = before.trim() ? `${before}${before.endsWith('\n') ? '' : '\n'}${result.memo}` : result.memo
+    setContent(after)
+    return {
+      summary: <p className="font-semibold">メモに入れました。読んで直してから「保存」を押してください。</p>,
+      undo: () => setContent(c => (c === after ? before : c)),
+    }
+  }
 
   // メモとテストを月別に統合
   type Entry =
@@ -221,13 +259,21 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
     <div className="space-y-4">
       {/* 入力エリア */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
-          <VoiceInputButton
-            onText={text => setContent(prev => (prev ? `${prev}${prev.endsWith('\n') ? '' : '\n'}${text}` : text))}
-            onInterim={setVoiceInterim}
-          />
-        </div>
+        <span className="block text-sm font-semibold text-gray-700">🗒️ メモを追加</span>
+        {/* 話した内容を、言いよどみ・雑談を除いたメモの文に整えて欄に入れる（文字起こしの設定が無ければ、いままでの音声入力） */}
+        <VoiceKarteCapture
+          mode="memo"
+          patientId={patient.id}
+          onMemo={applyVoiceMemo}
+          fallback={
+            <div className="flex justify-end">
+              <VoiceInputButton
+                onText={text => setContent(prev => (prev ? `${prev}${prev.endsWith('\n') ? '' : '\n'}${text}` : text))}
+                onInterim={setVoiceInterim}
+              />
+            </div>
+          }
+        />
         <div className="flex items-center gap-3">
           <label className="text-xs text-gray-500 whitespace-nowrap">日付</label>
           <input
@@ -237,26 +283,29 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
         </div>
-        <textarea
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
-          rows={4}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
-          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
-        />
+        <div className="relative">
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="例：患者さんから「昨日は痛みが少なかった」と報告あり。膝の腫脹やや改善。次回ROM再計測予定。"
+            rows={4}
+            className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none ${CLEARABLE_PADDING}`}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave() }}
+          />
+          <ClearTextButton value={content} onChange={setContent} multiline />
+        </div>
         {voiceInterim && (
-          <p className="text-xs text-gray-400 italic px-1">🎤 {voiceInterim}…</p>
+          <p className="text-xs text-gray-500 italic px-1">🎤 {voiceInterim}…</p>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-400">Ctrl+Enter で保存</span>
+          <span className="text-xs text-gray-500">Ctrl+Enter で保存</span>
           <div className="flex items-center gap-3">
-            {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+            {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
             <button
               type="button"
               onClick={handleSave}
               disabled={!content.trim()}
-              className="px-4 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-1.5 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
             >
               保存
             </button>
@@ -266,10 +315,10 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
 
       {/* 月別タイムライン */}
       {totalEntries === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-8">まだ記録がありません</p>
+        <p className="text-center text-sm text-gray-500 py-8">まだ記録がありません</p>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-gray-400 px-1">
+          <p className="text-xs text-gray-500 px-1">
             メモ {memos.length}件 · テスト {specialTests.length}件 · {months.length}ヶ月分
           </p>
 
@@ -286,27 +335,27 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                   <button
                     type="button"
                     onClick={() => toggleMonth(ym)}
-                    className="flex items-center gap-2 flex-1 text-left"
+                    className="flex items-center gap-2 flex-1 text-left max-lg:min-h-10"
                   >
                     <span className="text-sm font-bold text-teal-700">{formatMonthLabel(ym)}</span>
                     {monthMemos.length > 0 && (
-                      <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                      <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
                         📝 {monthMemos.length}
                       </span>
                     )}
                     {monthTests.length > 0 && (
-                      <span className="text-xs text-purple-500 bg-purple-50 rounded-full px-2 py-0.5">
+                      <span className="text-xs text-purple-600 bg-purple-50 rounded-full px-2 py-0.5">
                         🔍 {monthTests.length}
                       </span>
                     )}
-                    <span className="text-gray-400 text-xs ml-1">{collapsed ? '▶' : '▼'}</span>
+                    <span className="text-gray-500 text-xs ml-1">{collapsed ? '▶' : '▼'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => printMonthlyChart(patient, monthMemos, monthTests, ym)}
                     className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-teal-600
                       border border-gray-200 hover:border-teal-300 rounded-lg px-2.5 py-1
-                      transition-colors bg-white"
+                      transition-colors bg-white max-lg:min-h-10"
                     title="この月をカルテとして印刷"
                   >
                     🖨️ カルテ印刷
@@ -326,7 +375,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                           <div key={memo.id} className="flex gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors">
                             <div className="flex-shrink-0 w-16">
                               <p className="text-xs font-semibold text-teal-700">{dayLabel}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">📝 メモ</p>
+                              <p className="text-xs text-gray-500 mt-0.5">📝 メモ</p>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
@@ -334,7 +383,7 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                             <button
                               type="button"
                               onClick={() => handleDelete(memo.id)}
-                              className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
+                              className="flex-shrink-0 text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-lg leading-none mt-0.5"
                               title="削除"
                             >×</button>
                           </div>
@@ -345,27 +394,27 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                           <div key={t.id} className="flex gap-3 px-4 py-3 bg-purple-50/30">
                             <div className="flex-shrink-0 w-16">
                               <p className="text-xs font-semibold text-purple-600">{dayLabel}</p>
-                              <p className="text-[10px] text-purple-400 mt-0.5">🔍 テスト</p>
+                              <p className="text-xs text-purple-600 mt-0.5">🔍 テスト</p>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-800">
                                 {t.testName}
-                                <span className="ml-1.5 text-xs text-gray-400 font-normal">{BODY_REGION_LABELS[t.bodyRegion]}</span>
+                                <span className="ml-1.5 text-xs text-gray-500 font-normal">{BODY_REGION_LABELS[t.bodyRegion]}</span>
                               </p>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => (
-                                  <span key={key} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${ST_RESULT_COLOR[t[key]]}`}>
+                                  <span key={key} className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${ST_RESULT_COLOR[t[key]]}`}>
                                     {['右', '左', '総合'][i]}:{ST_RESULT_LABEL[t[key]]}
                                   </span>
                                 ))}
                               </div>
                               {(t.faberDistanceRight != null || t.faberDistanceLeft != null) && (
-                                <p className="text-[10px] text-blue-600 mt-1">
+                                <p className="text-xs text-blue-600 mt-1">
                                   床→脛骨粗面: 右 {t.faberDistanceRight ?? '-'}cm / 左 {t.faberDistanceLeft ?? '-'}cm
                                 </p>
                               )}
                               {(t.apprehension || t.clickSound || t.limitation) && (
-                                <p className="text-[10px] text-orange-600 mt-1">
+                                <p className="text-xs text-orange-700 mt-1">
                                   {[t.apprehension && '不安感', t.clickSound && 'クリック音', t.limitation && '可動域制限'].filter(Boolean).join(' · ')}
                                 </p>
                               )}
@@ -397,9 +446,24 @@ const SOAP_RESULT_SYMBOL: Record<SpecialTestResult, string> = {
 }
 
 // ── SOAPカルテ展開カード ────────────────────────────────────
-function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () => void }) {
+/** 誤って入れた記録を消す小さなボタン（確認つき） */
+function DeleteRowButton({ label, onDelete }: { label: string; onDelete: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => { if (window.confirm(`${label}を削除しますか？\nこの操作は取り消せません。`)) onDelete() }}
+      aria-label={`${label}を削除`}
+      title="削除"
+      className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-700 max-lg:min-h-10 max-lg:min-w-10"
+    >
+      🗑
+    </button>
+  )
+}
+
+function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferral?: () => void; onDelete?: () => void }) {
   const [open, setOpen] = useState(false)
-  const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'
+  const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-700' : 'text-green-700'
   const adherenceLabel = note.homeExerciseAdherence === 'done' ? '✅ 実施' : note.homeExerciseAdherence === 'partial' ? '⚠️ 一部' : '❌ 未実施'
 
   return (
@@ -421,11 +485,11 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           </span>
           <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:block">{adherenceLabel}</span>
           {note.improvements && (
-            <span className="text-xs text-gray-400 truncate flex-1 hidden md:block">
+            <span className="text-xs text-gray-500 truncate flex-1 hidden md:block">
               ✓ {note.improvements}
             </span>
           )}
-          <span className={`text-gray-400 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+          <span className={`text-gray-500 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
             ▼
           </span>
         </button>
@@ -436,9 +500,20 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
             type="button"
             onClick={onReferral}
             title="この経過から紹介状・報告書を作成"
-            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+            className="flex-shrink-0 px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
           >
             📄 紹介状
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            title="このカルテを削除"
+            aria-label={`${note.visitDate} のカルテを削除`}
+            className="flex-shrink-0 px-2 py-1.5 text-gray-500 text-xs rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors max-lg:min-h-10 max-lg:min-w-10"
+          >
+            🗑
           </button>
         )}
       </div>
@@ -450,7 +525,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* S: 主観的情報 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center">S</span>
+              <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">S</span>
               <span className="text-xs font-semibold text-blue-700">主観的情報（患者の訴え）</span>
             </div>
 
@@ -465,17 +540,17 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
                         {c.side !== 'na' && `（${SIDE_LABELS_SHORT[c.side]}）`}
                       </span>
                       {c.diagnosisLabel && (
-                        <span className="text-[10px] text-gray-400 truncate max-w-[80px]">{c.diagnosisLabel}</span>
+                        <span className="text-xs text-gray-500 truncate max-w-[80px]">{c.diagnosisLabel}</span>
                       )}
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className={`text-xl font-bold ${NRS_COLOR(c.nrs)}`}>{c.nrs}</span>
-                      <span className="text-[10px] text-gray-400">/10</span>
+                      <span className="text-xs text-gray-500">/10</span>
                     </div>
                     {c.symptoms.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {c.symptoms.map(s => (
-                          <span key={s} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-1.5 py-0.5">
+                          <span key={s} className="text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-1.5 py-0.5">
                             {s}
                           </span>
                         ))}
@@ -486,10 +561,39 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
               </div>
             )}
 
-            {note.painLocations && note.painLocations.length > 0 && (
+            {((note.painLocations && note.painLocations.length > 0) || (note.bodyMarks && Object.values(note.bodyMarks).some(m => m && (m.pins.length > 0 || m.strokes.length > 0)))) && (
               <div className="mb-3">
                 <p className="text-xs text-gray-500 font-medium mb-1">この日の痛み部位</p>
-                <BodyMap selected={note.painLocations} onChange={() => {}} readOnly />
+                <BodyMap selected={note.painLocations ?? []} onChange={() => {}} readOnly marks={note.bodyMarks} />
+              </div>
+            )}
+            {note.jointDetailLocations && Object.values(note.jointDetailLocations).some(v => v.length > 0) && (
+              <div className="mb-3 space-y-1">
+                <p className="text-xs text-gray-500 font-medium">痛みの場所（解剖図）</p>
+                {Object.entries(note.jointDetailLocations).filter(([, ids]) => ids.length > 0).map(([joint, ids]) => (
+                  <p key={joint} className="text-xs text-gray-800">
+                    <span className="font-semibold">{joint}</span>：{ids.map(id => zoneLabel(joint, id)).join('・')}
+                  </p>
+                ))}
+              </div>
+            )}
+            {note.anatomyMarks && Object.values(note.anatomyMarks).some(hasAnatomyMarks) && (
+              <div className="mb-3 space-y-2">
+                <p className="text-xs text-gray-500 font-medium">解剖図への書き込み</p>
+                {Object.entries(note.anatomyMarks).filter(([, m]) => hasAnatomyMarks(m)).map(([joint, m]) => {
+                  const side = jointsFromPainLocations(note.painLocations ?? [], [joint]).find(j => j.joint === joint)?.side
+                  return (
+                    <AnatomyMap
+                      key={joint}
+                      joint={joint}
+                      side={side}
+                      selected={note.jointDetailLocations?.[joint] ?? []}
+                      onChange={() => {}}
+                      marks={m}
+                      readOnly
+                    />
+                  )
+                })}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -504,7 +608,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* O: 客観的情報 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">O</span>
+              <span className="w-5 h-5 rounded-full bg-green-700 text-white text-xs font-bold flex items-center justify-center">O</span>
               <span className="text-xs font-semibold text-green-700">客観的情報（検査・観察）</span>
             </div>
             {note.treatmentAreas && note.treatmentAreas.length > 0 && (
@@ -518,14 +622,14 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
               {note.strengthFindings && <Row label="筋力所見" value={note.strengthFindings} />}
               {note.soapSpecialTests && note.soapSpecialTests.length > 0 && (
                 <div className="sm:col-span-2 rounded-lg border border-gray-100 bg-white p-2">
-                  <p className="text-gray-400 font-medium mb-1.5">スペシャルテスト</p>
+                  <p className="text-gray-500 font-medium mb-1.5">スペシャルテスト</p>
                   <div className="flex flex-wrap gap-1.5">
                     {note.soapSpecialTests.map((t, i) => (
                       <span
                         key={i}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border font-medium ${SOAP_RESULT_COLORS[t.result]}`}
                       >
-                        <span className="text-gray-400 font-normal text-[10px]">{t.joint.replace('関節', '').replace('・手指', '')}</span>
+                        <span className="text-gray-500 font-normal text-xs">{t.joint.replace('関節', '').replace('・手指', '')}</span>
                         {t.testName.replace(/ test| sign/i, '')}
                         <span className="font-bold">{SOAP_RESULT_SYMBOL[t.result]}</span>
                       </span>
@@ -548,7 +652,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* A: 評価・分析 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">A</span>
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-amber-950 text-xs font-bold flex items-center justify-center">A</span>
               <span className="text-xs font-semibold text-amber-700">評価・分析</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -561,7 +665,7 @@ function SOAPNoteCard({ note, onReferral }: { note: SOAPNote; onReferral?: () =>
           {/* P: 計画 */}
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center">P</span>
+              <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">P</span>
               <span className="text-xs font-semibold text-purple-700">計画</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -595,7 +699,7 @@ function Row({ label, value, highlight, className = '' }: {
     'bg-white border-gray-100'
   return (
     <div className={`rounded-lg border p-2 ${bg} ${className}`}>
-      <p className="text-gray-400 font-medium mb-0.5">{label}</p>
+      <p className="text-gray-500 font-medium mb-0.5">{label}</p>
       <p className="text-gray-700 whitespace-pre-wrap">{value}</p>
     </div>
   )
@@ -603,11 +707,10 @@ function Row({ label, value, highlight, className = '' }: {
 
 // ── 問診票サマリーカード ────────────────────────────────────
 function IntakeCard({
-  intake, onReferral, onProtocol,
+  intake, onReferral,
 }: {
   intake: Intake
   onReferral?: () => void
-  onProtocol?: () => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -633,7 +736,7 @@ function IntakeCard({
               🤖 AI分析済
             </span>
           )}
-          <span className={`text-gray-400 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+          <span className={`text-gray-500 text-xs transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
             ▼
           </span>
         </button>
@@ -645,19 +748,9 @@ function IntakeCard({
               type="button"
               onClick={onReferral}
               title="紹介状・報告書を作成"
-              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap"
+              className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm whitespace-nowrap max-lg:min-h-10"
             >
               📄 紹介状
-            </button>
-          )}
-          {onProtocol && (
-            <button
-              type="button"
-              onClick={onProtocol}
-              title="プロトコルを作成"
-              className="px-2.5 py-1.5 bg-teal-600 text-white text-xs font-medium rounded-lg hover:bg-teal-700 transition-colors shadow-sm whitespace-nowrap"
-            >
-              📋 プロトコル
             </button>
           )}
         </div>
@@ -680,7 +773,7 @@ function IntakeCard({
               <p className="text-xs font-semibold text-purple-700">🤖 AI分析結果</p>
               {intake.aiSuggestedTests && intake.aiSuggestedTests.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-gray-400 mb-1">推奨テスト</p>
+                  <p className="text-xs text-gray-500 mb-1">推奨テスト</p>
                   <div className="flex flex-wrap gap-1">
                     {intake.aiSuggestedTests.map((t, i) => (
                       <span key={i} className="text-xs px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-full">{t}</span>
@@ -690,7 +783,7 @@ function IntakeCard({
               )}
               {intake.aiDifferentials && intake.aiDifferentials.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-gray-400 mb-1">鑑別診断</p>
+                  <p className="text-xs text-gray-500 mb-1">鑑別診断</p>
                   <ul className="text-xs text-gray-600 space-y-0.5">
                     {intake.aiDifferentials.map((d, i) => <li key={i}>• {d}</li>)}
                   </ul>
@@ -698,7 +791,7 @@ function IntakeCard({
               )}
               {intake.aiProtocol && (
                 <div className="bg-green-50 border border-green-100 rounded-lg p-2">
-                  <p className="text-[10px] text-gray-400 mb-0.5">推奨プロトコル</p>
+                  <p className="text-xs text-gray-500 mb-0.5">推奨プロトコル</p>
                   <p className="text-xs text-green-800">{intake.aiProtocol}</p>
                 </div>
               )}
@@ -711,36 +804,54 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'intake' | 'overview' | 'plan' | 'evaluation' | 'soap' | 'memo' | 'cancel' | 'rom' | 'strength' | 'special' | 'progress' | 'exercises' | 'drills' | 'explanation'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'contract' | 'cancel'
+/** 「評価・測定」の中の切り替え */
+type EvalKey = 'outcome' | 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
+const EVAL_TABS: { key: EvalKey; label: string }[] = [
+  { key: 'outcome', label: 'アウトカム' },
+  { key: 'evaluation', label: '初回評価' },
+  { key: 'rom', label: 'ROM' },
+  { key: 'strength', label: '筋力' },
+  { key: 'special', label: 'スペシャルテスト' },
+  { key: 'progress', label: '経過グラフ' },
+]
 
 interface Props {
   patient: Patient
 }
 
 export default function PatientDetail({ patient }: Props) {
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabKey>('intake')
+  const [activeTab, setActiveTab] = useState<TabKey>('soap')
+  const [evalTab, setEvalTab] = useState<EvalKey>('outcome')
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [romRecords, setRomRecords] = useState<ROMRecord[]>([])
   const [strengthRecords, setStrengthRecords] = useState<StrengthRecord[]>([])
   const [specialTests, setSpecialTests] = useState<SpecialTestRecord[]>([])
   const [soapNotes, setSoapNotes] = useState<SOAPNote[]>([])
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [patientExercises, setPatientExercises] = useState<PatientExercise[]>([])
   const [progressRecords, setProgressRecords] = useState<ProgressRecord[]>([])
-  const [rehabPlans, setRehabPlans] = useState<RehabPlan[]>([])
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
+  const [karteQuestions, setKarteQuestions] = useState<KarteQuestion[]>([])
+  const [kartePhotos, setKartePhotos] = useState<KartePhoto[]>([])
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
   const [showReferralModal, setShowReferralModal] = useState(false)
-  const [showExplanation, setShowExplanation] = useState(false)
   const [selectedIntake, setSelectedIntake] = useState<Intake | null>(null)
   const [selectedSoap, setSelectedSoap] = useState<SOAPNote | null>(null)
   const [returnAssessments, setReturnAssessments] = useState<ReturnCriteriaAssessment[]>([])
+  const [contracts, setContracts] = useState<ContractRecord[]>([])
+  const [allContracts, setAllContracts] = useState<ContractRecord[]>([])
+  const [outcomes, setOutcomes] = useState<OutcomeRecord[]>([])
+  const [outcomeSport, setOutcomeSportState] = useState<SportKey | null>(null)
 
   useEffect(() => {
     reload()
   }, [patient.id])
+
+  // ほかの端末で書いた記録を取り込んだら、一覧を読み直す（入力中のフォームはそのまま）
+  useKarteSynced((keys) => {
+    if (keys.some(k => k.startsWith('pt_'))) reload()
+  })
 
   function reload() {
     setEvaluations(getEvaluations(patient.id))
@@ -748,45 +859,18 @@ export default function PatientDetail({ patient }: Props) {
     setStrengthRecords(getStrengthRecords(patient.id))
     setSpecialTests(getSpecialTests(patient.id))
     setSoapNotes(getSOAPNotes(patient.id).sort((a, b) => b.visitDate.localeCompare(a.visitDate)))
-    setExercises(getExercises())
-    setPatientExercises(getPatientExercises(patient.id))
     setProgressRecords(getProgressRecords(patient.id))
-    setRehabPlans(getRehabPlans(patient.id).sort((a, b) => a.phase - b.phase))
     setQuickMemos(getQuickMemos(patient.id).sort((a, b) => b.memoDate.localeCompare(a.memoDate)))
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
+    setKarteQuestions(getKarteQuestions(patient.id))
+    setKartePhotos(getKartePhotos(patient.id))
+    setAttendance(getAttendanceRecords(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
-  }
-
-  // 問診票データからプロトコル作成ページへのURLを生成
-  function buildProtocolUrl(intake: Intake): string {
-    const BODY_REGION_TO_JOINT: Record<string, string> = {
-      fkl: '膝関節', fkr: '膝関節', bkl: '膝関節', bkr: '膝関節',
-      fsl: '肩関節', fsr: '肩関節', bsl: '肩関節', bsr: '肩関節',
-      fhil: '股関節', fhir: '股関節', bgl: '股関節', bgr: '股関節',
-      fal: '足関節', far: '足関節', bhal: '足関節', bher: '足関節',
-      fab: '腰部', blb: '腰部', fn: '頚部', bn: '頚部',
-      fel: '肘関節', fer: '肘関節', bel: '肘関節', ber: '肘関節',
-      fhdl: '手関節・手指', fhdr: '手関節・手指',
-    }
-    const JOINT_NAME_TO_KEY: Record<string, string> = {
-      '膝関節': 'knee', '肩関節': 'shoulder', '股関節': 'hip',
-      '足関節': 'ankle', '肘関節': 'elbow', '手関節・手指': 'hand',
-      '腰部': 'spine', '頚部': 'spine',
-    }
-    const jointNames = [...new Set(intake.painLocations.map(l => BODY_REGION_TO_JOINT[l]).filter(Boolean))]
-    const jointKey = jointNames[0] ? (JOINT_NAME_TO_KEY[jointNames[0]] ?? 'other') : ''
-    const notesParts: string[] = []
-    if (intake.chiefComplaint) notesParts.push(intake.chiefComplaint)
-    if (intake.importantGoal) notesParts.push(`目標: ${intake.importantGoal}`)
-    if (intake.therapistNotes) notesParts.push(`施術者メモ: ${intake.therapistNotes}`)
-    const params = new URLSearchParams()
-    if (intake.suspectedDiagnosis) params.set('diagnosis', intake.suspectedDiagnosis)
-    if (jointKey) params.set('joint', jointKey)
-    if (intake.sportsActivity) params.set('sport', intake.sportsActivity)
-    if (intake.injuryDate) params.set('eventDate', intake.injuryDate)
-    if (notesParts.length) params.set('notes', notesParts.join('\n'))
-    return `/protocols/new?${params.toString()}`
+    setContracts(getContracts(patient.id))
+    setAllContracts(getAllContracts())
+    setOutcomes(getOutcomes(patient.id))
+    setOutcomeSportState(getOutcomeSport(patient.id))
   }
 
   // ── 算出値 ──
@@ -812,6 +896,9 @@ export default function PatientDetail({ patient }: Props) {
         patientSubjective: 60,
       })
     : null
+
+  // 会員プランの状態（契約・同意書タブで署名した入会・休会・解約から）
+  const memberStatus = memberStatusForPatient(patient.id, allContracts, jstToday())
 
   // キャンセル累計（ヘッダー表示・離脱リスク算出に使用）
   const cancelSummary = summarizeCancellations(cancellations)
@@ -853,66 +940,44 @@ export default function PatientDetail({ patient }: Props) {
   // ── ROM グラフデータ（最初の動作） ──
   const romMovements = [...new Set(romRecords.map(r => r.movement))].slice(0, 4)
 
-  // ── 運動割り当て ──
-  function handleAssignExercise(exerciseId: string) {
-    const pe: PatientExercise = {
-      id: nanoid(),
-      patientId: patient.id,
-      exerciseId,
-      assignedDate: new Date().toISOString().split('T')[0],
-      status: 'active',
-      adherenceRate: 0,
-      painAfterExercise: null,
-      memo: '',
-    }
-    savePatientExercise(pe)
-    reload()
-  }
-
-  function handleRemoveExercise(patientExerciseId: string) {
-    deletePatientExercise(patientExerciseId)
-    reload()
-  }
-
-  const assignedExerciseIds = new Set(patientExercises.filter(pe => pe.status === 'active').map(pe => pe.exerciseId))
-
-  const TABS: { key: TabKey; label: string; icon: string; badge?: number }[] = [
-    { key: 'intake', label: '問診票', icon: '📋', badge: intakes.length || undefined },
-    { key: 'overview', label: '概要', icon: '👁' },
-    { key: 'plan', label: 'リハビリ計画', icon: '📅', badge: rehabPlans.length || undefined },
-    { key: 'evaluation', label: '初回評価', icon: '🩺' },
-    { key: 'soap', label: 'SOAPカルテ', icon: '📝' },
-    { key: 'memo', label: '簡易メモ', icon: '🗒️', badge: quickMemos.length || undefined },
-    { key: 'cancel', label: 'キャンセル', icon: '🚫', badge: cancelSummary.total || undefined },
-    { key: 'rom', label: 'ROM', icon: '📐' },
-    { key: 'strength', label: '筋力', icon: '💪' },
-    { key: 'special', label: 'スペシャルテスト', icon: '🔍' },
-    { key: 'progress', label: '進捗', icon: '📈' },
-    { key: 'exercises', label: '運動メニュー', icon: '🏃' },
-    { key: 'drills', label: '競技復帰ドリル', icon: '🏅' },
-    { key: 'explanation', label: '患者説明', icon: '📄' },
+  const TABS: { key: TabKey; label: string; badge?: number }[] = [
+    { key: 'soap', label: 'SOAPカルテ', badge: soapNotes.length || undefined },
+    { key: 'overview', label: '概要' },
+    { key: 'eval', label: '評価・測定' },
+    { key: 'intake', label: '問診票', badge: intakes.length || undefined },
+    { key: 'memo', label: '簡易メモ', badge: quickMemos.length || undefined },
+    { key: 'question', label: '疑問・AI相談', badge: karteQuestions.filter(q => q.status === 'open').length || undefined },
+    { key: 'photo', label: '写真', badge: kartePhotos.length || undefined },
+    { key: 'contract', label: '契約・同意書', badge: contracts.filter(c => !c.voided).length || undefined },
+    { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
-
-  const guessedDrillSlug = guessDrillDiseaseSlug(patient.diagnosisLabel, patient.bodyRegion)
 
   return (
     <div className="space-y-0">
-      {/* ヘッダーカード */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
-        <div className="px-6 pt-5 pb-4">
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 mb-3 transition-colors"
-          >
-            ← 患者一覧に戻る
-          </button>
-          <div className="flex items-start justify-between gap-4">
+      {/* ヘッダー（お名前・大事な数字・よく使うボタン・タブ） */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="px-4 pb-4 pt-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link
+              href="/patients"
+              className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+            >
+              ← カルテ一覧
+            </Link>
+            <SyncNowButton />
+          </div>
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-semibold text-gray-900">{patient.name}</h1>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="text-sm text-gray-400">{patient.kana}</span>
+              {patient.kana && <p className="text-sm text-slate-500">{patient.kana}</p>}
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">{patient.name}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge color="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
                 {patient.diagnosisLabel && <Badge color="gray">{patient.diagnosisLabel}</Badge>}
+                {/* 予約の情報から自動で作ったカルテ（最初のSOAPを書くまで出す） */}
+                {patient.autoCreatedFrom === 'reservation' && soapNotes.length === 0 && (
+                  <Badge color="blue">予約から自動で登録</Badge>
+                )}
+                <MemberStatusBadge status={memberStatus} />
                 <RetentionRiskBadge level={retentionRisk.level} />
                 {/* キャンセル累計（0件のときは表示しない）。押すとキャンセルタブへ */}
                 {cancelSummary.total > 0 && (
@@ -920,74 +985,105 @@ export default function PatientDetail({ patient }: Props) {
                     type="button"
                     onClick={() => setActiveTab('cancel')}
                     title={`予約日前 ${cancelSummary.advance} / 当日 ${cancelSummary.same_day} / 無断 ${cancelSummary.no_show}`}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-colors max-lg:min-h-10 ${
                       cancelSummary.no_show > 0
-                        ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                        ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                        : 'border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
                     }`}
                   >
-                    🚫 キャンセル {cancelSummary.total}回
-                    <span className="opacity-70 tabular-nums">
+                    キャンセル {cancelSummary.total}回
+                    <span className="font-medium tabular-nums">
                       （前{cancelSummary.advance}・当{cancelSummary.same_day}・無{cancelSummary.no_show}）
                     </span>
                   </button>
                 )}
-                {/* 患者説明モード（NextGen v2.0・フラグでOFF可能） */}
-                {isFeatureEnabled('explanationMode') && (
-                  <button
-                    type="button"
-                    onClick={() => setShowExplanation(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
-                  >
-                    🖥️ 患者さんへ説明
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowReferralModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:border-teal-400 hover:text-teal-700 transition-colors shadow-sm"
-                >
-                  📄 紹介状・報告書
-                </button>
-                <Link
-                  href={`/patients/${patient.id}/return-criteria`}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors shadow-sm"
-                >
-                  🏆 復帰基準テスト
-                </Link>
               </div>
             </div>
             {improvementScore && (
-              <div className="flex flex-col items-center flex-shrink-0">
+              <div className="flex shrink-0 flex-col items-center">
                 <ProgressGauge score={improvementScore.total} size={72} />
-                <span className="text-xs text-gray-400 mt-1">改善スコア</span>
+                <span className="mt-1 text-xs text-slate-500">改善スコア</span>
               </div>
             )}
           </div>
+
+          {/* 患者さんの目標・希望（どのタブでも見える。その場で書ける・直せる） */}
+          <PatientGoalsBanner key={patient.id} patient={patient} latestSoap={latestSoap} />
+
+          {/* 大事な数字 */}
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { label: '来院回数（SOAP）', value: `${soapNotes.length}回` },
+              { label: '最後の記録', value: latestSoap?.visitDate || '—' },
+              {
+                label: '最新の痛み（NRS）',
+                value: latestSoap ? `${latestSoap.painToday} / 10` : '—',
+                tone: latestSoap ? NRS_COLOR(latestSoap.painToday) : '',
+              },
+              { label: '初回来院', value: patient.firstVisitDate || '—' },
+            ].map(f => (
+              <div key={f.label} className="min-w-0 rounded-xl bg-slate-50 px-3 py-2">
+                <dt className="text-xs font-bold text-slate-500">{f.label}</dt>
+                <dd className={`mt-0.5 truncate text-base font-black ${f.tone || 'text-slate-900'}`}>{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+
           {latestSoap && (
             <div className="mt-4 max-w-lg">
               <PhaseStepper currentPhase={currentPhase} />
             </div>
           )}
+
+          {/* よく使うボタン */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('soap')}
+              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-800 max-lg:min-h-10"
+            >
+              今日のSOAPを書く
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReferralModal(true)}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10"
+            >
+              紹介状・報告書
+            </button>
+            <Link
+              href={`/patients/${patient.id}/return-criteria`}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
+            >
+              復帰基準テスト
+            </Link>
+            <Link
+              href={`/patients/${patient.id}/outcome-scores`}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-teal-400 hover:text-teal-800 max-lg:min-h-10 max-lg:inline-flex max-lg:items-center"
+            >
+              アウトカム評価
+            </Link>
+          </div>
         </div>
 
-        {/* タブバー */}
-        <div className="px-1 overflow-x-auto border-t border-gray-100">
+        {/* タブ */}
+        <div className="overflow-x-auto border-t border-slate-100 px-1" role="group" aria-label="カルテの内容">
           <div className="flex min-w-max">
             {TABS.map(tab => (
               <button
                 key={tab.key}
                 type="button"
+                aria-pressed={activeTab === tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`relative px-3.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`relative whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
                   activeTab === tab.key
-                    ? 'border-teal-600 text-teal-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-teal-600 text-teal-800'
+                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
                 }`}
               >
-                {tab.icon} {tab.label}
+                {tab.label}
                 {tab.badge != null && tab.badge > 0 && (
-                  <span className="ml-1 bg-teal-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                  <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600 tabular-nums">
                     {tab.badge}
                   </span>
                 )}
@@ -1015,7 +1111,6 @@ export default function PatientDetail({ patient }: Props) {
                       setSelectedIntake(intake)
                       setShowReferralModal(true)
                     }}
-                    onProtocol={() => router.push(buildProtocolUrl(intake))}
                   />
                 ))}
               </div>
@@ -1026,6 +1121,8 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── 概要タブ ── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* 基本情報と保険証（NOAHから取り込んだ方）。情報が無い方には出さない */}
+            <PatientProfileCard patient={patient} />
             {/* 目標と課題（NextGen v2.0・説明モードの表示元）
                 key=patient.id で患者切替時に必ず読み直す（別患者のデータ混入防止） */}
             {isFeatureEnabled('goalsProblems') && (
@@ -1038,7 +1135,7 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="bg-teal-50 rounded-xl p-4">
                     <p className="text-sm font-bold text-teal-800 mb-2">📣 患者様への今日のメッセージ</p>
                     <p className="text-sm text-teal-700">{patientMessage.encouragementMessage}</p>
-                    <p className="text-sm text-teal-600 mt-2">{patientMessage.phaseExplanation}</p>
+                    <p className="text-sm text-teal-700 mt-2">{patientMessage.phaseExplanation}</p>
                     {patientMessage.nextGoalMessage && (
                       <p className="text-sm text-teal-800 font-medium mt-2">🎯 {patientMessage.nextGoalMessage}</p>
                     )}
@@ -1054,7 +1151,7 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                     <p className="text-sm font-bold text-red-700 mb-2">⚠️ 離脱リスクが高い状態です</p>
                     <p className="text-sm text-red-600 mb-2">{retentionRisk.recommendedAction}</p>
-                    <ul className="text-xs text-red-500 space-y-1">
+                    <ul className="text-xs text-red-600 space-y-1">
                       {retentionRisk.reasons.map((r, i) => <li key={i}>• {r}</li>)}
                     </ul>
                   </div>
@@ -1085,19 +1182,19 @@ export default function PatientDetail({ patient }: Props) {
                   <ul className="space-y-2">
                     {latestSoap?.improvements && (
                       <li className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span className="text-green-700 mt-0.5">✓</span>
                         {latestSoap.improvements}
                       </li>
                     )}
                     {romRecords.length > 0 && (
                       <li className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span className="text-green-700 mt-0.5">✓</span>
                         ROM測定が {romRecords.length}件記録されています
                       </li>
                     )}
                     {strengthRecords.length > 0 && (
                       <li className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span className="text-green-700 mt-0.5">✓</span>
                         筋力測定が {strengthRecords.length}件記録されています
                       </li>
                     )}
@@ -1124,7 +1221,7 @@ export default function PatientDetail({ patient }: Props) {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">痛みNRS</span>
-                      <p className={`font-bold text-lg ${latestSoap.painToday >= 7 ? 'text-red-600' : latestSoap.painToday >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                      <p className={`font-bold text-lg ${latestSoap.painToday >= 7 ? 'text-red-600' : latestSoap.painToday >= 4 ? 'text-yellow-700' : 'text-green-700'}`}>
                         {latestSoap.painToday} / 10
                       </p>
                     </div>
@@ -1142,80 +1239,25 @@ export default function PatientDetail({ patient }: Props) {
           </div>
         )}
 
-        {/* ── リハビリ計画タブ ── */}
-        {activeTab === 'plan' && (
-          <div className="space-y-4">
-            {rehabPlans.length === 0 ? (
-              <Card>
-                <CardContent className="py-10 text-center">
-                  <p className="text-gray-400 text-sm mb-2">リハビリ計画がまだありません</p>
-                  <p className="text-gray-400 text-xs">「プロトコル立案」でプロトコルを作成し、「カルテへ反映」ボタンで追加できます</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 px-1">
-                  <span className="text-sm font-medium text-gray-700">{rehabPlans.length}フェーズのリハビリ計画</span>
-                  <span className="text-xs text-gray-400">（プロトコルから反映）</span>
-                </div>
-                {rehabPlans.map((plan, i) => (
-                  <Card key={plan.id}>
-                    <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                          i === 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {plan.phase}
-                        </span>
-                        <div>
-                          <SectionTitle>{plan.mainProblem || PHASE_SHORT_LABELS[plan.phase]}</SectionTitle>
-                          <p className="text-xs text-gray-400 mt-0.5">{PHASE_LABELS[plan.phase]}</p>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        {plan.shortTermGoal && (
-                          <div>
-                            <p className="text-xs font-medium text-gray-400 mb-1">短期ゴール</p>
-                            <p className="text-gray-700 bg-green-50 rounded-lg p-2 text-xs">{plan.shortTermGoal}</p>
-                          </div>
-                        )}
-                        {plan.midTermGoal && (
-                          <div>
-                            <p className="text-xs font-medium text-gray-400 mb-1">中期ゴール</p>
-                            <p className="text-gray-700 bg-blue-50 rounded-lg p-2 text-xs">{plan.midTermGoal}</p>
-                          </div>
-                        )}
-                        {plan.longTermGoal && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-400 mb-1">長期ゴール</p>
-                            <p className="text-gray-700 bg-purple-50 rounded-lg p-2 text-xs">{plan.longTermGoal}</p>
-                          </div>
-                        )}
-                        {plan.recommendedFrequency && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-400 mb-1">運動メニュー</p>
-                            <p className="text-gray-700 text-xs">{plan.recommendedFrequency}</p>
-                          </div>
-                        )}
-                        {plan.precautions && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-400 mb-1">進行基準</p>
-                            <p className="text-gray-700 bg-amber-50 rounded-lg p-2 text-xs">{plan.precautions}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </>
-            )}
+        {/* ── 評価・測定タブ（初回評価・ROM・筋力・スペシャルテスト・経過グラフ） ── */}
+        {activeTab === 'eval' && (
+          <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="評価・測定の切り替え">
+            {EVAL_TABS.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={evalTab === t.key}
+                onClick={() => setEvalTab(t.key)}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors max-lg:min-h-10 ${
+                  evalTab === t.key ? 'bg-teal-700 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         )}
-
-        {/* ── 初回評価タブ ── */}
-        {activeTab === 'evaluation' && (
+        {activeTab === 'eval' && evalTab === 'evaluation' && (
           <div className="space-y-6">
             {evaluations.length > 0 && (
               <Card>
@@ -1227,7 +1269,7 @@ export default function PatientDetail({ patient }: Props) {
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-gray-600 text-sm">{ev.evaluationDate}</span>
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium text-sm ${ev.painNrs >= 7 ? 'text-red-600' : ev.painNrs >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                            <span className={`font-medium text-sm ${ev.painNrs >= 7 ? 'text-red-600' : ev.painNrs >= 4 ? 'text-yellow-700' : 'text-green-700'}`}>
                               NRS: {ev.painNrs}
                             </span>
                             {ev.painDuration && (
@@ -1261,6 +1303,20 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── SOAPカルテタブ ── */}
         {activeTab === 'soap' && (
           <div className="space-y-4">
+            {/* 来院カレンダー（来院・キャンセル・これからの予約を月で見る） */}
+            <VisitCalendar
+              patient={patient}
+              soapNotes={soapNotes}
+              attendance={attendance}
+              cancellations={cancellations}
+              evaluations={evaluations}
+              intakes={intakes}
+              photos={kartePhotos}
+              onOpenSoap={id => document.getElementById(`soap-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            />
+            {/* 部位の移り変わり（いつ始まり・いつ終わったか） */}
+            <ComplaintTimeline soapNotes={soapNotes} />
+
             {/* 新規カルテ入力 */}
             <SOAPForm patientId={patient.id} onSaved={reload} />
 
@@ -1269,18 +1325,24 @@ export default function PatientDetail({ patient }: Props) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1 pt-2">
                   <SectionTitle>過去のカルテ</SectionTitle>
-                  <span className="text-xs text-gray-400">{soapNotes.length}件</span>
+                  <span className="text-xs text-gray-500">{soapNotes.length}件</span>
                 </div>
                 {soapNotes.map(note => (
-                  <SOAPNoteCard
-                    key={note.id}
-                    note={note}
-                    onReferral={() => {
-                      setSelectedSoap(note)
-                      setSelectedIntake(null)
-                      setShowReferralModal(true)
-                    }}
-                  />
+                  <div key={note.id} id={`soap-${note.id}`} className="scroll-mt-24">
+                    <SOAPNoteCard
+                      note={note}
+                      onReferral={() => {
+                        setSelectedSoap(note)
+                        setSelectedIntake(null)
+                        setShowReferralModal(true)
+                      }}
+                      onDelete={() => {
+                        if (!window.confirm(`${note.visitDate} のカルテ（${note.visitNumber}回目）を削除しますか？\nこの操作は取り消せません。`)) return
+                        deleteSOAPNote(note.id)
+                        reload()
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -1297,6 +1359,29 @@ export default function PatientDetail({ patient }: Props) {
           />
         )}
 
+        {/* ── 疑問・AI相談 タブ ── */}
+        {activeTab === 'question' && (
+          <KarteQuestionsTab
+            patient={patient}
+            questions={karteQuestions}
+            intakes={intakes}
+            soapNotes={soapNotes}
+            specialTests={specialTests}
+            memos={quickMemos}
+            onUpdate={reload}
+          />
+        )}
+
+        {/* ── 写真タブ ── */}
+        {activeTab === 'photo' && (
+          <PhotosTab patient={patient} photos={kartePhotos} onUpdate={reload} />
+        )}
+
+        {/* ── 契約・同意書タブ（文面にチェック・記入 → 指で署名 → 院保管用と患者様控えを印刷） ── */}
+        {activeTab === 'contract' && (
+          <ContractsTab patient={patient} contracts={contracts} allContracts={allContracts} onUpdate={reload} />
+        )}
+
         {/* ── キャンセルタブ ── */}
         {activeTab === 'cancel' && (
           <CancellationTab
@@ -1308,7 +1393,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── ROM タブ ── */}
-        {activeTab === 'rom' && (
+        {activeTab === 'eval' && evalTab === 'rom' && (
           <div className="space-y-6">
             {romRecords.length > 0 && (
               <Card>
@@ -1325,6 +1410,7 @@ export default function PatientDetail({ patient }: Props) {
                           <th className="text-right py-2 text-gray-500 font-medium text-xs">他動</th>
                           <th className="text-right py-2 text-gray-500 font-medium text-xs">正常値</th>
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">痛み</th>
+                          <th className="py-2"><span className="sr-only">削除</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1337,13 +1423,16 @@ export default function PatientDetail({ patient }: Props) {
                               <td className="py-2 text-xs">{BODY_REGION_LABELS[r.bodyRegion]}</td>
                               <td className="py-2 text-xs font-medium">{r.movement}</td>
                               <td className="py-2 text-right">
-                                <span className={`text-xs font-bold ${pct && pct < 70 ? 'text-red-600' : pct && pct < 90 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                <span className={`text-xs font-bold ${pct && pct < 70 ? 'text-red-600' : pct && pct < 90 ? 'text-yellow-700' : 'text-green-700'}`}>
                                   {r.activeRom ?? '—'}{r.unit === 'deg' ? '°' : 'cm'}
                                 </span>
                               </td>
                               <td className="py-2 text-right text-xs">{r.passiveRom ?? '—'}</td>
-                              <td className="py-2 text-right text-xs text-gray-400">{r.normalValue}{r.unit === 'deg' ? '°' : 'cm'}</td>
+                              <td className="py-2 text-right text-xs text-gray-500">{r.normalValue}{r.unit === 'deg' ? '°' : 'cm'}</td>
                               <td className="py-2 text-center">{r.pain ? '⚠' : '—'}</td>
+                              <td className="py-1 text-right">
+                                <DeleteRowButton label={`${r.measuredDate} ${r.movement} のROM記録`} onDelete={() => { deleteROMRecord(r.id); reload() }} />
+                              </td>
                             </tr>
                           )
                         })}
@@ -1377,7 +1466,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 筋力タブ ── */}
-        {activeTab === 'strength' && (
+        {activeTab === 'eval' && evalTab === 'strength' && (
           <div className="space-y-6">
             {strengthRecords.length > 0 && (
               <Card>
@@ -1393,6 +1482,7 @@ export default function PatientDetail({ patient }: Props) {
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">MMT</th>
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">HHD</th>
                           <th className="text-center py-2 text-gray-500 font-medium text-xs">痛み</th>
+                          <th className="py-2"><span className="sr-only">削除</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1402,10 +1492,13 @@ export default function PatientDetail({ patient }: Props) {
                             <td className="py-2 text-xs font-medium">{r.movement}</td>
                             <td className="py-2 text-center text-xs">{r.side === 'right' ? '右' : r.side === 'left' ? '左' : r.side}</td>
                             <td className="py-2 text-center">
-                              <span className="font-bold text-teal-600 text-sm">{r.mmt !== null ? r.mmt : '—'}</span>
+                              <span className="font-bold text-teal-700 text-sm">{r.mmt !== null ? r.mmt : '—'}</span>
                             </td>
                             <td className="py-2 text-center text-xs">{r.hhdValue !== null ? `${r.hhdValue} ${r.unit}` : '—'}</td>
                             <td className="py-2 text-center">{r.pain ? '⚠' : '—'}</td>
+                            <td className="py-1 text-right">
+                              <DeleteRowButton label={`${r.measuredDate} ${r.movement} の筋力記録`} onDelete={() => { deleteStrengthRecord(r.id); reload() }} />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1419,7 +1512,7 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── スペシャルテストタブ ── */}
-        {activeTab === 'special' && (
+        {activeTab === 'eval' && evalTab === 'special' && (
           <div className="space-y-6">
 
             {/* ── アウトカムスコアへのショートカット ── */}
@@ -1432,7 +1525,7 @@ export default function PatientDetail({ patient }: Props) {
                   </div>
                   <Link
                     href={`/patients/${patient.id}/outcome-scores`}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 transition-colors whitespace-nowrap flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white text-xs font-semibold rounded-lg hover:bg-teal-800 transition-colors whitespace-nowrap flex-shrink-0 max-lg:min-h-10"
                   >
                     スコア入力 →
                   </Link>
@@ -1447,7 +1540,7 @@ export default function PatientDetail({ patient }: Props) {
                   <SectionTitle>🏆 機能評価・競技復帰テスト</SectionTitle>
                   <Link
                     href={`/patients/${patient.id}/return-criteria`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-semibold rounded-lg hover:bg-emerald-800 transition-colors whitespace-nowrap max-lg:min-h-10"
                   >
                     評価ページへ →
                   </Link>
@@ -1457,7 +1550,7 @@ export default function PatientDetail({ patient }: Props) {
                 {returnAssessments.length === 0 ? (
                   <div className="text-center py-6 bg-emerald-50 rounded-xl border border-emerald-100">
                     <p className="text-sm font-medium text-emerald-700">まだ復帰基準テストが実施されていません</p>
-                    <p className="text-xs text-emerald-500 mt-1 max-w-xs mx-auto">
+                    <p className="text-xs text-emerald-700 mt-1 max-w-xs mx-auto">
                       {({
                         hip: 'Harris Hip Score / RSI / 片脚立位・ステップダウン / LEFS',
                         shoulder: 'ASES肩スコア / RSI / 座位ショットパット・Y-Balance / 上肢機能質問紙',
@@ -1469,7 +1562,7 @@ export default function PatientDetail({ patient }: Props) {
                     </p>
                     <Link
                       href={`/patients/${patient.id}/return-criteria`}
-                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg hover:bg-emerald-800 transition-colors max-lg:min-h-10"
                     >
                       🏆 復帰基準テストを実施する
                     </Link>
@@ -1477,8 +1570,8 @@ export default function PatientDetail({ patient }: Props) {
                 ) : (() => {
                   const latest = returnAssessments[0]
                   const VERDICT = {
-                    cleared:     { label: '✅ 復帰可能', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', num: 'text-emerald-600' },
-                    conditional: { label: '⚠️ 条件付き',  bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   num: 'text-amber-600'   },
+                    cleared:     { label: '✅ 復帰可能', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', num: 'text-emerald-700' },
+                    conditional: { label: '⚠️ 条件付き',  bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   num: 'text-amber-700'   },
                     not_ready:   { label: '🔴 未達',      bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-700',     num: 'text-red-600'     },
                   }[latest.verdict]
                   return (
@@ -1493,7 +1586,7 @@ export default function PatientDetail({ patient }: Props) {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className={`text-3xl font-bold ${VERDICT.num}`}>{latest.scores.composite}</div>
-                            <div className="text-xs text-gray-400">/ 100点</div>
+                            <div className="text-xs text-gray-500">/ 100点</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2 mt-3">
@@ -1513,11 +1606,11 @@ export default function PatientDetail({ patient }: Props) {
                             <div key={item.label} className="text-center bg-white/70 rounded-lg py-2 px-1">
                               <div className="text-lg leading-none">{item.icon}</div>
                               <div className={`text-sm font-bold mt-0.5 ${
-                                item.score >= 80 ? 'text-emerald-600' :
-                                item.score >= 65 ? 'text-amber-600' : 'text-red-600'
+                                item.score >= 80 ? 'text-emerald-700' :
+                                item.score >= 65 ? 'text-amber-700' : 'text-red-600'
                               }`}>{item.score}</div>
-                              <div className="text-[10px] text-gray-500 leading-tight">{item.label}</div>
-                              <div className="text-[9px] text-gray-400">{item.note}</div>
+                              <div className="text-xs text-gray-500 leading-tight">{item.label}</div>
+                              <div className="text-xs text-gray-500">{item.note}</div>
                             </div>
                           ))}
                         </div>
@@ -1526,7 +1619,7 @@ export default function PatientDetail({ patient }: Props) {
                         )}
                       </div>
                       {returnAssessments.length > 1 && (
-                        <p className="text-xs text-gray-400 text-center mt-2">
+                        <p className="text-xs text-gray-500 text-center mt-2">
                           過去 {returnAssessments.length} 件の評価 — 詳細・履歴は評価ページで確認できます
                         </p>
                       )}
@@ -1548,10 +1641,10 @@ export default function PatientDetail({ patient }: Props) {
                         <div className="flex items-start justify-between gap-2 flex-wrap">
                           <div>
                             <span className="font-medium text-gray-800">{t.testName}</span>
-                            <span className="ml-2 text-gray-400">{BODY_REGION_LABELS[t.bodyRegion]}</span>
-                            <span className="ml-2 text-gray-400">{t.measuredDate}</span>
+                            <span className="ml-2 text-gray-500">{BODY_REGION_LABELS[t.bodyRegion]}</span>
+                            <span className="ml-2 text-gray-500">{t.measuredDate}</span>
                           </div>
-                          <div className="flex gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {(['rightResult', 'leftResult', 'result'] as const).map((key, i) => {
                               const val = t[key]
                               const label = ['右', '左', '総合'][i]
@@ -1563,6 +1656,7 @@ export default function PatientDetail({ patient }: Props) {
                                 </span>
                               )
                             })}
+                            <DeleteRowButton label={`${t.measuredDate} ${t.testName} のテスト結果`} onDelete={() => { deleteSpecialTest(t.id); reload() }} />
                           </div>
                         </div>
                         {(t.faberDistanceRight != null || t.faberDistanceLeft != null) && (
@@ -1572,9 +1666,9 @@ export default function PatientDetail({ patient }: Props) {
                         )}
                         {(t.apprehension || t.clickSound || t.limitation) && (
                           <div className="flex gap-1.5 mt-1.5">
-                            {t.apprehension && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">不安感あり</span>}
-                            {t.clickSound && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">クリック音</span>}
-                            {t.limitation && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px]">可動域制限</span>}
+                            {t.apprehension && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">不安感あり</span>}
+                            {t.clickSound && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">クリック音</span>}
+                            {t.limitation && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">可動域制限</span>}
                           </div>
                         )}
                         {t.memo && <p className="mt-1.5 text-gray-600">{t.memo}</p>}
@@ -1592,7 +1686,17 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 進捗タブ ── */}
-        {activeTab === 'progress' && (
+        {activeTab === 'eval' && evalTab === 'outcome' && (
+          <OutcomeQuickTab
+            patient={patient}
+            outcomes={outcomes}
+            sport={outcomeSport}
+            suggestText={[patient.diagnosisLabel, patient.mainComplaint, ...evaluations.map((e) => e.sportType), ...intakes.map((i) => i.sportsActivity)].filter(Boolean).join(' ')}
+            onUpdate={reload}
+          />
+        )}
+
+        {activeTab === 'eval' && evalTab === 'progress' && (
           <div className="space-y-6">
             {improvementScore && (
               <Card>
@@ -1640,89 +1744,8 @@ export default function PatientDetail({ patient }: Props) {
           </div>
         )}
 
-        {/* ── 運動メニュータブ ── */}
-        {activeTab === 'exercises' && (
-          <div className="space-y-6">
-            {/* 処方中の運動 */}
-            {patientExercises.filter(pe => pe.status === 'active').length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-gray-700 mb-3">処方中の運動</h3>
-                <div className="space-y-3">
-                  {patientExercises.filter(pe => pe.status === 'active').map(pe => {
-                    const exercise = exercises.find(e => e.id === pe.exerciseId)
-                    if (!exercise) return null
-                    return (
-                      <ExerciseCard
-                        key={pe.id}
-                        exercise={exercise}
-                        patientExercise={pe}
-                        onRemove={handleRemoveExercise}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
-            {/* 追加可能な運動 */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-700 mb-3">追加できる運動</h3>
-              <div className="space-y-3">
-                {exercises
-                  .filter(e => e.bodyRegion === patient.bodyRegion || e.bodyRegion === 'lumbar')
-                  .filter(e => !assignedExerciseIds.has(e.id))
-                  .map(exercise => (
-                    <ExerciseCard
-                      key={exercise.id}
-                      exercise={exercise}
-                      onAssign={handleAssignExercise}
-                    />
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── 競技復帰ドリルタブ ── */}
-        {activeTab === 'drills' && (
-          <div>
-            <p className="text-xs text-gray-400 mb-4">
-              {guessedDrillSlug
-                ? `診断名「${patient.diagnosisLabel}」から関連するドリルを表示しています。絞り込み条件は自由に変更できます。`
-                : '患者の診断名から自動で絞り込めなかったため、全疾患を表示しています。上の絞り込みから選択してください。'}
-            </p>
-            <DrillsBrowser initialDiseaseSlug={guessedDrillSlug} />
-          </div>
-        )}
-
-        {/* ── 患者説明タブ ── */}
-        {activeTab === 'explanation' && (
-          <PatientExplanationSheet
-            patient={patient}
-            evaluation={latestEval}
-            soapNote={latestSoap}
-            improvementScore={improvementScore?.total ?? 0}
-            currentPhase={currentPhase}
-            romRecords={romRecords}
-            strengthRecords={strengthRecords}
-            patientExercises={patientExercises}
-            exercises={exercises}
-          />
-        )}
       </div>
-
-      {/* 紹介状・報告書 フローティングボタン
-          （患者説明モード中は非表示＝患者向け全画面の上にスタッフUIを出さない） */}
-      {!showExplanation && (
-        <button
-          type="button"
-          onClick={() => setShowReferralModal(true)}
-          style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 40 }}
-          className="flex items-center gap-2 px-4 py-3 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl hover:bg-teal-700 transition-colors"
-        >
-          📄 紹介状・報告書
-        </button>
-      )}
 
       {/* 紹介状・報告書モーダル */}
       {showReferralModal && (
@@ -1740,15 +1763,6 @@ export default function PatientDetail({ patient }: Props) {
         />
       )}
 
-      {/* 患者説明モード（全画面・専門情報は表示しない）
-          必ず最後に描画し、最前面（z-index最大）でスタッフ向けUIをすべて覆う */}
-      {showExplanation && (
-        <ExplanationMode
-          key={patient.id}
-          patient={patient}
-          onClose={() => setShowExplanation(false)}
-        />
-      )}
     </div>
   )
 }

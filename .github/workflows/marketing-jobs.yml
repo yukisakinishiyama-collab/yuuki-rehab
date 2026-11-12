@@ -3,6 +3,7 @@
 # - 期限のきた投稿ジョブを実行（承認済みの投稿だけ）
 # - 自動投稿パイプライン: 日曜夕方に翌週分のAI下書きを作成→院長へLINE通知、
 #   承認されないまま時刻が過ぎた案を期限切れに、前日リマインド（ほとんどの回は一瞬で終わる）
+# - NOAH集計の毎晩のまとめ: 21時（日本時間）以降、その日の集計が届いたら院長へLINE1通
 #
 # Vercel無料プランのCronは1日1回のため、GitHub Actionsで補強する。
 # リポジトリの Settings → Secrets and variables → Actions に
@@ -36,5 +37,12 @@ jobs:
           URL="https://yuuki-rehab.vercel.app/api/marketing/autopilot/run"
           if [ "${{ inputs.generate_now }}" = "true" ]; then URL="$URL?generate=now"; fi
           curl -sS --max-time 290 -w "\nHTTP %{http_code}\n" -X POST "$URL" \
+            -H "Authorization: Bearer ${{ secrets.MARKETING_CRON_SECRET }}" \
+            -H "Content-Type: application/json"
+
+      - name: NOAH集計の毎晩のまとめ（21時より前・送信済みの夜はすぐ終わる）
+        if: always()
+        run: |
+          curl -sS --max-time 110 -w "\nHTTP %{http_code}\n" -X POST "https://yuuki-rehab.vercel.app/api/marketing/noah/nightly" \
             -H "Authorization: Bearer ${{ secrets.MARKETING_CRON_SECRET }}" \
             -H "Content-Type: application/json"

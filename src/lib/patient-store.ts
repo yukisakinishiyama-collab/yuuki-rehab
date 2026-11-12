@@ -4,10 +4,9 @@
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
-  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake,
+  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion, KartePhoto,
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
-import { SAMPLE_PATIENTS, SAMPLE_EVALUATIONS, SAMPLE_EXERCISES, SAMPLE_SOAP_NOTES } from './patient-data'
 
 const STORE_VERSION = '1'
 
@@ -26,16 +25,32 @@ const KEYS = {
   cancellations: 'pt_cancellations',
   retentionRisks: 'pt_retention_risks',
   quickMemos: 'pt_quick_memos',
+  karteQuestions: 'pt_karte_questions',
+  kartePhotos: 'pt_karte_photos',
   intakes: 'pt_intakes',
   explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
   version: 'pt_version',
 } as const
 
+/**
+ * 読み込みの控え（速さのため）
+ * localStorage の文字列をそのまま JSON.parse すると、カルテが増えるほど 1 回ごとに数十ms かかり、
+ * カルテ画面は開くたびに 10 回以上読むので、スマホでは体感で遅くなる。
+ * 文字列が前回と同じなら、前回の結果を使う（文字列の比較は parse よりずっと速い）。
+ * 別の場所（クラウドの取り込み・重複の整理）が localStorage を直接書き換えても、文字列が変わるので自然に読み直す。
+ */
+const cache = new Map<string, { raw: string; parsed: unknown[] }>()
+
 function get<T>(key: string): T[] {
   if (typeof window === 'undefined') return []
   try {
-    return JSON.parse(localStorage.getItem(key) ?? '[]') as T[]
+    const raw = localStorage.getItem(key) ?? '[]'
+    const hit = cache.get(key)
+    if (hit && hit.raw === raw) return hit.parsed.slice() as T[]
+    const parsed = JSON.parse(raw) as T[]
+    cache.set(key, { raw, parsed })
+    return parsed.slice()
   } catch {
     return []
   }
@@ -43,23 +58,28 @@ function get<T>(key: string): T[] {
 
 function set<T>(key: string, data: T[]): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(key, JSON.stringify(data))
+  const raw = JSON.stringify(data)
+  localStorage.setItem(key, raw)
+  cache.set(key, { raw, parsed: data.slice() })
   // 保存後にクラウドへ自動同期（設定済みの場合のみ）
   import('./sync-service').then(({ scheduleSync }) => scheduleSync())
 }
 
+/**
+ * 端末の準備。見本の患者さんは入れない（本物のカルテと混ざらないように）。
+ * 以前は「準備済み」の印が無い端末で見本データを書き込んでいたが、クラウドから取り込んだ直後の
+ * 端末（印はクラウドに同期されない）で本物のカルテを見本で上書きし、それがクラウドへ戻る恐れがあった。
+ * いまは印を付けるだけで、既にあるデータには一切さわらない。
+ */
 export function initPatientStore(): void {
   if (typeof window === 'undefined') return
-  const initialized = localStorage.getItem(KEYS.initialized)
-  const version = localStorage.getItem(KEYS.version)
-  if (initialized && version === STORE_VERSION) return
-
-  localStorage.setItem(KEYS.patients, JSON.stringify(SAMPLE_PATIENTS))
-  localStorage.setItem(KEYS.evaluations, JSON.stringify(SAMPLE_EVALUATIONS))
-  localStorage.setItem(KEYS.exercises, JSON.stringify(SAMPLE_EXERCISES))
-  localStorage.setItem(KEYS.soapNotes, JSON.stringify(SAMPLE_SOAP_NOTES))
-  localStorage.setItem(KEYS.initialized, 'true')
-  localStorage.setItem(KEYS.version, STORE_VERSION)
+  try {
+    if (localStorage.getItem(KEYS.initialized) && localStorage.getItem(KEYS.version) === STORE_VERSION) return
+    localStorage.setItem(KEYS.initialized, 'true')
+    localStorage.setItem(KEYS.version, STORE_VERSION)
+  } catch {
+    // localStorage が使えない環境でも続行
+  }
 }
 
 // ── 患者 ──
@@ -76,6 +96,22 @@ export function savePatient(patient: Patient): void {
   const idx = list.findIndex(p => p.id === patient.id)
   if (idx >= 0) list[idx] = patient
   else list.push(patient)
+  set(KEYS.patients, list)
+}
+
+/** まとめて保存（NOAHからの取り込みなど。1件ずつ保存すると同期が何百回も走るため、1回で書く） */
+export function savePatientsBulk(patients: Patient[]): void {
+  const list = getPatients()
+  const index = new Map(list.map((p, i) => [p.id, i]))
+  for (const p of patients) {
+    const i = index.get(p.id)
+    if (i === undefined) {
+      index.set(p.id, list.length)
+      list.push(p)
+    } else {
+      list[i] = p
+    }
+  }
   set(KEYS.patients, list)
 }
 
@@ -199,6 +235,42 @@ export function saveQuickMemo(memo: QuickMemo): void {
 
 export function deleteQuickMemo(id: string): void {
   set(KEYS.quickMemos, getQuickMemos().filter(m => m.id !== id))
+}
+
+// ── 疑問メモ・AI相談 ──
+export function getKarteQuestions(patientId?: string): KarteQuestion[] {
+  const all = get<KarteQuestion>(KEYS.karteQuestions)
+  return patientId ? all.filter(q => q.patientId === patientId) : all
+}
+
+export function saveKarteQuestion(question: KarteQuestion): void {
+  const list = getKarteQuestions()
+  const idx = list.findIndex(q => q.id === question.id)
+  if (idx >= 0) list[idx] = question
+  else list.push(question)
+  set(KEYS.karteQuestions, list)
+}
+
+export function deleteKarteQuestion(id: string): void {
+  set(KEYS.karteQuestions, getKarteQuestions().filter(q => q.id !== id))
+}
+
+// ── 患部の写真（メタデータ。画像本体はクラウド） ──
+export function getKartePhotos(patientId?: string): KartePhoto[] {
+  const all = get<KartePhoto>(KEYS.kartePhotos)
+  return patientId ? all.filter(p => p.patientId === patientId) : all
+}
+
+export function saveKartePhoto(photo: KartePhoto): void {
+  const list = getKartePhotos()
+  const idx = list.findIndex(p => p.id === photo.id)
+  if (idx >= 0) list[idx] = photo
+  else list.push(photo)
+  set(KEYS.kartePhotos, list)
+}
+
+export function deleteKartePhoto(id: string): void {
+  set(KEYS.kartePhotos, getKartePhotos().filter(p => p.id !== id))
 }
 
 // ── 問診票 ──

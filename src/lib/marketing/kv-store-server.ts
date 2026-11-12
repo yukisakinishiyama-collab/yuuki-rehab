@@ -13,7 +13,14 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 const TABLE = 'marketing_line_contacts'
 
 /** LINE顧客一覧などがKV行を誤って拾わないための予約プレフィックス */
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:'] as const
+// mkt: … 集客の自動化設定・動いた記録・監査ログ（automation-store-server.ts）
+// linesent: … 「LINEで予約日時を送る」や予約の「確定しました」を LINE で送った記録（api/line-link/reservation・line-reservation-server.ts）
+// linersv: … LINE連携の方の予約の控え（前日のお知らせ用。line-reservation-server.ts）
+// hpstat: … ホームページの閲覧数・電話タップの日別の件数（hp-stats-server.ts）
+// kcdoc: … 署名入りの契約書・同意書の本文（karte/contract-storage-server.ts）
+// backup: / backupidx: … 院内アプリの毎月の控えとその一覧（backup/backup-server.ts）
+// gbpseo: … Google検索向けの投稿の週ごとの予定と出した順（gbp-seo-server.ts）。gbp:perf … Googleの成果のとっておき
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'linersv:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:', 'kcdoc:', 'backup:', 'backupidx:', 'gbpseo:', 'promo:', 'yt:', 'buffer:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')

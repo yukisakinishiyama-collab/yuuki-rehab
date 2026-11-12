@@ -34,6 +34,20 @@ export interface PublishJob {
   publishedUrl?: string
   /** 手動投稿が必要な場合の理由（API未承認・画像未設定など） */
   actionReason?: string
+  /** 手動投稿に使うもの（ストーリーの画像のURLなど） */
+  manualUrl?: string
+  /** 投稿サービス（Buffer）に渡した投稿。実際に出たかは後で確かめる（promo-video-server の checkBufferPromoPosts） */
+  external?: {
+    service: 'buffer'
+    postId: string
+    createdAt: string
+    /** 出せなかったとき、手で投稿するための動画 */
+    videoUrl?: string
+    status?: string
+    checkedAt?: string
+    /** 確かめ終わった（出た・出せなかった・2日たった） */
+    done?: boolean
+  }
   createdAt: string
   updatedAt: string
 }

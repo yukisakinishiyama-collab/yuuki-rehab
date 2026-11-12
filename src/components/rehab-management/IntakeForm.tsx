@@ -3,7 +3,6 @@
 // 問診票フォーム（多段タブ構成）
 // ──────────────────────────────────────────────
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { nanoid } from 'nanoid'
 import type { Intake } from '@/types/patient'
 import { saveIntake } from '@/lib/patient-store'
@@ -12,7 +11,8 @@ import {
   ToggleSwitch, SectionTitle, NRSInput,
 } from './shared'
 import BodyMap from './BodyMap'
-import JointDetailMap, { SUPPORTED_JOINTS } from './JointDetailMap'
+import { SUPPORTED_JOINTS } from './JointDetailMap'
+import AnatomyMap from './AnatomyMap'
 import IntakeFlowchart, { type FlowchartResult } from './IntakeFlowchart'
 
 interface Props {
@@ -122,9 +122,9 @@ function CheckboxGroup({
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors max-lg:min-h-10 ${
             selected.includes(opt)
-              ? 'bg-teal-600 text-white border-teal-600'
+              ? 'bg-teal-700 text-white border-teal-700'
               : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
           }`}
         >
@@ -154,30 +154,13 @@ interface AIResult {
 
 type TabKey = 'basic' | 'pain_location' | 'flow' | 'detail' | 'life' | 'ai'
 
-// 関節名（日本語）→ Protocol Joint キーのマッピング
-const JOINT_NAME_TO_KEY: Record<string, string> = {
-  '膝関節': 'knee', '肩関節': 'shoulder', '股関節': 'hip',
-  '足関節': 'ankle', '肘関節': 'elbow', '手関節・手指': 'hand',
-  '腰部': 'spine', '頚部': 'spine',
-}
-
-interface ProtocolPrefill {
-  diagnosis: string
-  joint: string
-  sport: string
-  eventDate: string
-  notes: string
-}
-
 export default function IntakeForm({ patientId, onSaved }: Props) {
-  const router = useRouter()
   const [form, setForm] = useState<FormState>(defaultForm)
   const [tab, setTab] = useState<TabKey>('basic')
   const [saved, setSaved] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [aiResult, setAiResult] = useState<AIResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
-  const [protocolPrefill, setProtocolPrefill] = useState<ProtocolPrefill | null>(null)
   const [flowResults, setFlowResults] = useState<Record<string, FlowchartResult>>({})
 
   const TABS: { key: TabKey; label: string }[] = [
@@ -265,37 +248,10 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
 
-    // プロトコル作成用の転記データを保存
-    const joints = getJointsFromPainLocations(form.painLocations)
-    const firstJoint = joints[0] ? (JOINT_NAME_TO_KEY[joints[0]] ?? 'other') : ''
-    const notesParts: string[] = []
-    if (form.chiefComplaint) notesParts.push(form.chiefComplaint)
-    if (form.importantGoal) notesParts.push(`目標: ${form.importantGoal}`)
-    if (form.therapistNotes) notesParts.push(`施術者メモ: ${form.therapistNotes}`)
-    setProtocolPrefill({
-      diagnosis: form.suspectedDiagnosis,
-      joint: firstJoint,
-      sport: form.sportsActivity,
-      eventDate: form.injuryDate,
-      notes: notesParts.join('\n'),
-    })
-
     setForm(defaultForm)
     setAiResult(null)
     setFlowResults({})
     onSaved?.()
-  }
-
-  // プロトコル作成ページへ問診データを転記して遷移
-  function handleGoToProtocol() {
-    if (!protocolPrefill) return
-    const params = new URLSearchParams()
-    if (protocolPrefill.diagnosis) params.set('diagnosis', protocolPrefill.diagnosis)
-    if (protocolPrefill.joint) params.set('joint', protocolPrefill.joint)
-    if (protocolPrefill.sport) params.set('sport', protocolPrefill.sport)
-    if (protocolPrefill.eventDate) params.set('eventDate', protocolPrefill.eventDate)
-    if (protocolPrefill.notes) params.set('notes', protocolPrefill.notes)
-    router.push(`/protocols/new?${params.toString()}`)
   }
 
   return (
@@ -319,9 +275,9 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors max-lg:min-h-10 ${
                 tab === t.key
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -383,9 +339,9 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                     key={String(opt.value)}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, firstTimeSymptoм: opt.value }))}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors max-lg:min-h-10 ${
                       form.firstTimeSymptoм === opt.value
-                        ? 'bg-teal-600 text-white border-teal-600'
+                        ? 'bg-teal-700 text-white border-teal-700'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-teal-400'
                     }`}
                   >
@@ -432,7 +388,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                   関節別詳細部位
                 </p>
                 {selectedJoints.map(joint => (
-                  <JointDetailMap
+                  <AnatomyMap
                     key={joint}
                     joint={joint}
                     selected={form.jointDetailLocations[joint] ?? []}
@@ -448,7 +404,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
         {tab === 'flow' && (
           <div className="space-y-4">
             {selectedJoints.length === 0 && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-500">
                 先に「痛み部位」タブで痛みのある部位を選択してください。
               </p>
             )}
@@ -605,7 +561,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 type="button"
                 onClick={handleAnalyze}
                 disabled={analyzing || !form.chiefComplaint}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2 max-lg:min-h-10"
               >
                 {analyzing && (
                   <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -616,7 +572,7 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 {analyzing ? 'AI分析中...' : '🤖 AI分析を実行'}
               </button>
               {!form.chiefComplaint && (
-                <p className="text-xs text-gray-400">「基本情報」タブで主訴を入力してください</p>
+                <p className="text-xs text-gray-500">「基本情報」タブで主訴を入力してください</p>
               )}
             </div>
 
@@ -713,13 +669,13 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
 
             {/* 保存ボタン */}
             <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-              {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+              {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
               {!saved && <span />}
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={!form.chiefComplaint}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
               >
                 💾 問診票を保存
               </button>
@@ -737,17 +693,17 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
                 const idx = keys.indexOf(tab)
                 if (idx < keys.length - 1) setTab(keys[idx + 1])
               }}
-              className="text-sm text-teal-600 hover:text-teal-800 font-medium"
+              className="text-sm text-teal-700 hover:text-teal-800 font-medium max-lg:min-h-10"
             >
               次へ →
             </button>
             <div className="flex items-center gap-3">
-              {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+              {saved && <span className="text-teal-700 text-sm">✓ 保存しました</span>}
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={!form.chiefComplaint}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors max-lg:min-h-10"
               >
                 保存
               </button>
@@ -757,24 +713,6 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
       </CardContent>
     </Card>
 
-    {/* 問診票保存後: プロトコル作成への誘導バナー */}
-    {protocolPrefill && (
-      <div className="mt-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-teal-800">問診票を保存しました</p>
-          <p className="text-xs text-teal-600 mt-0.5 truncate">
-            この情報をもとにリハビリプロトコルを作成できます
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleGoToProtocol}
-          className="flex-shrink-0 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-1.5 whitespace-nowrap"
-        >
-          プロトコル作成 →
-        </button>
-      </div>
-    )}
     </>
   )
 }

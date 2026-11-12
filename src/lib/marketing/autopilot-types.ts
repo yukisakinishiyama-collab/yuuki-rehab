@@ -35,6 +35,48 @@ export interface AutopilotSettings {
   google: boolean
   /** 週のはじめにGoogle投稿で「今週の予約の空き状況」を出す（予約システムから自動集計） */
   availabilityPost: boolean
+  /**
+   * Google検索向けの投稿（「下関市彦島＋症状」の検索ワードと院の強みを入れた決まった文＋院の写真の画像）を、
+   * 毎週決まった曜日に自動で出す（src/data/gbp-seo-posts.ts を順にくり返す）。
+   * 文面は院長が確認した決まった文なので、この設定をオンにしたことを毎回の承認の代わりにする（2026-11-11 院長の依頼）
+   */
+  googleSeo: boolean
+  /** Google検索向けの投稿の本数（週1＝月曜、週2＝月曜と金曜） */
+  googleSeoPerWeek: number
+  /**
+   * 宣伝の短い動画（院の写真＋文字・約16秒。src/data/promo-videos.ts を順にくり返す）を、毎週 YouTube ショートに出す。
+   * 連携と審査（youtubeAudited）が済むと自動で公開。それまでは、時間になると動画と文を院長のLINEへ届ける（2026-11-11 院長の依頼）
+   */
+  youtubeShorts: boolean
+  /** 同じ動画を TikTok にも出す（時間になると動画と文を院長のLINEへ届ける。アプリの中で音楽を足して投稿する） */
+  tiktokVideo: boolean
+  /** 動画の本数（週1＝水曜、週2＝水曜と土曜） */
+  promoVideoPerWeek: number
+  /**
+   * YouTube の審査（YouTube API サービスの利用確認）に通った。
+   * 通る前にアプリから送った動画は「非公開」に固定され、あとから公開に直せない（YouTube の決まり）。
+   * そのため、ここをオンにするまではアプリからは送らず、手で投稿してもらう
+   */
+  youtubeAudited: boolean
+  /**
+   * 空き状況を Instagram のストーリーにも出す（週のはじめ＝今週の空き・空きが多い日の朝＝本日の空き）。
+   * 画像は投稿する時刻の空きで作り直し、空きが無くなっていたら出さない。承認されるまで出さない
+   */
+  availabilityStory: boolean
+  /**
+   * キャンセルが出たら、空いた枠を Instagram のストーリーですぐ知らせる（予約システムのキャンセルの通知をきっかけに）。
+   * 院長がこの設定をオンにしたことを「毎回の承認」の代わりにする（出すのは空き状況の定型の画像だけ。患者さんの情報は載せない）
+   */
+  cancelStory: boolean
+  /** どの日のキャンセルを知らせるか（today=当日だけ／tomorrow=当日と翌日） */
+  cancelStoryDays: 'today' | 'tomorrow'
+  /** 空いた枠の何分前までなら知らせるか（それより近い枠は、見てから来るのが間に合わないので出さない） */
+  cancelStoryLeadMinutes: number
+  /** ストーリーを出してよい時間帯（日本時間の時。from 時から to 時まで）。外のキャンセルは from 時に出す（枠に間に合うときだけ） */
+  cancelStoryFromHour: number
+  cancelStoryToHour: number
+  /** 1日に出すキャンセルのストーリーの上限 */
+  cancelStoryMaxPerDay: number
   /** 下書きを作る時刻（日曜・日本時間の時。既定18時） */
   generateHour: number
   /** 来週の投稿で触れてほしいこと（院長メモ）。次の下書きで1本目のテーマになり、使ったら空に戻る */
@@ -59,6 +101,20 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   instagram: 'instagram_carousel',
   google: true,
   availabilityPost: true,
+  googleSeo: true,
+  googleSeoPerWeek: 2,
+  youtubeShorts: true,
+  tiktokVideo: true,
+  promoVideoPerWeek: 1,
+  youtubeAudited: false,
+  availabilityStory: true,
+  // キャンセルのストーリーは院長がオンにするまで出さない
+  cancelStory: false,
+  cancelStoryDays: 'tomorrow',
+  cancelStoryLeadMinutes: 60,
+  cancelStoryFromHour: 7,
+  cancelStoryToHour: 21,
+  cancelStoryMaxPerDay: 3,
   generateHour: 18,
   ownerNote: '',
 }
@@ -72,7 +128,7 @@ export const CATEGORY_LABELS: Record<ThemeCategory, string> = {
   expertise: '症状・ケガの解説',
   prevention: '予防・セルフケア',
   clinic: '院のご案内',
-  availability: '今週の空き状況',
+  availability: '空き状況のご案内',
   owner: '院長メモから',
 }
 

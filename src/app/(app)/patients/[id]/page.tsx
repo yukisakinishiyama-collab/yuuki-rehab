@@ -8,6 +8,7 @@ import { getPatient, initPatientStore } from '@/lib/patient-store'
 import { recordRecentView } from '@/lib/patient-ui-prefs'
 import type { Patient } from '@/types/patient'
 import PatientDetail from '@/components/rehab-management/PatientDetail'
+import { useKarteSynced } from '@/lib/use-karte-sync'
 
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -22,6 +23,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     // 患者一覧の「最近閲覧」用に閲覧履歴を記録
     if (p) recordRecentView(p.id)
   }, [id])
+
+  // ほかの端末で患者さんの情報が変わったら読み直す（15秒ごとの同期・「すぐに反映する」）
+  useKarteSynced((keys) => {
+    if (keys.includes('pt_patients')) setPatient(getPatient(id) ?? null)
+  })
 
   if (loading) {
     return (

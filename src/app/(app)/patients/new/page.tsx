@@ -9,8 +9,6 @@ import { nanoid } from 'nanoid'
 import type { Patient, BodyRegion, Gender } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 import { savePatient } from '@/lib/patient-store'
-import { saveCase, getCurrentUser, generateId, getCases } from '@/lib/rehab-store'
-import type { RehabCase } from '@/types/rehab'
 import { FormLabel, Input, Textarea, SectionTitle } from '@/components/rehab-management/shared'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -62,36 +60,6 @@ export default function NewPatientPage() {
     }
     savePatient(patient)
 
-    // 同名案件がなければ動画解析にも自動登録
-    const user = getCurrentUser()
-    const existingCase = getCases().find(c => c.patientName === form.name)
-    if (!existingCase) {
-      const newCase: RehabCase = {
-        id: generateId('case'),
-        anonymousId: `YML-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-        patientName: form.name,
-        age: 0,
-        gender: form.gender,
-        diagnosis: form.mainComplaint,
-        injuredPart: form.mainComplaint,
-        evaluationPurpose: form.mainComplaint,
-        status: 'initial',
-        assignedTo: user ? [user.id] : [],
-        reviewers: [],
-        tags: [form.diagnosisLabel, BODY_REGION_LABELS[form.bodyRegion]].filter(Boolean),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        videos: [],
-        clientEmail: '',
-        clientPhone: form.phone || undefined,
-        sport: form.mainComplaint,
-        serviceType: 'rehab',
-        deliveryStatus: 'received',
-        requestNote: form.therapistNotes || undefined,
-      }
-      saveCase(newCase)
-    }
-
     router.push(`/patients/${patient.id}`)
   }
 
@@ -101,7 +69,7 @@ export default function NewPatientPage() {
       <div>
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors max-lg:min-h-10"
         >
           <ArrowLeft className="w-4 h-4" />
           戻る

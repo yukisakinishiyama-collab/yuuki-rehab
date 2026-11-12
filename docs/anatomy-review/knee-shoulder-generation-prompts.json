@@ -1,0 +1,128 @@
+[
+  {
+    "key": "knee",
+    "view": "anterior",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. Create one ORIGINAL medical textbook line illustration, an adult RIGHT KNEE, true ANTERIOR view, isolated on pure white, portrait aspect ratio 1000:1300. This is the BONE BASE layer for a two-layer interactive anatomy map. Fine dark-gray contours, restrained very pale gray hatching, no color. Distal femur shaft from y=100 to two condyles around y=620; proximal tibia from plateau around y=730 to y=1200. Tibial tuberosity visible around (520,900). PATELLA in front, around x=420..600,y=500..680, superior base and inferior apex. Fibula on VIEWER LEFT with head around (280,800), shaft down to y=1200. Broad bone assembly centered with generous white margins. Thin pale meniscal rims between femur and tibia, medial on viewer right/lateral on left. ACL/PCL may be faint behind patella, no visible overlying soft tissues. Draw ONLY bones/articular cartilage/faint menisci; NO quadriceps tendon, patellar tendon, collateral ligaments, IT band, muscles or skin. Do not copy any published drawing. No words, letters, labels, numbers, callout lines, arrows, frames, watermarks. No inset or multiple views. Clean monochrome original illustration.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "knee",
+    "view": "posterior",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. One ORIGINAL medical textbook illustration of an adult RIGHT KNEE bone base, portrait 1000:1300, pure white background. Fine dark-gray line contours and very pale gray smooth shading, restrained hatching, no color. Distal femoral shaft and proximal tibial shaft, joint space at approximately y=690, shafts stop inside canvas with 60px margins, entire joint occupies x=200..800. Bone/cartilage and thin pale menisci with faint internal ACL/PCL ONLY, no superficial ligaments/tendons/muscle/skin. No text, labels, callout lines, arrows, numbers, captions, borders, insets or watermarks. Do not copy a real illustration. Strict POSTERIOR view. Fibula and its head on VIEWER RIGHT, tibia medial on left. Two distinct rounded posterior femoral condyles with intercondylar notch between, thin menisci at tibial plateau. Faint broad PCL crossing narrower deeper ACL in central notch. Patella hidden entirely behind femur; NO patella or patellar tendon in this posterior view.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "knee",
+    "view": "medial",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. One ORIGINAL medical textbook illustration of an adult RIGHT KNEE bone base, portrait 1000:1300, pure white background. Fine dark-gray line contours and very pale gray smooth shading, restrained hatching, no color. Distal femoral shaft and proximal tibial shaft, joint space at approximately y=690, shafts stop inside canvas with 60px margins, entire joint occupies x=200..800. Bone/cartilage and thin pale menisci with faint internal ACL/PCL ONLY, no superficial ligaments/tendons/muscle/skin. No text, labels, callout lines, arrows, numbers, captions, borders, insets or watermarks. Do not copy a real illustration. Strict MEDIAL side view of right knee, ANTERIOR points to VIEWER RIGHT and posterior to LEFT. One medial femoral condyle in side profile, patella to RIGHT at its front. Tibial tuberosity visible on anterior RIGHT edge below plateau. Fibula occluded completely behind tibia. Pale medial meniscus in joint cleft. Mild 15-degree knee flexion to distinguish landmarks. NO MCL or tendons, they will be separate layer.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "knee",
+    "view": "lateral",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. One ORIGINAL medical textbook illustration of an adult RIGHT KNEE bone base, portrait 1000:1300, pure white background. Fine dark-gray line contours and very pale gray smooth shading, restrained hatching, no color. Distal femoral shaft and proximal tibial shaft, joint space at approximately y=690, shafts stop inside canvas with 60px margins, entire joint occupies x=200..800. Bone/cartilage and thin pale menisci with faint internal ACL/PCL ONLY, no superficial ligaments/tendons/muscle/skin. No text, labels, callout lines, arrows, numbers, captions, borders, insets or watermarks. Do not copy a real illustration. Strict LATERAL side view of right knee, ANTERIOR points to VIEWER LEFT and posterior to RIGHT. Lateral femoral condyle in profile, patella at front on LEFT. Tibial tuberosity on anterior LEFT edge below plateau. Fibular head behind proximal tibia on RIGHT, fibular shaft runs down at RIGHT. Pale lateral meniscus in joint cleft, Gerdy tubercle on anterolateral tibia just below joint. Mild 15-degree flexion. NO LCL, IT band or tendons, separate layer later.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "shoulder",
+    "view": "anterior",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. One original medical textbook line illustration of adult RIGHT SHOULDER, BONE BASE for layered anatomy. Portrait aspect 1000:1300, pure white, fine gray contours and very light gray shading, restrained fine hatching. Scapula, acromion, coracoid, lateral clavicle and proximal humerus only, faint articular cartilage and thin glenoid labrum rim. No muscles, tendons, ligaments or bursa (they will be a separate transparent layer), no ribs or skin. No text, labels, arrows, callout lines, numbers, borders or inset. Do not copy published images. Center shoulder articulation at approximately (500,500); cropped upper humerus extends toward bottom with scapular body visible alongside. Leave generous margins; clean medical educational drawing. True ANTERIOR view. Proximal humerus on VIEWER LEFT and scapular body extending medially toward VIEWER RIGHT. Clavicle arches from acromion upper LEFT to medial RIGHT. Scapular spine hidden on posterior side; show smooth subscapular fossa. Coracoid projects anterior near center. Lesser tubercle and bicipital groove at anterior proximal humerus. Narrow thin anterior glenoid labrum crescent at medial edge of humeral head should remain faintly visible. Bones assembled in normal relation, arm hanging down.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "shoulder",
+    "view": "posterior",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. One original medical textbook line illustration of adult RIGHT SHOULDER, BONE BASE for layered anatomy. Portrait aspect 1000:1300, pure white, fine gray contours and very light gray shading, restrained fine hatching. Scapula, acromion, coracoid, lateral clavicle and proximal humerus only, faint articular cartilage and thin glenoid labrum rim. No muscles, tendons, ligaments or bursa (they will be a separate transparent layer), no ribs or skin. No text, labels, arrows, callout lines, numbers, borders or inset. Do not copy published images. Center shoulder articulation at approximately (500,500); cropped upper humerus extends toward bottom with scapular body visible alongside. Leave generous margins; clean medical educational drawing. True POSTERIOR view. Proximal humerus on VIEWER RIGHT and broad scapular body on VIEWER LEFT, with scapular spine running laterally upwards to acromion over humeral head. Supraspinous and infraspinous fossae exposed bare bone. Faint narrow posterior glenoid labral edge between humeral head and lateral scapula. Arm hanging down.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "shoulder",
+    "view": "lateral",
+    "layer": "bone",
+    "prompt": "Use case: scientific-educational. One original medical textbook line illustration of adult RIGHT SHOULDER, BONE BASE for layered anatomy. Portrait aspect 1000:1300, pure white, fine gray contours and very light gray shading, restrained fine hatching. Scapula, acromion, coracoid, lateral clavicle and proximal humerus only, faint articular cartilage and thin glenoid labrum rim. No muscles, tendons, ligaments or bursa (they will be a separate transparent layer), no ribs or skin. No text, labels, arrows, callout lines, numbers, borders or inset. Do not copy published images. Center shoulder articulation at approximately (500,500); cropped upper humerus extends toward bottom with scapular body visible alongside. Leave generous margins; clean medical educational drawing. LATERAL view looking medially at right glenoid, ANTERIOR points to VIEWER LEFT, POSTERIOR to RIGHT. Acromion forms roof above, coracoid projects to left/anterior. Show glenoid oval face in center with a very thin pale labrum rim: anterior rim on left, posterior on right, superior at top. For this educational cutaway only, proximal humeral head is drawn as a pale ghosted outline in normal articulation over glenoid, so entire glenoid rim remains visible THROUGH it, humeral shaft solid below. Scapula seen edge-on projecting to viewer right. The single main view must enable locating anterior, posterior and superior labrum. No detached inset.",
+    "method": "built-in image_gen",
+    "reference": null,
+    "transparent_background": false
+  },
+  {
+    "key": "knee",
+    "view": "anterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational. Input image is our newly generated BONE BASE and is a POSITION REFERENCE ONLY. Deliver ONLY a separate SOFT TISSUE OVERLAY on genuinely TRANSPARENT background, with NO bones, cartilage, menisci, cruciate ligaments, silhouettes or white background. Preserve the exact 1000:1300 canvas and spatial registration to the supplied reference; do not recenter or change zoom. Every pixel outside named tissue is transparent. Fine gray outlines, pale translucent grayscale fibrous tissue, light sparse fibers, restrained contrast. No text, labels, leaders, arrows, numbers or watermark. Right knee. Front view, draw four disconnected structures in their anatomical locations: quadriceps tendon above the patella from (460,230)-(540,230) widening to patellar superior edge around (410,450)-(580,450); leave patella entirely transparent. Patellar tendon from patellar inferior apex (500,645), broadens slightly to attach to tibial tuberosity at (505,850), width65. Cordlike LCL on VIEWER LEFT, from lateral femoral epicondyle around (315,540) to fibular head around (285,775), narrow width25. Broad MCL on VIEWER RIGHT, from medial epicondyle (675,545) to proximal medial tibia (645,860), width50. These 4 tissue pieces ONLY. Do not put any bone shape in output.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/knee/anterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "knee",
+    "view": "posterior",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational. Input image is our newly generated BONE BASE and is a POSITION REFERENCE ONLY. Deliver ONLY a separate SOFT TISSUE OVERLAY on genuinely TRANSPARENT background, with NO bones, cartilage, menisci, cruciate ligaments, silhouettes or white background. Preserve the exact 1000:1300 canvas and spatial registration to the supplied reference; do not recenter or change zoom. Every pixel outside named tissue is transparent. Fine gray outlines, pale translucent grayscale fibrous tissue, light sparse fibers, restrained contrast. No text, labels, leaders, arrows, numbers or watermark. Right knee. Back view. Only TWO separate collateral ligaments: on VIEWER LEFT, broad flat MCL from medial epicondyle around (215,535) vertically down across joint to medial tibia around (275,855), 45px wide; on VIEWER RIGHT, narrow cordlike LCL from lateral femoral epicondyle around (745,535) to fibular head around (740,790), 25px wide. Keep the center and both condyles fully transparent. No patella, patellar tendon, quadriceps or cruciate ligaments. No bones or menisci.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/knee/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "knee",
+    "view": "medial",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational. Input is our RIGHT knee bone base, position reference ONLY. Generate SOFT TISSUES ONLY on genuinely transparent background, no bones/cartilage/menisci/ACL/PCL, no white background or skeletal outlines. Keep input canvas 1000:1300, position and zoom exactly. Tissue light translucent gray with fine outlines and sparse gray fibers, no color. No text, labels, lines, arrows or watermarks. MEDIAL view, anterior faces viewer RIGHT. Four elements: broad flat MCL from medial epicondyle around (480,560) down to proximal medial tibia around (470,925), width65. Three fine pes anserinus tendons sweep from posteromedial region (315,820) anteriorly/downward to converge at anteromedial tibia (610,915), with ends distinctly below tibial plateau, separate from patellar tendon. Quadriceps tendon follows front of distal femur from (550,215) to patella's superior edge at (720,440), width60. Patellar tendon runs from patellar inferior apex (724,684) down-left to tibial tuberosity (678,886), width40. Patella remains transparent between quadriceps and patellar tendon. No fibula, no bone. Leave all other regions transparent.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/knee/medial-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "knee",
+    "view": "lateral",
+    "layer": "ligament",
+    "prompt": "Use case: precise-object-edit / scientific-educational. Input is our RIGHT knee bone base, position reference ONLY. Generate SOFT TISSUES ONLY on genuinely transparent background, no bones/cartilage/menisci/ACL/PCL, no white background or skeletal outlines. Keep input canvas 1000:1300, position and zoom exactly. Tissue light translucent gray with fine outlines and sparse gray fibers, no color. No text, labels, lines, arrows or watermarks. LATERAL view, anterior faces viewer LEFT. FOUR elements only. Quadriceps tendon follows anterior border distal femur from (420,190) down-left to superior pole patella (260,405), width60. Patellar tendon from inferior patellar apex (252,661) to tibial tuberosity (263,870), width45. Thin cordlike LCL from lateral femoral epicondyle (565,518) down-right to fibular head (626,770), width25. IT band is a separate flattened ribbon coming down lateral thigh from (540,200) over lateral femur to terminate at Gerdy's tubercle on anterolateral tibia around (345,747), just below plateau, anterior to LCL. IT band must NOT continue to tibial tuberosity/patellar tendon. Its lower end should stay near y=755. Pale fibers. Do NOT fill the patella or any bone.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/knee/lateral-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "shoulder",
+    "view": "anterior",
+    "layer": "ligament",
+    "prompt": "Use case: scientific-educational / precise-object-edit. Reference is our ORIGINAL adult RIGHT SHOULDER ANTERIOR bone base, positional reference only. Output ONLY a transparent soft-tissue overlay, portrait 1000:1300 registered exactly to the reference. DO NOT render ANY bones, cartilage/labrum, skeletal silhouettes, skin, white background or muscle bellies. Fine grayscale outlines and very pale translucent gray fibrous tissues. Five tissues only: (1) short AC capsular ligament straddling AC seam at (320,230), from x=290 to350,y=205..270. (2) Supraspinatus tendon visible as ribbon crossing above humeral head under acromion, from (415,355) leftwards to greater tuberosity at (155,415), width40. (3) A separate very faint flattened oval subacromial-subdeltoid bursa immediately above that tendon and under acromion around x=160..385,y=340..390. Keep thin and translucent. (4) Subscapularis tendon a broad fan with short muscle attachment fibers, converging from scapular anterior fossa at (585,500) toward lesser tubercle at (290,480); fan extent roughly x=280..585,y=440..590. Do not cover most scapula, show only tendon and narrow transition. (5) Long head of biceps tendon from superior glenoid around (395,395), curving over head toward the anterior bicipital groove at (220,445), then running down groove to (205,745), thin width18-24. The tendon must never branch. Do NOT draw humerus head, scapula or clavicle. All unoccupied regions must be fully transparent, no white specks or checkerboard. No text, leaders, arrows, letters, numbers, insets or watermark. Preserve reference pose/scale/framing.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/shoulder/anterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "shoulder",
+    "view": "posterior",
+    "layer": "ligament",
+    "prompt": "Use case: scientific-educational / precise-object-edit. Input is our original RIGHT SHOULDER POSTERIOR bone base, ONLY a positional reference. Deliver ONLY soft tissues on a genuinely transparent background, portrait aspect1000:1300. Keep the reference composition and zoom. NO bones, bone outlines, cartilage, labrum, skin or white background. Fine gray lines, pale translucent gray fibrous texture, no color. Four tissue groups: a short AC capsular ligament bridge centered (675,285) across the AC seam, x640..710,y250..315; a small supraspinatus tendon over superior humeral head from (630,420) to (800,450), width40, from beneath acromion to superior facet greater tubercle; thin flattened subacromial-subdeltoid bursa immediately over that tendon at x650..815,y402..440, do not turn it into bone; infraspinatus tendon broad converging fan from posterior scapular fossa (450,580) to middle facet greater tuberosity (805,510), with a separate smaller teres minor tendon below from (520,665) to inferior facet (790,575). Short pale myotendinous fibers are fine but do not fill whole scapula with muscle. No biceps tendon or subscapularis (hidden anteriorly). Preserve attachment positions. All empty space must be alpha zero. No text, labels, arrows, callout lines, numbers, insets or watermark.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/shoulder/posterior-bone.webp",
+    "transparent_background": true
+  },
+  {
+    "key": "shoulder",
+    "view": "lateral",
+    "layer": "ligament",
+    "prompt": "Use case: scientific-educational / precise-object-edit. Reference is our original RIGHT SHOULDER LATERAL bone base with ghosted humeral head, anterior LEFT and posterior RIGHT, glenoid visible through head. This input is position reference ONLY. Output ONLY soft tissues on truly TRANSPARENT background, portrait 1000:1300, exact same pose/zoom/positions. NO bone shapes, bone outlines, cartilage or labrum, no skin, no muscle bellies, no white background. Thin gray contours and pale SEMITRANSPARENT grayscale tissues. Draw (1) short AC capsular ligament over seam at (375,260), about60x70; (2) supraspinatus tendon as narrow pale horizontal ribbon from posterior/superior (650,405) arching gently to greater tubercle near (330,495), passing superior to glenoid but below acromion; (3) thin flattened subacromial bursa immediately superior to tendon, around x365..640,y370..430, distinguish bursa as smooth pale sac without fibers; (4) thin long head biceps tendon starting superior glenoid at (490,405) curves anteriorly LEFT over humeral head to (345,485) then descends anterior groove x320 to y780. Keep central glenoid face empty/transparent and labral rim unobstructed; use very faint transparency where tissues pass superior rim. Do not draw other cuffs in this cutaway view so labrum stays visible; those are covered in anterior/posterior views. No text, labels, leaders, arrows, numbers, watermarks or insets. All regions outside these tissues alpha zero.",
+    "method": "built-in image_gen",
+    "reference": "public/anatomy/shoulder/lateral-bone.webp",
+    "transparent_background": true
+  }
+]

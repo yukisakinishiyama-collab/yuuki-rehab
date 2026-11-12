@@ -48,8 +48,38 @@ export interface StockVideo {
   caption?: string
   hashtags?: string[]
   memo?: string
+  /** AI（OpenAI の動画生成）で作った動画のときだけ入る */
+  ai?: AiVideoInfo
   createdAt: string
   updatedAt: string
+}
+
+export type AiVideoStatus = 'generating' | 'ready' | 'failed'
+
+export const AI_STATUS_LABELS: Record<AiVideoStatus, string> = {
+  generating: 'AIが作成中',
+  ready: 'AI作成',
+  failed: 'AI作成に失敗',
+}
+
+export interface AiVideoInfo {
+  provider: 'openai'
+  /** 画像を作ったモデル（gpt-image-2 など） */
+  model: string
+  /** 動画の作り方: OpenAIの画像を数枚つないだスライド動画 */
+  kind: 'image-slideshow'
+  /** 使った画像の枚数 */
+  images?: number
+  /** 何を作るかのテーマ（theme-library の key） */
+  themeKey: string
+  prompt: string
+  status: AiVideoStatus
+  error?: string
+  /** 作り始めた日（JST・YYYY-MM-DD）。週2本の判定に使う */
+  startedDate: string
+  startedAt: string
+  /** 自動（定期）か、院長がボタンで作ったか */
+  trigger: 'auto' | 'manual'
 }
 
 /** 公開工程に進めてよいか（掲載許可の担保） */

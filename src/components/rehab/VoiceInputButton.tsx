@@ -1,16 +1,19 @@
 'use client'
 // ──────────────────────────────────────────────
-// 音声入力ボタン（Web Speech API・日本語）
+// 音声入力ボタン（日本語）
 //
 // メモ欄などのテキスト入力に添えて使う共通部品。
 // - タップで録音開始、もう一度タップで停止
 // - 認識が確定した文章を onText で親に渡す（親が既存文に追記する）
-// - 認識途中の文字列は onInterim で渡す（表示は親の任意）
-// - ブラウザが非対応（Firefoxなど）の場合は何も表示しない
-// - Chromeは無音が続くと自動終了するため、録音中は自動で再開する
+// - 認識途中の文字列は onInterim で渡す（表示は親の任意。Web Speech のときだけ）
+//
+// 文字にする仕組み（2026-11-02〜 精度を上げるため）:
+// - 文字起こしの設定（OPENAI_API_KEY）があれば、話の切れ目ごとに録音を OpenAI で文字にする（医療用語に強い）
+// - 無ければ、いままでどおりブラウザの音声認識（Chrome は Google）。非対応のブラウザでは何も表示しない
 // ──────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react'
-import { Mic, Square } from 'lucide-react'
+import { Loader2, Mic, Square } from 'lucide-react'
+import { useDictation, useServerTranscription } from '@/lib/voice/use-dictation'
 
 // Web Speech API の最小限の型（TSの標準型に含まれないため自前定義）
 interface SpeechRecognitionAlternativeLike { transcript: string }
@@ -53,7 +56,86 @@ interface Props {
   className?: string
 }
 
-export default function VoiceInputButton({ onText, onInterim, size = 'md', className = '' }: Props) {
+function buttonClass(size: 'sm' | 'md', active: boolean, className: string) {
+  const dims = size === 'sm' ? 'h-8 px-2.5 text-xs' : 'h-9 px-3 text-xs'
+  return `inline-flex items-center gap-1.5 rounded-lg border font-medium transition-colors flex-shrink-0 max-lg:min-h-10 ${dims} ${
+    active
+      ? 'bg-red-50 border-red-300 text-red-600'
+      : 'bg-white border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700'
+  } ${className}`
+}
+
+function ListeningLabel() {
+  return (
+    <>
+      <span className="relative flex w-2.5 h-2.5">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+      </span>
+      <Square className="w-3 h-3" />
+      停止
+    </>
+  )
+}
+
+export default function VoiceInputButton(props: Props) {
+  const server = useServerTranscription()
+  if (server === 'checking') return null
+  return server === 'yes' ? <ServerVoiceButton {...props} /> : <WebSpeechButton {...props} />
+}
+
+/** 録音を OpenAI で文字にする（話の切れ目ごとに、話すそばから欄に入る） */
+function ServerVoiceButton({ onText, onInterim, size = 'md', className = '' }: Props) {
+  const dictation = useDictation({ profile: 'field', onPiece: onText })
+  const { status, pending, error, setError } = dictation
+
+  // マイクが使えないなどは、いままでどおりお知らせを出す
+  useEffect(() => {
+    if (!error) return
+    alert(error)
+    setError('')
+  }, [error, setError])
+
+  const recording = status === 'recording' || status === 'starting'
+  const working = status === 'finishing' || (!recording && pending > 0)
+
+  async function toggle() {
+    if (recording) {
+      await dictation.stop()
+      onInterim?.('')
+    } else if (!working) {
+      await dictation.start()
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void toggle()}
+      aria-pressed={recording}
+      disabled={working}
+      title={recording ? '音声入力を停止' : '音声で入力（日本語・医療用語に対応）'}
+      className={buttonClass(size, recording, className)}
+    >
+      {recording ? (
+        <ListeningLabel />
+      ) : working ? (
+        <>
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          文字に…
+        </>
+      ) : (
+        <>
+          <Mic className={size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+          音声入力
+        </>
+      )}
+    </button>
+  )
+}
+
+/** ブラウザの音声認識（文字起こしの設定が無いとき） */
+function WebSpeechButton({ onText, onInterim, size = 'md', className = '' }: Props) {
   const [supported, setSupported] = useState(false)
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
@@ -128,28 +210,16 @@ export default function VoiceInputButton({ onText, onInterim, size = 'md', class
 
   if (!supported) return null
 
-  const dims = size === 'sm' ? 'h-8 px-2.5 text-[11px]' : 'h-9 px-3 text-xs'
   return (
     <button
       type="button"
       onClick={toggle}
       aria-pressed={listening}
       title={listening ? '音声入力を停止' : '音声で入力（日本語）'}
-      className={`inline-flex items-center gap-1.5 rounded-lg border font-medium transition-colors flex-shrink-0 ${dims} ${
-        listening
-          ? 'bg-red-50 border-red-300 text-red-600'
-          : 'bg-white border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700'
-      } ${className}`}
+      className={buttonClass(size, listening, className)}
     >
       {listening ? (
-        <>
-          <span className="relative flex w-2.5 h-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-          </span>
-          <Square className="w-3 h-3" />
-          停止
-        </>
+        <ListeningLabel />
       ) : (
         <>
           <Mic className={size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} />

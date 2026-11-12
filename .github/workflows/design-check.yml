@@ -1,0 +1,33 @@
+# 院内アプリの見た目の決まり（DESIGN_DECISIONS.md「院内アプリの見た目の決まり」）を、Pull Request のたびに確かめる。
+#
+# eslint.config.mjs の no-restricted-syntax に入れた決まり（12px より小さい文字・白い地で読めない薄い色・スマホで押しにくい小さなボタンなど）に
+# 合わないところを足すと、PR に ✗（design-check）が付く。
+# ✗ のときは「Details」を開くと、どのファイルの何行目かが出る。手元では `npm run lint:design` で同じものを確かめられる。
+# 院長が PR を見るときに ✓ になっていることを確かめる。
+# （Settings → Branches → main のルールで「Require status checks」に design-check を入れると、✗ のままではマージできなくなる）
+#
+# 本番（Vercel）のビルドは止めない。急ぎの修正がこの決まりのせいで出せなくならないように。
+name: design-check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  design-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 部品を入れる
+        run: npm ci
+      - name: 院内アプリの見た目の決まりを確かめる
+        run: npm run lint:design

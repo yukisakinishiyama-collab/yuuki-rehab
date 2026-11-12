@@ -10,18 +10,28 @@ export type Channel =
   | 'instagram_feed'
   | 'instagram_carousel'
   | 'instagram_reel'
+  | 'instagram_story'
   | 'google_business'
   | 'line_broadcast'
   | 'note'
+  /** 宣伝の短い動画（院の写真＋文字。src/data/promo-videos.ts）。投稿づくりの画面では選ばない */
+  | 'youtube_short'
+  | 'tiktok'
 
 export const CHANNEL_LABELS: Record<Channel, string> = {
   instagram_feed: 'Instagramフィード',
   instagram_carousel: 'Instagramカルーセル',
   instagram_reel: 'Instagramリール',
+  instagram_story: 'Instagramストーリー',
   google_business: 'Google投稿',
   line_broadcast: '公式LINE配信',
   note: 'note記事',
+  youtube_short: 'YouTubeショート',
+  tiktok: 'TikTok',
 }
+
+/** 決まった動画を出す媒体（AIで文を書く「投稿づくり」には出さない） */
+export const VIDEO_CHANNELS: Channel[] = ['youtube_short', 'tiktok']
 
 /** 投稿の目的 */
 export const OBJECTIVES = [
@@ -97,7 +107,71 @@ export interface GeneratedContent {
   slides?: CarouselSlide[]
   imageText?: string
   altText?: string
+  /**
+   * 画像の場面の説明（英語）。下書きを書いたAI（Claude）が本文の内容に合わせて書き、
+   * ChatGPT（OpenAIの画像生成）にそのまま渡す。文字・医療行為・顔などを入れない決まりは post-image-server.ts で足す
+   */
+  imagePrompt?: string
+  /** AIで作った投稿画像（文字なしの写真）。投稿するときに見出しの文字を重ねる。無ければテンプレ画像 */
+  image?: PostImage
+  /** Google検索向けの投稿（src/data/gbp-seo-posts.ts の id）。画像は院の写真＋見出し・強み（renderSeoPostImage） */
+  seoPostId?: string
+  /** 宣伝の短い動画（src/data/promo-videos.ts の id）。YouTubeショート・TikTok に同じ動画を出す */
+  promoVideoId?: string
   warnings: string[]
+  /**
+   * Instagramストーリーの空き状況（instagram_story のときだけ）。
+   * 投稿する時刻に予約システムから空きを取り直して画像を作る（下書きのときの空きは snapshot）
+   */
+  story?: StoryContent
+}
+
+/**
+ * AIで作った投稿画像（ChatGPT＝OpenAIの画像生成）。
+ * 写真には文字を入れず、見出し（表現チェック済みの文言）は投稿するときに院のデザインで重ねる。
+ * Instagramフィード・カルーセルの1枚目・Google投稿・noteの見出し画像で同じ写真を使う（媒体ごとに切り抜く）
+ */
+export interface PostImage {
+  kind: 'ai'
+  /** 文字の入っていない写真（Vercel Blob の公開URL） */
+  photoUrl: string
+  /** OpenAIに渡した指示（場面の説明＋共通の決まり） */
+  prompt: string
+  /** 使えたモデル（例: gpt-image-2） */
+  model: string
+  createdAt: string
+}
+
+export interface StoryContent {
+  /** day＝その日（本日）の空き / week＝今週の空き */
+  scope: 'day' | 'week'
+  /** 載せる日 'YYYY-MM-DD' */
+  dates: string[]
+  /** 下書きを作ったときの空き（取り直せなかったときに使う） */
+  snapshot: Array<{ date: string; closed: boolean; am: number; pm: number }>
+  /** 見出し（例「明日のご予約の空き」）。無ければ scope から決める（本日／今週） */
+  title?: string
+  /** 院長が画面で直したところ（見出し・ひとこと・出さない時間・残り枠の数を出すか） */
+  edits?: StoryEdits
+  /**
+   * キャンセルで空いた枠のお知らせ（'HH:MM'）。出す時刻にこの枠がもう埋まっていたら出さない。
+   * 予約システムが時間ごとの空きを返さないときは、その半日（午前・午後）に空きがあるかで見る
+   */
+  requireSlot?: string
+  /** どこから作ったストーリーか（cancel=キャンセルで空いた枠のお知らせ） */
+  trigger?: 'cancel'
+}
+
+/** ストーリー画像を出す前に院長が直せるところ */
+export interface StoryEdits {
+  /** 見出し（最大24文字） */
+  title?: string
+  /** ひとこと（最大40文字。例「夕方は空きがあります」） */
+  note?: string
+  /** 出さない時間（'YYYY-MM-DD HH:MM'） */
+  hiddenSlots?: string[]
+  /** 残り枠の数を出すか（出さないときは「空きあり」だけ） */
+  showRemaining?: boolean
 }
 
 /** 媒体別バリアント（1プロジェクトから媒体ごとに生成） */

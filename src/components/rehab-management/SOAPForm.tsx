@@ -2,18 +2,27 @@
 // ──────────────────────────────────────────────
 // SOAPカルテ入力フォーム
 // ──────────────────────────────────────────────
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { SOAPNote, RehabPhase, SOAPSpecialTest, SpecialTestResult, ComplaintEntry } from '@/types/patient'
 import { PHASE_SHORT_LABELS } from '@/types/patient'
 import MultiComplaintInput from './MultiComplaintInput'
 import { SPECIAL_TEST_DESCRIPTIONS } from '@/lib/special-test-descriptions'
-import { saveSOAPNote, getSOAPNotes } from '@/lib/patient-store'
+import { saveSOAPNote, getSOAPNotes, getPatient, savePatient } from '@/lib/patient-store'
+import { carryForward, coverSuggestion, latestNote, TREND_LABELS } from '@/lib/karte/followup'
 import {
   Card, CardHeader, CardContent, FormLabel, Input, Textarea,
   ToggleSwitch, SaveButton, SectionTitle, NRSInput,
 } from './shared'
-import BodyMap from './BodyMap'
+import BodyMap, { type BodyMarks } from './BodyMap'
+import AnatomyMap from './AnatomyMap'
+import { SUPPORTED_JOINTS } from './JointDetailMap'
+import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
+import { hasAnatomyMarks, type AnatomyMarks } from '@/lib/anatomy/types'
+import { TAP_AREA } from '@/components/ui/tap-area'
+import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
+import { SOAP_SECTION_LABELS, VOICE_SOAP_FIELDS, type SoapSection, type VoiceSoapResult } from '@/lib/voice/soap-fields'
+import { applyVoiceChanges, planVoiceSoapChanges, undoVoiceChanges } from '@/lib/voice/merge-soap'
 
 interface Props {
   patientId: string
@@ -22,8 +31,16 @@ interface Props {
 
 interface FormState {
   visitDate: string
+  visitKind: 'first' | 'followup'
+  trend?: 'better' | 'same' | 'worse'
   complaints: ComplaintEntry[]
   painLocations: string[]
+  /** 解剖図で押した部位（関節ごと） */
+  jointDetailLocations: Record<string, string[]>
+  /** 解剖図に直接描いたマーク（関節ごと） */
+  anatomyMarks: Record<string, AnatomyMarks>
+  /** 人体図に直接描いたマーク（前面・背面） */
+  bodyMarks: BodyMarks
   painToday: number
   changeFromLast: string
   adlDifficulty: string
@@ -75,12 +92,12 @@ function TestInfoModal({ testName, onClose }: { testName: string; onClose: () =>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-gray-900">{testName}</h3>
-            <p className="text-xs text-teal-600 font-medium mt-0.5">🎯 {desc.target}</p>
+            <p className="text-xs text-teal-700 font-medium mt-0.5">🎯 {desc.target}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0 mt-0.5"
+            className="text-gray-500 hover:text-gray-600 text-xl leading-none flex-shrink-0 mt-0.5 max-lg:min-h-10"
           >×</button>
         </div>
 
@@ -124,7 +141,7 @@ function TestInfoModal({ testName, onClose }: { testName: string; onClose: () =>
         <button
           type="button"
           onClick={onClose}
-          className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-xl transition-colors"
+          className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-xl transition-colors max-lg:min-h-10"
         >
           閉じる
         </button>
@@ -235,13 +252,13 @@ function SpecialTestPicker({
               key={`${v.joint}-${v.testName}`}
               className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border font-medium ${RESULT_COLORS[v.result]}`}
             >
-              <span className="text-gray-400 font-normal">{v.joint.replace('関節', '').replace('・手指', '')}</span>
+              <span className="text-gray-500 font-normal">{v.joint.replace('関節', '').replace('・手指', '')}</span>
               {v.testName.replace(/ test| sign/i, '')}
               <span className="font-bold">{v.result === 'positive' ? '+' : v.result === 'negative' ? '−' : v.result === 'suspicious' ? '±' : '?'}</span>
               <button
                 type="button"
                 onClick={() => onChange(value.filter(x => !(x.joint === v.joint && x.testName === v.testName)))}
-                className="ml-0.5 hover:text-red-500"
+                className="ml-0.5 hover:text-red-500 max-lg:min-h-10 max-lg:min-w-10"
               >×</button>
             </span>
           ))}
@@ -257,15 +274,15 @@ function SpecialTestPicker({
               key={j}
               type="button"
               onClick={() => setJoint(j)}
-              className={`px-2.5 py-1 text-xs rounded-lg border transition-colors relative ${
+              className={`px-2.5 py-1 text-xs rounded-lg border transition-colors relative max-lg:min-h-10 ${
                 joint === j
-                  ? 'bg-teal-600 text-white border-teal-600'
+                  ? 'bg-teal-700 text-white border-teal-700'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
               }`}
             >
               {j}
               {count > 0 && (
-                <span className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
+                <span className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-xs font-bold ${
                   joint === j ? 'bg-white text-teal-700' : 'bg-teal-100 text-teal-700'
                 }`}>{count}</span>
               )}
@@ -291,11 +308,11 @@ function SpecialTestPicker({
               <button
                 type="button"
                 onClick={() => toggle(testName)}
-                className={`w-4 h-4 rounded border-2 flex-shrink-0 transition-colors ${
-                  selected ? 'bg-teal-600 border-teal-600' : 'border-gray-300'
+                className={`w-4 h-4 rounded border-2 flex-shrink-0 transition-colors ${TAP_AREA} ${
+                  selected ? 'bg-teal-700 border-teal-700' : 'border-gray-300'
                 }`}
               >
-                {selected && <span className="text-white text-[10px] leading-none flex items-center justify-center">✓</span>}
+                {selected && <span className="text-white text-xs leading-none flex items-center justify-center">✓</span>}
               </button>
               <span className={`flex-1 ${selected ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>{testName}</span>
               {/* ℹ 説明ボタン */}
@@ -303,7 +320,7 @@ function SpecialTestPicker({
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); setInfoTest(testName) }}
-                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-400 hover:text-teal-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors"
+                  className={`w-5 h-5 rounded-full bg-gray-100 hover:bg-teal-100 text-gray-500 hover:text-teal-600 text-xs font-bold flex items-center justify-center flex-shrink-0 transition-colors max-lg:mr-1 ${TAP_AREA}`}
                   title="テスト方法を確認"
                 >
                   i
@@ -316,10 +333,10 @@ function SpecialTestPicker({
                       key={r}
                       type="button"
                       onClick={() => setResult(testName, r)}
-                      className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${
+                      className={`px-2 py-0.5 rounded text-xs border transition-colors max-lg:min-h-10 ${
                         entry.result === r
                           ? RESULT_COLORS[r]
-                          : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
                       }`}
                     >
                       {RESULT_LABELS[r]}
@@ -339,8 +356,13 @@ const PHASES: RehabPhase[] = [1, 2, 3, 4, 5, 6]
 
 const defaultForm: FormState = {
   visitDate: new Date().toISOString().split('T')[0],
+  visitKind: 'first',
+  trend: undefined,
   complaints: [],
   painLocations: [],
+  jointDetailLocations: {},
+  anatomyMarks: {},
+  bodyMarks: {},
   painToday: 3,
   changeFromLast: '',
   adlDifficulty: '',
@@ -376,10 +398,100 @@ const defaultForm: FormState = {
 
 type TabKey = 'S' | 'O' | 'A' | 'P'
 
+/** 前回のカルテから引き継いだ初期値（経過モード）。前回が無ければ初診 */
+function initialForm(patientId: string): { form: FormState; previousNrs: Record<string, number>; from: SOAPNote | null } {
+  const last = latestNote(getSOAPNotes(patientId))
+  if (!last) return { form: defaultForm, previousNrs: {}, from: null }
+  const c = carryForward(last)
+  return {
+    from: last,
+    previousNrs: c.previousNrs,
+    form: {
+      ...defaultForm,
+      visitKind: 'followup',
+      complaints: c.complaints,
+      painLocations: c.painLocations,
+      jointDetailLocations: c.jointDetailLocations,
+      anatomyMarks: c.anatomyMarks,
+      bodyMarks: c.bodyMarks,
+      treatmentAreas: c.treatmentAreas,
+      currentPhase: c.currentPhase,
+      homeExercise: c.homeExercise,
+      forbiddenMovements: c.forbiddenMovements,
+      recommendedFrequency: c.recommendedFrequency || defaultForm.recommendedFrequency,
+      patientGoalToday: c.patientGoalToday,
+      nextGoal: c.nextGoal,
+      treatmentToday: c.treatmentToday,
+      painToday: last.painToday >= 0 ? last.painToday : defaultForm.painToday,
+    },
+  }
+}
+
 export default function SOAPForm({ patientId, onSaved }: Props) {
-  const [form, setForm] = useState<FormState>(defaultForm)
+  const [init] = useState(() => initialForm(patientId))
+  const [form, setForm] = useState<FormState>(init.form)
+  const selectedJoints = jointsFromPainLocations(form.painLocations, SUPPORTED_JOINTS)
+  const [carriedFrom, setCarriedFrom] = useState<SOAPNote | null>(init.from)
+  const previousNrs = carriedFrom ? init.previousNrs : {}
   const [activeTab, setActiveTab] = useState<TabKey>('S')
   const [saved, setSaved] = useState(false)
+  const [coverNotice, setCoverNotice] = useState<string | null>(null)
+
+  /** 引き継ぎをやめて空から書く（初診・別のケガなど） */
+  function startBlank() {
+    setForm({ ...defaultForm, visitDate: form.visitDate, visitKind: 'first' })
+    setCarriedFrom(null)
+  }
+  /** 前回から引き継ぎ直す */
+  function startFromLast() {
+    const next = initialForm(patientId)
+    setForm({ ...next.form, visitDate: form.visitDate })
+    setCarriedFrom(next.from)
+  }
+  // 音声の結果を入れるときは、録音中に手で書いた分も含めた「いまの欄」をもとにする
+  const formRef = useRef(form)
+  useEffect(() => {
+    formRef.current = form
+  }, [form])
+
+  /** 会話から振り分けた内容を欄に入れる（保存はしない。院長が読んで直してから保存） */
+  function applyVoice(result: VoiceSoapResult): VoiceApplied {
+    const changes = planVoiceSoapChanges(formRef.current, result, defaultForm)
+    if (changes.length === 0) {
+      return { summary: <p>カルテに書く内容が見つかりませんでした（雑談だけだった、声が遠かった など）。</p> }
+    }
+    setForm(f => applyVoiceChanges(f, changes))
+    const bySection = new Map<SoapSection, string[]>()
+    for (const c of changes) {
+      const field = VOICE_SOAP_FIELDS.find(v => v.key === c.key)
+      const section: SoapSection = field?.section ?? (c.key === 'painToday' || c.key === 'homeExerciseAdherence' ? 'S' : 'O')
+      const label = field?.label
+        ?? (c.key === 'painToday' ? `痛みNRS ${String(c.after)}` : c.key === 'swelling' ? '腫脹あり' : c.key === 'heat' ? '熱感あり' : '自宅運動の実施状況')
+      bySection.set(section, [...(bySection.get(section) ?? []), label])
+    }
+    const sections = (['S', 'O', 'A', 'P'] as const).filter(s => bySection.has(s))
+    if (sections[0]) setActiveTab(sections[0])
+    return {
+      summary: (
+        <>
+          <p className="font-semibold">{changes.length}か所に書き込みました。読んで直してから「カルテを保存」を押してください。</p>
+          <div className="flex flex-wrap gap-1.5">
+            {sections.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setActiveTab(s)}
+                className="rounded-full border border-teal-300 bg-white px-2.5 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 max-lg:min-h-10"
+              >
+                {SOAP_SECTION_LABELS[s]}：{bySection.get(s)?.join('・')}
+              </button>
+            ))}
+          </div>
+        </>
+      ),
+      undo: () => setForm(f => undoVoiceChanges(f, changes)),
+    }
+  }
 
   function handleSave() {
     const notes = getSOAPNotes(patientId)
@@ -388,13 +500,23 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       ? Math.max(...form.complaints.map(c => c.nrs))
       : form.painToday
 
+    const complaints = form.complaints.map(c => ({
+      ...c,
+      startedAt: c.startedAt ?? form.visitDate,
+      resolvedAt: c.status === 'resolved' ? (c.resolvedAt ?? form.visitDate) : undefined,
+    }))
     const note: SOAPNote = {
       id: nanoid(),
       patientId,
       visitDate: form.visitDate,
       visitNumber: notes.length + 1,
-      complaints: form.complaints.length > 0 ? form.complaints : undefined,
+      visitKind: form.visitKind,
+      trend: form.trend,
+      complaints: complaints.length > 0 ? complaints : undefined,
       painLocations: form.painLocations,
+      jointDetailLocations: Object.keys(form.jointDetailLocations).length > 0 ? form.jointDetailLocations : undefined,
+      anatomyMarks: Object.values(form.anatomyMarks).some(hasAnatomyMarks) ? form.anatomyMarks : undefined,
+      bodyMarks: Object.keys(form.bodyMarks).length > 0 ? form.bodyMarks : undefined,
       painToday: derivedNrs,
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
@@ -429,24 +551,42 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       createdAt: new Date().toISOString(),
     }
     saveSOAPNote(note)
+    // 主な部位・傷病名が変わっていたら、カルテの表紙も合わせるか聞く（院長が決める）
+    const patient = getPatient(patientId)
+    const suggestion = patient ? coverSuggestion(patient, complaints) : null
+    if (patient && suggestion && window.confirm(`主な部位・傷病名が変わっています（${suggestion.reason}）。カルテの表紙も合わせますか？`)) {
+      savePatient({ ...patient, bodyRegion: suggestion.bodyRegion, diagnosisLabel: suggestion.diagnosisLabel, updatedAt: new Date().toISOString() })
+      setCoverNotice('カルテの表紙（部位・傷病名）を更新しました')
+    }
     setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setTimeout(() => { setSaved(false); setCoverNotice(null) }, 3000)
+    // 次の入力に備えて、今保存した内容から引き継ぎ直す
+    const next = initialForm(patientId)
+    setForm(next.form)
+    setCarriedFrom(next.from)
+    setActiveTab('S')
     onSaved?.()
   }
 
   const tabs: { key: TabKey; label: string; color: string }[] = [
     { key: 'S', label: 'S：主観', color: 'bg-blue-600' },
-    { key: 'O', label: 'O：客観', color: 'bg-teal-600' },
+    { key: 'O', label: 'O：客観', color: 'bg-teal-700' },
     { key: 'A', label: 'A：評価', color: 'bg-purple-600' },
-    { key: 'P', label: 'P：計画', color: 'bg-orange-600' },
+    { key: 'P', label: 'P：計画', color: 'bg-orange-700' },
   ]
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <SectionTitle>SOAPカルテ</SectionTitle>
           <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+              <button type="button" onClick={() => { if (form.visitKind !== 'first') startBlank() }}
+                className={`px-3 py-1.5 max-lg:min-h-10 ${form.visitKind === 'first' ? 'bg-teal-700 text-white' : 'bg-white text-gray-600'}`}>初診・新しい記録</button>
+              <button type="button" onClick={() => { if (form.visitKind !== 'followup') startFromLast() }}
+                className={`px-3 py-1.5 max-lg:min-h-10 ${form.visitKind === 'followup' ? 'bg-teal-700 text-white' : 'bg-white text-gray-600'}`}>経過（前回から）</button>
+            </div>
             <Input
               type="date"
               value={form.visitDate}
@@ -455,6 +595,14 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
             />
           </div>
         </div>
+        {form.visitKind === 'followup' && carriedFrom ? (
+          <p className="mt-2 text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+            前回（{carriedFrom.visitDate}・{carriedFrom.visitNumber}回目）から部位・NRS・施術・自宅運動・目標を引き継いでいます。変わったところだけ直して保存してください。
+            終わった部位は「軽快・終了」に、新しいケガは「＋部位・疾患を追加」で足せます。
+          </p>
+        ) : form.visitKind === 'followup' ? (
+          <p className="mt-2 text-xs text-gray-500">前回のカルテがないため、空から書きます。</p>
+        ) : null}
         {/* タブ */}
         <div className="flex gap-1 mt-3">
           {tabs.map(tab => (
@@ -462,7 +610,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors max-lg:min-h-10 ${
                 activeTab === tab.key
                   ? `${tab.color} text-white`
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -474,6 +622,9 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* 音声から：施術中の会話 → 患者さんの情報だけを S/O/A/P に振り分けて欄に入れる */}
+        <VoiceKarteCapture mode="soap" patientId={patientId} onSoap={applyVoice} />
+
         {/* S: Subjective */}
         {activeTab === 'S' && (
           <div className="space-y-4">
@@ -484,10 +635,12 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 <MultiComplaintInput
                   value={form.complaints}
                   onChange={v => setForm(f => ({ ...f, complaints: v }))}
+                  previousNrs={previousNrs}
+                  visitDate={form.visitDate}
                 />
               </div>
               {form.complaints.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   部位を追加すると、それぞれのNRS・症状を個別に記録できます
                 </p>
               )}
@@ -504,12 +657,47 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 <BodyMap
                   selected={form.painLocations}
                   onChange={v => setForm(f => ({ ...f, painLocations: v }))}
+                  marks={form.bodyMarks}
+                  onMarksChange={m => setForm(f => ({ ...f, bodyMarks: m }))}
                 />
               </div>
             </div>
 
+            {/* 人体図で押した関節の解剖図（向き・層を切り替えて細かい部位を押す） */}
+            {selectedJoints.length > 0 && (
+              <div className="space-y-4">
+                <FormLabel>痛みの場所（解剖図）</FormLabel>
+                <p className="text-xs text-gray-500 -mt-1">人体図で押した関節のイラストです。痛む部位を押すか、「ペン」「×印」で直接描いてください。</p>
+                {selectedJoints.map(({ joint, side }) => (
+                  <div key={joint}>
+                    <AnatomyMap
+                      joint={joint}
+                      side={side}
+                      selected={form.jointDetailLocations[joint] ?? []}
+                      onChange={regions => setForm(f => ({
+                        ...f,
+                        jointDetailLocations: { ...f.jointDetailLocations, [joint]: regions },
+                      }))}
+                      marks={form.anatomyMarks[joint]}
+                      onMarksChange={m => setForm(f => ({ ...f, anatomyMarks: { ...f.anatomyMarks, [joint]: m } }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div>
               <FormLabel>前回からの変化</FormLabel>
+              <div className="flex gap-1.5 mt-1 mb-1.5">
+                {(Object.keys(TREND_LABELS) as Array<keyof typeof TREND_LABELS>).map(t => (
+                  <button key={t} type="button" onClick={() => setForm(f => ({ ...f, trend: f.trend === t ? undefined : t }))}
+                    className={`px-3 py-1 text-xs rounded-full border font-medium max-lg:min-h-10 ${form.trend === t
+                      ? t === 'better' ? 'bg-emerald-700 text-white border-emerald-700' : t === 'worse' ? 'bg-red-600 text-white border-red-600' : 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-gray-600 border-gray-200'}`}>
+                    {TREND_LABELS[t]}
+                  </button>
+                ))}
+              </div>
               <Textarea value={form.changeFromLast} onChange={v => setForm(f => ({ ...f, changeFromLast: v }))}
                 placeholder="例：階段が少し楽になった。朝の痛みが減った。" rows={2} />
             </div>
@@ -523,7 +711,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
               <FormLabel>自宅運動の実施状況</FormLabel>
               <div className="flex gap-3 mt-1">
                 {(['done', 'partial', 'not_done'] as const).map((v, i) => (
-                  <label key={v} className="flex items-center gap-1.5 cursor-pointer">
+                  <label key={v} className="flex items-center gap-1.5 cursor-pointer max-lg:min-h-10">
                     <input type="radio" value={v} checked={form.homeExerciseAdherence === v}
                       onChange={() => setForm(f => ({ ...f, homeExerciseAdherence: v }))}
                       className="accent-teal-600" />
@@ -636,9 +824,9 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                     key={p}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, currentPhase: p }))}
-                    className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    className={`px-3 py-1.5 text-xs rounded-lg border transition-colors max-lg:min-h-10 ${
                       form.currentPhase === p
-                        ? 'bg-teal-600 text-white border-teal-600'
+                        ? 'bg-teal-700 text-white border-teal-700'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'
                     }`}
                   >
@@ -707,13 +895,13 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 <div key={tab.key} className="flex gap-2">
                   {prev && (
                     <button type="button" onClick={() => setActiveTab(prev)}
-                      className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 max-lg:min-h-10">
                       ← 前へ
                     </button>
                   )}
                   {next && (
                     <button type="button" onClick={() => setActiveTab(next)}
-                      className="px-3 py-1.5 text-sm text-teal-600 border border-teal-300 rounded-lg hover:bg-teal-50">
+                      className="px-3 py-1.5 text-sm text-teal-700 border border-teal-300 rounded-lg hover:bg-teal-50 max-lg:min-h-10">
                       次へ →
                     </button>
                   )}
@@ -722,7 +910,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
             })}
           </div>
           <div className="flex items-center gap-3">
-            {saved && <span className="text-teal-600 text-sm">✓ 保存しました</span>}
+            {saved && <span className="text-teal-700 text-sm">✓ 保存しました{coverNotice ? `（${coverNotice}）` : ''}</span>}
             <SaveButton onClick={handleSave} label="カルテを保存" />
           </div>
         </div>

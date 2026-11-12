@@ -1,0 +1,445 @@
+[
+  {
+    "joint": "knee",
+    "view": "anterior",
+    "sizes": {
+      "anterior.webp": 207978,
+      "anterior-bone.webp": 77218,
+      "anterior-ligament.webp": 69478
+    },
+    "transparentPixels": 1253097,
+    "visiblePixels": 46903,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "knee_qt": [
+        459,
+        249
+      ],
+      "knee_mcl": [
+        651,
+        530
+      ],
+      "knee_lcl": [
+        305,
+        532
+      ],
+      "knee_patella": [
+        475,
+        441
+      ],
+      "knee_pt": [
+        465,
+        641
+      ],
+      "knee_tt": [
+        492,
+        830
+      ]
+    }
+  },
+  {
+    "joint": "knee",
+    "view": "posterior",
+    "sizes": {
+      "posterior.webp": 176032,
+      "posterior-bone.webp": 45108,
+      "posterior-ligament.webp": 14688
+    },
+    "transparentPixels": 1291583,
+    "visiblePixels": 8417,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "knee_mcl": [
+        261,
+        560
+      ],
+      "knee_lcl": [
+        652,
+        558
+      ],
+      "knee_mm": [
+        418,
+        660
+      ],
+      "knee_lm": [
+        663,
+        661
+      ],
+      "knee_acl": [
+        436,
+        556
+      ]
+    }
+  },
+  {
+    "joint": "knee",
+    "view": "medial",
+    "sizes": {
+      "medial.webp": 296256,
+      "medial-bone.webp": 77768,
+      "medial-ligament.webp": 48120
+    },
+    "transparentPixels": 1255553,
+    "visiblePixels": 44447,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "knee_qt": [
+        560,
+        219
+      ],
+      "knee_mcl": [
+        427,
+        555
+      ],
+      "knee_mm": [
+        596,
+        730
+      ],
+      "knee_pes": [
+        319,
+        815
+      ],
+      "knee_patella": [
+        710,
+        435
+      ],
+      "knee_pt": [
+        701,
+        675
+      ],
+      "knee_tt": [
+        675,
+        862
+      ]
+    }
+  },
+  {
+    "joint": "knee",
+    "view": "lateral",
+    "sizes": {
+      "lateral.webp": 272052,
+      "lateral-bone.webp": 75240,
+      "lateral-ligament.webp": 74486
+    },
+    "transparentPixels": 1244887,
+    "visiblePixels": 55113,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "knee_qt": [
+        415,
+        184
+      ],
+      "knee_patella": [
+        266,
+        398
+      ],
+      "knee_pt": [
+        232,
+        650
+      ],
+      "knee_tt": [
+        236,
+        841
+      ],
+      "knee_lm": [
+        283,
+        651
+      ],
+      "knee_lcl": [
+        544,
+        520
+      ],
+      "knee_itb": [
+        368,
+        642
+      ]
+    }
+  },
+  {
+    "joint": "ankle",
+    "view": "anterior",
+    "sizes": {
+      "anterior.webp": 336490,
+      "anterior-bone.webp": 133906,
+      "anterior-ligament.webp": 15040
+    },
+    "transparentPixels": 1289965,
+    "visiblePixels": 10035,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "ank_lat_mall": [
+        288,
+        596
+      ],
+      "ank_med_mall": [
+        683,
+        588
+      ],
+      "ank_atfl": [
+        325,
+        713
+      ],
+      "ank_cfl": [
+        307,
+        750
+      ]
+    }
+  },
+  {
+    "joint": "ankle",
+    "view": "posterior",
+    "sizes": {
+      "posterior.webp": 303140,
+      "posterior-bone.webp": 131040,
+      "posterior-ligament.webp": 108678
+    },
+    "transparentPixels": 1191723,
+    "visiblePixels": 108277,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "ank_achilles": [
+        439,
+        149
+      ],
+      "ank_lat_mall": [
+        664,
+        554
+      ],
+      "ank_med_mall": [
+        309,
+        518
+      ],
+      "ank_ptfl": [
+        622,
+        681
+      ],
+      "ank_peroneal": [
+        703,
+        340
+      ],
+      "ank_calcaneus": [
+        390,
+        950
+      ]
+    }
+  },
+  {
+    "joint": "ankle",
+    "view": "medial",
+    "sizes": {
+      "medial.webp": 280454,
+      "medial-bone.webp": 123940,
+      "medial-ligament.webp": 47676
+    },
+    "transparentPixels": 1246299,
+    "visiblePixels": 53701,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "ank_med_mall": [
+        441,
+        600
+      ],
+      "ank_deltoid": [
+        517,
+        717
+      ],
+      "ank_achilles": [
+        140,
+        204
+      ],
+      "ank_calcaneus": [
+        84,
+        929
+      ],
+      "ank_plantar": [
+        219,
+        1084
+      ]
+    }
+  },
+  {
+    "joint": "ankle",
+    "view": "lateral",
+    "sizes": {
+      "lateral.webp": 270722,
+      "lateral-bone.webp": 115232,
+      "lateral-ligament.webp": 102916
+    },
+    "transparentPixels": 1200688,
+    "visiblePixels": 99312,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "ank_lat_mall": [
+        630,
+        689
+      ],
+      "ank_atfl": [
+        627,
+        755
+      ],
+      "ank_cfl": [
+        643,
+        800
+      ],
+      "ank_peroneal": [
+        692,
+        397
+      ],
+      "ank_sinus": [
+        480,
+        829
+      ],
+      "ank_achilles": [
+        802,
+        196
+      ],
+      "ank_calcaneus": [
+        845,
+        1000
+      ],
+      "ank_plantar": [
+        687,
+        1084
+      ]
+    }
+  },
+  {
+    "joint": "shoulder",
+    "view": "anterior",
+    "sizes": {
+      "anterior.webp": 308292,
+      "anterior-bone.webp": 79606,
+      "anterior-ligament.webp": 64236
+    },
+    "transparentPixels": 1246262,
+    "visiblePixels": 53738,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "sh_sup": [
+        295,
+        374
+      ],
+      "sh_bursa": [
+        235,
+        334
+      ],
+      "sh_ac": [
+        322,
+        191
+      ],
+      "sh_sub": [
+        592,
+        410
+      ],
+      "sh_lhb": [
+        366,
+        369
+      ]
+    }
+  },
+  {
+    "joint": "shoulder",
+    "view": "posterior",
+    "sizes": {
+      "posterior.webp": 308544,
+      "posterior-bone.webp": 96130,
+      "posterior-ligament.webp": 69348
+    },
+    "transparentPixels": 1238585,
+    "visiblePixels": 61415,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "sh_sup": [
+        647,
+        410
+      ],
+      "sh_bursa": [
+        671,
+        392
+      ],
+      "sh_ac": [
+        666,
+        239
+      ],
+      "sh_inf": [
+        799,
+        470
+      ]
+    }
+  },
+  {
+    "joint": "shoulder",
+    "view": "lateral",
+    "sizes": {
+      "lateral.webp": 218414,
+      "lateral-bone.webp": 64560,
+      "lateral-ligament.webp": 27394
+    },
+    "transparentPixels": 1277468,
+    "visiblePixels": 22532,
+    "maxChannelDifference": 0,
+    "meanChannelDifference": 0,
+    "pixelsDifferentByMoreThan2": 0,
+    "exactCompositeMatch": true,
+    "hitSamples": {
+      "sh_sup": [
+        362,
+        414
+      ],
+      "sh_bursa": [
+        441,
+        373
+      ],
+      "sh_ac": [
+        353,
+        223
+      ],
+      "sh_lhb": [
+        341,
+        452
+      ],
+      "sh_ant_lab": [
+        422,
+        442
+      ],
+      "sh_post_lab": [
+        596,
+        456
+      ],
+      "sh_slap": [
+        481,
+        393
+      ]
+    }
+  }
+]
