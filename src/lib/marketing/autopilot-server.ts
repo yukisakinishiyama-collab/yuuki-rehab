@@ -936,23 +936,28 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
   for (const group of promoGroups.values()) {
     const youtube = group.find((j) => j.channel === 'youtube_short')
     const tiktok = group.find((j) => j.channel === 'tiktok')
-    const first = youtube ?? tiktok
+    const instagram = group.find((j) => j.channel === 'instagram_reel')
+    const first = youtube ?? tiktok ?? instagram
     if (!first) continue
     const videoUrl = first.manualUrl ?? ''
     const posterUrl = first.content.promoVideoId ? await promoPosterUrl(first.content.promoVideoId) : ''
-    const where = [youtube ? 'YouTube' : null, tiktok ? 'TikTok' : null].filter(Boolean).join('・')
+    const where = [youtube ? 'YouTube' : null, tiktok ? 'TikTok' : null, instagram ? 'Instagramリール' : null].filter(Boolean).join('・')
+    const step = ['②', '③', '④']
+    const tiktokStep = step[youtube ? 1 : 0]
+    const instagramStep = step[(youtube ? 1 : 0) + (tiktok ? 1 : 0)]
     const head = [
       `🎬 動画の投稿の時間です（${formatSlot(first.scheduledAt)}）`,
       `「${first.content.imageText ?? first.content.title}」→ ${where}`,
       '',
       '① 下の動画を開いて保存（長押し、または右上の保存ボタン）',
       youtube ? '② YouTube：アプリの「＋」→「動画をアップロード」→ 保存した動画を選ぶ（縦の短い動画は自動でショートになります）。題名と説明は、下の吹き出しを長押し→コピー' : null,
-      tiktok ? `${youtube ? '③' : '②'} TikTok：アプリの「＋」→「アップロード」→ 保存した動画を選ぶ。説明は下の吹き出しをコピー。音楽はアプリの中で足せます` : null,
+      tiktok ? `${tiktokStep} TikTok：アプリの「＋」→「アップロード」→ 保存した動画を選ぶ。説明は下の吹き出しをコピー。音楽はアプリの中で足せます` : null,
+      instagram ? `${instagramStep} Instagram：アプリの「＋」→「リール」→ 保存した動画を選ぶ。文は下の吹き出しをコピー` : null,
       first.content.body.includes(PROMO_AI_NOTE)
         ? '※前半の絵はAIで作ったイメージです。投稿の画面に「AIで作成したコンテンツ」「改変されたコンテンツ」の設定があれば、オンにしてください。'
         : null,
       // Buffer で自動で出すはずだったが出せなかったとき、その理由
-      ...group.filter((j) => /^Buffer/.test(j.actionReason ?? '')).map((j) => `⚠ ${j.actionReason}`),
+      ...group.filter((j) => /^(Buffer|Instagram)/.test(j.actionReason ?? '')).map((j) => `⚠ ${j.actionReason}`),
       '',
       '投稿したら、いちばん下のボタンを押してください。',
     ]
@@ -964,10 +969,13 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
     const lineCanRead = (u: string) => /^https:\/\//.test(u) && !u.startsWith(SITE_URL)
     if (lineCanRead(videoUrl) && lineCanRead(posterUrl)) messages.push({ type: 'video', originalContentUrl: videoUrl, previewImageUrl: posterUrl })
     if (youtube) messages.push(`【YouTube 題名】\n${youtube.content.title}\n\n【YouTube 説明】\n${youtube.content.body}`)
-    if (tiktok) messages.push(`【TikTok 説明】\n${tiktok.content.body}`)
+    // LINE は1通に吹き出し5つまで（文・動画・ボタンで3つ使う）。貼る文は2つの吹き出しにまとめる
+    const rest = [tiktok ? `【TikTok 説明】\n${tiktok.content.body}` : null, instagram ? `【Instagram の文】\n${instagram.content.body}` : null].filter((x): x is string => x !== null)
+    if (rest.length) messages.push(rest.join('\n\n'))
     const buttons = [
       ...(youtube ? [{ label: 'YouTubeに投稿した', postback: `ap:done:${youtube.id}`, primary: true }] : []),
       ...(tiktok ? [{ label: 'TikTokに投稿した', postback: `ap:done:${tiktok.id}`, primary: !youtube }] : []),
+      ...(instagram ? [{ label: 'Instagramに投稿した', postback: `ap:done:${instagram.id}`, primary: !youtube && !tiktok }] : []),
       ...(videoUrl ? [{ label: '動画を開く', uri: videoUrl }] : []),
       { label: '設定を開く', uri: `${AUTOPILOT_URL}?open=settings` },
     ].slice(0, 4)

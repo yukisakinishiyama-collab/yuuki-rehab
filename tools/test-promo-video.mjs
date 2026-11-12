@@ -19,7 +19,7 @@ const { findViolations } = await import(new URL('src/lib/marketing/compliance.ts
 const { KV_PREFIXES } = await import(new URL('src/lib/marketing/kv-store-server.ts', root).href)
 const { CHANNEL_LABELS, VIDEO_CHANNELS } = await import(new URL('src/lib/marketing/types.ts', root).href)
 const { DEFAULT_AUTOPILOT_SETTINGS } = await import(new URL('src/lib/marketing/autopilot-types.ts', root).href)
-const { PROMO_VIDEOS, PROMO_VIDEO_TEXTS, PROMO_LIMITS, PROMO_SAFE_PHOTOS, PROMO_AI_RULES, PROMO_AI_NOTE, promoAiPrompt, promoUsesAi, promoTextWidth, promoScenes, youtubeTitle, youtubeDescription, tiktokCaption, promoTags } = data
+const { PROMO_VIDEOS, PROMO_VIDEO_TEXTS, PROMO_LIMITS, PROMO_SAFE_PHOTOS, PROMO_AI_RULES, PROMO_AI_NOTE, promoAiPrompt, promoUsesAi, promoTextWidth, promoScenes, youtubeTitle, youtubeDescription, tiktokCaption, instagramReelCaption, promoTags } = data
 
 let passed = 0
 async function test(name, fn) {
@@ -54,7 +54,7 @@ await test('表現チェック：動画の文字・題名・説明に NG も 注
   for (const v of PROMO_VIDEOS) {
     const scenes = promoScenes(v)
     const onScreen = scenes.flatMap((s) => [...(s.titleLines ?? []), ...(s.subtitleLines ?? []), s.label, ...(s.lines ?? []), ...(s.chips ?? []), s.name, s.address, s.search]).filter(Boolean)
-    const all = [...onScreen, youtubeTitle(v), youtubeDescription(v, 'https://example.com/r'), tiktokCaption(v)].join('\n')
+    const all = [...onScreen, youtubeTitle(v), youtubeDescription(v, 'https://example.com/r'), tiktokCaption(v), instagramReelCaption(v)].join('\n')
     assert.deepEqual(findViolations(all).map((f) => `${f.level}:${f.match}`), [], v.id)
     assert.ok(!/専門|最新|最先端|日本一|地域一|No\.?1|治ります|完治|保証|改善します|必ず|絶対/.test(all), `${v.id} に強すぎる言葉`)
   }
@@ -183,6 +183,7 @@ await test('ジョブの目印・計測名・まとめ方', () => {
 await test('設定の初めの値：YouTube・TikTok はオン・週1本・YouTubeの審査はまだ（オフ）。KV の頭文字・媒体の名前', () => {
   assert.equal(DEFAULT_AUTOPILOT_SETTINGS.youtubeShorts, true)
   assert.equal(DEFAULT_AUTOPILOT_SETTINGS.tiktokVideo, true)
+  assert.equal(DEFAULT_AUTOPILOT_SETTINGS.instagramReels, true)
   assert.equal(DEFAULT_AUTOPILOT_SETTINGS.promoVideoPerWeek, 1)
   assert.equal(DEFAULT_AUTOPILOT_SETTINGS.youtubeAudited, false)
   // LINEの連絡先の一覧に、KV の行がまぎれこまないように
@@ -362,6 +363,70 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     assert.equal(out.manualUrl, stored.url)
     assert.match(out.reason, /TikTokは自動で出す連携（Buffer）がまだ/)
     assert.deepEqual(calls, [])
+
+    // 4-b) Instagram のリール：連携がまだなら手動。つながっていて承認済みなら、承認した動画をリールとして公開
+    const ig = promo.promoContent(v, 'instagram_reel', 'pv20261116-1')
+    const igKey = promo.promoJobKey('2026-11-16', 1, 'instagram_reel')
+    assert.equal(igKey, 'promo:2026-11-16:1:instagram_reel')
+    assert.match(ig.body, /プロフィールのリンクから/)
+    assert.match(ig.cta.url, /source=instagram/)
+    assert.equal(ig.promoVideoId, v.id)
+    const savedIg = { t: process.env.INSTAGRAM_ACCESS_TOKEN, u: process.env.INSTAGRAM_USER_ID }
+    delete process.env.INSTAGRAM_ACCESS_TOKEN
+    delete process.env.INSTAGRAM_USER_ID
+    calls.length = 0
+    assert.equal(await server.promoRouteFor('instagram_reel'), 'manual')
+    out = await publishToChannel('instagram_reel', ig, { jobKey: igKey })
+    assert.equal(out.kind, 'action_required')
+    assert.equal(out.manualUrl, stored.url)
+    assert.match(out.reason, /Instagramとの連携がまだ/)
+    assert.deepEqual(calls, [])
+    // 動画の無い（AIの投稿案の）リールは、これまでどおり手で
+    out = await publishToChannel('instagram_reel', { ...ig, promoVideoId: undefined })
+    assert.equal(out.kind, 'action_required')
+    process.env.INSTAGRAM_ACCESS_TOKEN = 'ig-token'
+    process.env.INSTAGRAM_USER_ID = '1789'
+    assert.equal(await server.promoRouteFor('instagram_reel'), 'instagram_api')
+    const igBodies = []
+    const baseFetch = globalThis.fetch
+    let igStatus = ['IN_PROGRESS', 'FINISHED']
+    globalThis.fetch = async (url, init) => {
+      const u = String(url)
+      if (u.startsWith('https://graph.instagram.com/')) {
+        calls.push(u)
+        if (u.endsWith('/1789/media')) { igBodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ id: 'c1' }), { status: 200 }) }
+        if (u.includes('/c1?fields=status_code')) return new Response(JSON.stringify({ status_code: igStatus.length > 1 ? igStatus.shift() : igStatus[0], status: 'Error: 2207026' }), { status: 200 })
+        if (u.endsWith('/1789/media_publish')) return new Response(JSON.stringify({ id: 'm1' }), { status: 200 })
+        if (u.includes('/m1?fields=permalink')) return new Response(JSON.stringify({ permalink: 'https://www.instagram.com/reel/abc/' }), { status: 200 })
+      }
+      return baseFetch(url, init)
+    }
+    // 承認待ち → 待つ（Instagram には送らない）
+    await kvSet('promo:week:2026-11-16', { weekStart: '2026-11-16', createdAt: '', items: [{ scheduledAt: later, videoId: v.id, campaign: 'pv20261116-1' }] })
+    out = await publishToChannel('instagram_reel', ig, { jobKey: igKey })
+    assert.equal(out.kind, 'wait')
+    assert.deepEqual(calls, [])
+    // 承認済み → リールとして公開（フィードにも出す・表紙つき・承認した動画のURL）
+    await kvSet('promo:week:2026-11-16', { weekStart: '2026-11-16', createdAt: '', items: [{ scheduledAt: later, videoId: v.id, campaign: 'pv20261116-1', approval: { status: 'approved', at: '', by: 'テスト', video: snap } }] })
+    out = await publishToChannel('instagram_reel', ig, { jobKey: igKey })
+    assert.deepEqual(out, { kind: 'published', url: 'https://www.instagram.com/reel/abc/', message: 'Instagramにリールを公開しました' })
+    assert.equal(igBodies.length, 1)
+    assert.equal(igBodies[0].media_type, 'REELS')
+    assert.equal(igBodies[0].video_url, snap.url)
+    assert.equal(igBodies[0].cover_url, snap.posterUrl)
+    assert.equal(igBodies[0].share_to_feed, true)
+    assert.equal(igBodies[0].caption, ig.body)
+    // Instagram が動画を取り込めなかった → 手で投稿（動画のURLつき）
+    igStatus = ['ERROR']
+    out = await publishToChannel('instagram_reel', ig, { jobKey: igKey })
+    assert.equal(out.kind, 'action_required')
+    assert.equal(out.manualUrl, snap.url)
+    assert.match(out.reason, /Instagramが動画を受け付けませんでした/)
+    await kvDelete('promo:week:2026-11-16')
+    globalThis.fetch = baseFetch
+    if (savedIg.t === undefined) delete process.env.INSTAGRAM_ACCESS_TOKEN; else process.env.INSTAGRAM_ACCESS_TOKEN = savedIg.t
+    if (savedIg.u === undefined) delete process.env.INSTAGRAM_USER_ID; else process.env.INSTAGRAM_USER_ID = savedIg.u
+    calls.length = 0
 
     // 5) 動画が決まっていないジョブはエラー
     assert.equal((await publishToChannel('tiktok', { ...tt, promoVideoId: undefined })).kind, 'error')

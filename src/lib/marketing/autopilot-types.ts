@@ -50,6 +50,11 @@ export interface AutopilotSettings {
   youtubeShorts: boolean
   /** 同じ動画を TikTok にも出す（時間になると動画と文を院長のLINEへ届ける。アプリの中で音楽を足して投稿する） */
   tiktokVideo: boolean
+  /**
+   * 同じ動画を Instagram のリールにも出す（Instagram とつながっていれば、院長の承認のあと自動で。
+   * つながっていなければ、時間になると動画と文を院長のLINEへ届ける。2026-11-12 院長の依頼）
+   */
+  instagramReels: boolean
   /** 動画の本数（週1＝水曜、週2＝水曜と土曜） */
   promoVideoPerWeek: number
   /**
@@ -105,6 +110,7 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   googleSeoPerWeek: 2,
   youtubeShorts: true,
   tiktokVideo: true,
+  instagramReels: true,
   promoVideoPerWeek: 1,
   youtubeAudited: false,
   availabilityStory: true,

@@ -33,7 +33,7 @@ export interface BufferConnection {
   error?: string
 }
 
-type PromoChannel = 'youtube_short' | 'tiktok'
+type PromoChannel = 'youtube_short' | 'tiktok' | 'instagram_reel'
 
 export interface PromoPlanItem {
   week: string
@@ -42,7 +42,7 @@ export interface PromoPlanItem {
   videoId: string
   title: string
   status: 'waiting' | 'approved' | 'skipped' | 'expired' | 'manual'
-  channels: Array<{ channel: PromoChannel; route: 'buffer' | 'youtube_api' | 'manual'; jobStatus: string | null; url: string | null }>
+  channels: Array<{ channel: PromoChannel; route: 'buffer' | 'youtube_api' | 'instagram_api' | 'manual'; jobStatus: string | null; url: string | null }>
   requestedAt: string | null
   requestDelivered: boolean
   approvedAt: string | null
@@ -54,8 +54,8 @@ export interface PromoPlanItem {
   soon: boolean
 }
 
-const CH_LABEL: Record<PromoChannel, string> = { youtube_short: 'YouTube', tiktok: 'TikTok' }
-const ROUTE_LABEL = { buffer: '自動（Buffer）', youtube_api: '自動（YouTubeに直接）', manual: '手で投稿（LINEでお送りします）' } as const
+const CH_LABEL: Record<PromoChannel, string> = { youtube_short: 'YouTube', tiktok: 'TikTok', instagram_reel: 'Instagramリール' }
+const ROUTE_LABEL = { buffer: '自動（Buffer）', youtube_api: '自動（YouTubeに直接）', instagram_api: '自動（Instagramに直接）', manual: '手で投稿（LINEでお送りします）' } as const
 
 function slotLabel(local: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})$/.exec(local)
@@ -132,7 +132,7 @@ export default function PromoVideoFields({
   /** 次の予定の操作中（`${week}:${n}`）と、その結果 */
   const [acting, setActing] = useState<string | null>(null)
   const [planMsg, setPlanMsg] = useState<{ key: string; ok: boolean; text: string } | null>(null)
-  const anyOn = s.youtubeShorts || s.tiktokVideo
+  const anyOn = s.youtubeShorts || s.tiktokVideo || s.instagramReels
 
   async function remake(id: string) {
     setRemaking(id)
@@ -199,7 +199,7 @@ export default function PromoVideoFields({
 
   return (
     <fieldset id="promo-video" className="scroll-mt-24 space-y-3 rounded-xl border border-sky-200 bg-sky-50/40 p-3">
-      <legend className="px-1 text-sm font-bold text-slate-900">YouTubeショート・TikTokの動画（約16秒）</legend>
+      <legend className="px-1 text-sm font-bold text-slate-900">YouTubeショート・TikTok・Instagramリールの動画（約16秒）</legend>
       <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
         <input type="checkbox" checked={s.youtubeShorts} disabled={disabled} onChange={(e) => setS({ ...s, youtubeShorts: e.target.checked })} className="mt-0.5 h-5 w-5 shrink-0" />
         毎週、YouTubeショートに出す
@@ -207,6 +207,10 @@ export default function PromoVideoFields({
       <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
         <input type="checkbox" checked={s.tiktokVideo} disabled={disabled} onChange={(e) => setS({ ...s, tiktokVideo: e.target.checked })} className="mt-0.5 h-5 w-5 shrink-0" />
         同じ動画をTikTokにも出す
+      </label>
+      <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
+        <input type="checkbox" checked={s.instagramReels} disabled={disabled} onChange={(e) => setS({ ...s, instagramReels: e.target.checked })} className="mt-0.5 h-5 w-5 shrink-0" />
+        同じ動画をInstagramのリールにも出す（フォロワー以外にも届きやすい）
       </label>
       <label className="block text-sm">
         <span className="font-bold text-slate-700">本数</span>
@@ -224,7 +228,7 @@ export default function PromoVideoFields({
         Google検索向けの投稿と同じ18のテーマ（「下関市彦島＋症状」に絞ったもの）を、短い動画にして、順にくり返します。絵は、前半（つかみ・こんなときに）がAIで作ったイメージ、後半（当院では・院の強み・ご予約）が院の写真です（足首とエコー・エコーの機械・運動の器具・外観だけ。人物が特定できる写真は使いません）。文面は院長が確認した文から抜いた決まった文です。年末年始（12/29〜1/3）は出しません。
       </p>
       <p className="text-xs text-slate-600">
-        <b>Bufferにつないだ場合：</b>投稿の前日に、見本の動画と「承認して投稿」「今回は見送る」「別の動画にする」のボタンが院長のLINEに届きます。承認すると、時間になったら自動で投稿します（承認しなかった動画は出しません。時刻から24時間たっても承認が無ければ、その回は出しません）。
+        <b>Bufferにつないだ場合（Instagramのリールは、院内アプリの Instagram の連携で出します）：</b>投稿の前日に、見本の動画と「承認して投稿」「今回は見送る」「別の動画にする」のボタンが院長のLINEに届きます。承認すると、時間になったら自動で投稿します（承認しなかった動画は出しません。時刻から24時間たっても承認が無ければ、その回は出しません）。
         <b>つないでいない媒体：</b>時間になると、動画と貼りつける文が院長のLINEに届くので、それぞれのアプリから投稿してください（1〜2分）。
       </p>
 
