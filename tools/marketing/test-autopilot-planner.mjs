@@ -227,7 +227,7 @@ test('手動のストーリー：本日・次の診療日（明日なら「明�
   assert.deepEqual(storyRange('today', openings, '2026-10-24'), { scope: 'day', dates: ['2026-10-24'], title: '本日のご予約の空き' })
   const next = storyRange('next', openings, '2026-10-24')
   assert.deepEqual(next.dates, ['2026-10-26'])
-  assert.equal(next.title, '次の診療日のご予約の空き', '土曜→月曜は明日ではない')
+  assert.equal(next.title, '次の施術日のご予約の空き', '土曜→月曜は明日ではない')
   assert.equal(storyRange('next', openings, '2026-10-25').title, '明日のご予約の空き')
   const week = storyRange('week', openings, '2026-10-24')
   assert.deepEqual(week.dates, ['2026-10-24', '2026-10-26', '2026-10-27'], '今日から7日間の診療日（休診の日曜は除く）')

@@ -117,7 +117,7 @@ function handoffReply(): BotReply {
   const urgentLine = P.emergencyPhone ? `\nお急ぎ・施術時間外は直通（${P.emergencyPhone}）へお電話ください。` : ''
   return {
     type: 'text',
-    text: `スタッフが直接確認して、こちらのLINEでお返事いたします。少しお時間をください。\nお急ぎの場合はお電話（${P.phone}）へお願いします。診療時間: ${P.hours}${urgentLine}`,
+    text: `スタッフが直接確認して、こちらのLINEでお返事いたします。少しお時間をください。\nお急ぎの場合はお電話（${P.phone}）へお願いします。施術時間: ${P.hours}${urgentLine}`,
   }
 }
 
@@ -197,7 +197,7 @@ function guidance(intent: IntentKey, contact: LineContact, menu: LineMenuVariant
   // 3つの選択肢の「料金・通院方法」は、料金に続けて通い方（時間・流れ・持ち物・場所）も出す
   const withVisitInfo = menu === 'three' && intent === 'price'
   if ((intent !== 'price' && intent !== 'lost') || withVisitInfo) {
-    const hours = `診療時間: ${P.hours}（休み: ${P.closedDays}）`
+    const hours = `施術時間: ${P.hours}（休み: ${P.closedDays}）`
     replies.push({ type: 'text', text: (withVisitInfo ? [hours, flow, bring, access] : [flow, bring, access]).join('\n\n') })
   }
   replies.push(reserveButtons(intent, menu))

@@ -37,7 +37,7 @@ const sections: Section[] = [
       '施術、施術録の作成・管理、経過の確認',
       '療養費の請求など、保険に関する事務',
       '医療機関へのご紹介と、紹介状の作成',
-      '公式LINEでのお知らせ（ご予約、患者番号の連携、休診のご案内など）',
+      '公式LINEでのお知らせ（ご予約、患者番号の連携、休みのご案内など）',
       '院の運営の見直し（個人が分からない形に集計してから使います）',
     ],
   },
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
             <p className="font-bold text-slate-800">ゆうき整骨院</p>
             <p>山口県下関市彦島江の浦町9丁目1-14</p>
             <p>
-              電話：<a href="tel:0832654545" className="text-blue-700 underline">083-265-4545</a>（診療時間内に受け付けています）
+              電話：<a href="tel:0832654545" className="text-blue-700 underline">083-265-4545</a>（施術時間内に受け付けています）
             </p>
           </div>
 
