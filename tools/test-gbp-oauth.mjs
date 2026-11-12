@@ -23,7 +23,9 @@ check('戻り先のベースは上書きできる', gbpOAuthConfig('https://exam
 console.log('許可画面のURL')
 const u = new URL(gbpAuthorizeUrl('cid', 'https://fixed.test/cb', 'st-1'))
 check('Googleの許可画面', u.origin === 'https://accounts.google.com')
-check('投稿の権限だけを求める', u.searchParams.get('scope') === 'https://www.googleapis.com/auth/business.manage')
+// 2026-11〜 Search Console（読むだけ）も同じ許可でもらう（#87）。それ以外は求めない
+const scopes = (u.searchParams.get('scope') ?? '').split(' ').sort()
+check('投稿と Search Console（読むだけ）の権限だけを求める', JSON.stringify(scopes) === JSON.stringify(['https://www.googleapis.com/auth/business.manage', 'https://www.googleapis.com/auth/webmasters.readonly']), scopes)
 check('リフレッシュトークンを受け取る（offline + consent）', u.searchParams.get('access_type') === 'offline' && u.searchParams.get('prompt') === 'consent')
 check('stateを付ける', u.searchParams.get('state') === 'st-1')
 

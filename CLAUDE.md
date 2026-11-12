@@ -12,7 +12,7 @@ npm run build    # 本番ビルド
 npm run lint     # ESLint
 ```
 
-テストスイートは未設定。
+テストは `npm run test:tools`（`tools/test-*.mjs` と `tools/marketing/test-*.mjs` をまとめて tsx で走らせる。外には送らない・データは架空）。1本だけなら `npx tsx tools/test-◯◯.mjs`（node だけだと `@/` を読めず止まるものがある）。
 
 ## アーキテクチャ
 
