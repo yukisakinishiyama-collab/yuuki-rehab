@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { readTicket, sealUserId } from '@/lib/liff-ticket'
-import { nameNoSpace, patientLinkKey, phoneDigits, type LineLink } from '@/lib/line-link'
+import { isPatientNo, nameNoSpace, patientLinkKey, phoneDigits, type LineLink } from '@/lib/line-link'
 import { fetchPatientNo, findKartePatient, getLineLink, patientNoErrorText, saveLineLink } from '@/lib/line-link-server'
 import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   const existing = await getLineLink(key)
   // 患者番号：前に発行できていればそれを使う。無ければ予約システムにもらう
-  let patientNo = existing?.patientNo
+  let patientNo = isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined
   let patientNoError: string | undefined
   if (!patientNo) {
     const r = await fetchPatientNo(name, phone)

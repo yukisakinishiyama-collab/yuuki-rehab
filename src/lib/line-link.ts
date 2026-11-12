@@ -34,7 +34,34 @@ export interface LineLink {
 }
 
 /** 画面に出す分（封印済みの参照は出さない） */
-export type LineLinkSummary = Omit<LineLink, 'sealed'>
+export type LineLinkSummary = Omit<LineLink, 'sealed'> & {
+  /** 控えの患者番号が数字でない（予約システムからもらい直す必要がある） */
+  patientNoInvalid?: boolean
+}
+
+/**
+ * 患者番号として使える値か（数字1〜6けた）。
+ * 予約システムの古い行には、番号の欄に「院側手動登録」という文字が入っていて、それがそのまま届いたことがある（2026-11）
+ */
+export const isPatientNo = (value: unknown): value is string => typeof value === 'string' && /^[0-9]{1,6}$/.test(value.trim())
+
+/** 前に送った番号がまちがっていた方へ、正しい番号を送り直すときの書き出し */
+export const PATIENT_NO_CORRECTION = '以前お送りした患者番号に誤りがありました。失礼いたしました。正しい番号をお送りします。'
+
+/**
+ * 連携のお知らせ（番号つき）の文。corrected のときは「誤りがありました」から書き出す。
+ * numberHelp は番号の使い方、fallback は番号を出せなかったときの文、sign は院の名前
+ */
+export function linkNoticeText(opts: { name: string; patientNo?: string; fallback: string; sign: string; corrected?: boolean }): string {
+  const numberLine = isPatientNo(opts.patientNo)
+    ? `\n\n患者番号：${opts.patientNo.trim()}\nネット予約の「患者番号をお持ちの方」に、この番号と、院にご登録の電話番号の下4桁の2つを入れると、お名前などが自動で入ります。`
+    : `\n\n${opts.fallback}`
+  const lead =
+    opts.corrected && isPatientNo(opts.patientNo)
+      ? `${opts.name}さんへ。${PATIENT_NO_CORRECTION}`
+      : `${opts.name}さんのカルテとこのLINEの連携が済みました。\n誕生日のご挨拶など、院からのお知らせをこのLINEへお送りします。`
+  return `${lead}${numberLine}\n\n${opts.sign}`
+}
 
 export const phoneDigits = (value: string): string => String(value || '').replace(/[^0-9]/g, '')
 export const nameNoSpace = (value: string): string => String(value || '').replace(/[\s　]/g, '')

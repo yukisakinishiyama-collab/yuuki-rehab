@@ -5,22 +5,22 @@
  * - POST : { keys?: string[], all?: boolean } all なら連携した全員、keys ならその方、
  *          どちらも無ければ「送れたことが確かめられていない方」全員に送る
  *          （notified が true の方には送らない。同じ方に二重に送らないため）
+ *          控えの患者番号が数字でない方は、送る前に予約システムから番号をもらい直す。
+ *          前に文字（「院側手動登録」）を番号としてお知らせしていた方には「誤りがありました」から書き出す
  * 送った結果は連携の記録（notified / notifyError）に残す。
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/marketing/auth'
 import { unsealUserId } from '@/lib/liff-ticket'
-import { getLineLink, listLineLinks, patientNoErrorText, saveLineLink } from '@/lib/line-link-server'
+import { getLineLink, listLineLinks, patientNoErrorText, refreshPatientNo, saveLineLink } from '@/lib/line-link-server'
+import { linkNoticeText } from '@/lib/line-link'
 import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-function noticeText(name: string, patientNo: string | undefined, patientNoError: string | undefined): string {
-  const numberLine = patientNo
-    ? `\n\n患者番号：${patientNo}\nネット予約の「患者番号をお持ちの方」に、この番号と、院にご登録の電話番号の下4桁の2つを入れると、お名前などが自動で入ります。`
-    : `\n\n${patientNoErrorText(patientNoError)}`
-  return `${name}さんのカルテとこのLINEの連携が済みました。\n誕生日のご挨拶など、院からのお知らせをこのLINEへお送りします。${numberLine}\n\n${DEFAULT_CLINIC_PROFILE.name}`
+function noticeText(name: string, patientNo: string | undefined, patientNoError: string | undefined, corrected = false): string {
+  return linkNoticeText({ name, patientNo, fallback: patientNoErrorText(patientNoError), sign: DEFAULT_CLINIC_PROFILE.name, corrected })
 }
 
 async function targets(keys: string[] | undefined, all = false) {
@@ -54,9 +54,15 @@ export async function POST(request: NextRequest) {
   let sent = 0
   let failed = 0
   const errors: string[] = []
+  let corrected = 0
   for (const summary of await targets(keys, body.all === true)) {
-    const link = await getLineLink(summary.key)
-    if (!link) continue
+    const stored = await getLineLink(summary.key)
+    if (!stored) continue
+    // 控えの患者番号が数字でないとき（「院側手動登録」など）は、送る前に予約システムからもらい直す
+    const fresh = await refreshPatientNo(stored)
+    const link = fresh.link
+    if (fresh.refreshed) await saveLineLink(link)
+    if (fresh.corrected) corrected += 1
     const userId = unsealUserId(link.sealed, secret)
     if (!userId) {
       failed += 1
@@ -67,7 +73,7 @@ export async function POST(request: NextRequest) {
       const res = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: noticeText(link.name, link.patientNo, link.patientNoError) }] }),
+        body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: noticeText(link.name, link.patientNo, link.patientNoError, fresh.corrected) }] }),
       })
       if (res.ok) {
         sent += 1
@@ -85,5 +91,5 @@ export async function POST(request: NextRequest) {
       await saveLineLink({ ...link, notified: false, notifyError: detail })
     }
   }
-  return NextResponse.json({ ok: true, sent, failed, errors: [...new Set(errors)].slice(0, 5) })
+  return NextResponse.json({ ok: true, sent, failed, corrected, errors: [...new Set(errors)].slice(0, 5) })
 }
