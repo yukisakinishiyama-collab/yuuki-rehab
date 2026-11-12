@@ -111,7 +111,7 @@ export default function KarteLinkCard() {
               type="button"
               onClick={() => void resend(true)}
               disabled={linkedTotal === 0 || resendState === '送っています…'}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-md bg-emerald-700 px-3 py-1.5 font-bold text-white hover:bg-emerald-800 disabled:opacity-50 max-lg:min-h-10"
             >
               連携した全員に送る（{linkedTotal}人）
             </button>
