@@ -14,14 +14,15 @@
  *    → 明日の控えの方へ送る（前日のお知らせの設定・本人の受け取りに従う）。予約システムと同じ印を使うので1通だけ
  * 4. 「今日」の画面の「LINEで予約日時を送る」を開いたとき、その一覧（予約システムから読んだもの）で控えを最新にする
  *
- * 控えに持つのは、予約番号・日付・時刻・LINE連携のキーだけ（お名前・電話は持たない）。
+ * 控えに持つのは、予約番号・日付・時刻・LINE連携のキー（連携の記録 linelink: と同じ「電話番号|お名前」）だけ。
+ * LINE の宛先は持たない（送るときに連携の記録の封印から開く）。
  */
 import { kvDelete, kvGet, kvList, kvSet } from './kv-store-server'
 import { getLineLink, listLineLinks } from '@/lib/line-link-server'
 import { patientLinkKey, nameNoSpace, phoneDigits, type LineLink } from '@/lib/line-link'
 import { unsealUserId } from '@/lib/liff-ticket'
 import { lineMark } from './consent-store-server'
-import { markSent } from './automation-store-server'
+import { getRule, markSent } from './automation-store-server'
 import { dedupeMark, pushToPatient } from './patient-line-push-server'
 import { jstTomorrow, patientConfirmText, patientRemindText } from '@/lib/reservation-message'
 
@@ -45,6 +46,8 @@ export interface LineReservation {
   savedAt: string
   confirmedAt?: string
   remindedAt?: string
+  /** 前日のお知らせを「テスト」の見本（院長あて）で済ませた。あとで「動かす」にしたら、ご本人へ送り直す */
+  remindedTest?: boolean
 }
 
 interface SentRecord {
@@ -118,7 +121,10 @@ export async function markConfirmSent(input: { reservationNo?: string; date?: st
 }
 
 /** 1. 予約が入った（予約システムからの通知。返事のあとで呼ぶ） */
-export async function onNewReservation(body: { reservationNo?: string; name?: string; phone?: string; date?: string; time?: string }): Promise<string> {
+export async function onNewReservation(
+  body: { reservationNo?: string; name?: string; phone?: string; date?: string; time?: string },
+  opts: { waitMs?: number; now?: Date } = {},
+): Promise<string> {
   const no = String(body.reservationNo ?? '')
   const date = String(body.date ?? '')
   const time = hhmm(body.time)
@@ -129,13 +135,13 @@ export async function onNewReservation(body: { reservationNo?: string; name?: st
   const userId = unsealUserId(link.sealed, secret)
   if (!userId) return 'LINEの宛先を開けません'
 
-  const today = jstParts().date
+  const today = jstParts(opts.now).date
   if (date < today) return '過ぎた日の予約'
   const rsv: LineReservation = { reservationNo: no, key: link.key, date, time, savedAt: new Date().toISOString() }
   await kvSet(`${RSV_PREFIX}${no}`, rsv)
 
   // LINE から予約した方には、予約システムが「確定しました」を送る。少し待ってから、送られていなければこちらから
-  await new Promise((r) => setTimeout(r, CONFIRM_WAIT_MS))
+  await new Promise((r) => setTimeout(r, opts.waitMs ?? CONFIRM_WAIT_MS))
   if (await alreadyConfirmed(no)) return '確定の LINE は送り済み'
   const r = await pushToPatient({
     automation: 'reservation_confirm',
@@ -165,6 +171,7 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
   const tomorrow = jstTomorrow(now)
   const rows = await kvList<LineReservation>(RSV_PREFIX)
   const secret = process.env.RESERVATION_NOTIFY_SECRET ?? ''
+  const testing = (await getRule('reservation_remind')).mode === 'test'
   let sent = 0
   let skipped = 0
   for (const { key, value } of rows) {
@@ -174,7 +181,9 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
       await kvDelete(key)
       continue
     }
-    if (value.date !== tomorrow || value.remindedAt) continue
+    if (value.date !== tomorrow) continue
+    // 送り済み（見本だけのものは、「動かす」になったらご本人へ）
+    if (value.remindedAt && (!value.remindedTest || testing)) continue
     const link = await getLineLink(value.key)
     const userId = link ? unsealUserId(link.sealed, secret) : null
     if (!link || !userId) {
@@ -197,7 +206,11 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
     if (r.result === 'sent') sent += 1
     else skipped += 1
     // 上限・送れなかったときは、次の回にもう一度（それ以外は、その予約は終わり）
-    if (r.result !== 'limited' && r.result !== 'error') await kvSet(key, { ...value, remindedAt: new Date().toISOString() })
+    if (r.result !== 'limited' && r.result !== 'error') {
+      // 見本（テスト）で済んだものは印をつけておき、「動かす」になったらご本人へ送る
+      const sample = r.result === 'test' || (r.result === 'duplicate' && !r.delivered)
+      await kvSet(key, { ...value, remindedAt: new Date().toISOString(), remindedTest: sample || undefined })
+    }
   }
   return { sent, skipped }
 }
@@ -242,6 +255,7 @@ export async function syncLineReservations(input: {
       // 日時が変わった → 新しい日時で前日のお知らせを送り直せるように
       const next: LineReservation = { ...value, date: now.date, time: now.time, savedAt: new Date().toISOString() }
       delete next.remindedAt
+      delete next.remindedTest
       await kvSet(`${RSV_PREFIX}${no}`, next)
       updated += 1
     }
