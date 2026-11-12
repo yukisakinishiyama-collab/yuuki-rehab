@@ -951,6 +951,8 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
       first.content.body.includes(PROMO_AI_NOTE)
         ? '※前半の絵はAIで作ったイメージです。投稿の画面に「AIで作成したコンテンツ」「改変されたコンテンツ」の設定があれば、オンにしてください。'
         : null,
+      // Buffer で自動で出すはずだったが出せなかったとき、その理由
+      ...group.filter((j) => /^Buffer/.test(j.actionReason ?? '')).map((j) => `⚠ ${j.actionReason}`),
       '',
       '投稿したら、いちばん下のボタンを押してください。',
     ]
@@ -1025,6 +1027,16 @@ export async function nudgeManualPosts(jobs: PublishJob[]): Promise<number> {
 
 /** 院長のLINEのボタン（webhookで送り主が院長本人と確認済みのときだけ呼ぶ） */
 export async function handleOwnerPostback(data: string): Promise<string[]> {
+  // YouTube・TikTok の動画の「承認して投稿」「今回は見送る」「別の動画にする」
+  if (data.startsWith('ap:pv_')) {
+    const { parsePromoPostback } = await import('./promo-approval')
+    const p = parsePromoPostback(data)
+    if (!p) return ['このボタンは期限切れか、無効です']
+    const { applyPromoAction } = await import('./promo-video-server')
+    const action = p.action === 'ok' ? 'approve' : p.action === 'skip' ? 'skip' : 'swap'
+    const result = await applyPromoAction(p.week, p.n, action, 'LINE（院長）', { token: p.token })
+    return [result.message]
+  }
   const [, action, arg] = data.split(':')
   if (action === 'approve_all' && /^\d{4}-\d{2}-\d{2}$/.test(arg ?? '')) {
     const result = await applyProposalAction(arg, { action: 'approve_all' }, 'LINE（院長）')

@@ -9,7 +9,7 @@ import { publishToChannel, type PublishOutcome } from './publishers'
 
 export type JobRunResult =
   | { ran: false }
-  | { ran: true; outcome: 'published' | 'action_required' | 'skipped' | 'retry_scheduled'; job: PublishJob | null; detail?: PublishOutcome }
+  | { ran: true; outcome: 'published' | 'action_required' | 'skipped' | 'retry_scheduled' | 'waiting'; job: PublishJob | null; detail?: PublishOutcome }
 
 export async function runOneJob(job: PublishJob): Promise<JobRunResult> {
   const locked = await updateJob(job.id, (j) => {
@@ -18,10 +18,26 @@ export async function runOneJob(job: PublishJob): Promise<JobRunResult> {
   if (!locked || locked.status !== 'processing') return { ran: false }
 
   try {
-    const outcome = await publishToChannel(locked.channel, locked.content)
+    const outcome = await publishToChannel(locked.channel, locked.content, { jobKey: locked.idempotencyKey })
     if (outcome.kind === 'published') {
-      const updated = await recordAttempt(locked.id, true, outcome.message, outcome.url)
+      let updated = await recordAttempt(locked.id, true, outcome.message, outcome.url)
+      // 投稿サービス（Buffer）に渡した投稿は、出たかを後で確かめる。承認待ちなどの断り書きは消す
+      if (updated && (outcome.external || updated.actionReason)) {
+        updated = await updateJob(locked.id, (j) => {
+          j.actionReason = undefined
+          if (outcome.external) j.external = outcome.external
+        })
+      }
       return { ran: true, outcome: 'published', job: updated, detail: outcome }
+    }
+    if (outcome.kind === 'wait') {
+      // 院長の承認待ちなど。やり直しの回数には数えず、しばらくしてからもう一度見る
+      const updated = await updateJob(locked.id, (j) => {
+        j.status = 'pending'
+        j.nextAttemptAt = outcome.retryAt
+        j.actionReason = outcome.message
+      })
+      return { ran: true, outcome: 'waiting', job: updated, detail: outcome }
     }
     if (outcome.kind === 'action_required') {
       const updated = await updateJob(locked.id, (j) => {

@@ -5,6 +5,7 @@
  * - 管理画面の「今すぐ実行」からも呼べる（管理者のBasic認証で許可）
  * - CRON_SECRET 設定時は Authorization: Bearer で保護
  * - 自動投稿（autopilot）のジョブが手動対応になったら、本文と「投稿した」ボタンを院長のLINEへ送る
+ * - YouTube・TikTok の動画：Buffer に渡した投稿が出たかを確かめる／前日に見本と「承認して投稿」ボタンを院長のLINEへ
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { refreshInstagramTokenIfNeeded } from '@/lib/marketing/instagram-token'
@@ -16,6 +17,7 @@ import { nudgeManualPosts } from '@/lib/marketing/autopilot-server'
 export const maxDuration = 300
 
 async function run() {
+  const startedAt = Date.now()
   // IGトークンの定期延長（60日期限対策）。失敗してもジョブ処理は続行する
   await refreshInstagramTokenIfNeeded()
 
@@ -40,6 +42,17 @@ async function run() {
     results.push({ id: job.id, channel: job.channel, outcome: r.outcome })
   }
 
+  // YouTube・TikTok の動画：Buffer に渡した投稿が出たかを確かめる。出せなかったものは手で投稿できるよう、LINEへ届ける
+  let buffer: unknown = null
+  try {
+    const { checkBufferPromoPosts } = await import('@/lib/marketing/promo-video-server')
+    const checked = await checkBufferPromoPosts()
+    manual.push(...checked.failed)
+    buffer = { checked: checked.checked, sent: checked.sent, failed: checked.failed.length }
+  } catch (error) {
+    console.error('Bufferの投稿の確認に失敗:', error instanceof Error ? error.message : error)
+  }
+
   // 手動で投稿する媒体は、院長のLINEへ本文を届ける（失敗してもジョブ処理の結果は返す）
   let nudged = 0
   if (manual.length > 0) {
@@ -48,6 +61,15 @@ async function run() {
     } catch (error) {
       console.error('手動投稿のお知らせに失敗:', error instanceof Error ? error.message : error)
     }
+  }
+
+  // YouTube・TikTok の動画：投稿の前日に、見本の動画と「承認して投稿」ボタンを院長のLINEへ（見本は1回に1本まで作る）
+  let approvals: unknown = null
+  try {
+    const { requestPromoApprovals } = await import('@/lib/marketing/promo-video-server')
+    approvals = await requestPromoApprovals({ deadlineMs: startedAt + 150_000 })
+  } catch (error) {
+    console.error('動画の承認のお願いに失敗:', error instanceof Error ? error.message : error)
   }
 
   // AI動画: 作成中のものの片付けだけ行う。自動で作り始めるのは止めている（2026-10-29 院長の指示）。
@@ -60,7 +82,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, nudged, aiVideos }
+  return { ok: true, processed: results.length, results, nudged, buffer, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {
