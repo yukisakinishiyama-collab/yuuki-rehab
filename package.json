@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:tools": "node tools/run-tests.mjs",
     "lint:design": "node tools/lint-design.mjs"
   },
   "dependencies": {
