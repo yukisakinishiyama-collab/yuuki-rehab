@@ -2,7 +2,8 @@
  * カルテ連携の「結びつけました＋患者番号」のお知らせを、もう一度LINEで送る（院長のみ）
  *
  * - GET  : 送れたことが確かめられていない方の人数（送る前の確認用。個人の情報は返さない）
- * - POST : { keys?: string[] } 指定が無ければ「送れたことが確かめられていない方」全員に送る
+ * - POST : { keys?: string[], all?: boolean } all なら連携した全員、keys ならその方、
+ *          どちらも無ければ「送れたことが確かめられていない方」全員に送る
  *          （notified が true の方には送らない。同じ方に二重に送らないため）
  * 送った結果は連携の記録（notified / notifyError）に残す。
  */
@@ -22,10 +23,10 @@ function noticeText(name: string, patientNo: string | undefined, patientNoError:
   return `${name}さんのカルテとこのLINEの連携が済みました。\n誕生日のご挨拶など、院からのお知らせをこのLINEへお送りします。${numberLine}\n\n${DEFAULT_CLINIC_PROFILE.name}`
 }
 
-async function targets(keys: string[] | undefined) {
+async function targets(keys: string[] | undefined, all = false) {
   const summaries = await listLineLinks()
-  const wanted = keys && keys.length > 0 ? summaries.filter(s => keys.includes(s.key)) : summaries.filter(s => s.notified !== true)
-  return wanted
+  if (all) return summaries
+  return keys && keys.length > 0 ? summaries.filter(s => keys.includes(s.key)) : summaries.filter(s => s.notified !== true)
 }
 
 export async function GET(request: NextRequest) {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
   if (!secret || !token) return NextResponse.json({ ok: false, error: 'LINEの設定がありません' }, { status: 503 })
 
-  let body: { keys?: unknown } = {}
+  let body: { keys?: unknown; all?: unknown } = {}
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
   let sent = 0
   let failed = 0
   const errors: string[] = []
-  for (const summary of await targets(keys)) {
+  for (const summary of await targets(keys, body.all === true)) {
     const link = await getLineLink(summary.key)
     if (!link) continue
     const userId = unsealUserId(link.sealed, secret)
