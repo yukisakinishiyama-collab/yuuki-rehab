@@ -388,6 +388,19 @@ function joinLines(a: string, b: string): string {
   return closed(joined) ? joined : `${joined}。`
 }
 
+/** Instagram リールの文（リンクは押せないので、プロフィールのリンクへ案内する） */
+export function instagramReelCaption(video: PromoVideo): string {
+  return [
+    `【下関市彦島｜${video.post.title}】`,
+    joinLines(video.worry[0], video.worry[1]),
+    `${video.points[0]}。${video.points[1]}。`,
+    'ご予約・ご相談は、プロフィールのリンクからどうぞ（ネット予約は24時間受付）。',
+    ...(promoUsesAi(video) ? [PROMO_AI_NOTE] : []),
+    '',
+    hash(promoTags(video)),
+  ].join('\n')
+}
+
 /** TikTok の説明（短く。リンクは押せないので「検索」で案内する） */
 export function tiktokCaption(video: PromoVideo): string {
   return [

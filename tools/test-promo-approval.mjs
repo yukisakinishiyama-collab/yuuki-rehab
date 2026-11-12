@@ -114,7 +114,7 @@ await test('LINEの文：見本の動画・貼る文・承認／見送り／別�
   assert.equal(msgs.length, 4)
   assert.match(msgs[0], /11\/18\(水\) 13:30 に出す動画です/)
   assert.match(msgs[0], /→ YouTube（承認すると、時間になったら自動で投稿します）/)
-  assert.match(msgs[0], /TikTokはBufferにつながっていないため/)
+  assert.match(msgs[0], /TikTokは自動で出す連携がまだのため/)
   assert.match(msgs[0], /押さなければ投稿しません/)
   assert.match(msgs[0], /前半の絵はAIで作ったイメージ/)
   assert.deepEqual(msgs[1], { type: 'video', originalContentUrl: video.url, previewImageUrl: video.posterUrl })
@@ -280,7 +280,7 @@ await test('通しで：前日にLINEで見本→念押し→承認→Buffer で
     const stored = { id: vid, hash, url: `https://blob.example/promo/${vid}-${hash}.mp4`, posterUrl: `https://blob.example/promo/${vid}-${hash}.jpg`, seconds: 16, bytes: 4, createdAt: new Date().toISOString(), aiImages: 0 }
     await kvSet(`promo:video:${vid}`, stored)
     const jobs = (await listJobs()).filter((j) => j.idempotencyKey.startsWith(`promo:${week}:1:`))
-    assert.deepEqual(jobs.map((j) => j.channel).sort(), ['tiktok', 'youtube_short'])
+    assert.deepEqual(jobs.map((j) => j.channel).sort(), ['instagram_reel', 'tiktok', 'youtube_short'])
 
     // 3) まだ早い（31時間前）・夜は送らない
     assert.equal((await server.requestPromoApprovals({ now: at(ap.addHoursLocal(slot, -31)) })).requested, 0)
@@ -389,7 +389,7 @@ await test('通しで：前日にLINEで見本→念押し→承認→Buffer で
     assert.equal((await listJobs()).filter((j) => j.idempotencyKey.startsWith(`promo:${week2}:1:`) && j.status === 'pending').length, 0, '見送った回のジョブは作り直さない')
     r = await server.applyPromoAction(week2, 1, 'restore', 'テスト', { now: now0 })
     assert.equal(r.ok, true)
-    assert.equal((await listJobs()).filter((j) => j.idempotencyKey.startsWith(`promo:${week2}:1:`) && j.status === 'pending').length, 2)
+    assert.equal((await listJobs()).filter((j) => j.idempotencyKey.startsWith(`promo:${week2}:1:`) && j.status === 'pending').length, 3)
 
     // 12) 承認が無いまま時刻から24時間たったら、その回は出さない
     const g = await server.promoGate('tiktok', promo.promoJobKey(week2, 1, 'tiktok'), at(ap.addHoursLocal((await server.getPromoWeekPlan(week2)).items[0].scheduledAt, 25)))
@@ -399,7 +399,7 @@ await test('通しで：前日にLINEで見本→念押し→承認→Buffer で
     // 13) 画面に出す一覧（承認の状態・出し方）
     const view = await server.promoPlanView(now0)
     assert.equal(view[0].status, 'approved')
-    assert.deepEqual(view[0].channels.map((c) => c.route), ['buffer', 'buffer'])
+    assert.deepEqual(view[0].channels.map((c) => c.route), ['buffer', 'buffer', 'manual'])
     assert.equal(view[0].videoUrl, stored.url)
 
     // 14) キーが取り消されたら、つながっていない扱い（自動では出さず手で）

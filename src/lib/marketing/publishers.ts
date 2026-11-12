@@ -32,8 +32,10 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
   switch (channel) {
     case 'instagram_feed':
     case 'instagram_carousel':
-    case 'instagram_reel':
       return publishInstagram(channel, content)
+    case 'instagram_reel':
+      // 宣伝の短い動画（promoVideoId あり）はリールとして出す。AIの投稿案のリールは動画が無いので手で（これまでどおり）
+      return content.promoVideoId ? publishPromoVideo(channel, content, ctx.jobKey) : publishInstagram(channel, content)
     case 'instagram_story':
       return publishInstagramStory(content)
     case 'google_business':
@@ -115,25 +117,28 @@ async function promoVideoFor(content: GeneratedContent): Promise<{ url: string; 
  * YouTube も TikTok も、審査に通っていないアプリから送ると「非公開」「自分だけ」に固定されるため、
  * 自分で送るのは YouTube の審査に通ったときだけ。ふだんは審査済みの Buffer を通す（2026-11-12 院長の判断）。
  */
-async function publishPromoVideo(channel: 'youtube_short' | 'tiktok', content: GeneratedContent, jobKey?: string): Promise<PublishOutcome> {
+async function publishPromoVideo(channel: 'youtube_short' | 'tiktok' | 'instagram_reel', content: GeneratedContent, jobKey?: string): Promise<PublishOutcome> {
   if (!content.promoVideoId) return { kind: 'error', message: '出す動画が決まっていません' }
   const { promoGate } = await import('./promo-video-server')
   const gate = await promoGate(channel, jobKey)
   if (gate.kind === 'wait') return { kind: 'wait', retryAt: gate.retryAt, message: gate.message }
   if (gate.kind === 'skip') return { kind: 'skipped', message: gate.message }
-  if (gate.kind === 'auto' && gate.route === 'buffer') return publishViaBuffer(channel, content, gate.video)
+  if (gate.kind === 'auto' && channel === 'instagram_reel') return publishInstagramReel(content, gate.video)
+  if (gate.kind === 'auto' && gate.route === 'buffer' && channel !== 'instagram_reel') return publishViaBuffer(channel, content, gate.video)
   if (gate.kind === 'auto' && channel === 'youtube_short') return publishYoutubeShort(content, gate.video)
   return publishPromoManually(channel, content)
 }
 
 /** 手で投稿（動画を作りおき＝無ければ作って、院長のLINEへ届ける） */
-async function publishPromoManually(channel: 'youtube_short' | 'tiktok', content: GeneratedContent): Promise<PublishOutcome> {
+async function publishPromoManually(channel: 'youtube_short' | 'tiktok' | 'instagram_reel', content: GeneratedContent): Promise<PublishOutcome> {
   const video = await promoVideoFor(content)
   if ('error' in video) return { kind: 'error', message: video.error }
   return {
     kind: 'action_required',
     reason:
-      channel === 'youtube_short'
+      channel === 'instagram_reel'
+        ? 'Instagramとの連携がまだのため手動投稿です。動画を保存して、Instagramアプリの「＋」→「リール」から投稿してください（文はコピーして貼れます）。'
+        : channel === 'youtube_short'
         ? 'YouTubeは自動で出す連携（Buffer）がまだのため手動投稿です。動画を保存して、YouTubeアプリの「＋」→「動画をアップロード」から投稿してください（題名・説明はコピーして貼れます）。'
         : 'TikTokは自動で出す連携（Buffer）がまだのため手動投稿です。動画を保存して、TikTokアプリの「＋」→「アップロード」から投稿してください（説明はコピーして貼れます。音楽はアプリの中で足せます）。',
     manualUrl: video.url,
@@ -176,6 +181,39 @@ async function publishViaBuffer(channel: 'youtube_short' | 'tiktok', content: Ge
     // 回数の上限はしばらく待てば直る（やり直す）。キーの誤り・Buffer が断った内容は、やり直しても同じなので手で
     if (error instanceof BufferError && error.kind === 'rate') return { kind: 'error', message: error.message }
     return manual(`${error instanceof Error ? error.message : 'Bufferのエラー'}。`)
+  }
+}
+
+/**
+ * 承認した動画を Instagram のリールとして出す（ふだんの投稿と同じ Instagram の連携で。フィードにも表示する）。
+ * 動画は Instagram が URL から取りに来るので、外から読める置き場（Vercel Blob）にあるものだけ。
+ * 取り込みに時間がかかる（数十秒〜）ので、準備ができるまで待ってから公開する
+ */
+async function publishInstagramReel(content: GeneratedContent, video: PromoVideoSnapshot): Promise<PublishOutcome> {
+  const manual = (reason: string): PublishOutcome => ({ kind: 'action_required', reason: `${reason}今回は手で投稿してください（承認した動画を開いて保存できます）。`, manualUrl: video.url })
+  const { getInstagramToken, getInstagramUserId, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
+  const token = await getInstagramToken()
+  const igUserId = await getInstagramUserId()
+  if (!token || !igUserId) return manual('Instagramとの連携が外れていました。')
+  const { isFetchableFromOutside } = await import('./promo-video-server')
+  if (!isFetchableFromOutside(video.url)) return manual('動画が院内アプリの中にあり、Instagramから取りに来られません（動画の置き場＝Vercel Blob の設定を確かめてください）。')
+  try {
+    const creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, {
+      media_type: 'REELS',
+      video_url: video.url,
+      caption: content.body,
+      share_to_feed: true,
+      ...(isFetchableFromOutside(video.posterUrl) ? { cover_url: video.posterUrl } : {}),
+    })
+    // 動画の取り込みは画像より長い（公開側でも40秒ほど待つので、合わせて2分ほど）
+    await igWaitForContainer(INSTAGRAM_GRAPH_HOST, token, creationId, 40)
+    const postUrl = await igPublishContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, creationId)
+    return { kind: 'published', url: postUrl, message: 'Instagramにリールを公開しました' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '不明'
+    // Instagram が動画を受け付けなかった（形式など）ときは、やり直しても同じなので手で
+    if (/取り込めませんでした|video|format|aspect|duration|codec/i.test(message)) return manual(`Instagramが動画を受け付けませんでした（${message.slice(0, 200)}）。`)
+    return { kind: 'error', message: `Instagram APIエラー: ${message}` }
   }
 }
 
@@ -314,8 +352,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** コンテナの準備（status_code）が FINISHED になるまで待つ。ERROR なら理由つきで止める */
-async function igWaitForContainer(host: string, token: string, creationId: string): Promise<void> {
-  for (let i = 0; i < 20; i++) {
+async function igWaitForContainer(host: string, token: string, creationId: string, tries = 20): Promise<void> {
+  for (let i = 0; i < tries; i++) {
     try {
       const res = await fetch(
         `${host}/v21.0/${creationId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`,
@@ -324,10 +362,10 @@ async function igWaitForContainer(host: string, token: string, creationId: strin
       const code = data.status_code as string | undefined
       if (code === 'FINISHED' || code === 'PUBLISHED') return
       if (code === 'ERROR' || code === 'EXPIRED') {
-        throw new Error(`Instagramが画像を取り込めませんでした（${data.status ?? code}）`)
+        throw new Error(`Instagramが画像・動画を取り込めませんでした（${data.status ?? code}）`)
       }
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith('Instagramが画像')) throw error
+      if (error instanceof Error && error.message.startsWith('Instagramが画像・動画')) throw error
       // 状態の確認自体の失敗は、待ってもう一度見る
     }
     await sleep(2000)

@@ -300,8 +300,12 @@ export async function getPromoWeekPlan(week: string): Promise<PromoWeekPlan | nu
   return kvGet<PromoWeekPlan>(WEEK_KEY(week))
 }
 
-export function enabledPromoChannels(settings: Pick<AutopilotSettings, 'youtubeShorts' | 'tiktokVideo'>): PromoChannel[] {
-  return [...(settings.youtubeShorts ? (['youtube_short'] as const) : []), ...(settings.tiktokVideo ? (['tiktok'] as const) : [])]
+export function enabledPromoChannels(settings: Pick<AutopilotSettings, 'youtubeShorts' | 'tiktokVideo'> & { instagramReels?: boolean }): PromoChannel[] {
+  return [
+    ...(settings.youtubeShorts ? (['youtube_short'] as const) : []),
+    ...(settings.tiktokVideo ? (['tiktok'] as const) : []),
+    ...(settings.instagramReels ? (['instagram_reel'] as const) : []),
+  ]
 }
 
 /**
@@ -311,7 +315,7 @@ export function enabledPromoChannels(settings: Pick<AutopilotSettings, 'youtubeS
 export async function schedulePromoVideos(now = new Date()): Promise<{ scheduled: number; weeks: string[]; skipped?: string }> {
   const settings = await getAutopilotSettings()
   const channels = enabledPromoChannels(settings)
-  if (channels.length === 0) return { scheduled: 0, weeks: [], skipped: 'YouTube・TikTokの動画はオフです' }
+  if (channels.length === 0) return { scheduled: 0, weeks: [], skipped: 'YouTube・TikTok・Instagramの動画はオフです' }
   const jst = jstParts(now)
   const thisMonday = mondayOf(jst.date)
   let scheduled = 0
@@ -388,6 +392,16 @@ export function promoSnapshot(stored: StoredPromoVideo): PromoVideoSnapshot {
 /** その媒体を自動で出せるか（Buffer につないだ → Buffer／YouTube の連携と審査が済んだ → YouTube に直接）。出せなければ manual */
 export async function promoRouteFor(channel: PromoChannel, settings?: AutopilotSettings): Promise<PromoRouteName> {
   if (process.env.MARKETING_MODE === 'mock') return 'manual'
+  // Instagram のリールは、院内アプリの Instagram の連携（ふだんの投稿と同じ）で直接出す。Buffer は通さない
+  if (channel === 'instagram_reel') {
+    try {
+      const { getInstagramToken, getInstagramUserId } = await import('./instagram-token')
+      return (await getInstagramToken()) && (await getInstagramUserId()) ? 'instagram_api' : 'manual'
+    } catch (error) {
+      console.warn('[promo-video] Instagram の連携を読めませんでした', error)
+      return 'manual'
+    }
+  }
   try {
     const { bufferTargetFor } = await import('./buffer-server')
     if (await bufferTargetFor(channel)) return 'buffer'
@@ -402,7 +416,7 @@ export async function promoRouteFor(channel: PromoChannel, settings?: AutopilotS
 }
 
 function parsePromoJobKey(key: string): { week: string; n: number; channel: PromoChannel } | null {
-  const m = /^promo:(\d{4}-\d{2}-\d{2}):(\d+):(youtube_short|tiktok)$/.exec(key)
+  const m = /^promo:(\d{4}-\d{2}-\d{2}):(\d+):(youtube_short|tiktok|instagram_reel)$/.exec(key)
   return m ? { week: m[1], n: Number(m[2]), channel: m[3] as PromoChannel } : null
 }
 
@@ -422,7 +436,7 @@ function jobsOfEntry(jobs: PublishJob[], week: string, n: number): PublishJob[] 
 
 export type PromoGate =
   | { kind: 'manual' }
-  | { kind: 'auto'; route: 'buffer' | 'youtube_api'; video: PromoVideoSnapshot }
+  | { kind: 'auto'; route: 'buffer' | 'youtube_api' | 'instagram_api'; video: PromoVideoSnapshot }
   | { kind: 'wait'; retryAt: string; message: string }
   | { kind: 'skip'; message: string }
 
@@ -585,6 +599,7 @@ function approvalInput(week: string, n: number, entry: PromoPlanEntry, video: Pr
     routes,
     youtubeTitle: routes.youtube_short ? promoContent(video, 'youtube_short', entry.campaign).title : undefined,
     tiktokCaption: routes.tiktok ? promoContent(video, 'tiktok', entry.campaign).body : undefined,
+    instagramCaption: routes.instagram_reel ? promoContent(video, 'instagram_reel', entry.campaign).body : undefined,
     appUrl: APP_URL,
     nowLocal,
   }
@@ -655,7 +670,7 @@ export async function requestPromoApprovals(opts: { now?: Date; deadlineMs?: num
   return { requested, reminded }
 }
 
-const CHANNEL_NAME: Record<PromoChannel, string> = { youtube_short: 'YouTube', tiktok: 'TikTok' }
+const CHANNEL_NAME: Record<PromoChannel, string> = { youtube_short: 'YouTube', tiktok: 'TikTok', instagram_reel: 'Instagramリール' }
 /** Buffer に渡してから、出たかを確かめ続ける長さ */
 const BUFFER_CHECK_MS = 2 * 24 * 60 * 60 * 1000
 

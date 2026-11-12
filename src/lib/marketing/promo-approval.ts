@@ -152,7 +152,7 @@ export function slotText(local: string): string {
   return `${m}/${d}(${WEEK[day]}) ${local.slice(11, 16)}`
 }
 
-export type PromoRouteName = 'buffer' | 'youtube_api' | 'manual'
+export type PromoRouteName = 'buffer' | 'youtube_api' | 'instagram_api' | 'manual'
 
 export interface ApprovalMessageInput {
   week: string
@@ -161,14 +161,15 @@ export interface ApprovalMessageInput {
   title: string
   video: PromoVideoSnapshot
   /** 媒体ごとの出し方（オンの媒体だけ） */
-  routes: Partial<Record<'youtube_short' | 'tiktok', PromoRouteName>>
+  routes: Partial<Record<'youtube_short' | 'tiktok' | 'instagram_reel', PromoRouteName>>
   youtubeTitle?: string
   tiktokCaption?: string
+  instagramCaption?: string
   appUrl: string
   nowLocal: string
 }
 
-const LABEL = { youtube_short: 'YouTube', tiktok: 'TikTok' } as const
+const LABEL = { youtube_short: 'YouTube', tiktok: 'TikTok', instagram_reel: 'Instagramリール' } as const
 
 function lists(routes: ApprovalMessageInput['routes']) {
   const auto = (Object.keys(routes) as Array<keyof typeof routes>).filter((c) => routes[c] && routes[c] !== 'manual').map((c) => LABEL[c])
@@ -195,7 +196,7 @@ export function approvalRequestMessages(input: ApprovalMessageInput): OwnerMessa
     `${slotText(input.entry.scheduledAt)} に出す動画です。`,
     `「${input.title}」`,
     `→ ${auto.join('・')}${past ? '（承認すると、すぐに自動で投稿します）' : '（承認すると、時間になったら自動で投稿します）'}`,
-    manual.length ? `※${manual.join('・')}はBufferにつながっていないため、時間になったらLINEで動画をお送りします（手で投稿）。` : null,
+    manual.length ? `※${manual.join('・')}は自動で出す連携がまだのため、時間になったらLINEで動画をお送りします（手で投稿）。` : null,
     '',
     '動画を見て、よければ「承認して投稿」を押してください。押さなければ投稿しません。',
     input.video.aiImages > 0 ? '※前半の絵はAIで作ったイメージです（投稿には「AIで作成」の申告を付けます）。' : null,
@@ -206,7 +207,7 @@ export function approvalRequestMessages(input: ApprovalMessageInput): OwnerMessa
   // LINE の動画は https のURLだけ（院内アプリのURLはパスワードの内側なので LINE からは読めない）
   const lineCanRead = (u: string) => /^https:\/\//.test(u) && !u.startsWith(input.appUrl)
   if (lineCanRead(input.video.url) && lineCanRead(input.video.posterUrl)) out.push({ type: 'video', originalContentUrl: input.video.url, previewImageUrl: input.video.posterUrl })
-  const texts = [input.youtubeTitle ? `【YouTube 題名】\n${input.youtubeTitle}` : null, input.tiktokCaption ? `【TikTok の文】\n${input.tiktokCaption}` : null].filter(Boolean)
+  const texts = [input.youtubeTitle ? `【YouTube 題名】\n${input.youtubeTitle}` : null, input.tiktokCaption ? `【TikTok の文】\n${input.tiktokCaption}` : null, input.instagramCaption ? `【Instagram の文】\n${input.instagramCaption}` : null].filter(Boolean)
   if (texts.length) out.push(texts.join('\n\n'))
   out.push(ownerCard('動画の確認のお願い', '承認しなかった動画は投稿しません。', approvalButtons(input)))
   return out

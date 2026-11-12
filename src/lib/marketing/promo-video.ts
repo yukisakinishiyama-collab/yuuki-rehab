@@ -9,7 +9,7 @@
  * - つないでいない媒体は、時間になったら動画と文を院長のLINEへ届けて手で投稿する（アプリの中で音楽も足せる）
  * 型の import だけにしてあるので、node で単体テストできる（tools/test-promo-video.mjs）。
  */
-import { PROMO_VIDEOS, tiktokCaption, youtubeDescription, youtubeTitle, type PromoVideo } from '../../data/promo-videos'
+import { PROMO_VIDEOS, instagramReelCaption, tiktokCaption, youtubeDescription, youtubeTitle, type PromoVideo } from '../../data/promo-videos'
 import { addDays, trackingUrl } from './autopilot-planner'
 import type { AutopilotSlot } from './autopilot-types'
 import { APP_URL, isYearEndBreak } from './gbp-seo'
@@ -18,8 +18,9 @@ import type { GeneratedContent } from './types'
 /** 動画の描き方（promo-video-render.tsx）を変えたら上げる。作りおきの動画を作り直す目印になる */
 export const PROMO_RENDER_VERSION = 2
 
-export type PromoChannel = 'youtube_short' | 'tiktok'
-export const PROMO_CHANNELS: PromoChannel[] = ['youtube_short', 'tiktok']
+/** instagram_reel は、同じ動画を Instagram のリールにも出す分（2026-11-12 院長の依頼。promoVideoId のある投稿だけ） */
+export type PromoChannel = 'youtube_short' | 'tiktok' | 'instagram_reel'
+export const PROMO_CHANNELS: PromoChannel[] = ['youtube_short', 'tiktok', 'instagram_reel']
 
 /** 投稿する曜日と時刻（日本時間。0=日 … 6=土）。2本目は perWeek が 2 のときだけ */
 export const PROMO_SLOTS: AutopilotSlot[] = [
@@ -63,7 +64,7 @@ export function isPromoJobKey(key: string): boolean {
   return key.startsWith('promo:')
 }
 
-/** 同じ動画の YouTube・TikTok のジョブをまとめる目印（promo:<週>:<番号>） */
+/** 同じ動画の YouTube・TikTok・Instagram のジョブをまとめる目印（promo:<週>:<番号>） */
 export function promoGroupKey(key: string): string | null {
   const parts = key.split(':')
   return parts[0] === 'promo' && parts.length >= 4 ? `${parts[1]}:${parts[2]}` : null
@@ -71,13 +72,13 @@ export function promoGroupKey(key: string): string | null {
 
 /** 投稿ジョブに入れる中身（題名・説明。動画そのものは投稿するときに作る／作りおきを使う） */
 export function promoContent(video: PromoVideo, channel: PromoChannel, campaign: string): GeneratedContent {
-  const source = channel === 'youtube_short' ? 'youtube' : 'tiktok'
+  const source = channel === 'youtube_short' ? 'youtube' : channel === 'tiktok' ? 'tiktok' : 'instagram'
   const url = trackingUrl(APP_URL, source, campaign)
   return {
     title: channel === 'youtube_short' ? youtubeTitle(video) : video.post.title,
     hook: video.post.subtitle,
     // そのまま貼れる形（ハッシュタグも中に入れてある）
-    body: channel === 'youtube_short' ? youtubeDescription(video, url) : tiktokCaption(video),
+    body: channel === 'youtube_short' ? youtubeDescription(video, url) : channel === 'tiktok' ? tiktokCaption(video) : instagramReelCaption(video),
     cta: { label: '予約', url },
     hashtags: [],
     imageText: video.post.title,

@@ -32,6 +32,7 @@ const SettingsSchema = z.object({
   googleSeoPerWeek: z.number().int().min(1).max(2).default(2),
   youtubeShorts: z.boolean().default(true),
   tiktokVideo: z.boolean().default(true),
+  instagramReels: z.boolean().default(true),
   promoVideoPerWeek: z.number().int().min(1).max(2).default(1),
   youtubeAudited: z.boolean().default(false),
   availabilityStory: z.boolean().default(true),
