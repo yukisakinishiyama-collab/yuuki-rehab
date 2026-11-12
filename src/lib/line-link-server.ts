@@ -4,7 +4,7 @@
 import { createHmac } from 'crypto'
 import { kvDelete, kvGet, kvList, kvSet } from '@/lib/marketing/kv-store-server'
 import { RESERVE_URL } from '@/lib/marketing/clinic'
-import { patientLinkKey, type LineLink, type LineLinkSummary } from '@/lib/line-link'
+import { isPatientNo, patientLinkKey, type LineLink, type LineLinkSummary } from '@/lib/line-link'
 
 const PREFIX = 'linelink:'
 
@@ -28,7 +28,20 @@ export async function listLineLinks(): Promise<LineLinkSummary[]> {
   return rows
     .map(({ value }) => value)
     .filter((v): v is LineLink => Boolean(v && v.key))
-    .map(({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError, notified, notifyError }) => ({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError, notified, notifyError }))
+    // 患者番号は数字のものだけを画面へ出す（古い控えには「院側手動登録」という文字が入っていることがある）
+    .map(({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError, notified, notifyError }) => ({
+      key,
+      name,
+      phone,
+      linkedAt,
+      via,
+      birthDate,
+      patientNo: isPatientNo(patientNo) ? patientNo.trim() : undefined,
+      patientNoError,
+      patientNoInvalid: Boolean(patientNo) && !isPatientNo(patientNo) ? true : undefined,
+      notified,
+      notifyError,
+    }))
     .sort((a, b) => (a.linkedAt < b.linkedAt ? 1 : -1))
 }
 
@@ -47,10 +60,25 @@ export async function fetchPatientNo(name: string, phone: string): Promise<{ pat
     const data = (await res.json().catch(() => null)) as { ok?: boolean; patientNo?: string; error?: string } | null
     if (!data) return { error: 'bad_response' }
     if (!data.ok) return { error: data.error ?? 'unknown' }
-    return { patientNo: String(data.patientNo ?? '') || undefined }
+    // 数字の番号だけを受け取る（予約システムの古い行の文字がそのまま届いたことがあるため）
+    const patientNo = String(data.patientNo ?? '').trim()
+    return isPatientNo(patientNo) ? { patientNo } : { error: 'bad_number' }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'fetch_failed' }
   }
+}
+
+/**
+ * 控えの患者番号が数字でないとき（空・「院側手動登録」など）は、予約システムからもらい直す。
+ * wrong     … まちがった番号（文字）をお知らせ済みの方（おわびと正しい番号を送るまで、控えに印を残す）
+ * corrected … その方に、いま数字の番号がある（＝おわびの文を送れる）
+ */
+export async function refreshPatientNo(link: LineLink): Promise<{ link: LineLink; wrong: boolean; corrected: boolean; refreshed: boolean }> {
+  const wrong = link.wrongNoNotified === true || (Boolean(String(link.patientNo ?? '').trim()) && !isPatientNo(link.patientNo))
+  if (isPatientNo(link.patientNo)) return { link, wrong, corrected: wrong, refreshed: false }
+  const r = await fetchPatientNo(link.name, link.phone)
+  const next: LineLink = { ...link, patientNo: r.patientNo, patientNoError: r.patientNo ? undefined : r.error, wrongNoNotified: wrong ? true : undefined }
+  return { link: next, wrong, corrected: wrong && Boolean(r.patientNo), refreshed: true }
 }
 
 /** 番号を発行できなかった理由を、患者さん向けの短い言葉に */
