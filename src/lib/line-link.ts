@@ -52,10 +52,10 @@ const PATIENT_NO_HELP = 'ネット予約の「患者番号をお持ちの方」�
 
 /**
  * 連携のお知らせ（番号つき）の文。
- * corrected … 前にまちがった番号（「院側手動登録」という文字）をお知らせしていた方へ、おわびと正しい番号を送る文（文面は、送る前に院長が確かめる）
+ * corrected … 前にまちがった番号（「院側手動登録」という文字）をお知らせしていた方へ、おわびと正しい番号を送る文（2026-11-12 院長の確認ずみの文面）
  * fallback は番号を出せなかったときの文、sign は院の名前、phone は院の電話番号
  */
-export function linkNoticeText(opts: { name: string; patientNo?: string; fallback: string; sign: string; phone?: string; corrected?: boolean }): string {
+export function linkNoticeText(opts: { name: string; patientNo?: string; fallback: string; sign: string; phone?: string; corrected?: boolean; issued?: boolean }): string {
   if (opts.corrected && isPatientNo(opts.patientNo)) {
     const contact = opts.phone ? `このLINEか、お電話（${opts.phone}）` : 'このLINE'
     return [
@@ -75,6 +75,10 @@ export function linkNoticeText(opts: { name: string; patientNo?: string; fallbac
       '',
       opts.sign,
     ].join('\n')
+  }
+  // issued … 前は番号を出せず「受付でお渡しします」とお知らせしていた方へ、番号が出せるようになったお知らせ（2026-11-12 院長の確認ずみの文面）
+  if (opts.issued && isPatientNo(opts.patientNo)) {
+    return `${opts.name}さんへ。\n${opts.sign}です。患者番号をお出しできるようになりましたので、お知らせします。\n\n患者番号：${opts.patientNo.trim()}\n${PATIENT_NO_HELP}\n\n${opts.sign}`
   }
   const numberLine = isPatientNo(opts.patientNo) ? `\n\n患者番号：${opts.patientNo.trim()}\n${PATIENT_NO_HELP}` : `\n\n${opts.fallback}`
   return `${opts.name}さんのカルテとこのLINEの連携が済みました。\n誕生日のご挨拶など、院からのお知らせをこのLINEへお送りします。${numberLine}\n\n${opts.sign}`
