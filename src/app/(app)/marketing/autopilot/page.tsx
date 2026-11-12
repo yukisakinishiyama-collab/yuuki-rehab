@@ -682,7 +682,7 @@ function SettingsPanel({
           maxLength={400}
           rows={3}
           onChange={(e) => setS({ ...s, ownerNote: e.target.value })}
-          placeholder="例: 11/3は祝日で休診です／高校サッカーの大会前なので肉離れの予防を"
+          placeholder="例: 11/3は祝日で休みです／高校サッカーの大会前なので肉離れの予防を"
           className="mt-1 w-full rounded-lg border border-slate-300 p-2"
         />
         <span className="text-xs text-slate-500">次の下書きの1本目のテーマになります（患者さんのお名前・症状などの個人情報は書かないでください）。使ったら空に戻ります。</span>

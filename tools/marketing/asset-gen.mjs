@@ -198,7 +198,7 @@ const REELS = [
     slides: [
       { kind: 'cover', kicker: 'ABOUT US', title: ['ゆうき整骨院って', 'どんなところ？'] },
       { kind: 'point', kicker: '01', title: ['国家資格者が', '丁寧に確認'], body: ['お一人おひとりの状態を', '確認してから施術します'] },
-      { kind: 'point', kicker: '02', title: ['平日は夜8時まで', '土曜も受付'], body: ['お仕事や学校帰りにも', '通いやすい診療時間です'] },
+      { kind: 'point', kicker: '02', title: ['平日は夜8時まで', '土曜も受付'], body: ['お仕事や学校帰りにも', '通いやすい施術時間です'] },
       { kind: 'point', kicker: '03', title: ['予約はネット・LINEで', 'いつでも'], body: ['24時間いつでも', 'スマホから予約できます'] },
       { kind: 'cta' },
     ],
@@ -234,7 +234,7 @@ const IMAGES = [
   { file: '画像03_捻挫は早めのケア.png', slide: { kind: 'cover', kicker: 'SPORTS', title: ['捻挫は早めの', 'ケアが大切'], body: ['応急処置から競技復帰まで', '段階的にサポートします'] } },
   { file: '画像04_初めての方へ.png', slide: { kind: 'cover', kicker: 'FIRST VISIT', title: ['初めての方へ'], body: ['丁寧なカウンセリングと説明から。', '施術内容と料金は事前にご案内します'] } },
   { file: '画像05_予約案内.png', slide: { kind: 'cta', kicker: 'RESERVATION' } },
-  { file: '画像06_診療時間.png', slide: { kind: 'cta', kicker: '診療時間のご案内' } },
+  { file: '画像06_施術時間.png', slide: { kind: 'cta', kicker: '施術時間のご案内' } },
 ]
 
 // ────────────────────────────────────────────────

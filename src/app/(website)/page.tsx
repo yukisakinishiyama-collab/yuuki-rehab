@@ -523,12 +523,12 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-12">
             <span className="text-blue-700 text-sm font-bold tracking-widest uppercase">Access</span>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">診療時間・<span className="text-blue-700">アクセス</span></h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">施術時間・<span className="text-blue-700">アクセス</span></h2>
           </div>
           <div className="grid md:grid-cols-2 gap-8 items-start">
             <div>
               <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
-                <Clock size={20} className="text-blue-700" /> 診療時間
+                <Clock size={20} className="text-blue-700" /> 施術時間
               </h3>
               <table className="w-full text-sm border-collapse mb-8">
                 <thead>
@@ -542,7 +542,7 @@ export default function HomePage() {
                   {[
                     { day: '月〜金', am: '10:00〜13:00', pm: '15:00〜20:00' },
                     { day: '土曜日', am: '10:00〜15:00', pm: '—' },
-                    { day: '日・祝日', am: '休診', pm: '休診' },
+                    { day: '日・祝日', am: '休み', pm: '休み' },
                   ].map((row, i) => (
                     <tr key={row.day} className={i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
                       <td className="py-3 px-4 font-medium text-slate-700 border-b border-slate-100">{row.day}</td>
@@ -635,7 +635,7 @@ export default function HomePage() {
               Instagramを見る
             </a>
           </div>
-          <p className="text-blue-300 text-xs mt-6">予約優先制 / 初診の方もお気軽にどうぞ</p>
+          <p className="text-blue-300 text-xs mt-6">予約優先制 / 初めての方もお気軽にどうぞ</p>
         </div>
       </section>
     </div>

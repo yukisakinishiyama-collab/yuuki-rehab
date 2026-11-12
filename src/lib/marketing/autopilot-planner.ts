@@ -216,7 +216,7 @@ export const STORY_LEVEL_LABELS: Record<StoryLevel, string> = {
   many: '空きあり',
   few: '少しあり',
   full: 'ご予約いっぱい',
-  closed: '休診',
+  closed: '休み',
 }
 
 export function storyLevel(count: number): StoryLevel {
@@ -288,7 +288,7 @@ export function storyText(
   const title = titleOverride ?? (scope === 'day' ? '本日のご予約の空き' : '今週のご予約の空き状況')
   const asOf = `${Number(asOfLocal.slice(5, 7))}/${Number(asOfLocal.slice(8, 10))} ${asOfLocal.slice(11, 16)}`
   const lines = rows.map((r) =>
-    r.closed ? `・${r.label} 休診` : `・${r.label} 午前 ${STORY_LEVEL_LABELS[r.am]}／午後 ${STORY_LEVEL_LABELS[r.pm]}`,
+    r.closed ? `・${r.label} 休み` : `・${r.label} 午前 ${STORY_LEVEL_LABELS[r.am]}／午後 ${STORY_LEVEL_LABELS[r.pm]}`,
   )
   const body = [
     `【Instagramストーリー】${title}`,
@@ -312,9 +312,9 @@ export function storyRange(
   if (range === 'today') return { scope: 'day', dates: [today], title: '本日のご予約の空き' }
   if (range === 'next') {
     const next = [...openings].filter((o) => o.date > today && !o.closed).sort((a, b) => a.date.localeCompare(b.date))[0]
-    if (!next) return { scope: 'day', dates: [], title: '次の診療日のご予約の空き' }
+    if (!next) return { scope: 'day', dates: [], title: '次の施術日のご予約の空き' }
     const tomorrow = addDays(today, 1)
-    return { scope: 'day', dates: [next.date], title: next.date === tomorrow ? '明日のご予約の空き' : '次の診療日のご予約の空き' }
+    return { scope: 'day', dates: [next.date], title: next.date === tomorrow ? '明日のご予約の空き' : '次の施術日のご予約の空き' }
   }
   // この1週間（今日から7日間の診療日。週をまたいでもよい）
   const end = addDays(today, 6)

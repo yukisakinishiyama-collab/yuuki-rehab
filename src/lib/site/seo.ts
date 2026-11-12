@@ -47,7 +47,7 @@ export function medicalClinicJsonLd(): Record<string, unknown> {
       { '@type': 'AdministrativeArea', name: '山口県' },
       { '@type': 'City', name: '北九州市' },
     ],
-    // 診療時間: 平日 午前10-13・午後15-20 / 土 10-15 / 日祝 休診
+    // 施術時間: 平日 午前10-13・午後15-20 / 土 10-15 / 日祝 休み
     openingHoursSpecification: [
       {
         '@type': 'OpeningHoursSpecification',

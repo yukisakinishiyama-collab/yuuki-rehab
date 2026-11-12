@@ -3,8 +3,8 @@ import { MapPin, Clock, Phone, Train, Car } from 'lucide-react'
 import LineQRCode from '@/components/site/LineQRCode'
 
 export const metadata: Metadata = {
-  title: 'アクセス・診療時間｜ゆうき整骨院（山口県下関市）',
-  description: '山口県下関市彦島江の浦町9丁目1-14のゆうき整骨院。アクセス・診療時間。平日10:00〜13:00・15:00〜20:00、土曜10:00〜15:00。TEL: 083-265-4545。LINE予約受付中。',
+  title: 'アクセス・施術時間｜ゆうき整骨院（山口県下関市）',
+  description: '山口県下関市彦島江の浦町9丁目1-14のゆうき整骨院。アクセス・施術時間。平日10:00〜13:00・15:00〜20:00、土曜10:00〜15:00。TEL: 083-265-4545。LINE予約受付中。',
 }
 
 const hours = [
@@ -14,8 +14,8 @@ const hours = [
   { day: '木曜日', am: '10:00〜13:00', pm: '15:00〜20:00', open: true },
   { day: '金曜日', am: '10:00〜13:00', pm: '15:00〜20:00', open: true },
   { day: '土曜日', am: '10:00〜15:00', pm: '—', open: true },
-  { day: '日曜日', am: '休診', pm: '休診', open: false },
-  { day: '祝日', am: '休診', pm: '休診', open: false },
+  { day: '日曜日', am: '休み', pm: '休み', open: false },
+  { day: '祝日', am: '休み', pm: '休み', open: false },
 ]
 
 export default function AccessPage() {
@@ -24,7 +24,7 @@ export default function AccessPage() {
       <section className="bg-gradient-to-br from-navy to-blue-800 py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 text-center">
           <span className="text-blue-300 text-sm font-bold tracking-widest uppercase">Access</span>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mt-2 mb-4">アクセス・診療時間</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-white mt-2 mb-4">アクセス・施術時間</h1>
           <p className="text-blue-100">山口県下関市のゆうき整骨院へのアクセス情報です</p>
         </div>
       </section>
@@ -67,7 +67,7 @@ export default function AccessPage() {
               {/* Hours */}
               <div>
                 <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                  <Clock size={22} className="text-blue-700" /> 診療時間
+                  <Clock size={22} className="text-blue-700" /> 施術時間
                 </h2>
                 <div className="border border-slate-100 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
@@ -92,7 +92,7 @@ export default function AccessPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-slate-400 text-xs mt-2">※ 祝日の診療は変更になる場合があります</p>
+                <p className="text-slate-400 text-xs mt-2">※ 祝日の施術時間は変更になる場合があります</p>
               </div>
 
               {/* Access Notes */}
@@ -156,7 +156,7 @@ export default function AccessPage() {
           <h2 className="text-2xl font-bold text-white mb-3">ご予約はLINEが便利です</h2>
           <p className="text-blue-200 mb-8 text-sm">
             LINEからご予約・お問い合わせいただけます。<br />
-            24時間受付（返信は診療時間内）
+            24時間受付（返信は施術時間内）
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
             <LineQRCode />

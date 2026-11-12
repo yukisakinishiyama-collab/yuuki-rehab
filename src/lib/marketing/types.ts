@@ -39,7 +39,7 @@ export const OBJECTIVES = [
   '認知拡大',
   '専門性の説明',
   '既存患者への案内',
-  '営業時間変更・休診案内',
+  '営業時間変更・休みのご案内',
   '料金案内',
   '症例・リハビリ解説',
   '論文解説',
@@ -210,7 +210,7 @@ export interface ClinicProfile {
   name: string
   address: string
   phone: string
-  /** 診療時間外・急ぎの連絡用の直通番号（LINE緊急応答で案内）。空なら案内しない */
+  /** 施術時間外・急ぎの連絡用の直通番号（LINE緊急応答で案内）。空なら案内しない */
   emergencyPhone?: string
   hours: string
   closedDays: string
