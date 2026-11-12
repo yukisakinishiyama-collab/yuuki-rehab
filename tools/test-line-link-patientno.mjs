@@ -1,6 +1,6 @@
 // カルテ連携の患者番号：数字だけを番号として扱う・まちがった番号を送っていた方への送り直しの文（数字・名前はすべて架空）
 // 実行: npx tsx tools/test-line-link-patientno.mjs
-import { isPatientNo, linkNoticeText, PATIENT_NO_CORRECTION } from '../src/lib/line-link.ts'
+import { isPatientNo, linkNoticeText } from '../src/lib/line-link.ts'
 import fs from 'node:fs'
 
 let passed = 0
@@ -19,12 +19,17 @@ console.log('\n【お知らせの文】')
 const base = { name: '試験 花子', fallback: '番号は受付でお渡しします（いまは発行できませんでした）', sign: 'ゆうき整骨院' }
 const normal = linkNoticeText({ ...base, patientNo: '28' })
 check('ふつうのお知らせ：連携が済みました＋番号', normal.startsWith('試験 花子さんのカルテとこのLINEの連携が済みました。') && normal.includes('\n\n患者番号：28\n') && normal.endsWith('\n\nゆうき整骨院'), normal)
-check('ふつうのお知らせに「誤り」の文は入らない', !normal.includes('誤り'))
-const fixed = linkNoticeText({ ...base, patientNo: '28', corrected: true })
-check('送り直し：誤りがありました＋正しい番号', fixed.startsWith(`試験 花子さんへ。${PATIENT_NO_CORRECTION}`) && fixed.includes('\n\n患者番号：28\n') && fixed.includes('電話番号の下4桁') && fixed.endsWith('\n\nゆうき整骨院'), fixed)
+check('ふつうのお知らせに、おわびの文は入らない', !normal.includes('誤って') && !normal.includes('申し訳'))
+const fixed = linkNoticeText({ ...base, patientNo: '28', phone: '083-000-0000', corrected: true })
+check('送り直し：お名前（様）と院名から始まる', fixed.startsWith('試験 花子様\n\nゆうき整骨院です。\n'), fixed)
+check('送り直し：誤りを伝えて、おわびする', fixed.includes('患者番号を誤ってお伝えしておりました。') && fixed.includes('誠に申し訳ございません。'), fixed)
+check('送り直し：正しい番号と使い方', fixed.includes('\n患者番号：28\n') && fixed.includes('電話番号の下4桁'), fixed)
+check('送り直し：問い合わせ先（LINEか電話）と院名で終わる', fixed.includes('このLINEか、お電話（083-000-0000）でお知らせください。') && fixed.endsWith('\n\nゆうき整骨院'), fixed)
 check('送り直しの文に「連携が済みました」は重ねない', !fixed.includes('連携が済みました'))
+check('送り直しの文は、LINEの1通（5000字）に十分おさまる', fixed.length < 600, fixed.length)
+check('電話番号が無くても文になる', linkNoticeText({ ...base, patientNo: '28', corrected: true }).includes('このLINEでお知らせください。'))
 const none = linkNoticeText({ ...base, patientNo: '院側手動登録', corrected: true })
-check('数字でない番号は、文に出さない（受付でお渡しします、にする）', !none.includes('院側手動登録') && !none.includes('患者番号：') && none.includes(base.fallback) && !none.includes('誤り'), none)
+check('数字でない番号は、文に出さない（受付でお渡しします、にする）', !none.includes('院側手動登録') && !none.includes('患者番号：') && none.includes(base.fallback) && !none.includes('誤って'), none)
 const empty = linkNoticeText({ ...base, patientNo: undefined })
 check('番号が無いときも今までどおりの文', empty.includes(base.fallback) && !empty.includes('患者番号：'), empty)
 check('言い切り・誇張の言葉が無い', !/絶対|必ず治|No\.?1|最安|医師が推薦/.test(normal + fixed))

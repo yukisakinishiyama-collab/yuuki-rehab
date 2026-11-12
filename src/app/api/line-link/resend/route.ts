@@ -6,7 +6,7 @@
  *          どちらも無ければ「送れたことが確かめられていない方」全員に送る
  *          （notified が true の方には送らない。同じ方に二重に送らないため）
  *          控えの患者番号が数字でない方は、送る前に予約システムから番号をもらい直す。
- *          前に文字（「院側手動登録」）を番号としてお知らせしていた方には「誤りがありました」から書き出す
+ *          前に文字（「院側手動登録」）を番号としてお知らせしていた方には、おわびと正しい番号の文を送る
  * 送った結果は連携の記録（notified / notifyError）に残す。
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 function noticeText(name: string, patientNo: string | undefined, patientNoError: string | undefined, corrected = false): string {
-  return linkNoticeText({ name, patientNo, fallback: patientNoErrorText(patientNoError), sign: DEFAULT_CLINIC_PROFILE.name, corrected })
+  return linkNoticeText({ name, patientNo, fallback: patientNoErrorText(patientNoError), sign: DEFAULT_CLINIC_PROFILE.name, phone: DEFAULT_CLINIC_PROFILE.phone, corrected })
 }
 
 async function targets(keys: string[] | undefined, all = false) {
