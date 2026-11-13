@@ -11,17 +11,21 @@
  * 4. 「印刷する」で院保管用と患者様控えの2部（控えだけ・白紙も印刷できる）
  * 会員プランの書類（入会・休会・解約）に署名すると、会員の状態と日付（最低利用期間・契約終了日）が自動で変わる。
  * 兄弟・親子プラン（2名まで）は契約者（代表）のカルテで手続きし、もう1名の方のカルテにも会員の状態が出る。
+ * 「会員プランのご案内」（患者様にお見せする説明。MemberPlanGuide.tsx）もここから開く。最後のページから入会の契約書へ進める。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { nanoid } from 'nanoid'
-import { CheckCircle2, ChevronLeft, CloudUpload, FileDown, FileSignature, Printer } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, CloudUpload, FileDown, FileSignature, Presentation, Printer } from 'lucide-react'
 import type { Patient } from '@/types/patient'
-import type { ContractRecord, MemberStatus } from '@/types/contracts'
+import type { ContractRecord, MemberPlan, MemberStatus } from '@/types/contracts'
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templates'
 import { parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
 import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
 import { CLINIC_STAFF } from '@/data/clinic-staff'
+import { Button } from '@/components/ui/button'
+import { cardSurface } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { dropPending, getPendingContracts, keepPending, sendContract, sendErrorText, type PendingContract } from '@/lib/contracts/send'
 import { buildContractPdfFile, isStandaloneApp, shareOrOpenPdf } from '@/lib/contracts/share-pdf'
 import {
@@ -43,6 +47,7 @@ import { printPages, printSigned, signatureBlockHtml, copyPage } from '@/lib/con
 import { addContract, voidContract } from '@/lib/contracts/store'
 import { fingerprint } from '@/lib/sync-merge'
 import ContractDocument from './ContractDocument'
+import MemberPlanGuide from './MemberPlanGuide'
 import SignaturePad from './SignaturePad'
 
 const STAFF_NAME_KEY = 'contractStaffName'
@@ -81,7 +86,11 @@ export function MemberStatusBadge({ status }: { status: MemberStatus }) {
   )
 }
 
-type View = { kind: 'list' } | { kind: 'doc'; tpl: ContractTemplate } | { kind: 'done'; record: ContractRecord; html: string }
+type View =
+  | { kind: 'list' }
+  /** plan：会員プランのご案内で選んだ種別（入会の契約書を、その種別を選んだ状態で開く） */
+  | { kind: 'doc'; tpl: ContractTemplate; plan?: MemberPlan }
+  | { kind: 'done'; record: ContractRecord; html: string }
 
 export default function ContractsTab({
   patient,
@@ -97,12 +106,17 @@ export default function ContractsTab({
 }) {
   const today = jstToday()
   const [view, setView] = useState<View>({ kind: 'list' })
+  /** 会員プランのご案内（患者様にお見せする説明）を開いている */
+  const [guideOpen, setGuideOpen] = useState(false)
   /** この方ご自身の契約からの状態（休会・解約の書類の計算に使う） */
   const ownStatus = useMemo(() => memberStatusOf(contracts, today), [contracts, today])
   /** 画面に出す状態（兄弟・親子プランのもう1名なら、代表の方の契約から） */
   const status = useMemo(() => memberStatusForPatient(patient.id, allContracts ?? contracts, today), [patient.id, allContracts, contracts, today])
   const active = contracts.filter((c) => !c.voided)
   const lastSigned = (id: string) => active.find((c) => c.docId === id)
+  /** まだ会員プランの手続きが無い（ご案内の最後から、入会の契約書へ進める） */
+  const canJoin = status.state === 'none' || status.state === 'ended'
+  const joinTemplate = CONTRACT_TEMPLATES.find((t) => t.member === 'join')
 
   if (view.kind === 'doc') {
     return (
@@ -113,6 +127,7 @@ export default function ContractsTab({
         contracts={contracts}
         status={ownStatus}
         covered={status.via ? status : undefined}
+        initialPlan={view.plan}
         today={today}
         onBack={() => setView({ kind: 'list' })}
         onDone={(record, html) => {
@@ -199,6 +214,31 @@ export default function ContractsTab({
       )}
 
       <PendingList patientId={patient.id} onUpdate={onUpdate} />
+
+      {/* 会員プランのご案内（患者様にお見せする説明） */}
+      <section className={cn(cardSurface, 'flex flex-wrap items-center gap-3 p-4')}>
+        <div className="min-w-0 flex-1 basis-64">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <Presentation className="h-4 w-4 shrink-0 text-teal-700" aria-hidden />
+            会員プランのご案内（患者様にお見せする説明）
+          </h3>
+          <p className="mt-1 text-xs text-slate-600">
+            プランの内容・料金・都度払いとの費用の比較・契約前の確認を、画面いっぱいに出します。開いている間、カルテの内容は見えません。
+          </p>
+        </div>
+        <Button onClick={() => setGuideOpen(true)}>ご案内を開く</Button>
+      </section>
+      {guideOpen && (
+        <MemberPlanGuide
+          patientName={patient.name}
+          canJoin={canJoin && Boolean(joinTemplate)}
+          onClose={() => setGuideOpen(false)}
+          onOpenContract={(plan) => {
+            setGuideOpen(false)
+            if (joinTemplate) setView({ kind: 'doc', tpl: joinTemplate, plan })
+          }}
+        />
+      )}
 
       {/* 書類をえらぶ */}
       <section>
@@ -538,6 +578,7 @@ function SignFlow({
   contracts,
   status,
   covered,
+  initialPlan,
   today,
   onBack,
   onDone,
@@ -548,6 +589,8 @@ function SignFlow({
   status: MemberStatus
   /** 兄弟・親子プランのもう1名として登録されているときの状態 */
   covered?: MemberStatus
+  /** 会員プランのご案内で選んだ種別（無ければ一般会員から） */
+  initialPlan?: MemberPlan
   today: string
   onBack: () => void
   onDone: (record: ContractRecord, html: string) => void
@@ -573,7 +616,7 @@ function SignFlow({
   const [sigGuardian, setSigGuardian] = useState<string | null>(null)
   const [sigStaff, setSigStaff] = useState<string | null>(null)
   const [member, setMember] = useState<MemberInput>(() => ({
-    plan: '一般会員',
+    plan: initialPlan ?? '一般会員',
     start: today,
     partnerName: '',
     partnerRelation: '',
