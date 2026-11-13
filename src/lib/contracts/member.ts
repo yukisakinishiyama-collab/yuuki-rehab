@@ -222,8 +222,8 @@ export function buildMemberEvent(
   }
 }
 
-/** 印刷・保存に入れる「会員の手続き」の枠 */
-export function memberEventHtml(ev: MemberEvent, before: MemberStatus): string {
+/** 会員の手続きの中身（見出しと値の組）。書類の頭の「ご契約内容」の枠（summary.ts）と、下の memberEventHtml で使う */
+export function memberEventRows(ev: MemberEvent, before: MemberStatus): Array<[string, string]> {
   const rows: Array<[string, string]> = []
   if (ev.kind === 'join' && ev.start && ev.plan) {
     rows.push(['会員の種別', `${ev.plan}（${MEMBER_FEES[ev.plan]}）`])
@@ -259,6 +259,12 @@ export function memberEventHtml(ev: MemberEvent, before: MemberStatus): string {
       ])
     }
   }
+  return rows
+}
+
+/** 印刷・保存に入れる「会員の手続き」の枠（2026-11-13 までの書類の形。いまは書類の頭の「ご契約内容」の枠に入れる） */
+export function memberEventHtml(ev: MemberEvent, before: MemberStatus): string {
+  const rows = memberEventRows(ev, before)
   if (rows.length === 0) return ''
   const title = ev.kind === 'join' ? '会員プランの入会（院の記録）' : ev.kind === 'pause' ? '会員プランの休会（院の記録）' : '会員プランの解約（院の記録）'
   return `<div class="member-box"><h3>${escapeHtml(title)}</h3><table>${rows
