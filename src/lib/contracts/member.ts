@@ -232,7 +232,7 @@ export function memberEventHtml(ev: MemberEvent, before: MemberStatus): string {
         'もう1名の利用者',
         `${ev.partner.name}（${ev.partner.relation ?? ''}${ev.partner.birthDate ? `・${jaDate(ev.partner.birthDate)}生` : ''}）`,
       ])
-      rows.push(['1部位施術料', '来院した方ごと・施術した部位ごとに1,000円'])
+      rows.push(['1部位施術料', '来院した方ごと・施術した部位ごとに1,500円（健康保険を使わない場合）'])
     }
     rows.push(['利用開始日（最初の決済日）', jaDate(ev.start)])
     rows.push(['最低利用期間の満了日', jaDate(minEndOf(ev.start))])
