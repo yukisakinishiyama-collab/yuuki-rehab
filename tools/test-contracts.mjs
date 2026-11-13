@@ -188,7 +188,9 @@ test('書類の文面：兄弟・親子プランの欄と、休会・解約・�
   assert.match(get('member-contract').body, /3名以上での利用や、届け出た方以外の利用はできません/)
   for (const id of ['member-pause', 'member-cancel']) assert.match(get(id).body, /□ 兄弟・親子プラン（月額30,000円・2名分）/)
   assert.match(get('fee-cancel-policy').body, /\| 兄弟・親子プラン（2名まで・月額） \| 30,000円 \|/)
-  for (const id of ['member-contract', 'member-pause', 'member-cancel', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-11.2')
+  for (const id of ['member-pause', 'member-cancel']) assert.equal(get(id).version, '2026-11-11.2')
+  // 1部位施術料を 1,500円（保険を併用する日は 1,000円＋窓口料金）にした版
+  for (const id of ['member-contract', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-13')
   // もう1名の欄（氏名・生年月日・続柄・目的）は4つの記入欄、確認のチェックは5つ
   const body = get('member-contract').body
   const start = body.indexOf('### 兄弟・親子プランを申し込む場合')
