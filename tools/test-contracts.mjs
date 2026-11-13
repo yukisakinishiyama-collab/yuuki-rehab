@@ -343,4 +343,161 @@ test('入会書の「□ 申し込む」で会員の種別、休会届の「□ 
   assert.equal(autofill.schoolOf({ occupation: '会社員' }), '')
 })
 
+// ── 書類の頭の「ご契約内容」の枠（2026-11-13 院長の依頼：プリントで契約内容が分かるように・患者様控えにも直筆の署名） ──
+const summary = await import(new URL('src/lib/contracts/summary.ts', root).href)
+const { signatureBlockHtml } = await import(new URL('src/lib/contracts/print.ts', root).href)
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+/** 入会の書類に署名したときと同じ材料を作る（数字・名前は架空） */
+function signedJoin({ plan = '一般会員', partner, guardian, freq = ['週2回'], purpose = '右膝（ACL術後）', school = '' } = {}) {
+  const { t, p } = tplOf('member-contract')
+  const described = autofill.describeTemplate(p)
+  const checks = Array(p.checkCount).fill(false)
+  const values = Array(p.blankCount).fill('')
+  for (const c of described.checks) {
+    if (autofill.planOfCheck(c) === plan) checks[c.i] = true
+    if (c.section.includes('通院頻度') && freq.some((f) => c.after.startsWith(f))) checks[c.i] = true
+  }
+  for (const b of described.blanks) {
+    if (b.label === '主な目的・部位' && !b.row) values[b.i] = purpose
+    if (b.label === '学校名') values[b.i] = school
+    if (b.label === 'その他' && b.section.includes('通院頻度')) values[b.i] = '月2回'
+  }
+  const record = {
+    id: 'ctest1', patientId: 'p1', docId: t.id, title: t.title, version: t.version, bodyHash: 'h', signedAt: '2026-11-20T01:00:00Z', signedDate: '2026-11-20',
+    patientName: '試験 太郎', guardianName: guardian?.name, relation: guardian?.relation, staffLabel: t.staffLabel, staffName: '担当 花子', checked: 1, written: 1,
+    member: { kind: 'join', plan, start: '2026-11-20', partner },
+  }
+  const signatures = [
+    { label: '患者様', name: record.patientName, image: PNG },
+    ...(guardian ? [{ label: `保護者（${guardian.relation}）`, name: guardian.name, image: PNG }] : []),
+    { label: t.staffLabel, name: record.staffName, image: PNG },
+  ]
+  const before = { state: 'none', label: '', pausedMonths: 0 }
+  const box = summary.contractSummaryHtml({ record, before, parsed: p, described, checks, values, signatures })
+  const doc = renderTemplateHtml(p, checks, values)
+  const html =
+    summary.insertSummary(doc, box) +
+    signatureBlockHtml({ date: record.signedDate, patientName: record.patientName, guardianName: record.guardianName, relation: record.relation, staffLabel: t.staffLabel, staffName: record.staffName, sigPatient: PNG, sigGuardian: guardian ? PNG : null, sigStaff: PNG })
+  return { t, p, described, checks, values, record, box, doc, html }
+}
+const rowOf = (box, head) => (new RegExp(`<tr><th>${head.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</th><td>([^<]*)</td></tr>`).exec(box) ?? [])[1]
+
+test('ご契約内容の枠：だれが・どのプランを・いくらで・いつから、が1つの枠で分かる', () => {
+  const { box, t } = signedJoin()
+  assert.match(box, /^<div class="contract-summary"><h3>ご契約内容<\/h3>/)
+  assert.equal(rowOf(box, 'ご契約者'), '試験 太郎 様')
+  assert.equal(rowOf(box, 'プラン'), '一般会員')
+  assert.equal(rowOf(box, '月額料金'), '23,000円（税込）')
+  // 1部位施術料は、文面の表の行と同じ見出し・同じ金額（別の数字を持たない）
+  const fee = summary.visitFeeOf(parseTemplate(t.body))
+  assert.ok(fee && fee.label.startsWith('来院ごとの1部位施術料') && /^[\d,]+円$/.test(fee.amount), JSON.stringify(fee))
+  assert.equal(rowOf(box, fee.label), fee.amount)
+  assert.ok(t.body.includes(`| ${fee.label} | ${fee.amount} |`))
+  assert.equal(rowOf(box, '利用開始日（最初の決済日）'), '2026年11月20日')
+  assert.equal(rowOf(box, '最低利用期間'), '利用開始日から3か月（2027年2月19日まで）')
+  assert.equal(rowOf(box, '満了後'), '解約のお申し出がない場合は、1か月ごとに自動更新')
+  assert.equal(rowOf(box, 'お支払い'), 'クレジットカード決済（毎月の決済日に月額料金）')
+  assert.equal(rowOf(box, '通院頻度の目安（開始時）'), '週2回')
+  assert.equal(rowOf(box, '主な目的・部位'), '右膝（ACL術後）')
+  assert.equal(rowOf(box, '解約するとき'), '解約届を15日までに提出すると当月末、16日以降は翌月末で終了')
+  assert.equal(rowOf(box, 'ご署名日'), '2026年11月20日')
+  // 枠の言い方は、文面の条件と同じ（最低3か月・カード決済・15日）
+  assert.ok(t.body.includes('最低利用期間は、利用開始日から3か月間です') && t.body.includes('お支払いはクレジットカード決済のみです') && t.body.includes('解約希望月の15日までに提出：当月末で契約終了'))
+})
+
+test('ご契約内容の枠：直筆の署名（患者様・保護者・担当者）が並ぶ。おかしな画像は入れない', () => {
+  const { box } = signedJoin({ guardian: { name: '試験 花子', relation: '母' } })
+  assert.equal(rowOf(box, 'ご契約者'), '試験 太郎 様（保護者：試験 花子・母）')
+  const sigs = [...box.matchAll(/<div class="sum-sig"><span>([^<]*)<\/span>(<img src="data:image\/png;base64,[A-Za-z0-9+\/=]+" alt="[^"]*">)?<\/div>/g)]
+  assert.deepEqual(sigs.map((m) => m[1]), ['患者様：試験 太郎', '保護者（母）：試験 花子', '説明担当者：担当 花子'])
+  assert.ok(sigs.every((m) => m[2]), '3人とも署名の画像がある')
+  const bad = summary.summaryBoxHtml('ご契約内容', [['a', 'b']], [{ label: '患者様', name: '<b>x</b>', image: 'javascript:alert(1)' }, { label: '担当', name: 'y', image: 'data:image/svg+xml;base64,AAAA' }])
+  assert.ok(!bad.includes('<img') && !bad.includes('javascript:') && bad.includes('&lt;b&gt;x&lt;/b&gt;'))
+  assert.equal(summary.summaryBoxHtml('ご契約内容', [], []), '')
+})
+
+test('ご契約内容の枠：学生会員は学校名、兄弟・親子プランはもう1名と「来院した方ごと」、その他の頻度は書いた内容', () => {
+  const st = signedJoin({ plan: '学生会員', school: '試験中学校', freq: ['その他'] })
+  assert.equal(rowOf(st.box, 'プラン'), '学生会員（学校名：試験中学校）')
+  assert.equal(rowOf(st.box, '月額料金'), '19,000円（税込）')
+  assert.equal(rowOf(st.box, '通院頻度の目安（開始時）'), 'その他（月2回）')
+  const pair = signedJoin({ plan: '兄弟・親子プラン', partner: { name: '試験 次郎', relation: '弟', birthDate: '2012-04-01' }, freq: [] })
+  assert.equal(rowOf(pair.box, '月額料金'), '30,000円・2名まで（税込）')
+  assert.equal(rowOf(pair.box, 'もう1名の利用者'), '試験 次郎 様（弟・2012年4月1日生）')
+  const fee = summary.visitFeeOf(pair.p)
+  assert.equal(rowOf(pair.box, fee.label), `${fee.amount}（来院した方ごと・施術した部位ごと）`)
+  assert.equal(rowOf(pair.box, '通院頻度の目安（開始時）'), undefined, 'チェックが無ければ行を出さない')
+})
+
+test('ご契約内容の枠：書類の題名のすぐ下（最初の見出しの前）に入る。本文と署名欄はそのまま残る', () => {
+  const { html, doc, box } = signedJoin()
+  const at = html.indexOf('<div class="contract-summary">')
+  assert.ok(at > html.indexOf('<h2 class="doc-title">') && at > html.indexOf('doc-note') && at < html.indexOf('<h3>1. 会員プランの目的</h3>'))
+  assert.equal(html.replace(`${box}\n`, '').startsWith(doc), true, '枠を外すと、もとの本文と同じ')
+  assert.ok(html.includes('<h3>署名欄</h3><table class="sigtable">'))
+  assert.ok(!html.includes('member-box'), '下の「院の記録」の枠は、上の枠にまとめた')
+  assert.equal(summary.hasContractSummary(html), true)
+  assert.equal(summary.insertSummary('<p>x</p>', '<div>b</div>'), '<div>b</div><p>x</p>')
+  assert.equal(summary.insertSummary(doc, ''), doc)
+})
+
+test('休会届・解約届にも、同じ形の枠（休会の内容・解約の内容）', () => {
+  const before = { state: 'active', label: '会員', plan: '一般会員', start: '2026-08-01', minEnd: '2026-10-31', pausedMonths: 0 }
+  const base = { id: 'c2', patientId: 'p1', title: '', version: '', bodyHash: 'h', signedAt: '', signedDate: '2026-11-16', patientName: '試験 太郎', staffLabel: '受付担当者', staffName: '担当 花子', checked: 0, written: 0 }
+  const mk = (docId, m) => {
+    const { p } = tplOf(docId)
+    const described = autofill.describeTemplate(p)
+    return summary.contractSummaryHtml({ record: { ...base, docId, member: m }, before, parsed: p, described, checks: Array(p.checkCount).fill(false), values: Array(p.blankCount).fill(''), signatures: [{ label: '患者様', name: '試験 太郎', image: PNG }] })
+  }
+  const pause = mk('member-pause', { kind: 'pause', pauseFrom: '2026-12', pauseMonths: 2 })
+  assert.match(pause, /<h3>休会の内容<\/h3>/)
+  assert.equal(rowOf(pause, '休会の期間'), '2026年12月から2か月（請求を止める月：2026年12月〜）')
+  assert.equal(rowOf(pause, '再開予定月'), '2027年2月')
+  const cancel = mk('member-cancel', { kind: 'cancel', submitted: '2026-11-16', end: '2026-12-31' })
+  assert.match(cancel, /<h3>解約の内容<\/h3>/)
+  assert.equal(rowOf(cancel, '契約終了日'), '2026年12月31日（16日以降の提出のため翌月末）')
+  assert.equal(rowOf(cancel, 'ご契約者'), '試験 太郎 様')
+  // 会員の書類でなければ、枠は作らない
+  const { p } = tplOf('fee-cancel-policy')
+  assert.equal(summary.contractSummaryHtml({ record: { ...base, docId: 'fee-cancel-policy' }, before, parsed: p, described: autofill.describeTemplate(p), checks: [], values: [], signatures: [] }), '')
+})
+
+test('前に署名した入会の書類（枠なし）：見るとき・印刷するときにだけ、同じ形の枠を足す。保存した本文は変えない', () => {
+  const { t, p, checks, values, record } = signedJoin({ guardian: { name: '試験 花子', relation: '母' } })
+  // 2026-11-13 より前の形：下に「院の記録」の枠、上の枠は無い
+  const old =
+    renderTemplateHtml(p, checks, values) +
+    member.memberEventHtml(record.member, { state: 'none', label: '', pausedMonths: 0 }) +
+    signatureBlockHtml({ date: record.signedDate, patientName: record.patientName, guardianName: record.guardianName, relation: record.relation, staffLabel: t.staffLabel, staffName: record.staffName, sigPatient: PNG, sigGuardian: PNG, sigStaff: PNG })
+  const keep = old
+  const shown = summary.withContractSummary(old, record)
+  assert.equal(old, keep)
+  assert.equal(summary.hasContractSummary(old), false)
+  assert.equal(summary.hasContractSummary(shown), true)
+  const box = shown.slice(shown.indexOf('<div class="contract-summary">'), shown.indexOf('<h3>1. 会員プランの目的</h3>'))
+  assert.equal(rowOf(box, 'プラン'), '一般会員')
+  assert.equal(rowOf(box, '利用開始日（最初の決済日）'), '2026年11月20日')
+  const fee = summary.visitFeeOf(p)
+  assert.equal(rowOf(box, fee.label), fee.amount, '施術料は、保存した本文に書いてある金額')
+  assert.deepEqual(summary.signaturesFromHtml(old).map((s) => `${s.label}：${s.name}：${s.image ? '署名あり' : 'なし'}`), ['患者様：試験 太郎：署名あり', '保護者（母）：試験 花子：署名あり', '説明担当者：担当 花子：署名あり'])
+  assert.equal((box.match(/<img /g) ?? []).length, 3)
+  // 枠を外すと、保存した本文と同じ。もう一度かけても増えない
+  assert.equal(shown.replace(/<div class="contract-summary">[\s\S]*?<\/p><\/div>\n/, ''), old)
+  assert.equal(summary.withContractSummary(shown, record), shown)
+  // 会員の書類でないもの・休会届は、そのまま
+  assert.equal(summary.withContractSummary('<p>x</p>', { ...record, member: undefined }), '<p>x</p>')
+  assert.equal(summary.withContractSummary('<p>x</p>', { ...record, member: { kind: 'pause', pauseFrom: '2026-12', pauseMonths: 1 } }), '<p>x</p>')
+})
+
+test('一覧の1行と、画面に出す前の確認', () => {
+  const { record, html } = signedJoin({ plan: '兄弟・親子プラン', partner: { name: '試験 次郎', relation: '弟' } })
+  assert.equal(summary.memberLineOf(record), '兄弟・親子プラン（月額30,000円・2名まで）・もう1名：試験 次郎さん・利用開始 2026年11月20日・最低利用期間 2027年2月19日まで')
+  assert.equal(summary.memberLineOf({ ...record, member: { kind: 'pause', pauseFrom: '2026-12', pauseMonths: 2 } }), '休会：2026年12月から2か月')
+  assert.equal(summary.memberLineOf({ ...record, member: { kind: 'cancel', submitted: '2026-11-16', end: '2026-12-31' } }), '解約：契約終了日 2026年12月31日')
+  assert.equal(summary.memberLineOf({ ...record, member: undefined }), '')
+  assert.equal(summary.isSafeContractHtml(html), true)
+  for (const bad of ['<script>alert(1)</script>', '<img src="x" onerror="a()">', '<a href="javascript:a()">x</a>', '<iframe src="x"></iframe>']) assert.equal(summary.isSafeContractHtml(bad), false, bad)
+})
+
 console.log(`\n${passed} 件 OK`)

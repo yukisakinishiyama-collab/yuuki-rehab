@@ -214,8 +214,8 @@ export const CONTRACT_PRINT_CSS = `
 .contract-paper .doc-title{font-size:14.5pt;text-align:center;margin:0 0 4pt;font-weight:700}
 .contract-paper .doc-clinic{text-align:center;margin:0 0 6pt}
 .contract-paper .doc-note{font-size:9pt;color:#333;margin:2pt 0 6pt}
-.contract-paper h3{font-size:11pt;margin:10pt 0 3pt;border-bottom:1px solid #999;padding-bottom:1pt;break-after:avoid}
-.contract-paper h4{font-size:10.5pt;margin:7pt 0 2pt;break-after:avoid}
+.contract-paper h3{font-size:11pt;font-weight:700;margin:10pt 0 3pt;border-bottom:1px solid #999;padding-bottom:1pt;break-after:avoid}
+.contract-paper h4{font-size:10.5pt;font-weight:700;margin:7pt 0 2pt;break-after:avoid}
 .contract-paper p{margin:3pt 0}
 .contract-paper ul{margin:2pt 0 2pt 14pt;padding:0}
 .contract-paper table{border-collapse:collapse;width:100%;margin:4pt 0;break-inside:avoid}
@@ -225,6 +225,16 @@ export const CONTRACT_PRINT_CSS = `
 .contract-paper .fill{border-bottom:1px solid #222;padding:0 3pt}
 .contract-paper .member-box{border:1.5px solid #111;padding:6pt 8pt;margin:10pt 0;break-inside:avoid}
 .contract-paper .member-box h3{margin-top:0}
+.contract-paper .contract-summary{border:2px solid #111;padding:7pt 9pt 6pt;margin:8pt 0 10pt;break-inside:avoid}
+.contract-paper .contract-summary h3{margin:0 0 3pt;border:0;padding:0;font-size:12.5pt}
+.contract-paper .contract-summary table{margin:2pt 0}
+.contract-paper .contract-summary th{width:36%}
+.contract-paper .contract-summary td{font-weight:700}
+.contract-paper .contract-summary .sum-sigs{display:flex;gap:6pt;margin-top:5pt}
+.contract-paper .contract-summary .sum-sig{flex:1 1 0;min-width:0;border:1px solid #555;padding:2pt 5pt;font-size:8.5pt}
+.contract-paper .contract-summary .sum-sig span{display:block}
+.contract-paper .contract-summary .sum-sig img{height:34pt;max-width:100%;display:block}
+.contract-paper .contract-summary .sum-note{font-size:8pt;color:#444;margin:4pt 0 0}
 .contract-paper .sig img{height:46pt;max-width:100%;display:block}
 .contract-paper .sigtable th{width:30%}
 .contract-paper .meta{margin-top:8pt;font-size:7.5pt;color:#555}
