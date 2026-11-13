@@ -151,7 +151,8 @@ test('兄弟・親子プラン：もう1名の名前と続柄が要る・印刷�
   const html = member.memberEventHtml(ok.event, { state: 'none', label: '', pausedMonths: 0 })
   assert.match(html, /兄弟・親子プラン（月額30,000円・2名まで）/)
   assert.match(html, /山田 次郎（弟・2012年4月1日生）/)
-  assert.match(html, /来院した方ごと/)
+  assert.match(html, /来院した方ごと・施術した部位ごとに1,500円（健康保険を使わない場合）/)
+  assert.ok(!html.includes('1,000円'))
 })
 
 test('兄弟・親子プラン：もう1名の方のカルテにも、代表の方の契約から状態が出る', () => {
@@ -188,7 +189,18 @@ test('書類の文面：兄弟・親子プランの欄と、休会・解約・�
   assert.match(get('member-contract').body, /3名以上での利用や、届け出た方以外の利用はできません/)
   for (const id of ['member-pause', 'member-cancel']) assert.match(get(id).body, /□ 兄弟・親子プラン（月額30,000円・2名分）/)
   assert.match(get('fee-cancel-policy').body, /\| 兄弟・親子プラン（2名まで・月額） \| 30,000円 \|/)
-  for (const id of ['member-contract', 'member-pause', 'member-cancel', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-11.2')
+  for (const id of ['member-pause', 'member-cancel']) assert.equal(get(id).version, '2026-11-11.2')
+  // 2026-11-13 会員プランの1部位施術料を 1,000円 → 1,500円（健康保険を使わない場合）に（院長の指示）。文面が変わったので版も変える
+  for (const id of ['member-contract', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-13')
+  assert.match(get('member-contract').body, /\| 来院ごとの1部位施術料（別途・健康保険を使わない場合） \| 1,500円 \| □ 確認しました \|/)
+  assert.match(get('member-contract').body, /□ 1部位施術料（健康保険を使わない場合 1,500円）は、来院した方ごと・施術した部位ごとにかかります。/)
+  assert.match(get('fee-cancel-policy').body, /\| 来院ごとの1部位施術料（別途・健康保険を使わない場合） \| 1,500円 \|/)
+  // 会員の1部位施術料に 1,000円 は残っていない
+  for (const id of ['member-contract', 'fee-cancel-policy']) assert.ok(!/1部位施術料[^\n]*1,000円/.test(get(id).body), id)
+  assert.ok(!get('member-contract').body.includes('1,000円'))
+  // 変えていないもの：健康保険を使う場合の「別途1,000円」と、非会員の施術料金（1部位）1,500円
+  assert.match(get('fee-cancel-policy').body, /健康保険をご利用いただく場合であっても、施術料金として別途1,000円を頂戴いたします/)
+  assert.match(get('fee-cancel-policy').body, /\| 施術料金（1部位） \| 1,500円 \|/)
   // もう1名の欄（氏名・生年月日・続柄・目的）は4つの記入欄、確認のチェックは5つ
   const body = get('member-contract').body
   const start = body.indexOf('### 兄弟・親子プランを申し込む場合')
