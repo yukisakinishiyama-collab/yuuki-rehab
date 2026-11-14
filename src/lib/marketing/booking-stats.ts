@@ -3,7 +3,7 @@
  *
  *   ?api=hubstats&ts=<ミリ秒>&sig=<HMAC-SHA256>&days=<日数>
  *
- * - 氏名・電話番号など個人を特定できる項目は受け取らない（流入元・日付・初診/再診・状態・空き枠数のみ）
+ * - 氏名・電話番号など個人を特定できる項目は受け取らない（流入元・日付・初診/再診・状態・空き枠数・予約画面の段階ごとの回数のみ）
  * - 署名は予約通知と同じ共有シークレット（Vercel: RESERVATION_NOTIFY_SECRET ＝ GAS: PATIENT_NOTIFY_SECRET）で
  *   「hubstats:<ts>」に付ける。シークレット自体はURLに載せない。GAS側は5分以内の署名だけ受け付ける
  * - 予約システムが未更新（このAPIが無い）・未設定のときは null を返し、呼び出し側は表示を省く
@@ -11,6 +11,7 @@
 import { createHmac } from 'node:crypto'
 import { RESERVE_URL } from './clinic'
 import type { OpeningDay } from './autopilot-planner'
+import { readFunnel, type FunnelRow } from './booking-funnel'
 
 export interface BookingStatRow {
   /** 受付日 'YYYY-MM-DD' */
@@ -44,6 +45,8 @@ export interface HubStats {
   /** 予約システムで選べる状態（「無断キャンセル」を記録できるか見る）。古い予約システムは返さない */
   statuses?: string[]
   followup?: FollowupStats
+  /** 予約画面の進み具合（段階ごとの回数。日付×流入元）。予約システム v3.17 より前は返さない（booking-funnel.ts） */
+  funnel?: FunnelRow[]
 }
 
 function readFollowup(value: unknown): FollowupStats | undefined {
@@ -88,6 +91,7 @@ export async function fetchHubStats(days = 30, opts: { fresh?: boolean } = {}): 
       openings: Array.isArray(data.openings) ? data.openings : [],
       statuses: Array.isArray(data.statuses) ? data.statuses.map(String).slice(0, 20) : undefined,
       followup: readFollowup(data.followup),
+      funnel: readFunnel((data as { funnel?: unknown }).funnel),
     }
     cache.set(span, { at: Date.now(), data: result })
     return result
