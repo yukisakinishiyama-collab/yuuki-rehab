@@ -1,7 +1,8 @@
 /**
  * ジョブ実行エンドポイント（指示書13章）
  *
- * - GitHub Actions（15分ごと）と Vercel Cron（1日1回）から呼ばれる
+ * - Vercel Cron（vercel.json。日本時間6〜21時は1時間ごと）と GitHub Actions（15分ごとの設定だが、実際は数時間に1回）から呼ばれる。
+ *   Vercel の Cron は、予定の時刻から1時間ほどの幅でずれることがある（2026-11-13：18:00 の投稿が 18:34 に出た）
  * - 管理画面の「今すぐ実行」からも呼べる（管理者のBasic認証で許可）
  * - CRON_SECRET 設定時は Authorization: Bearer で保護
  * - 自動投稿（autopilot）のジョブが手動対応になったら、本文と「投稿した」ボタンを院長のLINEへ送る

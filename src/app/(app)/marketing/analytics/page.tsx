@@ -8,6 +8,7 @@ import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
 import { useMarketingRole } from '@/lib/marketing/use-role'
 import { GBP_DAILY_METRICS, GBP_METRIC_LABELS, impressionsOf, type GbpPerformance } from '@/lib/marketing/gbp-performance'
 import type { GscReport } from '@/lib/marketing/gsc'
+import { FUNNEL_MIN_OPENS, type FunnelSummary } from '@/lib/marketing/booking-funnel'
 
 interface Analytics {
   days: number
@@ -24,6 +25,8 @@ interface Analytics {
     sources: Array<{ source: string; label: string; bookings: number; firstVisit: number; cancelled: number; clicks: number }>
     posts: Array<{ campaign: string; theme: string; scheduledAt: string; bookings: number }>
     generatedAt: string
+    /** 予約画面でどこまで進んだか（予約システムが数え始める前・古いときは null か無し） */
+    screenFunnel?: FunnelSummary | null
   }
   seoPosts?: Array<{ id: string; scheduledAt: string; title: string; status: string; url: string | null; campaign: string; taps: number; bookings: number }>
 }
@@ -38,6 +41,90 @@ const SEO_STATUS: Record<string, string> = {
 
 const ymdLabel = (ymd: string) => `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`
 const monthLabel = (ym: string) => `${ym.slice(0, 4)}年${Number(ym.slice(5, 7))}月`
+
+/**
+ * 予約画面の進み具合：ネット予約の画面を開いてから確定するまで、段階ごとに何回あったか（予約システム v3.17〜が数える。
+ * お名前などは数えない・人数ではなく回数）。どの段で減っているかを見て、予約画面を直す手がかりにする
+ */
+function BookingScreenFunnel({ funnel, supported, days }: { funnel: FunnelSummary | null; supported: boolean; days: number }) {
+  const max = funnel ? Math.max(...funnel.stages.map((s) => s.count), 1) : 1
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <h2 className="font-bold">予約画面の進み具合（ネット予約の画面で、どこまで進んだか）</h2>
+      {!funnel ? (
+        <p className="mt-2 text-sm text-slate-500">
+          {supported
+            ? `この期間（直近${days}日）の記録は、まだありません。予約画面が開かれると、ここに「開いた → 時間を選んだ → お客様情報 → 確認 → 確定」の回数が出ます（数え始めは 2026年11月12日の夜）。`
+            : '予約システムにつながると、ここに予約画面の段階ごとの回数が出ます。'}
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-xs text-slate-500">
+            {ymdLabel(funnel.from)}〜{ymdLabel(funnel.to)} の回数です（人数ではありません。同じ方が開き直すと、もう1回と数えます。院での動作確認も入ります。お名前などは数えていません）。
+          </p>
+          {/* スマホでも読めるように、段の名前と回数を上、棒を下に置く */}
+          <div className="mt-3 space-y-2.5">
+            {funnel.stages.map((stage, i) => (
+              <div key={stage.key}>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span>{stage.label}</span>
+                  <span className="shrink-0">
+                    <b>{stage.count}</b>
+                    {i > 0 && stage.ofPrev !== null ? <span className="ml-2 text-xs text-slate-500">前の段の{stage.ofPrev}%</span> : null}
+                  </span>
+                </div>
+                <div className="mt-1 h-3 overflow-hidden rounded bg-slate-100">
+                  <div className="h-full rounded bg-teal-600" style={{ width: `${Math.max((stage.count / max) * 100, stage.count ? 2 : 0)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-600">
+            お客様情報を入れ終えた内訳：初めて {funnel.total.first}・2回目以降 {funnel.total.repeat}／問診の画面まで {funnel.total.intake}／「料金の目安」を開いた {funnel.total.fee}
+          </p>
+          {funnel.biggestDrop ? (
+            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
+              いちばん減っているのは「{funnel.biggestDrop.from}」→「{funnel.biggestDrop.to}」です（{funnel.biggestDrop.fromCount}回 → {funnel.biggestDrop.toCount}回）。
+            </p>
+          ) : funnel.total.open < FUNNEL_MIN_OPENS ? (
+            <p className="mt-2 text-xs text-slate-500">まだ回数が少ないため（開いた回数 {funnel.total.open}）、どこで減っているかは、もう少したまってから出します。</p>
+          ) : null}
+          {funnel.sources.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[30rem] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="py-1.5 pr-2">どこから開いたか</th>
+                    <th className="py-1.5 pr-2 text-right">開いた</th>
+                    <th className="py-1.5 pr-2 text-right">時間を選んだ</th>
+                    <th className="py-1.5 pr-2 text-right">情報を入れ終えた</th>
+                    <th className="py-1.5 pr-2 text-right">確定</th>
+                    <th className="py-1.5 text-right">料金の目安</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnel.sources.map((s) => (
+                    <tr key={s.source} className="border-b border-slate-100">
+                      <td className="py-1.5 pr-2 font-medium">{s.label}</td>
+                      <td className="py-1.5 pr-2 text-right">{s.open}</td>
+                      <td className="py-1.5 pr-2 text-right">{s.time}</td>
+                      <td className="py-1.5 pr-2 text-right">{s.filled}</td>
+                      <td className="py-1.5 pr-2 text-right font-bold text-teal-900">
+                        {s.done}
+                        {s.doneRate !== null && s.open >= FUNNEL_MIN_OPENS ? <span className="ml-1 text-xs font-normal text-slate-500">（{s.doneRate}%）</span> : null}
+                      </td>
+                      <td className="py-1.5 text-right text-slate-500">{s.fee || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
 
 /** Search Console：ホームページ（shimonoseki-yuuki.com）の Google 検索でのクリック・表示・掲載順位とキーワード */
 function SearchConsole() {
@@ -553,6 +640,9 @@ export default function AnalyticsPage() {
           </>
         )}
       </section>
+
+      {/* 予約画面の進み具合 … ネット予約の画面で、どこでやめる人が多いか */}
+      <BookingScreenFunnel funnel={data.bookings?.screenFunnel ?? null} supported={Boolean(data.bookings)} days={data.days} />
 
       {/* LINEファネル */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">

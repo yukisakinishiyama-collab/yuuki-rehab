@@ -407,7 +407,7 @@ await test('通しで：Google へ送る中身（本文・ボタン）→ 審査
 
 const page = fs.readFileSync(new URL('src/app/(app)/marketing/jobs/page.tsx', root), 'utf8')
 const run = fs.readFileSync(new URL('src/app/api/marketing/jobs/run/route.ts', root), 'utf8')
-await test('つなぎ：15分ごとの実行で確かめる・画面に「Googleが拒否」を出し、出し直しのボタンは出さない', () => {
+await test('つなぎ：定期の実行（jobs/run）で確かめる・画面に「Googleが拒否」を出し、出し直しのボタンは出さない', () => {
   assert.ok(run.includes('checkGooglePosts()') && run.includes('notifyGoogleRejections(checked)'))
   assert.ok(page.includes("label: 'Googleが拒否'") && page.includes("job.status === 'failed' && !isGoogleRejected(job)"))
   assert.ok(page.includes('/api/marketing/google/posts'))
