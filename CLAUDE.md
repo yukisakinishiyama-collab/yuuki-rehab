@@ -30,7 +30,7 @@ npm run lint     # ESLint
 
 予約のLINE（LINE連携の方へ。2026-11-05 院長の依頼）: 予約システムから「新しい予約」の通知が来たら、電話＋お名前（無ければカルテのお名前＋生年月日）で LINE 連携を探し、15秒待って予約システムが送っていなければ「確定しました」を1通。予約は KV の `linersv:<予約番号>` に控え、jobs/run から前日の10〜20時に前日のお知らせを送る（予約システムと同じ印で1通だけ・「予約のお知らせ停止」の方には送らない・テストの見本だけだった分は「動かす」にしたらご本人へ）。「今日」の「LINEで予約日時を送る」を開くと、読んだ一覧で控えをそろえる。どれも 集客 → 自動化設定 の「予約確認の LINE」「前日のお知らせ」に従う。`src/lib/marketing/line-reservation-server.ts`・`patient-line-push-server.ts`・`node tools/test-line-reservation.mjs`
 
-院内アプリと院内用のAPIは `src/proxy.ts` の Basic 認証（院長／スタッフのパスワード）で守る。以前あった動作解析（動画・姿勢）、プロトコル立案・疾患/文献ライブラリ、患者さん向けの説明・問診・カラダマップの画面は削除済み。
+院内アプリと院内用のAPIは `src/proxy.ts` の Basic 認証（院長／スタッフのパスワード）で守る。LINE の中のブラウザはパスワードの入力画面を出さないので、院長のLINEへ送るお知らせ（`owner-notify.ts`）の院内アプリへのリンクには、送るときに openExternalBrowser=1 を付けて端末のブラウザで開かせる（`src/lib/marketing/line-links.ts`・`npx tsx tools/marketing/test-line-links.mjs`）。パスワードが無いまま画面を開いたときは、401 のまま「LINE からはブラウザで開く」の案内を出す（`npx tsx tools/test-proxy.mjs`）。以前あった動作解析（動画・姿勢）、プロトコル立案・疾患/文献ライブラリ、患者さん向けの説明・問診・カラダマップの画面は削除済み。
 
 ### データ層
 

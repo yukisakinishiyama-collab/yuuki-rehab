@@ -6,7 +6,11 @@
  * LINEの無料プランは月200通まで（1回のプッシュ＝吹き出し5つまでで1通）。週数通の想定。
  * ボタンの押下（postback）は webhook 側で「送り主が院長本人か」を確かめてから処理する。
  * 送れなくてもパイプライン自体は止めない（画面で確認できるため）。
+ * 院内アプリへのリンクは、送るときに「端末のブラウザで開く」印を付ける（line-links.ts。
+ * LINE の中のブラウザだとパスワードを入れられず「認証が必要です」になるため）。
  */
+import { withExternalBrowserLinks } from './line-links'
+
 const LINE_TEXT_LIMIT = 4900
 
 export interface NotifyResult {
@@ -71,6 +75,7 @@ export async function notifyOwner(messages: OwnerMessage[]): Promise<NotifyResul
   const payload = messages
     .filter((m) => (typeof m === 'string' ? m.trim().length > 0 : true))
     .slice(0, 5)
+    .map(withExternalBrowserLinks)
     .map((m) => (typeof m === 'string' ? { type: 'text', text: clip(m.trim(), LINE_TEXT_LIMIT) } : m))
   if (payload.length === 0) return { delivered: false, reason: '本文がありません' }
 
@@ -97,6 +102,7 @@ export async function replyOwner(replyToken: string, messages: OwnerMessage[]): 
   if (!token || !replyToken) return
   const payload = messages
     .slice(0, 5)
+    .map(withExternalBrowserLinks)
     .map((m) => (typeof m === 'string' ? { type: 'text', text: clip(m, LINE_TEXT_LIMIT) } : m))
   await fetch('https://api.line.me/v2/bot/message/reply', {
     method: 'POST',
