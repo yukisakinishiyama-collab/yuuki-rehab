@@ -13,6 +13,10 @@
  * 3. 前日のお知らせ（投稿ジョブの定期実行から。日本時間 REMIND_FROM_HOUR〜REMIND_TO_HOUR 時）
  *    → 明日の控えの方へ送る（前日のお知らせの設定・本人の受け取りに従う）。予約システムと同じ印を使うので1通だけ
  * 4. 「今日」の画面の「LINEで予約日時を送る」を開いたとき、その一覧（予約システムから読んだもの）で控えを最新にする
+ * 5. 患者さんが予約ページで日時を変更した（kind:'change'。予約システム v3.20〜。2026-11-16 院長の依頼）
+ *    → 控えの日時を直し（前日のお知らせは新しい日にちで送る）、ご本人の LINE へ「日時を変更しました」を1通
+ *
+ * 確定・前日・変更のお知らせには、日時の変更・キャンセルを入力なしで開けるリンクを入れる（lib/reservation-change-link.ts）。
  *
  * 控えに持つのは、予約番号・日付・時刻・LINE連携のキー（連携の記録 linelink: と同じ「電話番号|お名前」）だけ。
  * LINE の宛先は持たない（送るときに連携の記録の封印から開く）。
@@ -24,7 +28,8 @@ import { unsealUserId } from '@/lib/liff-ticket'
 import { lineMark } from './consent-store-server'
 import { getRule, markSent } from './automation-store-server'
 import { dedupeMark, pushToPatient } from './patient-line-push-server'
-import { jstTomorrow, patientConfirmText, patientRemindText } from '@/lib/reservation-message'
+import { jstTomorrow, patientChangeText, patientConfirmText, patientRemindText } from '@/lib/reservation-message'
+import { reservationChangeUrl } from '@/lib/reservation-change-link'
 
 const RSV_PREFIX = 'linersv:'
 const SENT_PREFIX = 'linesent:'
@@ -146,7 +151,7 @@ export async function onNewReservation(
   const r = await pushToPatient({
     automation: 'reservation_confirm',
     userId,
-    text: patientConfirmText({ name: link.name, date, time, reservationNo: no }),
+    text: patientConfirmText({ name: link.name, date, time, reservationNo: no, changeUrl: reservationChangeUrl(no) }),
     note: '予約の確定（LINE連携の方）',
     dedupe: { day: date, mark: (test) => dedupeMark({ kind: 'patient-confirm', userMark: lineMark(userId), time, reservationNo: no }, test) },
   })
@@ -162,6 +167,65 @@ export async function onNewReservation(
 export async function onCancelReservation(reservationNo?: string): Promise<void> {
   const no = String(reservationNo ?? '')
   if (NO_RE.test(no)) await kvDelete(`${RSV_PREFIX}${no}`)
+}
+
+/**
+ * 5. 患者さんが予約ページで日時を変更した（予約システムからの通知 kind:'change'）
+ * - 控え（linersv:<予約番号>）の日時を直す。前日のお知らせは、新しい日にちで送れるように戻す
+ * - 控えが無い方（予約システムの「新しい予約」の通知より前に入っていた予約など）は、電話＋お名前で LINE 連携を探して控える
+ * - ご本人の LINE へ「日時を変更しました」を1通（予約確認の LINE の設定に従う。同じ変更の知らせが二度来ても1通）
+ *   宛先は、LINE 連携の記録から。無ければ、予約の行の封印（LINE から予約した方）から
+ */
+export async function onChangeReservation(
+  body: { reservationNo?: string; name?: string; phone?: string; date?: string; time?: string; prevDate?: string; prevTime?: string; sealed?: string },
+  opts: { now?: Date } = {},
+): Promise<{ delivered: boolean; note: string }> {
+  const no = String(body.reservationNo ?? '')
+  const date = String(body.date ?? '')
+  const time = hhmm(body.time)
+  if (!NO_RE.test(no) || !DATE_RE.test(date) || !time) return { delivered: false, note: '予約番号・日時が読めません' }
+  const secret = process.env.RESERVATION_NOTIFY_SECRET ?? ''
+  const today = jstParts(opts.now).date
+
+  // 控えを直す（無ければ、LINE 連携の方かを探して作る）
+  const existing = await kvGet<LineReservation>(`${RSV_PREFIX}${no}`)
+  let link: LineLink | null = existing ? await getLineLink(existing.key) : null
+  if (!link) link = await findLinkForPerson(String(body.name ?? ''), String(body.phone ?? ''))
+  if (link && date >= today) {
+    const next: LineReservation = { ...(existing ?? {}), reservationNo: no, key: link.key, date, time, savedAt: new Date().toISOString() }
+    delete next.remindedAt
+    delete next.remindedTest
+    await kvSet(`${RSV_PREFIX}${no}`, next)
+  } else if (existing) {
+    // 連携が外れた・過ぎた日にちへの変更 → 古い日時のまま前日のお知らせを送らないように消す
+    await kvDelete(`${RSV_PREFIX}${no}`)
+  }
+  if (date < today) return { delivered: false, note: '過ぎた日の予約' }
+
+  const userId = (link ? unsealUserId(link.sealed, secret) : null) ?? unsealUserId(String(body.sealed ?? ''), secret)
+  if (!userId) return { delivered: false, note: link ? 'LINEの宛先を開けません' : 'LINE連携していない方' }
+  const prevDate = DATE_RE.test(String(body.prevDate ?? '')) ? String(body.prevDate) : ''
+  const r = await pushToPatient({
+    automation: 'reservation_confirm',
+    userId,
+    text: patientChangeText({
+      // LINE から予約した方（連携の記録が無い）は、予約のときのお名前
+      name: link ? link.name : String(body.name ?? ''),
+      date,
+      time,
+      prevDate,
+      prevTime: hhmm(body.prevTime),
+      reservationNo: no,
+      changeUrl: reservationChangeUrl(no),
+    }),
+    note: '予約の日時の変更',
+    // 同じ変更の知らせが二度来ても1通（別の日時へ変えて、また戻したときは別の変更として送る）
+    dedupe: {
+      day: date,
+      mark: (test) => dedupeMark({ kind: 'patient-change', userMark: lineMark(userId), time: `${time}<${prevDate} ${hhmm(body.prevTime)}`, reservationNo: no }, test),
+    },
+  })
+  return { delivered: r.delivered, note: r.reason ?? r.result }
 }
 
 /** 3. 前日のお知らせ（定期実行から。時間帯の外・送り済みは何もしない） */
@@ -194,7 +258,10 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
     const r = await pushToPatient({
       automation: 'reservation_remind',
       userId,
-      text: patientRemindText({ name: link.name, date: value.date, time: value.time, reservationNo: value.reservationNo }, now),
+      text: patientRemindText(
+        { name: link.name, date: value.date, time: value.time, reservationNo: value.reservationNo, changeUrl: reservationChangeUrl(value.reservationNo) },
+        now,
+      ),
       note: '前日のお知らせ（LINE連携の方）',
       requireConsent: true,
       // 予約システムの前日のお知らせと同じ印（どちらが先に送っても1通）

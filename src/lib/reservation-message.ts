@@ -5,8 +5,11 @@
  * - 「予約が確定しました」は、LINEで予約した方へ予約システムから届くもの（reservation-notify の patient-confirm）と同じ文面。
  *   reservation-notify にも同じ文面があるので、文面を変えるときは両方を直す
  * - 前日のお知らせは reservation-notify の patient-remind もこれを使う
+ * - changeUrl（日時の変更・キャンセルを入力なしで開けるリンク。サーバーが lib/reservation-change-link.ts で作る）を
+ *   渡すと、変更・キャンセルの案内がリンクつきになる。渡さなければ、今までどおり「このトークまたはお電話」
+ *   （2026-11-16 院長の依頼：患者さんが予約ページで変更しようとして、電話番号の下4桁が通らなかった）
  */
-import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
+import { DEFAULT_CLINIC_PROFILE, RESERVE_URL } from '@/lib/marketing/clinic'
 import { CONSENT_KEYWORDS } from '@/lib/marketing/consent'
 
 /** 外から来た文字を本文へ入れる前に、改行・制御文字を取り、長さをそろえる（文面のなりすまし防止） */
@@ -32,8 +35,21 @@ export function safeReservationNo(value?: string): string {
   return /^[A-Za-z0-9]{1,12}$/.test(v) ? v : ''
 }
 
+/** 変更用のリンクとして載せてよいもの（予約ページの ?rsv=…&rk=… だけ）なら返す。違えば '' */
+export function safeChangeUrl(value?: string): string {
+  const v = String(value ?? '')
+  return v.startsWith(`${RESERVE_URL}?rsv=`) && /^[A-Za-z0-9:/._?=&-]{1,300}$/.test(v) ? v : ''
+}
+
+/** 変更・キャンセルの案内（リンクがあればリンクつき。無ければ今までどおり） */
+function changeGuide(changeUrl: string | undefined, phone: string, closing: string): string[] {
+  const url = safeChangeUrl(changeUrl)
+  if (!url) return ['変更・キャンセルは、このトークまたは', `お電話（${phone}）へ${closing}`]
+  return ['日時の変更・キャンセルは、こちらから（入力はいりません）', url, `このトーク・お電話（${phone}）でも承ります。`]
+}
+
 /** 「ご予約ありがとうございます。以下の内容で確定しました」の文面 */
-export function patientConfirmText(input: { name?: string; date?: string; time?: string; reservationNo?: string }): string {
+export function patientConfirmText(input: { name?: string; date?: string; time?: string; reservationNo?: string; changeUrl?: string }): string {
   const name = safeName(input.name)
   const reservationNo = safeReservationNo(input.reservationNo)
   const when = `${formatDateJa(input.date)} ${String(input.time ?? '').slice(0, 5)}`.trim()
@@ -46,8 +62,40 @@ export function patientConfirmText(input: { name?: string; date?: string; time?:
     `📅 日時：${when}〜`,
     reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
     '',
-    '変更・キャンセルは、このトークまたは',
-    'お電話（083-265-4545）へお気軽にどうぞ。',
+    ...changeGuide(input.changeUrl, '083-265-4545', 'お気軽にどうぞ。'),
+    '当日はお気をつけてお越しください😊',
+  ]
+    .filter((x): x is string => x !== undefined)
+    .join('\n')
+}
+
+/** 「ご予約の日時を変更しました」の文面（患者さんが予約ページで日時を変えたとき） */
+export function patientChangeText(input: {
+  name?: string
+  date?: string
+  time?: string
+  prevDate?: string
+  prevTime?: string
+  reservationNo?: string
+  changeUrl?: string
+}): string {
+  const name = safeName(input.name)
+  const reservationNo = safeReservationNo(input.reservationNo)
+  const when = `${formatDateJa(input.date)} ${String(input.time ?? '').slice(0, 5)}`.trim()
+  const before = input.prevDate ? `${formatDateJa(input.prevDate)} ${String(input.prevTime ?? '').slice(0, 5)}`.trim() : ''
+  const url = safeChangeUrl(input.changeUrl)
+  return [
+    name ? `${name} 様` : undefined,
+    name ? '' : undefined,
+    'ゆうき整骨院です。ご予約の日時を変更しました。',
+    '',
+    `📅 新しい日時：${when}〜`,
+    before ? `（変更前：${before}〜）` : undefined,
+    reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
+    '',
+    ...(url
+      ? ['もう一度変更・キャンセルするときは、こちらから', url, `このトーク・お電話（${DEFAULT_CLINIC_PROFILE.phone}）でも承ります。`]
+      : ['変更・キャンセルは、このトークまたは', `お電話（${DEFAULT_CLINIC_PROFILE.phone}）へどうぞ。`]),
     '当日はお気をつけてお越しください😊',
   ]
     .filter((x): x is string => x !== undefined)
@@ -60,7 +108,7 @@ export function jstTomorrow(now = new Date()): string {
 }
 
 /** 前日のお知らせ（日時・場所・変更とキャンセルの方法だけ。来院を強くすすめる言葉・施術の指示は入れない） */
-export function patientRemindText(input: { name?: string; date?: string; time?: string; reservationNo?: string }, now = new Date()): string {
+export function patientRemindText(input: { name?: string; date?: string; time?: string; reservationNo?: string; changeUrl?: string }, now = new Date()): string {
   const name = safeName(input.name)
   const reservationNo = safeReservationNo(input.reservationNo)
   const when = `${formatDateJa(input.date)} ${String(input.time ?? '').slice(0, 5)}`.trim()
@@ -74,8 +122,7 @@ export function patientRemindText(input: { name?: string; date?: string; time?: 
     reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
     `📍 場所：${DEFAULT_CLINIC_PROFILE.address}（${DEFAULT_CLINIC_PROFILE.parking}）`,
     '',
-    '変更・キャンセルは、このトークまたは',
-    `お電話（${DEFAULT_CLINIC_PROFILE.phone}）へどうぞ。`,
+    ...changeGuide(input.changeUrl, DEFAULT_CLINIC_PROFILE.phone, 'どうぞ。'),
     '',
     `※このお知らせが不要な方は「${CONSENT_KEYWORDS.stopReservation}」と送ってください。`,
   ]
