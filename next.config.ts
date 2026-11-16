@@ -62,6 +62,10 @@ const nextConfig: NextConfig = {
     // 宣伝の短い動画（YouTubeショート・TikTok）を院内アプリで見るとき（作りおきが無ければここで組み立てる）
     '/api/marketing/promo-video': ['./node_modules/ffmpeg-static/ffmpeg*'],
   },
+  // 患者さんにお見せする紹介の動画（public/intro）は、院内アプリの中で見せるもの。検索には出さない
+  async headers() {
+    return [{ source: '/intro/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]
+  },
   async redirects() {
     return [
       ...REMOVED_TO_HOME.flatMap((source) => [
