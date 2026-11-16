@@ -4,6 +4,9 @@
  * 用途は2系統:
  * 1) 院長宛（従来）: 新規予約/キャンセル/前日リマインド一覧を院長のLINEへ
  *    - kind: 'new' | 'cancel' | 'reminder' → RESERVATION_NOTIFY_LINE_USER_ID宛
+ *    - kind: 'change' … 患者さんが予約ページで日時を変更した（予約システム v3.20〜。date・time が新しい日時、prevDate・prevTime が変更前）
+ *      院長のLINEへ知らせ、ご本人のLINEへ「日時を変更しました」を送り、前日のお知らせの控えを新しい日時に直す
+ *      （lib/marketing/line-reservation-server.ts の onChangeReservation）。返事の patientDelivered は、ご本人のLINEに届いたか
  * 2) 患者宛（LIFF連携）: 予約完了・キャンセル確認を患者本人のLINEへ
  *    - kind: 'patient-confirm' … ticket（LIFF IDトークン検証済みの短命チケット）
  *      または sealed（過去の予約行に保存済みの長期参照。管理画面からの手動登録で、
@@ -39,14 +42,15 @@ import { TEST_SAMPLES_PER_DAY, type AutomationKey } from '@/lib/marketing/automa
 import { checkConsent, lineMark } from '@/lib/marketing/consent-store-server'
 import { CONSENT_KEYWORDS, inSendHours } from '@/lib/marketing/consent'
 import { LIFF_RESERVE_URL } from '@/lib/marketing/clinic'
-import { patientRemindText } from '@/lib/reservation-message'
+import { patientConfirmText, patientRemindText } from '@/lib/reservation-message'
+import { reservationChangeUrl } from '@/lib/reservation-change-link'
 
 export const dynamic = 'force-dynamic'
 // キャンセルのストーリー（予約システムへの返事のあとで、空きの取り直し→画像→Instagramへの公開まで）に使う時間
 export const maxDuration = 120
 
 type NotifyBody = {
-  kind?: 'new' | 'cancel' | 'reminder' | PatientKind
+  kind?: 'new' | 'cancel' | 'change' | 'reminder' | PatientKind
   /** patient-confirm用：LIFF検証済みの短命チケット */
   ticket?: string
   /** patient-cancel用：予約行に保存された長期参照 */
@@ -58,6 +62,9 @@ type NotifyBody = {
   menu?: string
   date?: string
   time?: string
+  /** kind:'change' 用：変更前の日時 */
+  prevDate?: string
+  prevTime?: string
   symptom?: string
   /** kind:'reminder' 用。指定時はこの本文をそのまま送る（GAS側で整形済みの前提） */
   text?: string
@@ -114,12 +121,14 @@ function formatDateJa(dateString?: string): string {
 function buildMessage(b: NotifyBody): string {
   // リマインド等、GAS側で整形済みの本文はそのまま送る
   if (b.text) return b.text
-  const head = b.kind === 'cancel' ? '❌ 予約キャンセル' : '🗓 新規予約が入りました'
+  const head =
+    b.kind === 'cancel' ? '❌ 予約キャンセル' : b.kind === 'change' ? '🔁 患者さんが予約の日時を変更しました' : '🗓 新規予約が入りました'
   const lines = [
     head,
     '',
     b.name ? `氏名：${b.name}${b.kana ? `（${b.kana}）` : ''}` : undefined,
-    b.date || b.time ? `日時：${b.date ?? ''} ${b.time ?? ''}`.trim() : undefined,
+    b.date || b.time ? `${b.kind === 'change' ? '新しい日時' : '日時'}：${b.date ?? ''} ${b.time ?? ''}`.trim() : undefined,
+    b.kind === 'change' && (b.prevDate || b.prevTime) ? `変更前：${b.prevDate ?? ''} ${b.prevTime ?? ''}`.trim() : undefined,
     b.menu ? `メニュー：${b.menu}` : undefined,
     b.phone ? `電話：${b.phone}` : undefined,
     b.reservationNo ? `予約番号：${b.reservationNo}` : undefined,
@@ -136,9 +145,11 @@ function buildPatientMessage(b: NotifyBody): string {
     : ''
   const when = `${formatDateJa(b.date)} ${String(b.time ?? '').slice(0, 5)}`.trim()
 
+  // 日時の変更・キャンセルを入力なしで開けるリンク（予約番号の形が違う・鍵が無いときは ''＝今までどおりの文面）
+  const changeUrl = reservationChangeUrl(b.reservationNo)
   if (b.kind === 'patient-remind') {
     // 文面は院内アプリからの前日のお知らせ（LINE連携の方）と共通（lib/reservation-message.ts）
-    return patientRemindText({ name: b.name, date: b.date, time: b.time, reservationNo: b.reservationNo })
+    return patientRemindText({ name: b.name, date: b.date, time: b.time, reservationNo: b.reservationNo, changeUrl })
   }
   if (b.kind === 'patient-waitlist') {
     return [
@@ -172,21 +183,8 @@ function buildPatientMessage(b: NotifyBody): string {
       .filter((x): x is string => x !== undefined)
       .join('\n')
   }
-  return [
-    `${name} 様`,
-    '',
-    'ゆうき整骨院です。ご予約ありがとうございます。',
-    '以下の内容で確定しました。',
-    '',
-    `📅 日時：${when}〜`,
-    reservationNo ? `🎫 予約番号：${reservationNo}` : undefined,
-    '',
-    '変更・キャンセルは、このトークまたは',
-    'お電話（083-265-4545）へお気軽にどうぞ。',
-    '当日はお気をつけてお越しください😊',
-  ]
-    .filter((x): x is string => x !== undefined)
-    .join('\n')
+  // 予約の確定：文面は院内アプリからの確定のお知らせ（LINE連携の方）と共通（lib/reservation-message.ts）
+  return patientConfirmText({ name: b.name, date: b.date, time: b.time, reservationNo: b.reservationNo, changeUrl })
 }
 
 export async function POST(request: NextRequest) {
@@ -218,6 +216,33 @@ export async function POST(request: NextRequest) {
         console.error('[line-reservation] 失敗しました', error)
       }
     })
+  }
+
+  // 日時の変更：ご本人のLINEへ「日時を変更しました」・前日のお知らせの控えを新しい日時に（予約システムの画面に
+  // 「LINEに確認をお送りしました」と出すため、返事の前に行う。予約のロックは放してから呼ばれるので、待たせてよい）
+  let patientDelivered: boolean | undefined
+  if (body.kind === 'change') {
+    if (!/^[A-Za-z0-9]{1,12}$/.test(String(body.reservationNo ?? '')) || !DATE_RE.test(String(body.date ?? '')) || !TIME_RE.test(String(body.time ?? '').slice(0, 5))) {
+      return NextResponse.json({ ok: false, delivered: false, error: 'reservationNo・date（YYYY-MM-DD）・time（HH:MM）が要ります' }, { status: 400 })
+    }
+    patientDelivered = false
+    try {
+      const { onChangeReservation } = await import('@/lib/marketing/line-reservation-server')
+      const r = await onChangeReservation({
+        reservationNo: body.reservationNo,
+        name: body.name,
+        phone: body.phone,
+        date: body.date,
+        time: body.time,
+        prevDate: body.prevDate,
+        prevTime: body.prevTime,
+        sealed: body.sealed,
+      })
+      patientDelivered = r.delivered
+      console.log('[line-reservation] 日時の変更:', r.note)
+    } catch (error) {
+      console.error('[line-reservation] 日時の変更を反映できませんでした', error)
+    }
   }
 
   if (body.kind === 'cancel') {
@@ -380,7 +405,7 @@ export async function POST(request: NextRequest) {
 
   // 送信先未設定・トークン未設定でも、予約自体は成功させたいので 200 で握る（設定を段階的に進められる）
   if (!token || !to) {
-    return NextResponse.json({ ok: true, delivered: false, reason: '送信先またはトークン未設定' })
+    return NextResponse.json({ ok: true, delivered: false, reason: '送信先またはトークン未設定', patientDelivered })
   }
 
   try {
@@ -394,7 +419,7 @@ export async function POST(request: NextRequest) {
       const data = await res.json().catch(() => ({}))
       if (isPatientPush) await recordRun({ automation, result: 'error', note: patientNote })
       return NextResponse.json(
-        { ok: false, delivered: false, error: (data as { message?: string }).message ?? `HTTP ${res.status}` },
+        { ok: false, delivered: false, error: (data as { message?: string }).message ?? `HTTP ${res.status}`, patientDelivered },
         { status: 502 },
       )
     }
@@ -405,7 +430,7 @@ export async function POST(request: NextRequest) {
       const { markConfirmSent } = await import('@/lib/marketing/line-reservation-server')
       await markConfirmSent({ reservationNo: body.reservationNo, date: body.date, time: body.time, userId: to }).catch(() => {})
     }
-    return NextResponse.json({ ok: true, delivered: !testRun, test: testRun || undefined, sealed })
+    return NextResponse.json({ ok: true, delivered: !testRun, test: testRun || undefined, sealed, patientDelivered })
   } catch (error) {
     if (isPatientPush) await recordRun({ automation, result: 'error', note: patientNote })
     return NextResponse.json(

@@ -107,6 +107,8 @@ export default function LineReservationPanel() {
   const [noKey, setNoKey] = useState(false)
   const [patients, setPatients] = useState<Patient[]>([])
   const [sent, setSent] = useState<Record<string, SentInfo>>({})
+  // 文面に入る「日時の変更・キャンセル」のリンク（サーバーが作る。見本を、実際に送る文と同じにする）
+  const [changeLinks, setChangeLinks] = useState<Record<string, string>>({})
   const [preview, setPreview] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -193,8 +195,9 @@ export default function LineReservationPanel() {
     let alive = true
     void fetch(`/api/line-link/reservation?nos=${encodeURIComponent(nos)}`, { cache: 'no-store' })
       .then((res) => res.json())
-      .then((data: { ok?: boolean; sent?: Record<string, SentInfo> }) => {
+      .then((data: { ok?: boolean; sent?: Record<string, SentInfo>; links?: Record<string, string> }) => {
         if (alive && data.ok && data.sent) setSent(data.sent)
+        if (alive && data.ok && data.links) setChangeLinks(data.links)
       })
       .catch(() => {})
     return () => {
@@ -303,7 +306,7 @@ export default function LineReservationPanel() {
                       <div className="mt-2 space-y-2 rounded-lg border border-green-200 bg-white p-3">
                         <p className="text-xs font-bold text-slate-600">この文面を {item.link.name} 様のLINEへ送ります</p>
                         <p className="whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm text-slate-800">
-                          {patientConfirmText({ name: item.link.name, date: item.date, time: item.time, reservationNo: item.reservationNo })}
+                          {patientConfirmText({ name: item.link.name, date: item.date, time: item.time, reservationNo: item.reservationNo, changeUrl: changeLinks[item.reservationNo] })}
                         </p>
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
