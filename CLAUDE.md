@@ -23,6 +23,7 @@ npm run lint     # ESLint
 **院内アプリ** — `src/app/(app)/` — 予約管理・カルテ・経営（売上・来院）・集客の4つに絞った院内専用アプリ。共通の枠は `src/components/rehab/AppShell.tsx` → `src/components/clinic/ClinicShell.tsx`（メニューは `src/components/clinic/nav.ts`。PCは左、スマホは下の5タブ）。
 
 - 今日（ホーム）: `/dashboard` → `src/components/clinic/TodayDashboard.tsx`
+  - 患者さんに見せる紹介動画（料金と会員プランのご紹介。声の解説つき・約2分。2026-11-16 院長の依頼）: 今日 →「患者さんに見せる」→ `/dashboard/price-video`（`src/components/clinic/IntroVideoPage.tsx`）。「患者さんに見せる」を押すと、メニューを隠して動画だけを画面いっぱいに出す（横長の画面＝横向き、縦長＝縦向きの動画。何も保存しない）。動画・絵・字幕は `public/intro/`、動画の中の金額と決まりは `src/data/intro-videos.ts`（動画の金額は書きかえられないので、料金・条件を変えたら動画を作り直して `PRICE_GUIDE_FACTS` も直す。ひな形の金額とずれると `npx tsx tools/test-intro-videos.mjs` が知らせる）。院内で通院中の方に見せる前提。SNS など院の外には、広告として点検し直すまで出さない
 - 予約: `/yoyaku`（GAS の予約管理画面を常駐 iframe で表示。`src/components/rehab/YoyakuFrame.tsx`）
 - カルテ: `/patients/**`（`src/components/rehab-management/`。SOAP・来院カレンダー・評価・アウトカム・問診・メモ・疑問・AI相談・患部の写真・契約・同意書（指で署名・院保管用と患者様控えの印刷・会員プランの状態）・キャンセル・紹介状）
 - 経営: `/marketing/sales`（NOAH の売上・来院）、`/marketing/analytics`（集客の効果）
