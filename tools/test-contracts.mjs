@@ -151,8 +151,8 @@ test('兄弟・親子プラン：もう1名の名前と続柄が要る・印刷�
   const html = member.memberEventHtml(ok.event, { state: 'none', label: '', pausedMonths: 0 })
   assert.match(html, /兄弟・親子プラン（月額30,000円・2名まで）/)
   assert.match(html, /山田 次郎（弟・2012年4月1日生）/)
-  assert.match(html, /来院した方ごと・施術した部位ごとに1,500円（健康保険を使わない場合）/)
-  assert.ok(!html.includes('1,000円'))
+  assert.ok(html.includes('来院した方ごと・施術した部位ごとに健康保険を使う日 1,000円＋保険の窓口料金／健康保険を使わない日 1,500円'))
+  assert.equal(html.split('1,000円').length - 1, 1)
 })
 
 test('兄弟・親子プラン：もう1名の方のカルテにも、代表の方の契約から状態が出る', () => {
@@ -190,14 +190,20 @@ test('書類の文面：兄弟・親子プランの欄と、休会・解約・�
   for (const id of ['member-pause', 'member-cancel']) assert.match(get(id).body, /□ 兄弟・親子プラン（月額30,000円・2名分）/)
   assert.match(get('fee-cancel-policy').body, /\| 兄弟・親子プラン（2名まで・月額） \| 30,000円 \|/)
   for (const id of ['member-pause', 'member-cancel']) assert.equal(get(id).version, '2026-11-11.2')
-  // 2026-11-13 会員プランの1部位施術料を 1,000円 → 1,500円（健康保険を使わない場合）に（院長の指示）。文面が変わったので版も変える
-  for (const id of ['member-contract', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-13')
-  assert.match(get('member-contract').body, /\| 来院ごとの1部位施術料（別途・健康保険を使わない場合） \| 1,500円 \| □ 確認しました \|/)
-  assert.match(get('member-contract').body, /□ 1部位施術料（健康保険を使わない場合 1,500円）は、来院した方ごと・施術した部位ごとにかかります。/)
-  assert.match(get('fee-cancel-policy').body, /\| 来院ごとの1部位施術料（別途・健康保険を使わない場合） \| 1,500円 \|/)
-  // 会員の1部位施術料に 1,000円 は残っていない
-  for (const id of ['member-contract', 'fee-cancel-policy']) assert.ok(!/1部位施術料[^\n]*1,000円/.test(get(id).body), id)
-  assert.ok(!get('member-contract').body.includes('1,000円'))
+  // 2026-11-13 会員プランの1部位施術料を 1,000円 → 1,500円（健康保険を使わない場合）に（院長の指示）。
+  // 2026-11-16 同じ行に、健康保険を使う日（1,000円＋保険の窓口料金）を書き足した（動画・ご案内・ホームページと同じ言い方）。文面が変わったので版も変える
+  for (const id of ['member-contract', 'fee-cancel-policy']) assert.equal(get(id).version, '2026-11-16')
+  const FEE_TEXT = '健康保険を使う日 1,000円＋保険の窓口料金／健康保険を使わない日 1,500円'
+  assert.ok(get('member-contract').body.includes(`| 来院ごとの1部位施術料（別途） | ${FEE_TEXT} | □ 確認しました |`))
+  assert.ok(get('member-contract').body.includes(`□ 1部位施術料（${FEE_TEXT}）は、来院した方ごと・施術した部位ごとにかかります。`))
+  assert.ok(get('fee-cancel-policy').body.includes(`| 来院ごとの1部位施術料（別途） | ${FEE_TEXT} |`))
+  // 会員の1部位施術料に出てくる 1,000円 は「健康保険を使う日」のものだけ（古い「1,000円だけ」の書き方は残っていない）
+  for (const id of ['member-contract', 'fee-cancel-policy']) {
+    for (const line of get(id).body.split('\n')) {
+      if (/1部位施術料[^\n]*1,000円/.test(line)) assert.ok(line.includes('健康保険を使う日 1,000円＋保険の窓口料金'), `${id}: ${line}`)
+    }
+  }
+  assert.equal(get('member-contract').body.split('1,000円').length - 1, 2)
   // 変えていないもの：健康保険を使う場合の「別途1,000円」と、非会員の施術料金（1部位）1,500円
   assert.match(get('fee-cancel-policy').body, /健康保険をご利用いただく場合であっても、施術料金として別途1,000円を頂戴いたします/)
   assert.match(get('fee-cancel-policy').body, /\| 施術料金（1部位） \| 1,500円 \|/)
@@ -391,7 +397,8 @@ test('ご契約内容の枠：だれが・どのプランを・いくらで・�
   assert.equal(rowOf(box, '月額料金'), '23,000円（税込）')
   // 1部位施術料は、文面の表の行と同じ見出し・同じ金額（別の数字を持たない）
   const fee = summary.visitFeeOf(parseTemplate(t.body))
-  assert.ok(fee && fee.label.startsWith('来院ごとの1部位施術料') && /^[\d,]+円$/.test(fee.amount), JSON.stringify(fee))
+  assert.ok(fee && fee.label.startsWith('来院ごとの1部位施術料') && /[\d,]+円$/.test(fee.amount), JSON.stringify(fee))
+  assert.equal(fee.amount, '健康保険を使う日 1,000円＋保険の窓口料金／健康保険を使わない日 1,500円')
   assert.equal(rowOf(box, fee.label), fee.amount)
   assert.ok(t.body.includes(`| ${fee.label} | ${fee.amount} |`))
   assert.equal(rowOf(box, '利用開始日（最初の決済日）'), '2026年11月20日')

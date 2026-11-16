@@ -3,11 +3,13 @@
 // - 動画・絵・字幕のファイルがそろっているか（大きすぎないか）
 // - 動画の中の金額（PRICE_GUIDE_FACTS）が、契約書・料金案内のひな形と同じか
 //   （料金を変えたのに古い動画を見せ続けないように。ずれたら動画を作り直して FACTS も直す）
+// - カルテの「会員プランのご案内」（lib/contracts/member-guide.ts）と同じ金額・同じ比べ方か
 // - 向きの選び方・長さの表記
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, yen } from '../src/data/intro-videos.ts'
 import { CONTRACT_TEMPLATES } from '../src/data/contract-templates.ts'
+import * as G from '../src/lib/contracts/member-guide.ts'
 
 let n = 0
 const t = (name, fn) => { fn(); n++; console.log('✓', name) }
@@ -60,13 +62,34 @@ t('動画の金額は、料金案内のひな形と同じ（都度払い・物�
   assert.equal(paygPerVisit(), 4350)
 })
 
-t('会員の1回ごとの施術料：保険を使わない日・使う日とも、ひな形と同じ', () => {
+t('会員の1回ごとの施術料：保険を使う日・使わない日とも、ひな形と同じ', () => {
   const fee = body('fee-cancel-policy')
   const member = body('member-contract')
-  assert.ok(fee.includes(`| 来院ごとの1部位施術料（別途・健康保険を使わない場合） | ${yen(F.memberPartNoInsurance)} |`))
-  assert.ok(member.includes(`| 来院ごとの1部位施術料（別途・健康保険を使わない場合） | ${yen(F.memberPartNoInsurance)} |`))
+  const row = `| 来院ごとの1部位施術料（別途） | 健康保険を使う日 ${yen(F.memberPartWithInsurance)}＋保険の窓口料金／健康保険を使わない日 ${yen(F.memberPartNoInsurance)} |`
+  assert.ok(fee.includes(row))
+  assert.ok(member.includes(row))
   // 健康保険を使う日は、施術料金として別途 1,000円（＋保険の窓口料金）
   assert.ok(fee.includes(`施術料金として別途${yen(F.memberPartWithInsurance)}`))
+})
+
+t('動画と、カルテの「会員プランのご案内」の金額が同じ（月額・施術料・都度払い・材料費）', () => {
+  assert.equal(G.MEMBER_MONTHLY['一般会員'], F.memberGeneral)
+  assert.equal(G.MEMBER_MONTHLY['学生会員'], F.memberStudent)
+  assert.equal(G.MEMBER_PART_FEE_WITH_INSURANCE, F.memberPartWithInsurance)
+  assert.equal(G.MEMBER_PART_FEE, F.memberPartNoInsurance)
+  assert.equal(G.MEMBER_MATERIALS_INCLUDED, F.memberMaterialsIncluded)
+  assert.equal(G.PAYG_FEES.rehab, F.paygRehab)
+  assert.equal(G.PAYG_FEES.part, F.paygPart)
+  assert.equal(G.paygPerVisit(1, 0), paygPerVisit())
+  // 動画の比べ方（月8回・微弱電流あり／なし）は、ご案内の計算と同じ数字になる
+  const elesas = G.PHYSIO_OPTIONS.find((p) => p.id === 'elesas').fee
+  assert.deepEqual(G.compareGuide({ plan: '一般会員', visits: 8, parts: 1, physioFee: elesas }), { payg: 47600, member: 35000, diff: 12600, cheaper: 'member' })
+  assert.deepEqual(G.compareGuide({ plan: '一般会員', visits: 8, parts: 1, physioFee: 0 }), { payg: 34800, member: 35000, diff: -200, cheaper: 'payg' })
+  // ご案内から動画へ、動画からご案内へ行ける
+  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
+  assert.ok(read('src/components/rehab-management/ContractsTab.tsx').includes('href="/dashboard/price-video"'))
+  assert.ok(read('src/components/clinic/IntroVideoPage.tsx').includes('会員プランのご案内'))
+  assert.ok(read('src/components/rehab-management/MemberPlanGuide.tsx').includes("title: '材料費'"))
 })
 
 t('最低利用期間は、契約書と同じ', () => {

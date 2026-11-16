@@ -191,7 +191,7 @@ export default function IntroVideoPage() {
     { label: '会員プラン（月額）', value: `一般 ${yen(F.memberGeneral)}・学生 ${yen(F.memberStudent)}` },
     {
       label: '会員の1回ごとの施術料（1部位）',
-      value: `健康保険を使う日 ${yen(F.memberPartWithInsurance)}＋窓口料金`,
+      value: `健康保険を使う日 ${yen(F.memberPartWithInsurance)}＋保険の窓口料金`,
       note: `健康保険を使わない日 ${yen(F.memberPartNoInsurance)}`,
     },
     { label: '会員の材料費', value: '追加の料金なし' },
@@ -274,6 +274,9 @@ export default function IntroVideoPage() {
         </dl>
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
           料金や条件を変えたときは、動画を作り直してください。動画の中の金額は書きかえられません（古い金額のまま見せないため）。
+        </p>
+        <p className="mt-3 text-sm text-slate-700">
+          その方の回数や部位で費用を比べるときは、カルテの「契約・同意書」→「会員プランのご案内」を開きます（金額と言い方は、この動画と同じです）。
         </p>
         <p className="mt-2 text-xs text-slate-600">
           通院中の方に院内でお見せするための動画です。SNS など院の外に出すときは、広告として点検し直してください。
