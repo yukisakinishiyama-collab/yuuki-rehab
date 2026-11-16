@@ -173,7 +173,7 @@ export function findLocalPost(
 export const GOOGLE_CHECK_DAYS = 7
 
 /**
- * いま確かめる番か。出してから2時間は毎回（15分ごと）、そのあとは6時間おき、7日たったら終わり。
+ * いま確かめる番か。出してから2時間は jobs/run のたびに（10分より間を空けて。実際はおよそ1時間ごと）、そのあとは6時間おき、7日たったら終わり。
  * まだ一度も確かめていない古いジョブ（この仕組みの前に出したもの）は、45日前までなら1回だけ確かめる
  */
 export function googleCheckDue(

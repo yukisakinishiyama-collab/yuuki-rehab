@@ -10,7 +10,8 @@
  * - notifyGoogleRejections()  … 新しい拒否を院長のLINEへ（1つの投稿につき1回だけ）
  * - googlePostsOverview()     … 「投稿の予定と結果」の画面に出す、Google の投稿の状態（10分は覚えておく）
  *
- * jobs/run（15分ごと）から呼ぶ。確かめる番のものが無ければ、Google には問い合わせない。
+ * jobs/run から呼ぶ（実際の間隔は、Vercel の Cron で日本時間6〜21時は1時間ごと。GitHub Actions の「15分ごと」は
+ * 数時間に1回しか動いていない。2026-11-13 に実行の記録で確かめた）。確かめる番のものが無ければ、Google には問い合わせない。
  * 拒否されないための決まり（ボタンのリンク・本文）は gbp-post-rules.ts。
  */
 import { kvGet, kvSet } from './kv-store-server'

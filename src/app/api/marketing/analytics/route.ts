@@ -6,6 +6,7 @@ import { listJobs } from '@/lib/marketing/jobs-store-server'
 import { INTENT_LABELS, type IntentKey } from '@/lib/marketing/line-types'
 import { sourceLabel } from '@/lib/marketing/booking-stats'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
+import { summarizeFunnel } from '@/lib/marketing/booking-funnel'
 import { listProposals } from '@/lib/marketing/autopilot-store-server'
 import { kvList } from '@/lib/marketing/kv-store-server'
 import { getGbpSeoPost } from '@/data/gbp-seo-posts'
@@ -72,6 +73,8 @@ async function bookingsBySource(days: number, since: string, clicks: Array<{ met
     posts,
     campaignBookings: Object.fromEntries(byCampaign),
     generatedAt: stats.generatedAt,
+    // 予約画面でどこまで進んだか（段階ごとの回数。予約システムがまだ数えていなければ null）
+    screenFunnel: summarizeFunnel(stats.funnel, sinceDay),
   }
 }
 

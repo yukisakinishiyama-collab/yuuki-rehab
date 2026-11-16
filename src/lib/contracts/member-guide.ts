@@ -5,7 +5,8 @@
 // どちらかを変えたら、もう一方も同じように直す（食いちがうと tools/test-member-guide.mjs が知らせる）。
 //
 // 2026-11-13（院長の指示）：来院ごとの1部位施術料を 1,000円 → 1,500円 に。
-// 健康保険の施術を併用する日は 1,000円＋保険の窓口料金。
+// 2026-11-16（院長の指示）：会員の施術料は「健康保険を使う日 1,000円＋保険の窓口料金／使わない日 1,500円」。会員は材料費もかからない。
+// 言い方は、紹介動画（今日 →「患者さんに見せる」。src/data/intro-videos.ts）・ホームページの料金ページと同じにする。
 // ──────────────────────────────────────────────
 import type { MemberPlan } from '@/types/contracts'
 
@@ -16,10 +17,12 @@ export const MEMBER_MONTHLY: Record<MemberPlan, number> = {
   '兄弟・親子プラン': 30000,
 }
 
-/** 来院ごとの1部位施術料（会員・税込）。来院した方ごと・施術した部位ごとにかかる */
+/** 来院ごとの1部位施術料（会員・税込）。健康保険を使わない日。来院した方ごと・施術した部位ごとにかかる */
 export const MEMBER_PART_FEE = 1500
-/** 健康保険の施術を併用する日の施術料。このほかに保険の窓口料金（一部負担金）がかかる */
+/** 健康保険を使う日の1部位施術料。このほかに保険の窓口料金（一部負担金）がかかる */
 export const MEMBER_PART_FEE_WITH_INSURANCE = 1000
+/** 会員は、材料費（テーピング・包帯など）を別にいただかない（2026-11-16 院長） */
+export const MEMBER_MATERIALS_INCLUDED = true
 
 /** 都度払い（非会員）の料金。料金案内 2-(2) と同じ */
 export const PAYG_FEES = { rehab: 2850, part: 1500 } as const
@@ -46,8 +49,8 @@ export function yen(n: number): string {
   return `${Math.round(n).toLocaleString('ja-JP')}円`
 }
 
-/** 契約書・院の記録に書く、1部位施術料の言い方（金額はここの定数から作る） */
-export const MEMBER_PART_FEE_TEXT = `${yen(MEMBER_PART_FEE)}（健康保険の施術を併用する日は${yen(MEMBER_PART_FEE_WITH_INSURANCE)}＋保険の窓口料金）`
+/** 契約書・ご案内・院の記録に書く、1部位施術料の言い方（金額はここの定数から作る。ひな形の行と同じ文字になる） */
+export const MEMBER_PART_FEE_TEXT = `健康保険を使う日 ${yen(MEMBER_PART_FEE_WITH_INSURANCE)}＋保険の窓口料金／健康保険を使わない日 ${yen(MEMBER_PART_FEE)}`
 
 export interface GuideInput {
   plan: MemberPlan
@@ -85,7 +88,7 @@ export function paygMonthly(input: GuideInput): number {
   return paygPerVisit(i.parts, i.physioFee) * i.visits
 }
 
-/** 会員プランの、1か月の金額（月額＋1部位施術料×部位×回数。保険を併用しない場合） */
+/** 会員プランの、1か月の金額（月額＋1部位施術料×部位×回数。健康保険を使わない日だけの場合） */
 export function memberMonthly(input: GuideInput): number {
   const i = normalizeGuideInput(input)
   return MEMBER_MONTHLY[i.plan] + MEMBER_PART_FEE * i.parts * i.visits

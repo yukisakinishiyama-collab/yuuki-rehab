@@ -2,7 +2,8 @@
  * LINEで連携した患者さんへ、予約の日時をLINEで送る（院内のみ。proxy.ts の Basic 認証の内側。院長・スタッフとも使える）
  * 2026-11-02 院長の依頼「LINE連携した人に予約した際、LINEに予約日・時間を送るボタン」
  *
- * - GET  ?nos=R1,R2 … 予約ごとに、このアプリから送ったか（送った日時・そのときの予約日時）
+ * - GET  ?nos=R1,R2 … 予約ごとに、このアプリから送ったか（送った日時・そのときの予約日時）と、
+ *   文面に入れる「日時の変更・キャンセル」のリンク（links。送る前の見本を、実際に送る文と同じにするため）
  * - PUT  { from, to, items } … 前日のお知らせの控えを、画面で読んだ予約の一覧で最新にする
  * - POST { key, reservationNo, date, time } … その予約の日時を、結びついたLINEへ送る
  *   宛先は連携の記録（linelink:<key>）の封印から、サーバーの中でだけ開く（画面から LINE の宛先は受け取らない）
@@ -15,6 +16,7 @@ import { unsealUserId } from '@/lib/liff-ticket'
 import { getLineLink } from '@/lib/line-link-server'
 import { kvGet, kvSet } from '@/lib/marketing/kv-store-server'
 import { patientConfirmText } from '@/lib/reservation-message'
+import { reservationChangeUrl } from '@/lib/reservation-change-link'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -44,7 +46,13 @@ export async function GET(request: NextRequest) {
   for (const [no, record] of entries) {
     if (record) sent[no] = { date: record.date, time: record.time, sentAt: record.sentAt }
   }
-  return NextResponse.json({ ok: true, sent }, { headers: { 'Cache-Control': 'no-store' } })
+  // 患者さんが日時の変更・キャンセルを入力なしで開けるリンク（作れない予約は入れない＝リンクなしの文面）
+  const links: Record<string, string> = {}
+  for (const no of nos) {
+    const url = reservationChangeUrl(no)
+    if (url) links[no] = url
+  }
+  return NextResponse.json({ ok: true, sent, links }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 const syncSchema = z.object({
@@ -95,7 +103,7 @@ export async function POST(request: NextRequest) {
   const userId = unsealUserId(link.sealed, secret)
   if (!userId) return NextResponse.json({ ok: false, error: 'LINEの宛先を開けませんでした' }, { status: 500 })
 
-  const text = patientConfirmText({ name: link.name, date, time, reservationNo })
+  const text = patientConfirmText({ name: link.name, date, time, reservationNo, changeUrl: reservationChangeUrl(reservationNo) })
   try {
     const res = await fetch(LINE_PUSH_URL, {
       method: 'POST',

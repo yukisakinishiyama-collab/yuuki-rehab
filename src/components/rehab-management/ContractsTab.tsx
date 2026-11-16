@@ -8,22 +8,28 @@
  * 3. 患者さん（未成年なら保護者も）と担当者が指で署名 →「署名して完了する」
  *    （まだのものがあれば、ボタンの上に「あと○つ」を出し、押すとそこへ飛ぶ。2026-11-11「登録できない」の見直し）
  *    → 署名入りの本文をクラウドに保存（あとから変えない）、一覧（pt_contracts）に1行
- * 4. 「印刷する」で院保管用と患者様控えの2部（控えだけ・白紙も印刷できる）
+ * 4. 「印刷する」で院保管用と患者様控えの2部（控えだけ・白紙も印刷できる）。署名済みの書類は「内容を見る・印刷する」で、
+ *    アプリの画面でも中身（署名入り）を確かめられる
+ * 会員プランの書類（入会・休会・解約）は、いちばん上に「ご契約内容」の枠（だれが・どのプランを・いくらで・いつから＋直筆の署名）が入る。
+ * 院保管用にも患者様控えにも同じものが出る（lib/contracts/summary.ts。2026-11-13 院長の依頼）。
  * 会員プランの書類（入会・休会・解約）に署名すると、会員の状態と日付（最低利用期間・契約終了日）が自動で変わる。
  * 兄弟・親子プラン（2名まで）は契約者（代表）のカルテで手続きし、もう1名の方のカルテにも会員の状態が出る。
  * 「会員プランのご案内」（患者様にお見せする説明。MemberPlanGuide.tsx）もここから開く。最後のページから入会の契約書へ進める。
+ * となりの「紹介動画」は、同じ内容を約2分にまとめた動画のページ（/dashboard/price-video）へ。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { nanoid } from 'nanoid'
-import { CheckCircle2, ChevronLeft, CloudUpload, FileDown, FileSignature, Presentation, Printer } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, CloudUpload, Eye, FileDown, FileSignature, MonitorPlay, Presentation, Printer } from 'lucide-react'
 import type { Patient } from '@/types/patient'
 import type { ContractRecord, MemberPlan, MemberStatus } from '@/types/contracts'
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templates'
-import { parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
+import { CONTRACT_PRINT_CSS, parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
+import { contractSummaryHtml, insertSummary, isSafeContractHtml, memberLineOf, withContractSummary } from '@/lib/contracts/summary'
 import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
 import { CLINIC_STAFF } from '@/data/clinic-staff'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { lengthLabel, PRICE_GUIDE_VIDEO } from '@/data/intro-videos'
 import { cardSurface } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { dropPending, getPendingContracts, keepPending, sendContract, sendErrorText, type PendingContract } from '@/lib/contracts/send'
@@ -35,7 +41,6 @@ import {
   jstToday,
   MEMBER_FEES,
   MEMBER_PLANS,
-  memberEventHtml,
   memberStatusForPatient,
   memberStatusOf,
   minEndOf,
@@ -226,7 +231,14 @@ export default function ContractsTab({
             プランの内容・料金・都度払いとの費用の比較・契約前の確認を、画面いっぱいに出します。開いている間、カルテの内容は見えません。
           </p>
         </div>
-        <Button onClick={() => setGuideOpen(true)}>ご案内を開く</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setGuideOpen(true)}>ご案内を開く</Button>
+          {/* 同じ内容を約2分にまとめた動画（今日 →「患者さんに見せる」）。金額と言い方はご案内と同じ */}
+          <Link href="/dashboard/price-video" className={buttonVariants({ variant: 'outline' })}>
+            <MonitorPlay className="h-4 w-4" aria-hidden />
+            紹介動画（{lengthLabel(PRICE_GUIDE_VIDEO.seconds)}）
+          </Link>
+        </div>
       </section>
       {guideOpen && (
         <MemberPlanGuide
@@ -293,6 +305,7 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
   const [reason, setReason] = useState('')
 
   const [html, setHtml] = useState<string | null>(null)
+  const memberLine = memberLineOf(record)
 
   /** 署名入りの本文をクラウドから読む（読んでから印刷のボタンを出す。iPad は押したその場でないと印刷の画面が出ないため） */
   async function load() {
@@ -322,6 +335,8 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
             {jaDate(record.signedDate)}・{record.staffLabel} {record.staffName}
             {record.guardianName ? `・保護者 ${record.guardianName}` : ''}・記録ID {record.id}
           </p>
+          {/* 会員プランの書類は、開かなくても契約の中身が分かるように1行で出す */}
+          {memberLine && <p className="mt-0.5 text-sm font-medium text-teal-800">{memberLine}</p>}
           {record.voided && <p className="text-xs text-slate-600">取り消しの理由：{record.voided.reason}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -332,8 +347,8 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
               onClick={load}
               className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 text-sm font-medium text-teal-800 hover:bg-teal-50 disabled:opacity-60"
             >
-              <Printer className="h-4 w-4" aria-hidden />
-              {busy ? '読み込んでいます…' : '控えを印刷する'}
+              <Eye className="h-4 w-4" aria-hidden />
+              {busy ? '読み込んでいます…' : '内容を見る・印刷する'}
             </button>
           )}
           {!record.voided && (
@@ -371,8 +386,9 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
         </div>
       )}
       {html && (
-        <div className="mt-2 rounded-lg bg-slate-50 p-2">
+        <div className="mt-2 space-y-2 rounded-lg bg-slate-50 p-2">
           <CopyActions html={html} record={record} compact />
+          <SignedDocumentView html={html} record={record} onClose={() => setHtml(null)} />
         </div>
       )}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -380,9 +396,34 @@ function SignedRow({ record, onUpdate }: { record: ContractRecord; onUpdate: () 
   )
 }
 
+/** 署名済みの書類を、アプリの画面で見る（印刷と同じ中身。署名も出る） */
+function SignedDocumentView({ html, record, onClose }: { html: string; record: ContractRecord; onClose: () => void }) {
+  const shown = useMemo(() => withContractSummary(html, record), [html, record])
+  if (!isSafeContractHtml(shown)) {
+    return <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">この書類は画面に出せませんでした。「患者様控えを印刷」で確かめてください。</p>
+  }
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5">
+        <p className="text-xs font-bold text-slate-600">署名した書類の内容（印刷と同じもの）</p>
+        <button type="button" onClick={onClose} className="min-h-9 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100">
+          閉じる
+        </button>
+      </div>
+      <style>{CONTRACT_PRINT_CSS}</style>
+      <div className="max-h-[70vh] overflow-auto p-3 sm:p-5">
+        {/* 本文はアプリが作ってクラウドに保存したもの（お名前などは保存するときに文字として入れてある） */}
+        <div className="contract-paper mx-auto max-w-[190mm]" dangerouslySetInnerHTML={{ __html: shown }} />
+      </div>
+    </div>
+  )
+}
+
 /** 署名済みの書類の控えを印刷する（印刷は患者様の控えが基本。院の分はクラウドに残る） */
-function CopyActions({ html, record, compact = false }: { html: string; record: ContractRecord; compact?: boolean }) {
+function CopyActions({ html: stored, record, compact = false }: { html: string; record: ContractRecord; compact?: boolean }) {
   const standalone = isStandaloneApp()
+  // 前に署名した入会の書類にも、印刷のときに「ご契約内容」の枠を足す（保存した本文は書きかえない）
+  const html = useMemo(() => withContractSummary(stored, record), [stored, record])
   return (
     <div className={compact ? 'space-y-2' : 'mt-5 space-y-3'}>
       <div className={`flex flex-wrap gap-2 ${compact ? '' : 'justify-center'}`}>
@@ -738,9 +779,22 @@ function SignFlow({
       written: values.filter((v) => v.trim()).length,
       member: memberCheck && memberCheck.ok ? memberCheck.event : undefined,
     }
+    // 会員プランの書類は、いちばん上に「ご契約内容」の枠（直筆の署名も）を入れる。院保管用にも患者様控えにも同じものが出る
+    const summary = contractSummaryHtml({
+      record,
+      before: status,
+      parsed,
+      described,
+      checks,
+      values,
+      signatures: [
+        { label: '患者様', name: record.patientName, image: sigPatient },
+        ...(record.guardianName ? [{ label: `保護者${record.relation ? `（${record.relation}）` : ''}`, name: record.guardianName, image: sigGuardian }] : []),
+        { label: tpl.staffLabel, name: record.staffName, image: sigStaff },
+      ],
+    })
     const html =
-      renderTemplateHtml(parsed, checks, values) +
-      (record.member ? memberEventHtml(record.member, status) : '') +
+      insertSummary(renderTemplateHtml(parsed, checks, values), summary) +
       signatureBlockHtml({
         date: today,
         patientName: record.patientName,

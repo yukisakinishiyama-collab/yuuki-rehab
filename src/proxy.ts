@@ -95,11 +95,45 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  return new NextResponse('認証が必要です', {
+  return unauthorized(request)
+}
+
+/**
+ * パスワードが無いときの返事（401）。ふつうのブラウザは、これを受けてパスワードの入力画面を出す。
+ * LINE の中のブラウザのように入力画面が出ないものでは、この文がそのまま出るので、
+ * 人が画面を開いたとき（Accept に text/html）は、どうすれば見られるかを書いて返す
+ * （2026-11-16 院長から：LINE のお知らせから開くと「認証が必要です」とだけ出て、分からなかった）。
+ * アプリの中からの通信（API）には、これまでどおり短い文だけを返す。
+ */
+function unauthorized(request: NextRequest) {
+  // 名前は従来のまま（保存済みのログインを使い続けられるように）
+  const headers = { 'WWW-Authenticate': 'Basic realm="marketing-hub", charset="UTF-8"' }
+  if (!(request.headers.get('accept') ?? '').includes('text/html')) {
+    return new NextResponse('認証が必要です', { status: 401, headers })
+  }
+  return new NextResponse(UNAUTHORIZED_PAGE, {
     status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="marketing-hub", charset="UTF-8"' }, // 名前は従来のまま（保存済みのログインを使い続けられるように）
+    headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
   })
 }
+
+// 決まった文だけ（開いたアドレスなど、外から来た文字は入れない）
+const UNAUTHORIZED_PAGE = `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>パスワードが必要です｜ゆうき整骨院 院内アプリ</title>
+</head>
+<body style="margin:0;padding:24px;font-family:-apple-system,'Hiragino Sans','Noto Sans JP',sans-serif;line-height:1.8;color:#0f172a;background:#f8fafc">
+<h1 style="font-size:20px;margin:0 0 12px">パスワードが必要な画面です</h1>
+<p style="margin:0 0 12px">ここは、ゆうき整骨院の院内アプリです。院のパスワードを入れると見られます。</p>
+<p style="margin:0 0 12px"><b>LINEから開いたとき</b>は、パスワードを入れる画面が出ません。画面の右上か右下のメニューから「ブラウザで開く」（Safari・Chrome）を選んでください。</p>
+<p style="margin:0">いつもの院内アプリを開いて、同じ画面を見ることもできます。</p>
+</body>
+</html>
+`
 
 export const config = {
   matcher: [

@@ -453,7 +453,8 @@ await test('投稿：YouTube は「連携」と「審査に通った」の両方
     assert.match(msgs[2].text, /【YouTube 題名】\n足首の捻挫のリハビリ｜下関市彦島 ゆうき整骨院/)
     assert.match(msgs[3].text, /【TikTok 説明】/)
     const buttons = msgs[4].contents.footer.contents.map((b) => b.action.data ?? b.action.uri)
-    assert.deepEqual(buttons, ['ap:done:job-yt', 'ap:done:job-tt', stored.url, 'https://yuuki-rehab.vercel.app/marketing/autopilot?open=settings'])
+    // 院内アプリへのリンクは、LINE の中ではなく端末のブラウザで開く印つき（中のブラウザはパスワードを入れられない）。動画そのもののリンクは変えない
+    assert.deepEqual(buttons, ['ap:done:job-yt', 'ap:done:job-tt', stored.url, 'https://yuuki-rehab.vercel.app/marketing/autopilot?open=settings&openExternalBrowser=1'])
     // TikTok だけ（YouTube は自動で出た）のときは、TikTok の分だけ
     pushed.length = 0
     await nudgeManualPosts([job('tiktok', 'job-tt', tt)])

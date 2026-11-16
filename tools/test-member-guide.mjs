@@ -1,6 +1,7 @@
 // 会員プランのご案内（患者様にお見せする説明）の、料金の計算と、契約書のひな形との金額の一致の確認
 // 実行: npx tsx tools/test-member-guide.mjs
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { register } from 'node:module'
 register(
   'data:text/javascript,' +
@@ -72,7 +73,7 @@ test('入力は計算できる範囲にそろえる（回数1〜31・部位1〜3
 
 test('金額の書き方', () => {
   assert.equal(guide.yen(23000), '23,000円')
-  assert.equal(guide.MEMBER_PART_FEE_TEXT, '1,500円（健康保険の施術を併用する日は1,000円＋保険の窓口料金）')
+  assert.equal(guide.MEMBER_PART_FEE_TEXT, '健康保険を使う日 1,000円＋保険の窓口料金／健康保険を使わない日 1,500円')
 })
 
 test('契約書・料金案内のひな形と、ご案内の金額が同じ', () => {
@@ -87,14 +88,15 @@ test('契約書・料金案内のひな形と、ご案内の金額が同じ', ()
     assert.match(contract, row, plan)
     assert.ok(member.MEMBER_FEES[plan].includes(guide.yen(guide.MEMBER_MONTHLY[plan])), `${plan} の月額`)
   }
-  // 来院ごとの1部位施術料と、保険を併用する日
+  // 来院ごとの1部位施術料：健康保険を使う日・使わない日（ご案内・契約書・料金案内とも、同じ言い方）
   const fee = guide.yen(guide.MEMBER_PART_FEE)
   const ins = guide.yen(guide.MEMBER_PART_FEE_WITH_INSURANCE)
-  assert.ok(contract.includes(`| 来院ごとの1部位施術料（別途） | ${fee}（健康保険の施術を併用する日は${ins}＋保険の窓口料金） | □ 確認しました |`))
-  assert.ok(contract.includes(`□ 1部位施術料（${fee}。健康保険の施術を併用する日は${ins}＋保険の窓口料金）は、来院した方ごと・施術した部位ごとにかかります。`))
-  assert.ok(policy.includes(`| 来院ごとの1部位施術料（別途） | ${fee} |`))
-  assert.ok(policy.includes(`健康保険の施術を併用する日の1部位施術料は、${ins}＋保険の窓口料金です。`))
-  // 古い金額（1部位施術料 1,000円）が残っていない
+  const text = `健康保険を使う日 ${ins}＋保険の窓口料金／健康保険を使わない日 ${fee}`
+  assert.equal(guide.MEMBER_PART_FEE_TEXT, text)
+  assert.ok(contract.includes(`| 来院ごとの1部位施術料（別途） | ${text} | □ 確認しました |`))
+  assert.ok(contract.includes(`□ 1部位施術料（${text}）は、来院した方ごと・施術した部位ごとにかかります。`))
+  assert.ok(policy.includes(`| 来院ごとの1部位施術料（別途） | ${text} |`))
+  // 古い金額（1部位施術料 1,000円 だけ）が残っていない
   assert.ok(!/1部位施術料（別途） \| 1,000円/.test(contract + policy))
   assert.ok(!contract.includes('1部位施術料（1,000円）'))
   // 都度払い・物理療法・特別手技療法
@@ -108,12 +110,22 @@ test('契約書・料金案内のひな形と、ご案内の金額が同じ', ()
   }
 })
 
+test('材料費：会員は追加なし（ご案内の「含まれるもの」「料金」に出す）', () => {
+  assert.equal(guide.MEMBER_MATERIALS_INCLUDED, true)
+  const src = readFileSync(new URL('src/components/rehab-management/MemberPlanGuide.tsx', root), 'utf8')
+  assert.ok(src.includes("title: '材料費'"))
+  assert.ok(src.includes('材料費の追加はありません'))
+  // 古い言い方（併用する日）が画面に残っていない
+  assert.ok(!src.includes('健康保険の施術を併用'))
+})
+
 test('院の記録（兄弟・親子プランの入会）にも新しい施術料が出る', () => {
   const html = member.memberEventHtml(
     { kind: 'join', plan: '兄弟・親子プラン', start: '2026-12-01', partner: { name: '山田 花子', relation: '妹' } },
     { state: 'none', label: '', pausedMonths: 0 },
   )
-  assert.match(html, /来院した方ごと・施術した部位ごとに1,500円（健康保険の施術を併用する日は1,000円＋保険の窓口料金）/)
+  assert.ok(html.includes(`来院した方ごと・施術した部位ごとに${guide.MEMBER_PART_FEE_TEXT}`))
+  assert.ok(html.includes('健康保険を使う日 1,000円＋保険の窓口料金／健康保険を使わない日 1,500円'))
 })
 
 console.log(`\n会員プランのご案内：${passed} 件 OK`)

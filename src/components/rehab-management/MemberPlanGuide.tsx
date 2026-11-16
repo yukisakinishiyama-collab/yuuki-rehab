@@ -9,11 +9,13 @@
  *       → 会員の方の取り扱い → 契約前の確認 → 選び方とお申し込みの流れ（ここから契約書の署名へ進める）
  *
  * - 金額と計算は lib/contracts/member-guide.ts（契約書・料金案内のひな形と同じ金額）
+ * - 1部位施術料と材料費の言い方は、紹介動画（今日 →「患者さんに見せる」）・ホームページの料金ページと同じにする
+ *   （健康保険を使う日 1,000円＋保険の窓口料金／使わない日 1,500円。会員は材料費の追加なし。2026-11-16 院長の指示）
  * - 効果を約束する言い方・不安をあおる言い方はしない。都度払いのほうが少ないときは、そのまま出す
  * - 会員プランは、1か月以上通院され、継続管理が合うと院が判断した方にだけご案内する（料金案内 4）
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Activity, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Clock, FileSignature, LineChart, Minus, Plus, X, Zap } from 'lucide-react'
+import { Activity, Bandage, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Clock, FileSignature, LineChart, Minus, Plus, X, Zap } from 'lucide-react'
 import type { MemberPlan } from '@/types/contracts'
 import { Button } from '@/components/ui/button'
 import { cardSurface } from '@/components/ui/card'
@@ -24,6 +26,7 @@ import {
   compareGuide,
   MEMBER_MONTHLY,
   MEMBER_PART_FEE,
+  MEMBER_PART_FEE_TEXT,
   MEMBER_PART_FEE_WITH_INSURANCE,
   PAYG_FEES,
   PHYSIO_OPTIONS,
@@ -332,6 +335,7 @@ function IncludedPage() {
     { icon: LineChart, title: '継続管理と定期的な再評価', text: '施術計画にもとづいて進めます。' },
     { icon: Zap, title: '状態に応じた物理療法', text: '体外衝撃波・5D・コンビネーション治療・微弱電流エレサス など' },
     { icon: CheckCircle2, title: 'その他の自費施術', text: '当院が必要と判断するものが対象です。' },
+    { icon: Bandage, title: '材料費', text: '会員の方は、追加の料金はかかりません。' },
   ]
   return (
     <div>
@@ -352,7 +356,7 @@ function IncludedPage() {
       <Note className="mt-5">
         <p>施術内容・通院頻度・物理療法の使用は、症状・評価結果・安全性・必要性をふまえて当院が判断します。</p>
         <p>
-          来院ごとの1部位施術料（{yen(MEMBER_PART_FEE)}。健康保険の施術を併用する日は{yen(MEMBER_PART_FEE_WITH_INSURANCE)}＋保険の窓口料金）は、月額とは別にかかります。
+          来院ごとの1部位施術料（{MEMBER_PART_FEE_TEXT}）は、月額とは別にかかります。
         </p>
       </Note>
     </div>
@@ -363,6 +367,7 @@ function IncludedPage() {
 
 function PricePage({ visits }: { visits: number }) {
   const example = MEMBER_MONTHLY['一般会員'] + MEMBER_PART_FEE * visits
+  const exampleWithInsurance = MEMBER_MONTHLY['一般会員'] + MEMBER_PART_FEE_WITH_INSURANCE * visits
   return (
     <div>
       <Heading eyebrow="料金（税込）">月額料金と、来院ごとの1部位施術料</Heading>
@@ -381,25 +386,54 @@ function PricePage({ visits }: { visits: number }) {
         ))}
       </div>
       <div className={cn(cardSurface, 'mt-4 p-5')}>
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h3 className="text-base font-bold text-teal-800">＋ 来院ごとの1部位施術料</h3>
-          <p className="text-4xl font-black text-slate-900 tabular-nums">
-            {MEMBER_PART_FEE.toLocaleString('ja-JP')}
-            <span className="ml-1 text-base font-bold">円／回</span>
-          </p>
-        </div>
+        <h3 className="text-base font-bold text-teal-800">＋ 来院ごとの1部位施術料</h3>
+        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl bg-teal-50 p-4">
+            <dt className="text-sm font-bold text-slate-700">健康保険を使う日</dt>
+            <dd className="mt-1 flex flex-wrap items-baseline gap-x-2 text-slate-900">
+              <span className="text-4xl font-black tabular-nums">
+                {MEMBER_PART_FEE_WITH_INSURANCE.toLocaleString('ja-JP')}
+                <span className="ml-1 text-base font-bold">円</span>
+              </span>
+              <span className="text-lg font-bold">＋ 保険の窓口料金</span>
+            </dd>
+          </div>
+          <div className="rounded-xl bg-slate-100 p-4">
+            <dt className="text-sm font-bold text-slate-700">健康保険を使わない日</dt>
+            <dd className="mt-1 text-4xl font-black text-slate-900 tabular-nums">
+              {MEMBER_PART_FEE.toLocaleString('ja-JP')}
+              <span className="ml-1 text-base font-bold">円</span>
+            </dd>
+          </div>
+        </dl>
         <ul className="mt-3 space-y-1 text-base leading-relaxed text-slate-700">
           <li>・月額とは別に、来院した方ごと・施術した部位ごとにかかります。</li>
-          <li>
-            ・健康保険の施術を併用する日は、<b className="text-slate-900">{yen(MEMBER_PART_FEE_WITH_INSURANCE)}＋保険の窓口料金</b>です。
-          </li>
+          <li>・保険の窓口料金は、保険の負担割合や施術の内容によって変わります。</li>
+          <li>・会員の方は、材料費の追加はありません。</li>
         </ul>
       </div>
       <div className="mt-4 rounded-xl bg-teal-700 p-5 text-white">
-        <p className="text-sm font-bold text-teal-100">例）一般会員・月{visits}回・1部位・保険併用なしの場合</p>
-        <p className="mt-1 text-xl font-black leading-snug tabular-nums sm:text-2xl">
-          {yen(MEMBER_MONTHLY['一般会員'])} ＋ {yen(MEMBER_PART_FEE)} × {visits}回 ＝ 月{yen(example)}
-        </p>
+        <p className="text-sm font-bold text-teal-100">例）一般会員・月{visits}回・1部位の場合</p>
+        <dl className="mt-1 space-y-2">
+          <div>
+            <dt className="text-sm font-bold text-teal-50">健康保険を使う日だけのとき</dt>
+            <dd className="text-xl font-black leading-snug tabular-nums sm:text-2xl">
+              <span className="whitespace-nowrap">
+                {yen(MEMBER_MONTHLY['一般会員'])} ＋ {yen(MEMBER_PART_FEE_WITH_INSURANCE)} × {visits}回
+              </span>{' '}
+              <span className="whitespace-nowrap">＝ 月{yen(exampleWithInsurance)}</span> <span className="whitespace-nowrap">＋ 保険の窓口料金</span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm font-bold text-teal-50">健康保険を使わない日だけのとき</dt>
+            <dd className="text-xl font-black leading-snug tabular-nums sm:text-2xl">
+              <span className="whitespace-nowrap">
+                {yen(MEMBER_MONTHLY['一般会員'])} ＋ {yen(MEMBER_PART_FEE)} × {visits}回
+              </span>{' '}
+              <span className="whitespace-nowrap">＝ 月{yen(example)}</span>
+            </dd>
+          </div>
+        </dl>
       </div>
       <p className="mt-4 text-base text-slate-700">
         通院回数が少ない月も、月額は変わりません（日割り・増減はありません）。お支払いはクレジットカードのみです。
@@ -504,7 +538,8 @@ function ComparePage({
         )}
       </Note>
       <ul className="mt-4 space-y-1 text-sm leading-relaxed text-slate-600">
-        <li>・健康保険の施術を併用しない場合の金額です。</li>
+        <li>・どちらも、健康保険を使わない日だけで比べた金額です。</li>
+        <li>・健康保険を使う日の会員の施術料は、{yen(MEMBER_PART_FEE_WITH_INSURANCE)}＋保険の窓口料金になります。</li>
         <li>・会員プランで行う内容は、状態に応じて当院が判断します。毎回同じ内容とは限らないため、金額は目安です。</li>
         {pair && <li>・兄弟・親子プランは、2名分の来院を合わせた回数で比べています。</li>}
       </ul>
