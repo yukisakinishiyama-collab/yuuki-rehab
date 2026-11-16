@@ -15,7 +15,8 @@
  * 会員プランの書類（入会・休会・解約）に署名すると、会員の状態と日付（最低利用期間・契約終了日）が自動で変わる。
  * 兄弟・親子プラン（2名まで）は契約者（代表）のカルテで手続きし、もう1名の方のカルテにも会員の状態が出る。
  * 「会員プランのご案内」（患者様にお見せする説明。MemberPlanGuide.tsx）もここから開く。最後のページから入会の契約書へ進める。
- * となりの「紹介動画」は、同じ内容を約2分にまとめた動画のページ（/dashboard/price-video）へ。
+ * となりの「紹介動画を見せる」は、同じ内容を約2分にまとめた動画を、カルテを開いたまま画面いっぱいに再生する
+ * （clinic/IntroVideoStage.tsx。今日 →「患者さんに見せる」のページと同じ動画。閉じるとこのタブに戻る）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -28,8 +29,9 @@ import { CONTRACT_PRINT_CSS, parseTemplate, renderTemplateHtml, escapeHtml, jaDa
 import { contractSummaryHtml, insertSummary, isSafeContractHtml, memberLineOf, withContractSummary } from '@/lib/contracts/summary'
 import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
 import { CLINIC_STAFF } from '@/data/clinic-staff'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { lengthLabel, PRICE_GUIDE_VIDEO } from '@/data/intro-videos'
+import { Button } from '@/components/ui/button'
+import { lengthLabel, pickOrientation, PRICE_GUIDE_VIDEO, type VideoOrientation } from '@/data/intro-videos'
+import IntroVideoStage from '@/components/clinic/IntroVideoStage'
 import { cardSurface } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { dropPending, getPendingContracts, keepPending, sendContract, sendErrorText, type PendingContract } from '@/lib/contracts/send'
@@ -113,6 +115,9 @@ export default function ContractsTab({
   const [view, setView] = useState<View>({ kind: 'list' })
   /** 会員プランのご案内（患者様にお見せする説明）を開いている */
   const [guideOpen, setGuideOpen] = useState(false)
+  /** 紹介動画を画面いっぱいで出しているときの、動画の向き（出していなければ null） */
+  const [videoStage, setVideoStage] = useState<VideoOrientation | null>(null)
+  const closeVideo = useCallback(() => setVideoStage(null), [])
   /** この方ご自身の契約からの状態（休会・解約の書類の計算に使う） */
   const ownStatus = useMemo(() => memberStatusOf(contracts, today), [contracts, today])
   /** 画面に出す状態（兄弟・親子プランのもう1名なら、代表の方の契約から） */
@@ -228,18 +233,19 @@ export default function ContractsTab({
             会員プランのご案内（患者様にお見せする説明）
           </h3>
           <p className="mt-1 text-xs text-slate-600">
-            プランの内容・料金・都度払いとの費用の比較・契約前の確認を、画面いっぱいに出します。開いている間、カルテの内容は見えません。
+            プランの内容・料金・都度払いとの費用の比較・契約前の確認を、画面いっぱいに出します。「紹介動画を見せる」は、同じ内容を約2分にまとめた動画（声の解説つき・音が出ます）を、この場で再生します。どちらも、開いている間、カルテの内容は見えません。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setGuideOpen(true)}>ご案内を開く</Button>
-          {/* 同じ内容を約2分にまとめた動画（今日 →「患者さんに見せる」）。金額と言い方はご案内と同じ */}
-          <Link href="/dashboard/price-video" className={buttonVariants({ variant: 'outline' })}>
+          {/* 同じ内容を約2分にまとめた動画。カルテを開いたまま、その場で画面いっぱいに再生する（金額と言い方はご案内と同じ） */}
+          <Button variant="outline" onClick={() => setVideoStage(pickOrientation(window.innerWidth, window.innerHeight))}>
             <MonitorPlay className="h-4 w-4" aria-hidden />
-            紹介動画（{lengthLabel(PRICE_GUIDE_VIDEO.seconds)}）
-          </Link>
+            紹介動画を見せる（{lengthLabel(PRICE_GUIDE_VIDEO.seconds)}）
+          </Button>
         </div>
       </section>
+      {videoStage && <IntroVideoStage orientation={videoStage} onOrientation={setVideoStage} onClose={closeVideo} />}
       {guideOpen && (
         <MemberPlanGuide
           patientName={patient.name}

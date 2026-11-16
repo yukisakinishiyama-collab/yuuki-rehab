@@ -5,15 +5,17 @@
  * 今日 →「患者さんに見せる」から開く（/dashboard/price-video）。2026-11-16 院長の依頼。
  *
  * - この画面（スタッフ用）：動画の確認、向きの選択、動画に出てくる金額の一覧（聞かれたときの確認用）
- * - 「患者さんに見せる」を押すと、画面いっぱいに動画だけを出す（Stage）。開いている間は、院内アプリの
+ * - 「患者さんに見せる」を押すと、画面いっぱいに動画だけを出す（IntroVideoStage.tsx）。開いている間は、院内アプリの
  *   メニューやほかの画面を見せない。Esc か「閉じる」で戻る。何も保存しない
+ * - 同じ動画は、カルテの「契約・同意書」タブの「紹介動画を見せる」からも、カルテを開いたまま再生できる
  * - 向きは、押したときの画面の形で選ぶ（横長＝横向きの動画、縦長＝縦向きの動画）。手で選ぶこともできる
  *
  * 動画・金額の出どころと、料金を変えたときの決まりは src/data/intro-videos.ts
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { MonitorPlay, RectangleHorizontal, RectangleVertical, RotateCcw, X } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { MonitorPlay } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import IntroVideoStage from './IntroVideoStage'
 import { cardSurface } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import {
@@ -37,138 +39,6 @@ const CHOICES: Array<{ id: Choice; label: string }> = [
 function asOfLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${y}年${m}月${d}日`
-}
-
-// ── 画面いっぱいで見せる ─────────────────────────────
-
-function Stage({
-  orientation,
-  onOrientation,
-  onClose,
-}: {
-  orientation: VideoOrientation
-  onOrientation: (o: VideoOrientation) => void
-  onClose: () => void
-}) {
-  const video = useRef<HTMLVideoElement>(null)
-  /** 向きを替えたとき、同じところから続ける */
-  const resumeAt = useRef(0)
-  const [ended, setEnded] = useState(false)
-  const file = V.files[orientation]
-
-  // Esc で閉じる。開いている間は、うしろの画面を動かさない
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    const before = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = before
-    }
-  }, [onClose])
-
-  function switchTo(next: VideoOrientation) {
-    if (next === orientation) return
-    resumeAt.current = video.current?.currentTime ?? 0
-    setEnded(false)
-    onOrientation(next)
-  }
-
-  function replay() {
-    const el = video.current
-    if (!el) return
-    setEnded(false)
-    el.currentTime = 0
-    // 再生を断られたとき（端末の設定など）は、動画の再生ボタンを押してもらう
-    el.play().catch(() => {})
-  }
-
-  return (
-    // m-0：置き場所の space-y-* が付ける余白（margin）で、画面の下があかないように
-    <div
-      className="no-print fixed inset-0 z-[60] m-0 flex flex-col bg-teal-950 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-      role="dialog"
-      aria-modal="true"
-      aria-label={V.title}
-    >
-      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 sm:px-4">
-        <p className="text-sm font-bold text-teal-100">ゆうき整骨院　{V.title}</p>
-        <div className="flex items-center gap-1.5">
-          <div className="flex overflow-hidden rounded-lg ring-1 ring-white/40" role="group" aria-label="動画の向き">
-            {(['land', 'port'] as const).map((o) => (
-              <button
-                key={o}
-                type="button"
-                aria-pressed={orientation === o}
-                onClick={() => switchTo(o)}
-                className={cn(
-                  'inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-bold',
-                  orientation === o ? 'bg-white text-teal-900' : 'text-white hover:bg-white/10',
-                )}
-              >
-                {o === 'land' ? <RectangleHorizontal className="h-4 w-4" aria-hidden /> : <RectangleVertical className="h-4 w-4" aria-hidden />}
-                {o === 'land' ? '横向き' : '縦向き'}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-bold text-white hover:bg-white/10"
-          >
-            <X className="h-4 w-4" aria-hidden />
-            閉じる
-          </button>
-        </div>
-      </header>
-
-      <div className="relative flex min-h-0 flex-1 items-center justify-center px-2 pb-2 sm:px-4 sm:pb-4">
-        <video
-          // 向きを替えたら、別の動画として読み直す
-          key={orientation}
-          ref={video}
-          src={file.src}
-          poster={file.poster}
-          width={file.width}
-          height={file.height}
-          controls
-          playsInline
-          preload="auto"
-          className="h-auto max-h-full w-auto max-w-full rounded-lg bg-black"
-          onLoadedMetadata={(e) => {
-            const el = e.currentTarget
-            if (resumeAt.current > 0.3) el.currentTime = resumeAt.current
-            resumeAt.current = 0
-            // 「患者さんに見せる」を押した流れで再生を始める。断られたら、動画の再生ボタンを押してもらう
-            el.play().catch(() => {})
-          }}
-          onEnded={() => setEnded(true)}
-          onPlay={() => setEnded(false)}
-        >
-          <track kind="captions" src={V.captions} srcLang="ja" label="日本語（声の文字）" />
-          この端末では動画を再生できません。
-        </video>
-
-        {ended && (
-          <div className="absolute inset-x-0 bottom-6 flex justify-center px-4">
-            <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 shadow-lg">
-              <p className="text-sm font-bold text-slate-900">ご覧いただき、ありがとうございました。</p>
-              <Button variant="outline" onClick={replay} className="h-11">
-                <RotateCcw className="h-4 w-4" aria-hidden />
-                もう一度見る
-              </Button>
-              <Button onClick={onClose} className="h-11">
-                閉じる
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // ── スタッフ用の画面 ─────────────────────────────────
@@ -283,7 +153,7 @@ export default function IntroVideoPage() {
         </p>
       </section>
 
-      {stage && <Stage orientation={stage} onOrientation={setStage} onClose={close} />}
+      {stage && <IntroVideoStage orientation={stage} onOrientation={setStage} onClose={close} />}
     </div>
   )
 }

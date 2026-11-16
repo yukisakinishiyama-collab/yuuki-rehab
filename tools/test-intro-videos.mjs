@@ -85,9 +85,15 @@ t('動画と、カルテの「会員プランのご案内」の金額が同じ�
   const elesas = G.PHYSIO_OPTIONS.find((p) => p.id === 'elesas').fee
   assert.deepEqual(G.compareGuide({ plan: '一般会員', visits: 8, parts: 1, physioFee: elesas }), { payg: 47600, member: 35000, diff: 12600, cheaper: 'member' })
   assert.deepEqual(G.compareGuide({ plan: '一般会員', visits: 8, parts: 1, physioFee: 0 }), { payg: 34800, member: 35000, diff: -200, cheaper: 'payg' })
-  // ご案内から動画へ、動画からご案内へ行ける
+  // カルテの「契約・同意書」タブから、カルテを開いたまま動画を再生できる。動画のページからは、ご案内への案内がある
   const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
-  assert.ok(read('src/components/rehab-management/ContractsTab.tsx').includes('href="/dashboard/price-video"'))
+  const tab = read('src/components/rehab-management/ContractsTab.tsx')
+  assert.ok(tab.includes('<IntroVideoStage ') && tab.includes('紹介動画を見せる'))
+  assert.ok(tab.includes('pickOrientation(window.innerWidth, window.innerHeight)'))
+  // 画面いっぱいの動画は1つの部品（今日のページとカルテで同じもの）。ご案内（z-[60]）より手前に出す
+  const stage = read('src/components/clinic/IntroVideoStage.tsx')
+  assert.ok(stage.includes('z-[70]') && stage.includes('no-print') && stage.includes('aria-modal="true"'))
+  assert.ok(read('src/components/clinic/IntroVideoPage.tsx').includes('<IntroVideoStage '))
   assert.ok(read('src/components/clinic/IntroVideoPage.tsx').includes('会員プランのご案内'))
   assert.ok(read('src/components/rehab-management/MemberPlanGuide.tsx').includes("title: '材料費'"))
 })
