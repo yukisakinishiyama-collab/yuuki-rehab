@@ -81,6 +81,10 @@ t('料金のしくみと健康保険の動画：金額は料金案内・料金�
   assert.ok(EV.painAtOneYear.doi.startsWith('10.') && EV.recurrence.doi.startsWith('10.'))
   const page = readFileSync(new URL('../src/components/clinic/FeeVideoPage.tsx', import.meta.url), 'utf8')
   assert.ok(page.includes('EV.painAtOneYear.doi') && page.includes('EV.recurrence.doi') && page.includes('すべての方に当てはまるわけではない'))
+  // 保険＋自費：理由（ねんざの保険の料金表に運動療法の項目が無い）を声で伝える。組み合わせの合計金額は出さない
+  assert.deepEqual([...FS.exerciseItemOnlyFor], ['骨折', '脱臼', '不全骨折'])
+  assert.ok(vtt.includes('運動療法の項目が、ないため') && vtt.includes('自費は、必要なぶんだけ'))
+  assert.ok(!vtt.includes('3,050円'), '組み合わせの合計金額は出さない')
   // ほかの保険の金額（初検料など）は入れない
   for (const word of ['初検料', '1,560円', '再検料']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
 })
