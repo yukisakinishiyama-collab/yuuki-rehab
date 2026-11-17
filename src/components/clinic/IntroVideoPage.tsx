@@ -24,6 +24,8 @@ import {
   pickOrientation,
   PRICE_GUIDE_FACTS as F,
   PRICE_GUIDE_VIDEO as V,
+  videoMemberMonthly,
+  videoPaygMonthly,
   yen,
   type VideoOrientation,
 } from '@/data/intro-videos'
@@ -65,6 +67,23 @@ export default function IntroVideoPage() {
       note: `健康保険を使わない日 ${yen(F.memberPartNoInsurance)}`,
     },
     { label: '会員の材料費', value: '追加の料金なし' },
+    {
+      label: '月額に含まれる物理療法',
+      value: '追加の料金なし（使用は状態に応じて当院が判断）',
+      note: `都度払いでは ${F.includedPhysio.map((p) => `${p.name} ${yen(p.fee)}`).join('・')}`,
+    },
+    {
+      label: `動画の比べ方（月${F.compareVisits}回）`,
+      value: `会員プラン ${yen(videoMemberMonthly(F.compareVisits))}（どの場合も同じ）`,
+      note: `都度払い：物理療法なし ${yen(videoPaygMonthly(F.compareVisits))}・${F.compareExamples
+        .map((x) => `${x.label} ${yen(videoPaygMonthly(F.compareVisits, x.fee))}`)
+        .join('・')}。一般会員・1部位・健康保険を使わない場合`,
+    },
+    {
+      label: '物理療法を使わない場合',
+      value: `月${F.compareVisits}回はほぼ同じ（都度払いが${yen(videoMemberMonthly(F.compareVisits) - videoPaygMonthly(F.compareVisits))}少ない）`,
+      note: `月9回からは会員プランが少ない（月9回 ${yen(videoPaygMonthly(9))} → ${yen(videoMemberMonthly(9))}、月12回 ${yen(videoPaygMonthly(12))} → ${yen(videoMemberMonthly(12))}）`,
+    },
     { label: '最低利用期間', value: `${F.minimumMonths}か月`, note: 'そのあとは1か月ごとの更新。解約届は15日までの提出で当月末に終了' },
   ]
 
