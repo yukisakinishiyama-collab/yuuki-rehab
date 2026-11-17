@@ -7,7 +7,7 @@
 // - 向きの選び方・長さの表記
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { FEE_SYSTEM_FACTS as FS, FEE_SYSTEM_VIDEO as FV, INSURANCE_ONE_PART as IO, INTRO_VIDEOS, insuranceOnePartTotal, windowPayment, PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, videoMemberMonthly, videoPaygMonthly, yen } from '../src/data/intro-videos.ts'
+import { FEE_SYSTEM_FACTS as FS, FEE_SYSTEM_VIDEO as FV, FEE_VIDEO_EVIDENCE as EV, INSURANCE_ONE_PART as IO, INTRO_VIDEOS, insuranceOnePartTotal, windowPayment, PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, videoMemberMonthly, videoPaygMonthly, yen } from '../src/data/intro-videos.ts'
 import { CONTRACT_TEMPLATES } from '../src/data/contract-templates.ts'
 import * as G from '../src/lib/contracts/member-guide.ts'
 
@@ -73,6 +73,14 @@ t('料金のしくみと健康保険の動画：金額は料金案内・料金�
   assert.equal(IO.since, '2026-07-01')
   assert.ok(IO.source.url.startsWith('https://www.mhlw.go.jp/'))
   assert.ok(vtt.includes(`${insuranceOnePartTotal()}円`) && vtt.includes(`およそ${windowPayment(insuranceOnePartTotal(), 0.3)}円`))
+  // 研究の数字（100人中○人）は、声・字幕と出どころの数字が同じ。出どころを画面に出す
+  assert.deepEqual([EV.painAtOneYear.min, EV.painAtOneYear.max], [5, 33])
+  assert.deepEqual([EV.recurrence.usualCare, EV.recurrence.withBalanceTraining, EV.recurrence.weeks], [33, 22, 8])
+  assert.ok(vtt.includes(`100人に${EV.painAtOneYear.min}人から${EV.painAtOneYear.max}人`))
+  assert.ok(vtt.includes(`100人中${EV.recurrence.usualCare}人`) && vtt.includes(`100人中${EV.recurrence.withBalanceTraining}人`))
+  assert.ok(EV.painAtOneYear.doi.startsWith('10.') && EV.recurrence.doi.startsWith('10.'))
+  const page = readFileSync(new URL('../src/components/clinic/FeeVideoPage.tsx', import.meta.url), 'utf8')
+  assert.ok(page.includes('EV.painAtOneYear.doi') && page.includes('EV.recurrence.doi') && page.includes('すべての方に当てはまるわけではない'))
   // ほかの保険の金額（初検料など）は入れない
   for (const word of ['初検料', '1,560円', '再検料']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
 })

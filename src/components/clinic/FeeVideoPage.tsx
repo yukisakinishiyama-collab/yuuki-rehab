@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import {
   FEE_SYSTEM_FACTS as F,
   FEE_SYSTEM_VIDEO as V,
+  FEE_VIDEO_EVIDENCE as EV,
   INSURANCE_ONE_PART as I,
   insuranceOnePartTotal,
   windowPayment,
@@ -31,6 +32,20 @@ export default function FeeVideoPage() {
       label: '保険の日の1か所の料金（国が決めた金額）',
       value: `全部で ${yen(total)}（後療料 ${yen(I.koryo)}＋温罨法 ${yen(I.onanpo)}＋電療 ${yen(I.denryo)}・10割）`,
       note: `窓口3割で約${yen(windowPayment(total, 0.3))}・2割で約${yen(windowPayment(total, 0.2))}・1割で約${yen(windowPayment(total, 0.1))}。ねんざ・打撲の2回目以降、受傷から6日目以降に温罨法と電療を加えた場合。長く続く場合や部位が増える場合は計算が変わる`,
+    },
+    {
+      label: '痛みが引いても（線のグラフ）',
+      value: '痛みは早く引くが、筋力・バランスが戻るまでには時間がかかることがある（線の形はイメージ図）',
+      note: `足首のねんざで、1年たっても痛みが残る人は100人に${EV.painAtOneYear.min}〜${EV.painAtOneYear.max}人（${EV.painAtOneYear.source}）`,
+    },
+    {
+      label: 'くり返した人（100人の図）',
+      value: `1年のあいだに、いつもの治療だけ 100人中${EV.recurrence.usualCare}人／＋${EV.recurrence.weeks}週間のバランスの運動 100人中${EV.recurrence.withBalanceTraining}人`,
+      note: `${EV.recurrence.source}・${EV.recurrence.participants}人。運動は自宅で行うプログラム。すべての方に当てはまるわけではない`,
+    },
+    {
+      label: '保険と自費の役割（帯のグラフ）',
+      value: '健康保険＝急なケガの手当て／自費のリハビリ＝機能の回復・再発の予防。どちらか一方ではなく、時期と目的で使い分ける',
     },
     { label: '当院のリハビリ（自費）', value: '機能の回復と再発の予防を目的にした運動療法', note: '保険の対象とは目的がちがうため、自費。「保険では不十分だから」とは言っていない' },
     {
@@ -68,7 +83,15 @@ export default function FeeVideoPage() {
           <a href={I.source.url} target="_blank" rel="noreferrer" className="font-bold text-teal-800 underline underline-offset-2">
             {I.source.label}
           </a>
-          の金額で、{asOfLabel(I.since)}からのものです。次の改定で変わります。
+          の金額で、{asOfLabel(I.since)}からのものです。次の改定で変わります。研究の出どころ：
+          <a href={`https://doi.org/${EV.painAtOneYear.doi}`} target="_blank" rel="noreferrer" className="font-bold text-teal-800 underline underline-offset-2">
+            van Rijn ほか 2008
+          </a>
+          ・
+          <a href={`https://doi.org/${EV.recurrence.doi}`} target="_blank" rel="noreferrer" className="font-bold text-teal-800 underline underline-offset-2">
+            Hupperets ほか 2009
+          </a>
+          。
         </p>
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
           料金や保険のきまり・保険の金額が変わったときは、動画を作り直してください。動画の中の文字と声は書きかえられません。
