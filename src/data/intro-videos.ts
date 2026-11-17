@@ -1,5 +1,7 @@
 // ──────────────────────────────────────────────
-// 患者さんにお見せする紹介動画（今日 → 「患者さんに見せる」→ 料金と会員プランのご紹介）
+// 患者さんにお見せする紹介動画（今日 → 「患者さんに見せる」）
+//   1. 料金と会員プランのご紹介（PRICE_GUIDE_VIDEO・/dashboard/price-video）
+//   2. 料金のしくみと健康保険のご案内（FEE_SYSTEM_VIDEO・/dashboard/fee-video。2026-11-17 院長の依頼で、別の枠として足した）
 //
 // 2026-11-16 院長の依頼で足した。声の解説つき・約2分。タブレットを患者さんに向けて、画面いっぱいで見せる。
 // 動画の本体は public/intro/（横向き＝タブレット・モニター用 1920x1080、縦向き＝スマホ用 1080x1920。中身は同じ）。
@@ -38,6 +40,8 @@ export interface IntroVideoFile {
 export interface IntroVideo {
   id: string
   title: string
+  /** スタッフ用のページ（今日 →「患者さんに見せる」から開く） */
+  page: string
   /** スタッフ向けの一言（何の動画か） */
   summary: string
   /** 長さ（秒） */
@@ -52,6 +56,7 @@ export interface IntroVideo {
 export const PRICE_GUIDE_VIDEO: IntroVideo = {
   id: 'price-guide',
   title: '料金と会員プランのご紹介',
+  page: '/dashboard/price-video',
   summary: '都度払いの料金、会員プランの内容・料金・都度払いとの比較・入る前に知っておいてほしいことを、声と画面でご案内します。',
   seconds: 143,
   asOf: '2026-11-17',
@@ -102,6 +107,58 @@ export const PRICE_GUIDE_FACTS = {
   /** 最低利用期間（か月） */
   minimumMonths: 3,
 } as const
+
+// ──────────────────────────────────────────────
+// 2. 料金のしくみと健康保険のご案内（2026-11-17 院長の依頼「高いと言われる前に、院の料金の必要性と保険制度を説明する動画」）
+//
+// 流れ：先に疑問を言葉にする（整骨院なのに、どうして保険だけじゃないの？）→ 健康保険が使えるケガ・使えないもの（国の決まり）
+//   → 窓口の料金は全体の一部（1〜3割）→ 当院のリハビリは機能の回復・再発予防が目的の運動療法なので自費
+//   → リハビリ2,850円に含まれるもの → 金額は先に伝える・追加は了承をいただいてから → 選び方 → 受付でどうぞ。
+// 保険のきまりは、厚生労働省「柔道整復師の施術を受けられる方へ」（2026-11-17 確認）の範囲だけ。保険で決まっている金額
+//   （初検料・後療料など）は、改定で変わるので動画には入れていない。院のことは、ホームページの料金ページ（2026-11-16 版）の範囲だけ。
+// 「保険では不十分だから自費」という言い方はしない（保険の施術を下げて見せない。目的がちがう、と説明する）。
+//   効果の約束・他院との比較・不安をあおる言い方・急がせる言い方は入れていない。
+// 案内役と声は、料金と会員プランの動画と同じ（声は行ごとに平均 約196Hz にそろえて少し下げた）。
+// ──────────────────────────────────────────────
+
+export const FEE_SYSTEM_VIDEO: IntroVideo = {
+  id: 'fee-insurance',
+  title: '料金のしくみと健康保険のご案内',
+  page: '/dashboard/fee-video',
+  summary: '整骨院で健康保険が使えるケガと使えないもの、窓口の料金が全体の一部であること、当院のリハビリが自費である理由と料金に含まれるもの、料金の約束を、声と画面でご案内します。',
+  seconds: 131,
+  asOf: '2026-11-17',
+  files: {
+    land: { src: '/intro/fee-insurance-land.mp4', poster: '/intro/fee-insurance-land.jpg', width: 1920, height: 1080 },
+    port: { src: '/intro/fee-insurance-port.mp4', poster: '/intro/fee-insurance-port.jpg', width: 1080, height: 1920 },
+  },
+  captions: '/intro/fee-insurance.vtt',
+}
+
+/** 「料金のしくみと健康保険のご案内」に出てくる内容（スタッフが聞かれたときの確認用。動画と同じ） */
+export const FEE_SYSTEM_FACTS = {
+  /** 都度払い：リハビリ（約30分） */
+  paygRehab: 2850,
+  /** 都度払い：施術料金（1部位） */
+  paygPart: 1500,
+  /** 初回のみの初回料（ホームページの料金ページ） */
+  firstVisit: 2000,
+  /** 健康保険が使えるケガ（厚生労働省の案内） */
+  insuranceCovered: ['ねんざ・打撲・肉ばなれ（挫傷）', '骨折・脱臼（応急手当を除き、医師の同意が必要）'],
+  /** 健康保険の対象にならないもの（原則。肩こり・疲れは厚生労働省の案内、手術後・競技復帰・再発予防は当院の料金案内） */
+  insuranceNotCovered: ['慢性的な痛み・肩こり・疲れ', '手術後のリハビリ', '競技復帰・再発予防が目的のもの'],
+  /** 窓口の負担（1〜3割。年齢や所得などで変わる） */
+  windowShare: '1〜3割',
+  /** 保険のきまりの出どころ */
+  insuranceSource: {
+    label: '厚生労働省「柔道整復師等の施術にかかる療養費の取扱いについて」',
+    url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryouhoken/jyuudou/index.html',
+    checked: '2026-11-17',
+  },
+} as const
+
+/** 今日 →「患者さんに見せる」に並べる順 */
+export const INTRO_VIDEOS: readonly IntroVideo[] = [PRICE_GUIDE_VIDEO, FEE_SYSTEM_VIDEO]
 
 /** 都度払いの1回の基本（リハビリ＋施術1部位） */
 export function paygPerVisit(): number {

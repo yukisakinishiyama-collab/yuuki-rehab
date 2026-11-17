@@ -8,7 +8,7 @@
  * - 昨日の締め（NOAHの来院数・金額）と次の一手 … 経営メニューを隠しコマンドで開いているときだけ
  * - 気にかけたい患者さん（しばらく記録がない・離脱リスクが高い）と最近ひらいたカルテ
  * - 承認を待っている投稿
- * - 患者さんに見せる（料金と会員プランのご紹介の動画。2026-11-16 院長の依頼）
+ * - 患者さんに見せる（紹介の動画。料金と会員プランのご紹介＝2026-11-16、料金のしくみと健康保険のご案内＝2026-11-17 院長の依頼）
  *
  * カードはすべて Panel（./Panel.tsx）で、見出し・余白・見出しの右のボタンの置き方をそろえている。
  * スマホでは上から「承認待ちのお知らせ → 今日の予約 → キャンセル → （昨日の締め）→ カルテ」の順に並ぶ。
@@ -33,7 +33,7 @@ import { useKeieiOpen } from '@/lib/clinic/keiei-mode'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MoreLink, Panel } from './Panel'
-import { lengthLabel, PRICE_GUIDE_VIDEO } from '@/data/intro-videos'
+import { INTRO_VIDEOS, lengthLabel } from '@/data/intro-videos'
 import BackupReminder from './BackupReminder'
 
 function todayLabel(): string {
@@ -374,16 +374,23 @@ function KartePanel() {
 function ShowToPatientPanel() {
   return (
     <Panel title="患者さんに見せる" icon={MonitorPlay}>
-      <Link
-        href="/dashboard/price-video"
-        className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 hover:border-teal-600 hover:bg-teal-50/40"
-      >
-        <span className="min-w-0">
-          <span className="block text-sm font-bold text-slate-900">{PRICE_GUIDE_VIDEO.title}（動画）</span>
-          <span className="block text-xs text-slate-600">{lengthLabel(PRICE_GUIDE_VIDEO.seconds)}・声の解説つき。画面いっぱいで見せられます</span>
-        </span>
-        <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-      </Link>
+      {/* 動画ごとに別の枠（ページ）。並べる順は INTRO_VIDEOS */}
+      <ul className="space-y-2">
+        {INTRO_VIDEOS.map((v) => (
+          <li key={v.id}>
+            <Link
+              href={v.page}
+              className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 hover:border-teal-600 hover:bg-teal-50/40"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-slate-900">{v.title}（動画）</span>
+                <span className="block text-xs text-slate-600">{lengthLabel(v.seconds)}・声の解説つき。画面いっぱいで見せられます</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </Panel>
   )
 }
