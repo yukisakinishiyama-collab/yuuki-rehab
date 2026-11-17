@@ -7,7 +7,7 @@
 // - 向きの選び方・長さの表記
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { FEE_SYSTEM_FACTS as FS, FEE_SYSTEM_VIDEO as FV, INTRO_VIDEOS, PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, videoMemberMonthly, videoPaygMonthly, yen } from '../src/data/intro-videos.ts'
+import { FEE_SYSTEM_FACTS as FS, FEE_SYSTEM_VIDEO as FV, INSURANCE_ONE_PART as IO, INTRO_VIDEOS, insuranceOnePartTotal, windowPayment, PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, videoMemberMonthly, videoPaygMonthly, yen } from '../src/data/intro-videos.ts'
 import { CONTRACT_TEMPLATES } from '../src/data/contract-templates.ts'
 import * as G from '../src/lib/contracts/member-guide.ts'
 
@@ -66,8 +66,15 @@ t('料金のしくみと健康保険の動画：金額は料金案内・料金�
   const vtt = readFileSync(pub(FV.captions), 'utf8')
   for (const word of ['不十分', '治ります', '必ず', '今だけ', '今すぐ', '他院']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
   for (const word of ['目的がちがう', '2,850円', '施術の前にお伝えします', '了承をいただいてから', '医師の同意']) assert.ok(vtt.includes(word), `字幕に「${word}」が無い`)
-  // 保険で決まっている金額（初検料・後療料など）は、改定で変わるので入れない
-  for (const word of ['初検料', '後療料', '1,560円', '550円']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
+  // 1か所の料金（国が決めた金額・令和8年7月から）：後療料550円＋温罨法80円＋電療46円＝676円、窓口3割で約200円
+  assert.deepEqual([IO.koryo, IO.onanpo, IO.denryo], [550, 80, 46])
+  assert.equal(insuranceOnePartTotal(), 676)
+  assert.deepEqual([0.3, 0.2, 0.1].map((r) => windowPayment(676, r)), [200, 140, 70])
+  assert.equal(IO.since, '2026-07-01')
+  assert.ok(IO.source.url.startsWith('https://www.mhlw.go.jp/'))
+  assert.ok(vtt.includes(`${insuranceOnePartTotal()}円`) && vtt.includes(`およそ${windowPayment(insuranceOnePartTotal(), 0.3)}円`))
+  // ほかの保険の金額（初検料など）は入れない
+  for (const word of ['初検料', '1,560円', '再検料']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
 })
 
 t('動画の金額は、料金案内のひな形と同じ（都度払い・物理療法・会員の月額）', () => {

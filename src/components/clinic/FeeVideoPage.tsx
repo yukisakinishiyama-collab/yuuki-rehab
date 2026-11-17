@@ -12,13 +12,26 @@
 import IntroVideoShell, { asOfLabel } from './IntroVideoShell'
 import { cardSurface } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { FEE_SYSTEM_FACTS as F, FEE_SYSTEM_VIDEO as V, yen } from '@/data/intro-videos'
+import {
+  FEE_SYSTEM_FACTS as F,
+  FEE_SYSTEM_VIDEO as V,
+  INSURANCE_ONE_PART as I,
+  insuranceOnePartTotal,
+  windowPayment,
+  yen,
+} from '@/data/intro-videos'
 
 export default function FeeVideoPage() {
+  const total = insuranceOnePartTotal()
   const facts: Array<{ label: string; value: string; note?: string }> = [
     { label: '健康保険が使えるケガ', value: F.insuranceCovered.join('／'), note: '使えるかどうかは、症状や受診の状況によって変わります' },
     { label: '健康保険の対象にならないもの（原則）', value: F.insuranceNotCovered.join('・') },
     { label: '保険が使えるときの料金', value: '施術の内容と料金は、国が全国共通で決めている', note: `窓口のお支払いは${F.windowShare}（年齢や所得などで変わる）。残りは加入している健康保険から` },
+    {
+      label: '保険の日の1か所の料金（国が決めた金額）',
+      value: `全部で ${yen(total)}（後療料 ${yen(I.koryo)}＋温罨法 ${yen(I.onanpo)}＋電療 ${yen(I.denryo)}・10割）`,
+      note: `窓口3割で約${yen(windowPayment(total, 0.3))}・2割で約${yen(windowPayment(total, 0.2))}・1割で約${yen(windowPayment(total, 0.1))}。ねんざ・打撲の2回目以降、受傷から6日目以降に温罨法と電療を加えた場合。長く続く場合や部位が増える場合は計算が変わる`,
+    },
     { label: '当院のリハビリ（自費）', value: '機能の回復と再発の予防を目的にした運動療法', note: '保険の対象とは目的がちがうため、自費。「保険では不十分だから」とは言っていない' },
     {
       label: 'リハビリ（約30分）',
@@ -51,10 +64,14 @@ export default function FeeVideoPage() {
           <a href={F.insuranceSource.url} target="_blank" rel="noreferrer" className="font-bold text-teal-800 underline underline-offset-2">
             {F.insuranceSource.label}
           </a>
-          （{asOfLabel(F.insuranceSource.checked)}に確認）。保険で決まっている金額（初検料など）は、改定で変わるため動画には入れていません。
+          （{asOfLabel(F.insuranceSource.checked)}に確認）。1か所の料金（{yen(total)}）は
+          <a href={I.source.url} target="_blank" rel="noreferrer" className="font-bold text-teal-800 underline underline-offset-2">
+            {I.source.label}
+          </a>
+          の金額で、{asOfLabel(I.since)}からのものです。次の改定で変わります。
         </p>
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          料金や保険のきまりが変わったときは、動画を作り直してください。動画の中の文字と声は書きかえられません。
+          料金や保険のきまり・保険の金額が変わったときは、動画を作り直してください。動画の中の文字と声は書きかえられません。
         </p>
         <p className="mt-2 text-xs text-slate-600">
           通院中の方・初めての方に院内でお見せするための動画です。SNS など院の外に出すときは、広告として点検し直してください。
