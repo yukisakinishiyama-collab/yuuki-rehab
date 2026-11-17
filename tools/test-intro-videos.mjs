@@ -1,13 +1,13 @@
 // 患者さんにお見せする紹介動画（今日 →「患者さんに見せる」）の検査
 //   npx tsx tools/test-intro-videos.mjs
-// - 動画・絵・字幕のファイルがそろっているか（大きすぎないか）
+// - 動画・絵・字幕のファイルがそろっているか（大きすぎないか）。2本（料金と会員プラン／料金のしくみと健康保険）とも
 // - 動画の中の金額（PRICE_GUIDE_FACTS）が、契約書・料金案内のひな形と同じか
 //   （料金を変えたのに古い動画を見せ続けないように。ずれたら動画を作り直して FACTS も直す）
 // - カルテの「会員プランのご案内」（lib/contracts/member-guide.ts）と同じ金額・同じ比べ方か
 // - 向きの選び方・長さの表記
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, videoMemberMonthly, videoPaygMonthly, yen } from '../src/data/intro-videos.ts'
+import { FEE_SYSTEM_FACTS as FS, FEE_SYSTEM_VIDEO as FV, FEE_VIDEO_EVIDENCE as EV, INSURANCE_ONE_PART as IO, INTRO_VIDEOS, insuranceOnePartTotal, windowPayment, PRICE_GUIDE_FACTS as F, PRICE_GUIDE_VIDEO as V, lengthLabel, paygPerVisit, pickOrientation, videoMemberMonthly, videoPaygMonthly, yen } from '../src/data/intro-videos.ts'
 import { CONTRACT_TEMPLATES } from '../src/data/contract-templates.ts'
 import * as G from '../src/lib/contracts/member-guide.ts'
 
@@ -16,33 +16,88 @@ const t = (name, fn) => { fn(); n++; console.log('✓', name) }
 const pub = (p) => new URL(`../public${p}`, import.meta.url)
 const body = (id) => CONTRACT_TEMPLATES.find((x) => x.id === id).body
 
-t('横向き・縦向きの動画と絵がある（mp4・大きすぎない）', () => {
-  for (const o of ['land', 'port']) {
-    const f = V.files[o]
-    assert.ok(existsSync(pub(f.src)), `${f.src} が無い`)
-    assert.ok(existsSync(pub(f.poster)), `${f.poster} が無い`)
-    const size = statSync(pub(f.src)).size
-    assert.ok(size > 500_000 && size < 15_000_000, `${f.src} の大きさ ${size}`)
-    // mp4 のしるし（先頭の ftyp）
-    assert.equal(readFileSync(pub(f.src)).subarray(4, 8).toString('latin1'), 'ftyp')
+t('横向き・縦向きの動画と絵がある（mp4・大きすぎない。2本とも）', () => {
+  assert.deepEqual(INTRO_VIDEOS.map((x) => x.id), ['price-guide', 'fee-insurance'])
+  assert.equal(new Set(INTRO_VIDEOS.map((x) => x.page)).size, INTRO_VIDEOS.length, '動画ごとに別のページ')
+  for (const video of INTRO_VIDEOS) {
+    for (const o of ['land', 'port']) {
+      const f = video.files[o]
+      assert.ok(existsSync(pub(f.src)), `${f.src} が無い`)
+      assert.ok(existsSync(pub(f.poster)), `${f.poster} が無い`)
+      const size = statSync(pub(f.src)).size
+      assert.ok(size > 500_000 && size < 15_000_000, `${f.src} の大きさ ${size}`)
+      // mp4 のしるし（先頭の ftyp）
+      assert.equal(readFileSync(pub(f.src)).subarray(4, 8).toString('latin1'), 'ftyp')
+    }
+    assert.ok(video.files.land.width > video.files.land.height)
+    assert.ok(video.files.port.height > video.files.port.width)
   }
-  assert.ok(V.files.land.width > V.files.land.height)
-  assert.ok(V.files.port.height > V.files.port.width)
 })
 
-t('字幕（声の文字）は時刻の順に並び、動画の長さに収まる', () => {
-  const vtt = readFileSync(pub(V.captions), 'utf8')
-  assert.ok(vtt.startsWith('WEBVTT'))
+t('字幕（声の文字）は時刻の順に並び、動画の長さに収まる（2本とも）', () => {
   const sec = (s) => { const [h, m, x] = s.split(':'); return Number(h) * 3600 + Number(m) * 60 + Number(x) }
-  const cues = [...vtt.matchAll(/(\d\d:\d\d:\d\d\.\d{3}) --> (\d\d:\d\d:\d\d\.\d{3})\n(.+)/g)].map((m) => [sec(m[1]), sec(m[2]), m[3]])
-  assert.ok(cues.length >= 20, `字幕が ${cues.length} 行`)
-  let prev = 0
-  for (const [a, b, text] of cues) {
-    assert.ok(a >= prev - 0.2 && b > a, `時刻の順がおかしい：${text}`)
-    assert.ok(text.trim().length > 0)
-    prev = b
+  for (const video of INTRO_VIDEOS) {
+    const vtt = readFileSync(pub(video.captions), 'utf8')
+    assert.ok(vtt.startsWith('WEBVTT'))
+    const cues = [...vtt.matchAll(/(\d\d:\d\d:\d\d\.\d{3}) --> (\d\d:\d\d:\d\d\.\d{3})\n(.+)/g)].map((m) => [sec(m[1]), sec(m[2]), m[3]])
+    assert.ok(cues.length >= 20, `${video.id}：字幕が ${cues.length} 行`)
+    let prev = 0
+    for (const [a, b, text] of cues) {
+      assert.ok(a >= prev - 0.2 && b > a, `${video.id}：時刻の順がおかしい：${text}`)
+      assert.ok(text.trim().length > 0)
+      prev = b
+    }
+    assert.ok(prev <= video.seconds + 1, `${video.id}：最後の字幕 ${prev} が動画の長さ ${video.seconds} を超える`)
   }
-  assert.ok(prev <= V.seconds + 1, `最後の字幕 ${prev} が動画の長さ ${V.seconds} を超える`)
+})
+
+t('料金のしくみと健康保険の動画：金額は料金案内・料金と会員プランの動画と同じ。言い方の決まり', () => {
+  const fee = body('fee-cancel-policy')
+  assert.ok(fee.includes(`| リハビリ（約30分） | ${yen(FS.paygRehab)} |`))
+  assert.ok(fee.includes(`| 施術料金（1部位） | ${yen(FS.paygPart)} |`))
+  assert.equal(FS.paygRehab, F.paygRehab)
+  assert.equal(FS.paygPart, F.paygPart)
+  assert.equal(FS.firstVisit, F.firstVisit)
+  // 保険のきまりは厚生労働省の案内（出どころを画面に出す）。骨折・脱臼は医師の同意
+  assert.ok(FS.insuranceSource.url.startsWith('https://www.mhlw.go.jp/'))
+  assert.ok(FS.insuranceCovered.some((x) => x.includes('骨折') && x.includes('医師の同意')))
+  assert.equal(FS.windowShare, '1〜3割')
+  // 字幕（声の文）：保険の施術を下げて見せない・効果を約束しない・急がせない
+  const vtt = readFileSync(pub(FV.captions), 'utf8')
+  for (const word of ['不十分', '治ります', '必ず', '今だけ', '今すぐ', '他院']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
+  for (const word of ['目的がちがう', '2,850円', '施術の前にお伝えします', '了承をいただいてから', '医師の同意']) assert.ok(vtt.includes(word), `字幕に「${word}」が無い`)
+  // 1か所の料金（国が決めた金額・令和8年7月から）：後療料550円＋温罨法80円＋電療46円＝676円、窓口3割で約200円
+  assert.deepEqual([IO.koryo, IO.onanpo, IO.denryo], [550, 80, 46])
+  assert.equal(insuranceOnePartTotal(), 676)
+  assert.deepEqual([0.3, 0.2, 0.1].map((r) => windowPayment(676, r)), [200, 140, 70])
+  assert.equal(IO.since, '2026-07-01')
+  assert.ok(IO.source.url.startsWith('https://www.mhlw.go.jp/'))
+  assert.ok(vtt.includes(`${insuranceOnePartTotal()}円`) && vtt.includes(`およそ${windowPayment(insuranceOnePartTotal(), 0.3)}円`))
+  // 研究の数字（100人中○人）は、声・字幕と出どころの数字が同じ。出どころを画面に出す
+  assert.deepEqual([EV.painAtOneYear.min, EV.painAtOneYear.max], [5, 33])
+  assert.deepEqual([EV.recurrence.usualCare, EV.recurrence.withBalanceTraining, EV.recurrence.weeks], [33, 22, 8])
+  assert.ok(vtt.includes(`100人に${EV.painAtOneYear.min}人から${EV.painAtOneYear.max}人`))
+  assert.ok(vtt.includes(`100人中${EV.recurrence.usualCare}人`) && vtt.includes(`100人中${EV.recurrence.withBalanceTraining}人`))
+  assert.ok(EV.painAtOneYear.doi.startsWith('10.') && EV.recurrence.doi.startsWith('10.'))
+  const page = readFileSync(new URL('../src/components/clinic/FeeVideoPage.tsx', import.meta.url), 'utf8')
+  assert.ok(page.includes('EV.painAtOneYear.doi') && page.includes('EV.recurrence.doi') && page.includes('すべての方に当てはまるわけではない'))
+  // 保険＋自費：理由（ねんざの保険の料金表に運動療法の項目が無い）を声で伝える。組み合わせの合計金額は出さない
+  assert.deepEqual([...FS.exerciseItemOnlyFor], ['骨折', '脱臼', '不全骨折'])
+  assert.ok(vtt.includes('運動療法の項目が、ないため') && vtt.includes('自費は、必要なぶんだけ'))
+  assert.ok(!vtt.includes('3,050円'), '組み合わせの合計金額は出さない')
+  // 特殊な物理療法：機器の料金は料金案内のひな形と同じ。幅（1,100〜3,500円）は動画1本目と同じ。保険の電気は46円
+  // （超音波 2,800円は、ひな形には無くホームページの料金ページにある金額）
+  const tplName = { '微弱電流（エレサス）': '微弱電流エレサス', 'コンビネーション療法': 'コンビネーション療法', '体外衝撃波': '体外衝撃波' }
+  for (const d of FS.devices.filter((x) => tplName[x.name])) {
+    assert.ok(fee.includes(`| ${tplName[d.name]} | ${yen(d.fee)} |`), `${d.name} の金額がひな形とちがう`)
+  }
+  assert.deepEqual(FS.devices.map((d) => d.fee), [1600, 2600, 2800, 3500])
+  assert.deepEqual([FS.deviceFeeMin, FS.deviceFeeMax], [F.physioMin, F.physioMax])
+  assert.equal(IO.denryo, 46)
+  assert.ok(vtt.includes('1か所1回、46円') && vtt.includes('使う日だけ') && vtt.includes('1,100円から3,500円'))
+  for (const word of ['他院', 'ほかの院', '効果があります', '治ります']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
+  // ほかの保険の金額（初検料など）は入れない
+  for (const word of ['初検料', '1,560円', '再検料']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
 })
 
 t('動画の金額は、料金案内のひな形と同じ（都度払い・物理療法・会員の月額）', () => {
@@ -122,7 +177,10 @@ t('動画と、カルテの「会員プランのご案内」の金額が同じ�
   // 画面いっぱいの動画は1つの部品（今日のページとカルテで同じもの）。ご案内（z-[60]）より手前に出す
   const stage = read('src/components/clinic/IntroVideoStage.tsx')
   assert.ok(stage.includes('z-[70]') && stage.includes('no-print') && stage.includes('aria-modal="true"'))
-  assert.ok(read('src/components/clinic/IntroVideoPage.tsx').includes('<IntroVideoStage '))
+  // 動画ごとのページは、共通の枠（IntroVideoShell）から、その動画を画面いっぱいに出す
+  assert.ok(read('src/components/clinic/IntroVideoShell.tsx').includes('<IntroVideoStage video={V} '))
+  assert.ok(read('src/components/clinic/IntroVideoPage.tsx').includes('<IntroVideoShell video={V}>'))
+  assert.ok(read('src/components/clinic/FeeVideoPage.tsx').includes('<IntroVideoShell video={V}>'))
   assert.ok(read('src/components/clinic/IntroVideoPage.tsx').includes('会員プランのご案内'))
   assert.ok(read('src/components/rehab-management/MemberPlanGuide.tsx').includes("title: '材料費'"))
 })
@@ -143,8 +201,14 @@ t('向きの選び方（横長＝横向き・縦長＝縦向き）と、長さ�
 
 t('入口と画面がある（今日の画面から開く・検索には出さない）', () => {
   const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
-  assert.ok(existsSync(new URL('../src/app/(app)/dashboard/price-video/page.tsx', import.meta.url)))
-  assert.ok(read('src/components/clinic/TodayDashboard.tsx').includes('href="/dashboard/price-video"'))
+  assert.equal(V.page, '/dashboard/price-video')
+  assert.equal(FV.page, '/dashboard/fee-video')
+  for (const video of INTRO_VIDEOS) {
+    assert.ok(existsSync(new URL(`../src/app/(app)${video.page}/page.tsx`, import.meta.url)), `${video.page} のページが無い`)
+  }
+  // 今日の「患者さんに見せる」に、動画ごとの入口を並べる
+  const today = read('src/components/clinic/TodayDashboard.tsx')
+  assert.ok(today.includes('INTRO_VIDEOS.map((v)') && today.includes('href={v.page}'))
   assert.ok(read('next.config.ts').includes("source: '/intro/:path*'"))
   assert.ok(read('src/app/robots.ts').includes("'/intro/'"))
   // /dashboard の下なので、院内アプリのパスワードで守られる

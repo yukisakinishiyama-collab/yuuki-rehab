@@ -1,10 +1,10 @@
 'use client'
 /**
- * 料金と会員プランのご紹介（動画）を、画面いっぱいで患者さんに見せる
+ * 紹介の動画を、画面いっぱいで患者さんに見せる（どの動画かは video で渡す。省くと、料金と会員プランのご紹介）
  *
  * 開いている間は、院内アプリのメニューや、うしろの画面（カルテなど）を見せない。Esc か「閉じる」で戻る。何も保存しない。
  * 使うところ（2026-11-16 院長の依頼）：
- * - 今日 →「患者さんに見せる」のページ（IntroVideoPage.tsx）
+ * - 今日 →「患者さんに見せる」のページ（IntroVideoShell.tsx。料金と会員プラン／料金のしくみと健康保険）
  * - カルテの「契約・同意書」タブの「紹介動画を見せる」（ContractsTab.tsx）。カルテを開いたまま、その場で再生して戻れる
  *
  * 向きは、開くときに画面の形で選んで渡す（pickOrientation）。開いたあとも、右上で横向き・縦向きを替えられる（続きから再生）。
@@ -14,13 +14,15 @@ import { useEffect, useRef, useState } from 'react'
 import { RectangleHorizontal, RectangleVertical, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { PRICE_GUIDE_VIDEO as V, type VideoOrientation } from '@/data/intro-videos'
+import { PRICE_GUIDE_VIDEO, type IntroVideo, type VideoOrientation } from '@/data/intro-videos'
 
 export default function IntroVideoStage({
+  video: V = PRICE_GUIDE_VIDEO,
   orientation,
   onOrientation,
   onClose,
 }: {
+  video?: IntroVideo
   orientation: VideoOrientation
   onOrientation: (o: VideoOrientation) => void
   onClose: () => void
@@ -103,7 +105,7 @@ export default function IntroVideoStage({
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-2 pb-2 sm:px-4 sm:pb-4">
         <video
           // 向きを替えたら、別の動画として読み直す
-          key={orientation}
+          key={`${V.id}-${orientation}`}
           ref={video}
           src={file.src}
           poster={file.poster}
