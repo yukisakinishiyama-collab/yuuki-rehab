@@ -59,6 +59,11 @@ export default function FeeVideoPage() {
       note: '完全予約制・柔道整復師（国家資格）が問診から運動療法まで担当・状態の確認（初回はエコーで観察できる範囲も）・運動療法とセルフケア',
     },
     { label: '画面の小さな文字', value: `1回の基本 ${yen(F.paygRehab + F.paygPart)}（リハビリ＋施術1部位 ${yen(F.paygPart)}）`, note: `初回のみ初回料 ${yen(F.firstVisit)}。すべて税込` },
+    {
+      label: '当院の特殊な物理療法',
+      value: `保険の電気（電療料）は、どの機器を使っても1か所1回${yen(I.denryo)}。専用の機器は、使う日だけ自費（1回 ${F.deviceFeeMin.toLocaleString('ja-JP')}〜${yen(F.deviceFeeMax)}・会員の方は月額に含まれる）`,
+      note: `${F.devices.map((d) => `${d.name} ${yen(d.fee)}`).join('・')}。理由：専用の機器は用意と点検に費用がかかるため。ほかの院との比較や、機器の効果を約束する言い方はしていない`,
+    },
     { label: '料金の約束', value: '施術の前に料金を伝える・追加は内容と金額を伝えて了承をいただいてから・表示は税込' },
     { label: '最後の画面', value: '急なケガは保険が使える場合あり・会員プラン（1か月以上通院され必要と判断した方）・料金だけの相談も歓迎' },
   ]

@@ -85,6 +85,17 @@ t('料金のしくみと健康保険の動画：金額は料金案内・料金�
   assert.deepEqual([...FS.exerciseItemOnlyFor], ['骨折', '脱臼', '不全骨折'])
   assert.ok(vtt.includes('運動療法の項目が、ないため') && vtt.includes('自費は、必要なぶんだけ'))
   assert.ok(!vtt.includes('3,050円'), '組み合わせの合計金額は出さない')
+  // 特殊な物理療法：機器の料金は料金案内のひな形と同じ。幅（1,100〜3,500円）は動画1本目と同じ。保険の電気は46円
+  // （超音波 2,800円は、ひな形には無くホームページの料金ページにある金額）
+  const tplName = { '微弱電流（エレサス）': '微弱電流エレサス', 'コンビネーション療法': 'コンビネーション療法', '体外衝撃波': '体外衝撃波' }
+  for (const d of FS.devices.filter((x) => tplName[x.name])) {
+    assert.ok(fee.includes(`| ${tplName[d.name]} | ${yen(d.fee)} |`), `${d.name} の金額がひな形とちがう`)
+  }
+  assert.deepEqual(FS.devices.map((d) => d.fee), [1600, 2600, 2800, 3500])
+  assert.deepEqual([FS.deviceFeeMin, FS.deviceFeeMax], [F.physioMin, F.physioMax])
+  assert.equal(IO.denryo, 46)
+  assert.ok(vtt.includes('1か所1回、46円') && vtt.includes('使う日だけ') && vtt.includes('1,100円から3,500円'))
+  for (const word of ['他院', 'ほかの院', '効果があります', '治ります']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
   // ほかの保険の金額（初検料など）は入れない
   for (const word of ['初検料', '1,560円', '再検料']) assert.ok(!vtt.includes(word), `字幕に「${word}」`)
 })
