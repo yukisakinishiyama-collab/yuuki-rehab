@@ -8,7 +8,7 @@ import Link from 'next/link'
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, ProgressRecord,
-  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion, KartePhoto, AttendanceRecord,
+  SpecialTestResult, QuickMemo, Intake, CancellationRecord, KarteQuestion, KartePhoto, ImagingReport, AttendanceRecord,
 } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 const SIDE_LABELS_SHORT: Record<string, string> = { right: '右', left: '左', bilateral: '両側', na: '' }
@@ -21,7 +21,7 @@ import { hasAnatomyMarks } from '@/lib/anatomy/types'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getAttendanceRecords,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getImagingReports, getAttendanceRecords,
   deleteSOAPNote, deleteROMRecord, deleteStrengthRecord, deleteSpecialTest,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
@@ -47,6 +47,7 @@ import IntakeForm from './IntakeForm'
 import CancellationTab from './CancellationTab'
 import KarteQuestionsTab from './KarteQuestionsTab'
 import PhotosTab from './PhotosTab'
+import ImagingReportsTab from './ImagingReportsTab'
 import VisitCalendar from './VisitCalendar'
 import ComplaintTimeline from './ComplaintTimeline'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
@@ -804,7 +805,7 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'contract' | 'cancel'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'imaging' | 'contract' | 'cancel'
 /** 「評価・測定」の中の切り替え */
 type EvalKey = 'outcome' | 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
 const EVAL_TABS: { key: EvalKey; label: string }[] = [
@@ -832,6 +833,7 @@ export default function PatientDetail({ patient }: Props) {
   const [quickMemos, setQuickMemos] = useState<QuickMemo[]>([])
   const [karteQuestions, setKarteQuestions] = useState<KarteQuestion[]>([])
   const [kartePhotos, setKartePhotos] = useState<KartePhoto[]>([])
+  const [imagingReports, setImagingReports] = useState<ImagingReport[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
@@ -864,6 +866,7 @@ export default function PatientDetail({ patient }: Props) {
     setIntakes(getIntakes(patient.id).sort((a, b) => b.intakeDate.localeCompare(a.intakeDate)))
     setKarteQuestions(getKarteQuestions(patient.id))
     setKartePhotos(getKartePhotos(patient.id))
+    setImagingReports(getImagingReports(patient.id))
     setAttendance(getAttendanceRecords(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
@@ -948,6 +951,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'memo', label: '簡易メモ', badge: quickMemos.length || undefined },
     { key: 'question', label: '疑問・AI相談', badge: karteQuestions.filter(q => q.status === 'open').length || undefined },
     { key: 'photo', label: '写真', badge: kartePhotos.length || undefined },
+    { key: 'imaging', label: '画像レポート', badge: imagingReports.length || undefined },
     { key: 'contract', label: '契約・同意書', badge: contracts.filter(c => !c.voided).length || undefined },
     { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
@@ -1375,6 +1379,11 @@ export default function PatientDetail({ patient }: Props) {
         {/* ── 写真タブ ── */}
         {activeTab === 'photo' && (
           <PhotosTab patient={patient} photos={kartePhotos} onUpdate={reload} />
+        )}
+
+        {/* ── 画像レポートタブ（CDのDICOMを院のパソコンで読影 → 下書きを確かめる → カルテに提出） ── */}
+        {activeTab === 'imaging' && (
+          <ImagingReportsTab patient={patient} reports={imagingReports} onUpdate={reload} />
         )}
 
         {/* ── 契約・同意書タブ（文面にチェック・記入 → 指で署名 → 院保管用と患者様控えを印刷） ── */}

@@ -56,3 +56,7 @@ next-env.d.ts
 
 # 投稿用の生成画像・動画（作業用・コミットしない）
 .post-images/
+
+# 読影プログラム（Python）の作業ファイル
+__pycache__/
+.pytest_cache/

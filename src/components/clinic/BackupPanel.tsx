@@ -119,7 +119,7 @@ export default function BackupPanel() {
       <div>
         <h2 className="text-lg font-bold">バックアップ（データの控え）</h2>
         <p className="mt-1 text-sm text-slate-600">
-          カルテ（患者さん・SOAP・評価・アウトカム・問診・メモ）、署名済みの契約書・同意書、患部の写真を控えます。
+          カルテ（患者さん・SOAP・評価・アウトカム・問診・メモ）、署名済みの契約書・同意書、患部の写真、画像レポートを控えます。
           クラウドの控えとは別に、院のパソコンにも保存しておくと安心です。
         </p>
       </div>

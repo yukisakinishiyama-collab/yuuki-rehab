@@ -4,7 +4,7 @@
 import type {
   Patient, Evaluation, ROMRecord, StrengthRecord,
   SpecialTestRecord, SOAPNote, RehabPlan, Exercise,
-  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion, KartePhoto,
+  PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion, KartePhoto, ImagingReport,
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
 
@@ -27,6 +27,7 @@ const KEYS = {
   quickMemos: 'pt_quick_memos',
   karteQuestions: 'pt_karte_questions',
   kartePhotos: 'pt_karte_photos',
+  imagingReports: 'pt_imaging_reports',
   intakes: 'pt_intakes',
   explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
@@ -271,6 +272,24 @@ export function saveKartePhoto(photo: KartePhoto): void {
 
 export function deleteKartePhoto(id: string): void {
   set(KEYS.kartePhotos, getKartePhotos().filter(p => p.id !== id))
+}
+
+// ── 画像レポート（要点と場所。PDF本体はクラウド） ──
+export function getImagingReports(patientId?: string): ImagingReport[] {
+  const all = get<ImagingReport>(KEYS.imagingReports)
+  return patientId ? all.filter(r => r.patientId === patientId) : all
+}
+
+export function saveImagingReport(report: ImagingReport): void {
+  const list = getImagingReports()
+  const idx = list.findIndex(r => r.id === report.id)
+  if (idx >= 0) list[idx] = report
+  else list.push(report)
+  set(KEYS.imagingReports, list)
+}
+
+export function deleteImagingReport(id: string): void {
+  set(KEYS.imagingReports, getImagingReports().filter(r => r.id !== id))
 }
 
 // ── 問診票 ──
