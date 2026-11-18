@@ -68,6 +68,16 @@ import { useKarteSynced } from '@/lib/use-karte-sync'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
 import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
+import { getScores as getOutcomeScores } from '@/lib/outcome-score-store'
+import type { OutcomeScoreRecord } from '@/types/outcome-scores'
+import type { ReevalPlan } from '@/types/reeval'
+import { getReevalPlan } from '@/lib/reeval/store'
+import { reevalStatus } from '@/lib/reeval/schedule'
+import ReevalMark from './ReevalMark'
+import ReevalPanel from './ReevalPanel'
+import { adherenceRate, adherenceText } from '@/lib/karte/adherence'
+import { MEMO_KINDS, memoKindLabel, memoTemplateFor } from '@/lib/karte/memo-kinds'
+import type { QuickMemoKind } from '@/types/patient'
 
 // ── 月次カルテ印刷 ────────────────────────────────────────────
 function printMonthlyChart(
@@ -97,7 +107,8 @@ function printMonthlyChart(
     const label = d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
     if (e.kind === 'memo') {
       const escaped = e.memo.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
-      return `<tr><td class="date">${label}</td><td class="kind memo">📝 メモ</td><td class="content">${escaped}</td></tr>`
+      const kindLabel = memoKindLabel(e.memo.kind)
+      return `<tr><td class="date">${label}</td><td class="kind memo">📝 メモ</td><td class="content">${kindLabel ? `<strong>【${kindLabel}】</strong><br>` : ''}${escaped}</td></tr>`
     } else {
       const t = e.test
       const right = `右:<span style="${resultColor(t.rightResult)}">${resultLabel(t.rightResult)}</span>`
@@ -180,8 +191,11 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
   specialTests: SpecialTestRecord[]
   onUpdate: () => void
 }) {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  // 日付は日本時間の今日（以前は UTC で、朝9時前は前の日になっていた）
+  const [date, setDate] = useState(() => jstToday())
   const [content, setContent] = useState('')
+  /** 記録の種類（null＝ふつうのメモ） */
+  const [kind, setKind] = useState<QuickMemoKind | null>(null)
   const [saved, setSaved] = useState(false)
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   // 音声入力の認識途中テキスト（確定前のプレビュー表示用）
@@ -238,9 +252,11 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
       patientId: patient.id,
       memoDate: date,
       content: content.trim(),
+      ...(kind ? { kind } : {}),
       createdAt: new Date().toISOString(),
     })
     setContent('')
+    setKind(null)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
     onUpdate()
@@ -275,6 +291,29 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
             </div>
           }
         />
+        {/* 記録の種類（治療方針の説明・同意、中断の申し出 など。えらぶと見本が入る。ふつうのメモはそのまま） */}
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="記録の種類">
+          <span className="text-xs font-bold text-gray-500">種類</span>
+          {[{ value: null as QuickMemoKind | null, label: 'ふつうのメモ' }, ...MEMO_KINDS].map(k => (
+            <button
+              key={k.value ?? 'plain'}
+              type="button"
+              aria-pressed={kind === k.value}
+              onClick={() => {
+                setKind(k.value)
+                setContent(c => memoTemplateFor(k.value, c))
+              }}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-10 ${
+                kind === k.value ? 'border-teal-700 bg-teal-700 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-teal-300'
+              }`}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+        {kind && (
+          <p className="text-xs text-gray-600">説明した内容と、患者さんの意思決定を、事実のまま残す記録です。署名で残す説明・同意は「契約・同意書」タブの書類で行います。</p>
+        )}
         <div className="flex items-center gap-3">
           <label className="text-xs text-gray-500 whitespace-nowrap">日付</label>
           <input
@@ -379,6 +418,11 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
                               <p className="text-xs text-gray-500 mt-0.5">📝 メモ</p>
                             </div>
                             <div className="flex-1 min-w-0">
+                              {memoKindLabel(memo.kind) && (
+                                <span className="mb-1 inline-block rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-bold text-teal-800">
+                                  {memoKindLabel(memo.kind)}
+                                </span>
+                              )}
                               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{memo.content}</p>
                             </div>
                             <button
@@ -465,7 +509,11 @@ function DeleteRowButton({ label, onDelete }: { label: string; onDelete: () => v
 function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferral?: () => void; onDelete?: () => void }) {
   const [open, setOpen] = useState(false)
   const nrsColor = note.painToday >= 7 ? 'text-red-600' : note.painToday >= 4 ? 'text-yellow-700' : 'text-green-700'
-  const adherenceLabel = note.homeExerciseAdherence === 'done' ? '✅ 実施' : note.homeExerciseAdherence === 'partial' ? '⚠️ 一部' : '❌ 未実施'
+  const adherenceLabel = [
+    adherenceText(note.homeExerciseAdherence, true),
+    note.homeExerciseReasons && note.homeExerciseReasons.length > 0 ? `（理由：${note.homeExerciseReasons.join('・')}）` : '',
+    note.homeExerciseNote ? ` ${note.homeExerciseNote}` : '',
+  ].join('')
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
@@ -821,9 +869,21 @@ interface Props {
   patient: Patient
 }
 
+/** 患者さん一覧などの再評価マークから来た（/patients/<id>?reeval=1） */
+function openedForReeval(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('reeval') === '1'
+}
+
 export default function PatientDetail({ patient }: Props) {
-  const [activeTab, setActiveTab] = useState<TabKey>('soap')
+  // 再評価マークから来たときは「評価・測定」の再評価の欄を開く（このカルテは端末の記録を読んでから描くので、最初から URL を読める）
+  const [fromReevalMark] = useState(openedForReeval)
+  const [activeTab, setActiveTab] = useState<TabKey>(fromReevalMark ? 'eval' : 'soap')
   const [evalTab, setEvalTab] = useState<EvalKey>('outcome')
+  const [reevalPlan, setReevalPlan] = useState<ReevalPlan | null>(null)
+  const [outcomeScores, setOutcomeScores] = useState<OutcomeScoreRecord[]>([])
+  /** 再評価の欄を開いているか（null＝おまかせ：まもなく・当日・超過なら開く） */
+  const [reevalOpen, setReevalOpen] = useState<boolean | null>(fromReevalMark ? true : null)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [romRecords, setRomRecords] = useState<ROMRecord[]>([])
   const [strengthRecords, setStrengthRecords] = useState<StrengthRecord[]>([])
@@ -874,6 +934,24 @@ export default function PatientDetail({ patient }: Props) {
     setAllContracts(getAllContracts())
     setOutcomes(getOutcomes(patient.id))
     setOutcomeSportState(getOutcomeSport(patient.id))
+    setReevalPlan(getReevalPlan(patient.id))
+    setOutcomeScores(getOutcomeScores(patient.id))
+  }
+
+  // 再評価マークから来たときは、URL の印を消して（読み直しでまた開かないように）再評価の欄へ
+  const scrolledForReeval = useRef(false)
+  useEffect(() => {
+    if (!fromReevalMark || scrolledForReeval.current) return
+    scrolledForReeval.current = true
+    window.history.replaceState(window.history.state, '', window.location.pathname)
+    window.setTimeout(() => document.getElementById('reeval')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+  }, [fromReevalMark])
+
+  /** カルテの上の再評価マークを押したとき */
+  function openReeval() {
+    setActiveTab('eval')
+    setReevalOpen(true)
+    window.setTimeout(() => document.getElementById('reeval')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
   // ── 算出値 ──
@@ -894,14 +972,20 @@ export default function PatientDetail({ patient }: Props) {
         strengthImprovementRate: 15,
         specialTestImproved: false,
         functionalScore: 40,
-        homeExerciseAdherence: latestSoap?.homeExerciseAdherence === 'done' ? 100 : latestSoap?.homeExerciseAdherence === 'partial' ? 50 : 0,
+        // 未確認は「一部」と同じ扱い（2026-11-18 までは聞いていなくても初期値の「一部実施」で残っていたため、点数が変わらないように）
+        homeExerciseAdherence: adherenceRate(latestSoap?.homeExerciseAdherence) ?? 50,
         visitContinuity: 80,
         patientSubjective: 60,
       })
     : null
 
   // 会員プランの状態（契約・同意書タブで署名した入会・休会・解約から）
-  const memberStatus = memberStatusForPatient(patient.id, allContracts, jstToday())
+  const today = jstToday()
+  const memberStatus = memberStatusForPatient(patient.id, allContracts, today)
+
+  // 再評価の時期（予定日を決めた方だけ。カルテが「終了」の方には出さない）
+  const reevalSt = reevalStatus(reevalPlan, today, { ended: patient.status === 'discharged' })
+  const reevalPanelOpen = reevalOpen ?? (reevalSt.state === 'soon' || reevalSt.state === 'due' || reevalSt.state === 'overdue')
 
   // キャンセル累計（ヘッダー表示・離脱リスク算出に使用）
   const cancelSummary = summarizeCancellations(cancellations)
@@ -935,10 +1019,12 @@ export default function PatientDetail({ patient }: Props) {
   // ── グラフデータ ──
   const painChartData = soapNotes.map(n => ({ date: n.visitDate, nrs: n.painToday })).reverse()
   const progressChartData = progressRecords.map(r => ({ date: r.recordDate, score: r.improvementScore }))
-  const adherenceData = soapNotes.slice(0, 10).map(n => ({
-    date: n.visitDate,
-    rate: n.homeExerciseAdherence === 'done' ? 100 : n.homeExerciseAdherence === 'partial' ? 50 : 0,
-  })).reverse()
+  // 未確認（聞いていない日）はグラフに入れない
+  const adherenceData = soapNotes
+    .filter(n => adherenceRate(n.homeExerciseAdherence) !== null)
+    .slice(0, 10)
+    .map(n => ({ date: n.visitDate, rate: adherenceRate(n.homeExerciseAdherence) as number }))
+    .reverse()
 
   // ── ROM グラフデータ（最初の動作） ──
   const romMovements = [...new Set(romRecords.map(r => r.movement))].slice(0, 4)
@@ -982,6 +1068,8 @@ export default function PatientDetail({ patient }: Props) {
                   <Badge color="blue">予約から自動で登録</Badge>
                 )}
                 <MemberStatusBadge status={memberStatus} />
+                {/* 再評価の時期（まもなく・当日・超過のときだけ）。押すと評価・測定の再評価の欄へ */}
+                <ReevalMark status={reevalSt} today={today} onClick={openReeval} />
                 <RetentionRiskBadge level={retentionRisk.level} />
                 {/* キャンセル累計（0件のときは表示しない）。押すとキャンセルタブへ */}
                 {cancelSummary.total > 0 && (
@@ -1231,7 +1319,7 @@ export default function PatientDetail({ patient }: Props) {
                     </div>
                     <div>
                       <span className="text-gray-500">自宅運動</span>
-                      <p className="font-medium">{latestSoap.homeExerciseAdherence === 'done' ? '✅ 実施できた' : latestSoap.homeExerciseAdherence === 'partial' ? '⚠️ 一部実施' : '❌ 未実施'}</p>
+                      <p className="font-medium">{adherenceText(latestSoap.homeExerciseAdherence, true)}</p>
                     </div>
                   </div>
                   {latestSoap.changeFromLast && (
@@ -1244,6 +1332,25 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 評価・測定タブ（初回評価・ROM・筋力・スペシャルテスト・経過グラフ） ── */}
+        {/* いちばん上に「再評価」の欄（予定日・前回との比べ・完了）。測るのは今までどおり下の各タブ */}
+        {activeTab === 'eval' && (
+          <ReevalPanel
+            key={`${patient.id}:${reevalPlan?.updatedAt ?? ''}`}
+            patient={patient}
+            plan={reevalPlan}
+            today={today}
+            soapNotes={soapNotes}
+            outcomes={outcomes}
+            rom={romRecords}
+            strength={strengthRecords}
+            scores={outcomeScores}
+            returnTests={returnAssessments}
+            open={reevalPanelOpen}
+            onToggle={() => setReevalOpen(!reevalPanelOpen)}
+            onGo={(to) => setEvalTab(to)}
+            onUpdate={reload}
+          />
+        )}
         {activeTab === 'eval' && (
           <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="評価・測定の切り替え">
             {EVAL_TABS.map(t => (

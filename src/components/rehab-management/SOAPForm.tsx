@@ -23,6 +23,9 @@ import { TAP_AREA } from '@/components/ui/tap-area'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import { SOAP_SECTION_LABELS, VOICE_SOAP_FIELDS, type SoapSection, type VoiceSoapResult } from '@/lib/voice/soap-fields'
 import { applyVoiceChanges, planVoiceSoapChanges, undoVoiceChanges } from '@/lib/voice/merge-soap'
+import { ADHERENCE_OPTIONS, ADHERENCE_REASONS, adherenceReviewHints, needsReason } from '@/lib/karte/adherence'
+import { applySoapReassessment } from '@/lib/reeval/store'
+import { shortDate } from '@/lib/reeval/schedule'
 
 interface Props {
   patientId: string
@@ -44,7 +47,9 @@ interface FormState {
   painToday: number
   changeFromLast: string
   adlDifficulty: string
-  homeExerciseAdherence: 'done' | 'partial' | 'not_done'
+  homeExerciseAdherence: 'done' | 'partial' | 'not_done' | 'unknown'
+  homeExerciseReasons: string[]
+  homeExerciseNote: string
   patientConcern: string
   patientGoalToday: string
   romFindings: string
@@ -366,7 +371,10 @@ const defaultForm: FormState = {
   painToday: 3,
   changeFromLast: '',
   adlDifficulty: '',
-  homeExerciseAdherence: 'partial',
+  // 聞いていないのに「一部実施」と残らないように、初期値は「未確認」（2026-11-18。それまでは partial）
+  homeExerciseAdherence: 'unknown',
+  homeExerciseReasons: [],
+  homeExerciseNote: '',
   patientConcern: '',
   patientGoalToday: '',
   romFindings: '',
@@ -521,6 +529,8 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
       homeExerciseAdherence: form.homeExerciseAdherence,
+      homeExerciseReasons: needsReason(form.homeExerciseAdherence) && form.homeExerciseReasons.length > 0 ? form.homeExerciseReasons : undefined,
+      homeExerciseNote: needsReason(form.homeExerciseAdherence) && form.homeExerciseNote.trim() ? form.homeExerciseNote.trim().slice(0, 200) : undefined,
       patientConcern: form.patientConcern,
       patientGoalToday: form.patientGoalToday,
       romFindings: form.romFindings,
@@ -551,12 +561,16 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       createdAt: new Date().toISOString(),
     }
     saveSOAPNote(note)
+    // 「再評価予定」に日付があれば、再評価の予定日にもする（ふつうの記録なので、再評価の完了にはしない）
+    const reevalSet = applySoapReassessment(patientId, note)
     // 主な部位・傷病名が変わっていたら、カルテの表紙も合わせるか聞く（院長が決める）
     const patient = getPatient(patientId)
     const suggestion = patient ? coverSuggestion(patient, complaints) : null
     if (patient && suggestion && window.confirm(`主な部位・傷病名が変わっています（${suggestion.reason}）。カルテの表紙も合わせますか？`)) {
       savePatient({ ...patient, bodyRegion: suggestion.bodyRegion, diagnosisLabel: suggestion.diagnosisLabel, updatedAt: new Date().toISOString() })
       setCoverNotice('カルテの表紙（部位・傷病名）を更新しました')
+    } else if (reevalSet) {
+      setCoverNotice(`再評価の予定日を ${shortDate(note.nextReassessment)} にしました`)
     }
     setSaved(true)
     setTimeout(() => { setSaved(false); setCoverNotice(null) }, 3000)
@@ -709,16 +723,46 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
 
             <div>
               <FormLabel>自宅運動の実施状況</FormLabel>
-              <div className="flex gap-3 mt-1">
-                {(['done', 'partial', 'not_done'] as const).map((v, i) => (
-                  <label key={v} className="flex items-center gap-1.5 cursor-pointer max-lg:min-h-10">
-                    <input type="radio" value={v} checked={form.homeExerciseAdherence === v}
-                      onChange={() => setForm(f => ({ ...f, homeExerciseAdherence: v }))}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                {ADHERENCE_OPTIONS.map(o => (
+                  <label key={o.value} className="flex items-center gap-1.5 cursor-pointer max-lg:min-h-10">
+                    <input type="radio" value={o.value} checked={form.homeExerciseAdherence === o.value}
+                      onChange={() => setForm(f => ({ ...f, homeExerciseAdherence: o.value }))}
                       className="accent-teal-600" />
-                    <span className="text-sm">{['できた', '一部できた', 'できなかった'][i]}</span>
+                    <span className="text-sm">{o.form}</span>
                   </label>
                 ))}
               </div>
+              {/* 未実施・一部実施のときだけ、理由をタップで（運動内容を見直す手がかりにする。これだけで危ない方とは決めない） */}
+              {needsReason(form.homeExerciseAdherence) && (
+                <div className="mt-2 space-y-2 rounded-lg bg-gray-50 p-3">
+                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="できなかった理由">
+                    <span className="text-xs font-bold text-gray-600">理由</span>
+                    {ADHERENCE_REASONS.map(r => {
+                      const on = form.homeExerciseReasons.includes(r)
+                      return (
+                        <button key={r} type="button" aria-pressed={on}
+                          onClick={() => setForm(f => ({
+                            ...f,
+                            homeExerciseReasons: on ? f.homeExerciseReasons.filter(x => x !== r) : [...f.homeExerciseReasons, r],
+                          }))}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-10 ${
+                            on ? 'border-teal-700 bg-teal-700 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-teal-300'
+                          }`}>
+                          {r}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <Input value={form.homeExerciseNote} onChange={v => setForm(f => ({ ...f, homeExerciseNote: v }))}
+                    placeholder="ひとこと（任意）例：朝は時間がない。夜なら5分できそう" />
+                  {adherenceReviewHints(form.homeExerciseReasons).length > 0 && (
+                    <ul className="list-disc space-y-0.5 pl-5 text-xs text-gray-700">
+                      {adherenceReviewHints(form.homeExerciseReasons).map(h => <li key={h}>{h}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>

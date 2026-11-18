@@ -2,7 +2,7 @@
 /**
  * カルテの「契約・同意書」タブ
  *
- * 1. 書類をえらぶ（6種類。署名済みのものには日付が出る）
+ * 1. 書類をえらぶ（7種類。署名済みのものには日付が出る）
  * 2. 文面をいっしょに読み、□ をタップ（チェックは患者様ご自身で）。記入欄は、署名のほかはカルテ・今日の日付・
  *    会員の手続きの欄から自動で入る（緑の欄。lib/contracts/autofill.ts）
  * 3. 患者さん（未成年なら保護者も）と担当者が指で署名 →「署名して完了する」
@@ -28,6 +28,7 @@ import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templ
 import { CONTRACT_PRINT_CSS, parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
 import { contractSummaryHtml, insertSummary, isSafeContractHtml, memberLineOf, withContractSummary } from '@/lib/contracts/summary'
 import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
+import { consentProblem } from '@/lib/contracts/consent'
 import { CLINIC_STAFF } from '@/data/clinic-staff'
 import { Button } from '@/components/ui/button'
 import { lengthLabel, pickOrientation, PRICE_GUIDE_VIDEO, type VideoOrientation } from '@/data/intro-videos'
@@ -739,6 +740,9 @@ function SignFlow({
   if (!staffName.trim()) missing.push({ id: 'cf-staff-name', text: `${tpl.staffLabel}の氏名` })
   if (!sigStaff) missing.push({ id: 'cf-sig-staff', text: `${tpl.staffLabel}の署名` })
   if (memberCheck && !memberCheck.ok) missing.push({ id: 'cf-member', text: memberCheck.error })
+  // 説明および同意書：「同意します」にチェック、「追加説明を希望」はチェックなし、のときだけ署名できる
+  const consent = consentProblem(tpl.id, described.checks, checks)
+  if (consent) missing.push({ id: 'cf-doc', text: consent })
   if (checkedPlans.length > 1) missing.push({ id: 'cf-doc', text: '文面の「申し込む」のチェックが2つ以上あります。申し込むプランを1つにしてください。' })
   else if (checkedPlans.length === 1 && checkedPlans[0] !== member.plan)
     missing.push({ id: 'cf-member', text: `文面で選んだプラン（${checkedPlans[0]}）と、下の「会員の種別」（${member.plan}）がちがいます。` })

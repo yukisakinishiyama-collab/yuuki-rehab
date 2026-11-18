@@ -269,7 +269,12 @@ export interface SOAPNote {
   painToday: number
   changeFromLast: string
   adlDifficulty: string
-  homeExerciseAdherence: 'done' | 'partial' | 'not_done'
+  /** 自宅運動の実施状況。unknown＝未確認（聞いていない）。2026-11-18 に足した（それより前の記録には無い） */
+  homeExerciseAdherence: 'done' | 'partial' | 'not_done' | 'unknown'
+  /** 未実施・一部実施の理由（タップで残す。lib/karte/adherence.ts の ADHERENCE_REASONS） */
+  homeExerciseReasons?: string[]
+  /** 自宅運動についての一言（理由の補足など） */
+  homeExerciseNote?: string
   patientConcern: string
   patientGoalToday: string
   // O: Objective
@@ -382,8 +387,13 @@ export interface QuickMemo {
   patientId: string
   memoDate: string
   content: string
+  /** 記録の種類（省略＝ふつうのメモ）。説明・同意など、あとで探したい記録に付ける（lib/karte/memo-kinds.ts） */
+  kind?: QuickMemoKind
   createdAt: string
 }
+
+/** 簡易メモの種類（治療方針の説明・同意、自主トレの合意、中断の申し出 など）。2026-11-18 に足した */
+export type QuickMemoKind = 'explain' | 'home_plan' | 'stop_request' | 'self_resume' | 'plan_change' | 'caution' | 'wish'
 
 // ──────────────────────────────────────────────
 // 疑問メモ・AI相談
