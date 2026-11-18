@@ -417,6 +417,49 @@ export interface KarteQuestion {
 }
 
 // ──────────────────────────────────────────────
+// 画像レポート（CDのDICOMを院のパソコンで読影して作った、画像所見レポート＝参考意見）
+// PDF はクラウド（Supabase Storage の非公開バケット karte-imaging）に置き、ここには要点と場所だけを持つ。
+// ──────────────────────────────────────────────
+export interface ImagingEstimate {
+  condition: string
+  /** 読影者（AI）の主観的な見積もり（%）。統計値ではない */
+  percent: number
+  basis: string
+}
+
+export interface ImagingReport {
+  id: string
+  patientId: string
+  /** 撮影日（yyyy-MM-dd。DICOMから。無ければ空） */
+  studyDate: string
+  /** 部位（例：右足関節） */
+  region: string
+  /** 検査の種類（例：['単純X線', 'MRI']） */
+  modalities: string[]
+  /** 種類ごとの枚数 */
+  imageCounts?: Record<string, number>
+  /** 撮影した施設（DICOMから） */
+  institution?: string
+  /** 一覧に出す一行 */
+  headline: string
+  /** 総括（段落ごと。**…** は強調） */
+  summary: string[]
+  estimates: ImagingEstimate[]
+  /** 読影のときに伝えた主訴 */
+  complaint: string
+  /** クラウド上の場所（patientId/id.pdf） */
+  storagePath: string
+  /** 保存するときのファイル名 */
+  fileName: string
+  bytes: number
+  /** 読影した者（例：Claude（AI）） */
+  author: string
+  /** カルテに提出した日時・提出した人 */
+  submittedAt: string
+  submittedBy?: string
+}
+
+// ──────────────────────────────────────────────
 // 患部の写真
 // 写真そのものはクラウド（Supabase Storage の非公開バケット）に置き、ここには場所と説明だけを持つ。
 // 表示・削除は院内アプリの API 経由（Basic 認証の内側）。

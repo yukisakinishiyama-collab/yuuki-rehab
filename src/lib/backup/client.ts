@@ -151,7 +151,7 @@ export async function collectBackup(onProgress?: (p: BackupProgress) => void): P
     version: core.version,
     kind: 'full',
     createdAt: core.createdAt,
-    note: 'ゆうき整骨院 院内アプリのバックアップ。karte.data は各端末の localStorage と同じ形（キー → JSON の文字列）。contracts は署名入りの契約書の本文。写真の画像は同じフォルダの「写真」にある',
+    note: 'ゆうき整骨院 院内アプリのバックアップ。karte.data は各端末の localStorage と同じ形（キー → JSON の文字列）。contracts は署名入りの契約書の本文。写真の画像は同じフォルダの「写真」、画像レポートのPDFは「画像レポート」にある',
     counts: core.counts,
     karte: core.karte,
     photosMeta: core.photosMeta,
@@ -206,6 +206,32 @@ async function savePhotos(dir: FsDirHandle, core: CoreBackup, onProgress?: (p: B
   return added
 }
 
+/** 画像レポートのPDFをフォルダの「画像レポート/患者さんのID/」に足す（すでにあるものはそのまま）。足した数を返す */
+async function saveImagingReports(dir: FsDirHandle, core: CoreBackup, onProgress?: (p: BackupProgress) => void): Promise<number> {
+  let reports: Array<{ patientId?: string; storagePath?: string }> = []
+  try {
+    const parsed = JSON.parse(core.karte.data['pt_imaging_reports'] ?? '[]')
+    if (Array.isArray(parsed)) reports = parsed
+  } catch {
+    return 0
+  }
+  const valid = reports.filter((r) => typeof r.storagePath === 'string' && /^[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\.pdf$/.test(r.storagePath))
+  if (valid.length === 0) return 0
+  const root = await dir.getDirectoryHandle('画像レポート', { create: true })
+  let added = 0
+  for (let i = 0; i < valid.length; i++) {
+    onProgress?.({ step: '画像レポートを保存しています', done: i, total: valid.length })
+    const [pid, file] = (valid[i].storagePath as string).split('/')
+    const sub = await root.getDirectoryHandle(pid, { create: true })
+    if (await exists(sub, file)) continue
+    const res = await fetch(`/api/karte/imaging?path=${encodeURIComponent(valid[i].storagePath as string)}`)
+    if (!res.ok) continue
+    await writeFile(sub, file, await res.blob())
+    added += 1
+  }
+  return added
+}
+
 export interface SaveResult {
   ok: boolean
   where: 'folder' | 'download' | 'none'
@@ -233,6 +259,7 @@ export async function saveBackupToPc(interactive: boolean, onProgress?: (p: Back
       onProgress?.({ step: 'パソコンのフォルダに書いています' })
       await writeFile(dir, name, new Blob([json], { type: 'application/json' }))
       const photosAdded = await savePhotos(dir, core, onProgress)
+      await saveImagingReports(dir, core, onProgress)
       localStorage.setItem(LAST_PC_BACKUP_KEY, new Date().toISOString())
       return { ok: true, where: 'folder', fileName: name, folderName: dir.name, photosAdded, counts: core.counts }
     }
