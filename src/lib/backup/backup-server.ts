@@ -2,7 +2,7 @@
  * 院内アプリのバックアップ（サーバー専用）
  *
  * 1. クラウドの毎月の控え … 毎日夜中に確かめ、その月（日本時間）の控えが無ければ作る（backup:YYYY-MM）。12か月分を残す
- *    中身＝カルテ（端末と同期している全部：患者さん・SOAP・評価・アウトカム・契約の一覧など）と、患部の写真の一覧
+ *    中身＝カルテ（端末と同期している全部：患者さん・SOAP・評価・アウトカム・契約の一覧・資料の題名と保存場所など）と、患部の写真の一覧
  *    署名入りの契約書の本文（kcdoc:）は、あとから書きかえない作りなので、毎月の控えには重ねて入れない
  * 2. パソコンに保存 … 画面から core（カルテ＋写真の一覧＋契約の番号）と、契約書の本文を20件ずつ受け取り、
  *    端末で1つのファイルにまとめてパソコンのフォルダへ書く（lib/backup/client.ts）
@@ -82,6 +82,7 @@ export async function buildCoreBackup(now: Date = new Date()): Promise<CoreBacku
       簡易メモ: lengthOf(data.pt_quick_memos),
       問診: lengthOf(data.pt_intakes),
       アウトカム: lengthOf(data.pt_outcomes),
+      資料: lengthOf(data.pt_karte_docs),
       契約書: contractIds.length,
       写真: Object.values(photosMeta).reduce((s, l) => s + l.length, 0),
     },

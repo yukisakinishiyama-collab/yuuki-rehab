@@ -1,7 +1,7 @@
 'use client'
 // ──────────────────────────────────────────────
 // カルテ（患者さん1人分）
-// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・疑問・AI相談・写真・キャンセル
+// タブ: SOAPカルテ（最初に開く）・概要・評価・測定・問診票・簡易メモ・疑問・AI相談・写真・画像レポート・資料・契約・同意書・キャンセル
 // ──────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
@@ -21,7 +21,7 @@ import { hasAnatomyMarks } from '@/lib/anatomy/types'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
-  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getImagingReports, getAttendanceRecords,
+  getQuickMemos, saveQuickMemo, deleteQuickMemo, getIntakes, getCancellations, getKarteQuestions, getKartePhotos, getImagingReports, getKarteDocs, getAttendanceRecords,
   deleteSOAPNote, deleteROMRecord, deleteStrengthRecord, deleteSpecialTest,
 } from '@/lib/patient-store'
 import { summarizeCancellations } from '@/lib/cancellation-utils'
@@ -48,6 +48,8 @@ import CancellationTab from './CancellationTab'
 import KarteQuestionsTab from './KarteQuestionsTab'
 import PhotosTab from './PhotosTab'
 import ImagingReportsTab from './ImagingReportsTab'
+import DocsTab from './DocsTab'
+import type { KarteDoc } from '@/types/karte-docs'
 import VisitCalendar from './VisitCalendar'
 import ComplaintTimeline from './ComplaintTimeline'
 import VoiceInputButton from '@/components/rehab/VoiceInputButton'
@@ -853,7 +855,7 @@ function IntakeCard({
   )
 }
 
-type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'imaging' | 'contract' | 'cancel'
+type TabKey = 'soap' | 'overview' | 'eval' | 'intake' | 'memo' | 'question' | 'photo' | 'imaging' | 'docs' | 'contract' | 'cancel'
 /** 「評価・測定」の中の切り替え */
 type EvalKey = 'outcome' | 'evaluation' | 'rom' | 'strength' | 'special' | 'progress'
 const EVAL_TABS: { key: EvalKey; label: string }[] = [
@@ -894,6 +896,7 @@ export default function PatientDetail({ patient }: Props) {
   const [karteQuestions, setKarteQuestions] = useState<KarteQuestion[]>([])
   const [kartePhotos, setKartePhotos] = useState<KartePhoto[]>([])
   const [imagingReports, setImagingReports] = useState<ImagingReport[]>([])
+  const [karteDocs, setKarteDocs] = useState<KarteDoc[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [intakes, setIntakes] = useState<Intake[]>([])
   const [cancellations, setCancellations] = useState<CancellationRecord[]>([])
@@ -927,6 +930,7 @@ export default function PatientDetail({ patient }: Props) {
     setKarteQuestions(getKarteQuestions(patient.id))
     setKartePhotos(getKartePhotos(patient.id))
     setImagingReports(getImagingReports(patient.id))
+    setKarteDocs(getKarteDocs(patient.id))
     setAttendance(getAttendanceRecords(patient.id))
     setCancellations(getCancellations(patient.id))
     setReturnAssessments(getReturnAssessments(patient.id))
@@ -1038,6 +1042,7 @@ export default function PatientDetail({ patient }: Props) {
     { key: 'question', label: '疑問・AI相談', badge: karteQuestions.filter(q => q.status === 'open').length || undefined },
     { key: 'photo', label: '写真', badge: kartePhotos.length || undefined },
     { key: 'imaging', label: '画像レポート', badge: imagingReports.length || undefined },
+    { key: 'docs', label: '資料', badge: karteDocs.length || undefined },
     { key: 'contract', label: '契約・同意書', badge: contracts.filter(c => !c.voided).length || undefined },
     { key: 'cancel', label: 'キャンセル', badge: cancelSummary.total || undefined },
   ]
@@ -1494,6 +1499,11 @@ export default function PatientDetail({ patient }: Props) {
         )}
 
         {/* ── 契約・同意書タブ（文面にチェック・記入 → 指で署名 → 院保管用と患者様控えを印刷） ── */}
+        {/* ── 資料 タブ（論文・リハビリプロトコルなどの PDF・リンク） ── */}
+        {activeTab === 'docs' && (
+          <DocsTab patient={patient} docs={karteDocs} onUpdate={reload} />
+        )}
+
         {activeTab === 'contract' && (
           <ContractsTab patient={patient} contracts={contracts} allContracts={allContracts} onUpdate={reload} />
         )}

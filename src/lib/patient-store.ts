@@ -7,6 +7,7 @@ import type {
   PatientExercise, ProgressRecord, AttendanceRecord, RetentionRisk, QuickMemo, Intake, KarteQuestion, KartePhoto, ImagingReport,
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
+import type { KarteDoc } from '@/types/karte-docs'
 
 const STORE_VERSION = '1'
 
@@ -28,6 +29,7 @@ const KEYS = {
   karteQuestions: 'pt_karte_questions',
   kartePhotos: 'pt_karte_photos',
   imagingReports: 'pt_imaging_reports',
+  karteDocs: 'pt_karte_docs',
   intakes: 'pt_intakes',
   explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
@@ -290,6 +292,24 @@ export function saveImagingReport(report: ImagingReport): void {
 
 export function deleteImagingReport(id: string): void {
   set(KEYS.imagingReports, getImagingReports().filter(r => r.id !== id))
+}
+
+// ── 資料（論文・リハビリプロトコルなど。題名・メモと保存場所。ファイル本体はクラウド） ──
+export function getKarteDocs(patientId?: string): KarteDoc[] {
+  const all = get<KarteDoc>(KEYS.karteDocs)
+  return patientId ? all.filter(d => d.patientId === patientId) : all
+}
+
+export function saveKarteDoc(doc: KarteDoc): void {
+  const list = getKarteDocs()
+  const idx = list.findIndex(d => d.id === doc.id)
+  if (idx >= 0) list[idx] = doc
+  else list.push(doc)
+  set(KEYS.karteDocs, list)
+}
+
+export function deleteKarteDoc(id: string): void {
+  set(KEYS.karteDocs, getKarteDocs().filter(d => d.id !== id))
 }
 
 // ── 問診票 ──
