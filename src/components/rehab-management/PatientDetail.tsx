@@ -18,6 +18,7 @@ import { zoneLabel } from './JointDetailMap'
 import AnatomyMap from './AnatomyMap'
 import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
 import { hasAnatomyMarks } from '@/lib/anatomy/types'
+import { anatomyMarksForLayout, bodyMarksForLayout } from '@/lib/anatomy/layout'
 import {
   getEvaluations, getROMRecords, getStrengthRecords, getSpecialTests,
   getSOAPNotes, getProgressRecords,
@@ -615,7 +616,7 @@ function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferr
             {((note.painLocations && note.painLocations.length > 0) || (note.bodyMarks && Object.values(note.bodyMarks).some(m => m && (m.pins.length > 0 || m.strokes.length > 0)))) && (
               <div className="mb-3">
                 <p className="text-xs text-gray-500 font-medium mb-1">この日の痛み部位</p>
-                <BodyMap selected={note.painLocations ?? []} onChange={() => {}} readOnly marks={note.bodyMarks} />
+                <BodyMap selected={note.painLocations ?? []} onChange={() => {}} readOnly marks={bodyMarksForLayout(note.bodyMarks, note.diagramLayout)} />
               </div>
             )}
             {note.jointDetailLocations && Object.values(note.jointDetailLocations).some(v => v.length > 0) && (
@@ -631,7 +632,7 @@ function SOAPNoteCard({ note, onReferral, onDelete }: { note: SOAPNote; onReferr
             {note.anatomyMarks && Object.values(note.anatomyMarks).some(hasAnatomyMarks) && (
               <div className="mb-3 space-y-2">
                 <p className="text-xs text-gray-500 font-medium">解剖図への書き込み</p>
-                {Object.entries(note.anatomyMarks).filter(([, m]) => hasAnatomyMarks(m)).map(([joint, m]) => {
+                {Object.entries(anatomyMarksForLayout(note.anatomyMarks, note.diagramLayout)).filter(([, m]) => hasAnatomyMarks(m)).map(([joint, m]) => {
                   const side = jointsFromPainLocations(note.painLocations ?? [], [joint]).find(j => j.joint === joint)?.side
                   return (
                     <AnatomyMap

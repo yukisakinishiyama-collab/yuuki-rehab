@@ -67,6 +67,18 @@ for (const file of readdirSync(ZONES_DIR).filter((f) => f.endsWith('.json'))) {
         if (!(x >= 0 && x <= v.width && y >= 0 && y <= v.height)) { fail(`${v.view}: ${z.id} の点 (${x},${y}) が画像の外`); break }
       }
     }
+    // 左右の決まり（2026-11-18）：後面は向かって左が患者さんの左、前面は向かって左が患者さんの右。
+    // 左右を別の部位として持つ図（mirrorForLeft: false）で、「右…」「左…」の部位が逆の半分に無いこと
+    if (spec.mirrorForLeft === false && (v.view === 'posterior' || v.view === 'anterior')) {
+      for (const z of v.zones) {
+        const side = z.label?.startsWith('右') ? 'right' : z.label?.startsWith('左') ? 'left' : null
+        if (!side || !Array.isArray(z.polygon) || z.polygon.length < 3) continue
+        const cx = z.polygon.reduce((sum, p) => sum + p[0], 0) / z.polygon.length
+        const onViewerRight = cx > v.width / 2
+        const wantViewerRight = v.view === 'posterior' ? side === 'right' : side === 'left'
+        if (onViewerRight !== wantViewerRight) fail(`${v.view}: ${z.id}（${z.label}）が図の逆の側にある（後面は向かって右が患者さんの右、前面は向かって右が患者さんの左）`)
+      }
+    }
     ok(`${v.view}: 部位 ${v.zones.length}件`)
   }
   const covered = new Set(spec.views.flatMap((v) => v.zones.map((z) => z.id)))

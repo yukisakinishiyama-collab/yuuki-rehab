@@ -7,6 +7,7 @@
  * - coverSuggestion: 主な部位・傷病名が変わっていたら、カルテの表紙（Patient）を合わせる提案を返す
  */
 import type { AnatomyMarks } from '@/lib/anatomy/types'
+import { anatomyMarksForLayout, bodyMarksForLayout } from '@/lib/anatomy/layout'
 import type { ComplaintEntry, Patient, SOAPNote, BodyRegion, Side } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 
@@ -51,8 +52,9 @@ export function carryForward(last: SOAPNote): CarriedForward {
     complaints: active.map(c => ({ ...c, status: 'active', startedAt: c.startedAt ?? last.visitDate, resolvedAt: undefined })),
     painLocations: [...(last.painLocations ?? [])],
     jointDetailLocations: Object.fromEntries(Object.entries(last.jointDetailLocations ?? {}).map(([k, v]) => [k, [...v]])),
-    anatomyMarks: JSON.parse(JSON.stringify(last.anatomyMarks ?? {})) as Record<string, AnatomyMarks>,
-    bodyMarks: JSON.parse(JSON.stringify(last.bodyMarks ?? {})) as NonNullable<SOAPNote['bodyMarks']>,
+    // 図に描いた印は、いまの左右の決まりの向きにして引き継ぐ（前の決まりの記録は、人体図の前面と腰部の後面を左右に入れかえる）
+    anatomyMarks: anatomyMarksForLayout(JSON.parse(JSON.stringify(last.anatomyMarks ?? {})) as Record<string, AnatomyMarks>, last.diagramLayout),
+    bodyMarks: bodyMarksForLayout(JSON.parse(JSON.stringify(last.bodyMarks ?? {})) as NonNullable<SOAPNote['bodyMarks']>, last.diagramLayout),
     treatmentAreas: [...(last.treatmentAreas ?? [])],
     currentPhase: last.currentPhase,
     homeExercise: last.homeExercise ?? '',

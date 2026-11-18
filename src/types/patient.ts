@@ -266,6 +266,8 @@ export interface SOAPNote {
   jointDetailLocations?: Record<string, string[]>  // 関節別詳細部位
   anatomyMarks?: Record<string, AnatomyMarks>     // 解剖図に直接描いたマーク（関節ごと）
   bodyMarks?: Partial<Record<'front' | 'back', AnatomyViewMarks>>  // 人体図に直接描いたマーク（前面・背面）
+  /** 図の左右の決まりの版（lib/anatomy/layout.ts）。無い記録は、2026-11-18 に左右を直す前の決まりで描いた印（出すときに左右を入れかえる） */
+  diagramLayout?: number
   painToday: number
   changeFromLast: string
   adlDifficulty: string

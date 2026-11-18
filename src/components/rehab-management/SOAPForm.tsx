@@ -19,6 +19,7 @@ import AnatomyMap from './AnatomyMap'
 import { SUPPORTED_JOINTS } from './JointDetailMap'
 import { jointsFromPainLocations } from '@/lib/anatomy/body-joints'
 import { hasAnatomyMarks, type AnatomyMarks } from '@/lib/anatomy/types'
+import { DIAGRAM_LAYOUT } from '@/lib/anatomy/layout'
 import { TAP_AREA } from '@/components/ui/tap-area'
 import VoiceKarteCapture, { type VoiceApplied } from './VoiceKarteCapture'
 import { SOAP_SECTION_LABELS, VOICE_SOAP_FIELDS, type SoapSection, type VoiceSoapResult } from '@/lib/voice/soap-fields'
@@ -26,6 +27,9 @@ import { applyVoiceChanges, planVoiceSoapChanges, undoVoiceChanges } from '@/lib
 import { ADHERENCE_OPTIONS, ADHERENCE_REASONS, adherenceReviewHints, needsReason } from '@/lib/karte/adherence'
 import { applySoapReassessment } from '@/lib/reeval/store'
 import { shortDate } from '@/lib/reeval/schedule'
+import SoapPhraseField from './SoapPhraseField'
+import type { SoapPhraseField as SoapPhraseKey } from '@/data/soap-phrases'
+import { regionsForPhrases } from '@/lib/karte/soap-phrases'
 
 interface Props {
   patientId: string
@@ -439,6 +443,19 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
   const [init] = useState(() => initialForm(patientId))
   const [form, setForm] = useState<FormState>(init.form)
   const selectedJoints = jointsFromPainLocations(form.painLocations, SUPPORTED_JOINTS)
+  // 「文を選ぶ」で先に出す部位（部位別NRS → 人体図で押した関節 → 表紙の部位）
+  const [coverRegion] = useState(() => getPatient(patientId)?.bodyRegion)
+  const phraseRegions = regionsForPhrases({
+    complaints: form.complaints,
+    joints: selectedJoints.map(j => j.joint),
+    patientRegion: coverRegion,
+  })
+  const phrase = (field: SoapPhraseKey) => ({
+    field,
+    value: form[field],
+    onChange: (v: string) => setForm(f => ({ ...f, [field]: v })),
+    regions: phraseRegions,
+  })
   const [carriedFrom, setCarriedFrom] = useState<SOAPNote | null>(init.from)
   const previousNrs = carriedFrom ? init.previousNrs : {}
   const [activeTab, setActiveTab] = useState<TabKey>('S')
@@ -525,6 +542,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
       jointDetailLocations: Object.keys(form.jointDetailLocations).length > 0 ? form.jointDetailLocations : undefined,
       anatomyMarks: Object.values(form.anatomyMarks).some(hasAnatomyMarks) ? form.anatomyMarks : undefined,
       bodyMarks: Object.keys(form.bodyMarks).length > 0 ? form.bodyMarks : undefined,
+      diagramLayout: DIAGRAM_LAYOUT,
       painToday: derivedNrs,
       changeFromLast: form.changeFromLast,
       adlDifficulty: form.adlDifficulty,
@@ -700,8 +718,7 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
               </div>
             )}
 
-            <div>
-              <FormLabel>前回からの変化</FormLabel>
+            <SoapPhraseField label="前回からの変化" {...phrase('changeFromLast')}>
               <div className="flex gap-1.5 mt-1 mb-1.5">
                 {(Object.keys(TREND_LABELS) as Array<keyof typeof TREND_LABELS>).map(t => (
                   <button key={t} type="button" onClick={() => setForm(f => ({ ...f, trend: f.trend === t ? undefined : t }))}
@@ -714,12 +731,11 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
               </div>
               <Textarea value={form.changeFromLast} onChange={v => setForm(f => ({ ...f, changeFromLast: v }))}
                 placeholder="例：階段が少し楽になった。朝の痛みが減った。" rows={2} />
-            </div>
-            <div>
-              <FormLabel>生活上困ったこと</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="生活上困ったこと" {...phrase('adlDifficulty')}>
               <Textarea value={form.adlDifficulty} onChange={v => setForm(f => ({ ...f, adlDifficulty: v }))}
                 placeholder="例：長時間の歩行が辛い" rows={2} />
-            </div>
+            </SoapPhraseField>
 
             <div>
               <FormLabel>自宅運動の実施状況</FormLabel>
@@ -765,16 +781,14 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
               )}
             </div>
 
-            <div>
-              <FormLabel>患者様の不安</FormLabel>
+            <SoapPhraseField label="患者様の不安" {...phrase('patientConcern')}>
               <Textarea value={form.patientConcern} onChange={v => setForm(f => ({ ...f, patientConcern: v }))}
                 placeholder="例：いつ治るか不安。仕事に戻れるか心配。" rows={2} />
-            </div>
-            <div>
-              <FormLabel>今日の希望・目標</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="今日の希望・目標" {...phrase('patientGoalToday')}>
               <Input value={form.patientGoalToday} onChange={v => setForm(f => ({ ...f, patientGoalToday: v }))}
                 placeholder="例：階段を楽に降りたい" />
-            </div>
+            </SoapPhraseField>
           </div>
         )}
 
@@ -790,16 +804,14 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 />
               </div>
             </div>
-            <div>
-              <FormLabel>ROM所見</FormLabel>
+            <SoapPhraseField label="ROM所見" {...phrase('romFindings')}>
               <Textarea value={form.romFindings} onChange={v => setForm(f => ({ ...f, romFindings: v }))}
                 placeholder="例：膝屈曲 右125度 / 左140度" rows={2} />
-            </div>
-            <div>
-              <FormLabel>筋力所見</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="筋力所見" {...phrase('strengthFindings')}>
               <Textarea value={form.strengthFindings} onChange={v => setForm(f => ({ ...f, strengthFindings: v }))}
                 placeholder="例：大腿四頭筋 右MMT4、左5" rows={2} />
-            </div>
+            </SoapPhraseField>
             <div>
               <FormLabel>スペシャルテスト（関節別）</FormLabel>
               <div className="mt-1">
@@ -809,56 +821,48 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
                 />
               </div>
             </div>
-            <div>
-              <FormLabel>スペシャルテスト補足メモ</FormLabel>
+            <SoapPhraseField label="スペシャルテスト補足メモ" {...phrase('specialTestFindings')}>
               <Textarea value={form.specialTestFindings} onChange={v => setForm(f => ({ ...f, specialTestFindings: v }))}
                 placeholder="例：再現性低い、疼痛回避あり" rows={2} />
-            </div>
-            <div>
-              <FormLabel>圧痛</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="圧痛" {...phrase('tenderness')}>
               <Input value={form.tenderness} onChange={v => setForm(f => ({ ...f, tenderness: v }))}
                 placeholder="例：関節裂隙前内側（+）" />
-            </div>
+            </SoapPhraseField>
             <div className="flex gap-6">
               <ToggleSwitch label="腫脹あり" value={form.swelling} onChange={v => setForm(f => ({ ...f, swelling: v }))} />
               <ToggleSwitch label="熱感あり" value={form.heat} onChange={v => setForm(f => ({ ...f, heat: v }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FormLabel>歩行所見</FormLabel>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SoapPhraseField label="歩行所見" {...phrase('gait')}>
                 <Input value={form.gait} onChange={v => setForm(f => ({ ...f, gait: v }))} placeholder="例：右膝屈曲制限あり" />
-              </div>
-              <div>
-                <FormLabel>片脚立位</FormLabel>
+              </SoapPhraseField>
+              <SoapPhraseField label="片脚立位" {...phrase('singleLegStance')}>
                 <Input value={form.singleLegStance} onChange={v => setForm(f => ({ ...f, singleLegStance: v }))} placeholder="例：右10秒" />
-              </div>
+              </SoapPhraseField>
             </div>
-            <div>
-              <FormLabel>動作観察・施術者メモ</FormLabel>
+            <SoapPhraseField label="動作観察・施術者メモ" {...phrase('therapistObservation')}>
               <Textarea value={form.therapistObservation} onChange={v => setForm(f => ({ ...f, therapistObservation: v }))}
                 placeholder="例：スクワット時の膝valgusが改善傾向" rows={3} />
-            </div>
+            </SoapPhraseField>
           </div>
         )}
 
         {/* A: Assessment */}
         {activeTab === 'A' && (
           <div className="space-y-4">
-            <div>
-              <FormLabel>改善している点</FormLabel>
+            <SoapPhraseField label="改善している点" {...phrase('improvements')}>
               <Textarea value={form.improvements} onChange={v => setForm(f => ({ ...f, improvements: v }))}
                 placeholder="例：ROM改善、腫脹消退、痛みNRS減少" rows={2} />
-            </div>
-            <div>
-              <FormLabel>残っている問題</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="残っている問題" {...phrase('remainingIssues')}>
               <Textarea value={form.remainingIssues} onChange={v => setForm(f => ({ ...f, remainingIssues: v }))}
                 placeholder="例：大腿四頭筋筋力低下、深屈曲制限" rows={2} />
-            </div>
-            <div>
-              <FormLabel>優先課題</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="優先課題" {...phrase('priorityIssue')}>
               <Input value={form.priorityIssue} onChange={v => setForm(f => ({ ...f, priorityIssue: v }))}
                 placeholder="例：筋力強化と動的安定性の向上" />
-            </div>
+            </SoapPhraseField>
 
             <div>
               <FormLabel required>現在フェーズ</FormLabel>
@@ -894,32 +898,27 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
         {/* P: Plan */}
         {activeTab === 'P' && (
           <div className="space-y-4">
-            <div>
-              <FormLabel>本日の施術内容</FormLabel>
+            <SoapPhraseField label="本日の施術内容" {...phrase('treatmentToday')}>
               <Textarea value={form.treatmentToday} onChange={v => setForm(f => ({ ...f, treatmentToday: v }))}
                 placeholder="例：膝周囲ストレッチ、スクワット練習、階段降段練習" rows={2} />
-            </div>
-            <div>
-              <FormLabel>次回までの目標</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="次回までの目標" {...phrase('nextGoal')}>
               <Textarea value={form.nextGoal} onChange={v => setForm(f => ({ ...f, nextGoal: v }))}
                 placeholder="例：片脚スクワット安定、階段降段の痛み軽減" rows={2} />
-            </div>
-            <div>
-              <FormLabel>自宅運動</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="自宅運動" {...phrase('homeExercise')}>
               <Textarea value={form.homeExercise} onChange={v => setForm(f => ({ ...f, homeExercise: v }))}
                 placeholder="例：スクワット15回×3セット、カーフレイズ20回×3セット" rows={2} />
-            </div>
-            <div>
-              <FormLabel>禁止動作</FormLabel>
+            </SoapPhraseField>
+            <SoapPhraseField label="禁止動作" {...phrase('forbiddenMovements')}>
               <Input value={form.forbiddenMovements} onChange={v => setForm(f => ({ ...f, forbiddenMovements: v }))}
                 placeholder="例：深屈曲（130度以上）" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FormLabel>通院目安</FormLabel>
+            </SoapPhraseField>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SoapPhraseField label="通院目安" {...phrase('recommendedFrequency')}>
                 <Input value={form.recommendedFrequency} onChange={v => setForm(f => ({ ...f, recommendedFrequency: v }))}
                   placeholder="例：週2回" />
-              </div>
+              </SoapPhraseField>
               <div>
                 <FormLabel>再評価予定</FormLabel>
                 <Input type="date" value={form.nextReassessment} onChange={v => setForm(f => ({ ...f, nextReassessment: v }))} />
