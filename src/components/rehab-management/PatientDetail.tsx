@@ -78,6 +78,8 @@ import { getReevalPlan } from '@/lib/reeval/store'
 import { reevalStatus } from '@/lib/reeval/schedule'
 import ReevalMark from './ReevalMark'
 import ReevalPanel from './ReevalPanel'
+import ReturnProgramPanel from './ReturnProgramPanel'
+import { regionsForPhrases } from '@/lib/karte/soap-phrases'
 import { adherenceRate, adherenceText } from '@/lib/karte/adherence'
 import { MEMO_KINDS, memoKindLabel, memoTemplateFor } from '@/lib/karte/memo-kinds'
 import type { QuickMemoKind } from '@/types/patient'
@@ -1355,6 +1357,18 @@ export default function PatientDetail({ patient }: Props) {
             onToggle={() => setReevalOpen(!reevalPanelOpen)}
             onGo={(to) => setEvalTab(to)}
             onUpdate={reload}
+          />
+        )}
+        {/* 復帰プログラム（段階的に競技・ランニング・投球へ戻す手順。文献つき。進み具合はこの方の記録として残す） */}
+        {activeTab === 'eval' && (
+          <ReturnProgramPanel
+            key={`rp:${patient.id}`}
+            patient={patient}
+            today={today}
+            regions={regionsForPhrases({
+              complaints: [...soapNotes].sort((a, b) => (b.visitDate + b.createdAt).localeCompare(a.visitDate + a.createdAt))[0]?.complaints,
+              patientRegion: patient.bodyRegion,
+            })}
           />
         )}
         {activeTab === 'eval' && (
