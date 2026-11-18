@@ -30,6 +30,7 @@ import { shortDate } from '@/lib/reeval/schedule'
 import SoapPhraseField from './SoapPhraseField'
 import type { SoapPhraseField as SoapPhraseKey } from '@/data/soap-phrases'
 import { regionsForPhrases } from '@/lib/karte/soap-phrases'
+import { returnProgramPhrases } from '@/lib/return-programs/store'
 
 interface Props {
   patientId: string
@@ -450,11 +451,14 @@ export default function SOAPForm({ patientId, onSaved }: Props) {
     joints: selectedJoints.map(j => j.joint),
     patientRegion: coverRegion,
   })
+  // 進行中の復帰プログラムの段階（「本日の施術内容」「次回までの目標」で選べる）
+  const [programPhrases] = useState(() => returnProgramPhrases(patientId))
   const phrase = (field: SoapPhraseKey) => ({
     field,
     value: form[field],
     onChange: (v: string) => setForm(f => ({ ...f, [field]: v })),
     regions: phraseRegions,
+    extra: field === 'treatmentToday' || field === 'nextGoal' ? { label: '復帰プログラム（進行中）', phrases: programPhrases } : undefined,
   })
   const [carriedFrom, setCarriedFrom] = useState<SOAPNote | null>(init.from)
   const previousNrs = carriedFrom ? init.previousNrs : {}

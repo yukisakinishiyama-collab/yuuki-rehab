@@ -20,11 +20,13 @@ interface Props {
   onChange: (v: string) => void
   /** その方の部位（先に出す） */
   regions: BodyRegion[]
+  /** その方だけの文（進行中の復帰プログラムの段階など）。いちばん上に出す */
+  extra?: { label: string; phrases: string[] }
   /** 記入欄（Input・Textarea。見出しと欄の間にボタンなどを置くときも、ここに入れる） */
   children: ReactNode
 }
 
-export default function SoapPhraseField({ label, field, value, onChange, regions, children }: Props) {
+export default function SoapPhraseField({ label, field, value, onChange, regions, extra, children }: Props) {
   const [open, setOpen] = useState(false)
   const [picked, setPicked] = useState<BodyRegion | null | undefined>(undefined)
   const panelId = useId()
@@ -57,7 +59,10 @@ export default function SoapPhraseField({ label, field, value, onChange, regions
   // 部位：自分で選んだもの（null＝部位なし）→ その方の部位 → なし
   const region = picked !== undefined ? picked : mine[0] ?? null
   const single = isSinglePhraseField(field)
-  const groups = phraseGroups(field, region)
+  const groups = [
+    ...(extra && extra.phrases.length > 0 ? [{ region: null, key: 'extra', label: extra.label, phrases: extra.phrases }] : []),
+    ...phraseGroups(field, region).map(g => ({ ...g, key: g.region ?? 'common' })),
+  ]
   const hasBlank = groups.some(g => g.phrases.some(x => x.includes(PHRASE_BLANK)))
   // その方の部位を先に、残りをあとに
   const tabs = [...mine, ...available.filter(r => !mine.includes(r))]
@@ -100,7 +105,7 @@ export default function SoapPhraseField({ label, field, value, onChange, regions
             </div>
           )}
           {groups.map(g => (
-            <div key={g.region ?? 'common'} className="flex flex-wrap items-center gap-1.5">
+            <div key={g.key} className="flex flex-wrap items-center gap-1.5">
               {g.label && <span className="w-full text-xs font-bold text-gray-600">{g.label}</span>}
               {g.phrases.map(p => {
                 const on = single ? value.trim() === p : hasPhrase(value, p)
