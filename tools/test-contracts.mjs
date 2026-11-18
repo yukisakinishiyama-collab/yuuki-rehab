@@ -14,6 +14,7 @@ const { CONTRACT_TEMPLATES } = await import(new URL('src/data/contract-templates
 const { parseTemplate, renderTemplateHtml } = await import(new URL('src/lib/contracts/template.ts', root).href)
 const member = await import(new URL('src/lib/contracts/member.ts', root).href)
 const autofill = await import(new URL('src/lib/contracts/autofill.ts', root).href)
+const { consentProblem } = await import(new URL('src/lib/contracts/consent.ts', root).href)
 
 let passed = 0
 function test(name, fn) {
@@ -22,8 +23,8 @@ function test(name, fn) {
   console.log(`  ✓ ${name}`)
 }
 
-test('6種類のひな形が読める（題名・チェック・記入欄の数）', () => {
-  assert.equal(CONTRACT_TEMPLATES.length, 6)
+test('7種類のひな形が読める（題名・チェック・記入欄の数）', () => {
+  assert.equal(CONTRACT_TEMPLATES.length, 7)
   for (const t of CONTRACT_TEMPLATES) {
     const p = parseTemplate(t.body)
     assert.equal(p.blocks[0].type, 'title', t.id)
@@ -505,6 +506,42 @@ test('一覧の1行と、画面に出す前の確認', () => {
   assert.equal(summary.memberLineOf({ ...record, member: undefined }), '')
   assert.equal(summary.isSafeContractHtml(html), true)
   for (const bad of ['<script>alert(1)</script>', '<img src="x" onerror="a()">', '<a href="javascript:a()">x</a>', '<iframe src="x"></iframe>']) assert.equal(summary.isSafeContractHtml(bad), false, bad)
+})
+
+test('施術・リハビリテーション 説明および同意書：PDF の文面・チェック4つ・記入欄なし・署名欄は画面で', () => {
+  const t = CONTRACT_TEMPLATES.find((x) => x.id === 'treatment-consent')
+  assert.ok(t)
+  assert.equal(t.title, '施術・リハビリテーション 説明および同意書')
+  assert.equal(t.staffLabel, '説明担当者')
+  const p = parseTemplate(t.body)
+  assert.equal(p.checkCount, 4)
+  assert.equal(p.blankCount, 0)
+  const h2 = p.blocks.filter((b) => b.type === 'h2').map((b) => b.parts.map((x) => x.v ?? '').join(''))
+  assert.deepEqual(h2, ['1｜目的と治療の範囲', '2｜施術・運動に伴うリスク', '3｜治療計画と患者さんの選択', '4｜中断・自己判断による再開・変更', '5｜責任範囲の確認', '6｜費用・中断時の取扱い', '7｜説明と確認'])
+  // PDF の大事な言い回しがそのまま入っている
+  for (const phrase of [
+    '治癒、疼痛消失、特定の時期までの回復を保証するものではありません',
+    '緊急性が疑われる場合は当院への連絡を待たず救急医療機関を受診してください',
+    '提案を断る権利、別の選択肢を相談する権利、同意を撤回する権利',
+    '本書は当院や担当者の故意・過失等に基づく法令上の責任を免除・制限するものではありません',
+    '追加費用の支払いや不返金に同意したものとは扱いません',
+  ]) assert.ok(t.body.includes(phrase), phrase)
+  // 署名欄（説明日・患者氏名・保護者・説明担当者）は文面に残さない
+  assert.ok(!/説明日・同意日|患者氏名：|保護者・代理人氏名/.test(t.body))
+})
+
+test('説明および同意書：「同意します」だけにチェックのときに署名できる（追加説明を希望のままでは署名しない）', () => {
+  const t = CONTRACT_TEMPLATES.find((x) => x.id === 'treatment-consent')
+  const { checks } = autofill.describeTemplate(parseTemplate(t.body))
+  const agree = checks.find((c) => c.after.startsWith('上記の説明を受け')).i
+  const more = checks.find((c) => c.after.startsWith('疑問・不安が残る')).i
+  const state = (on) => checks.map((c) => on.includes(c.i))
+  assert.match(consentProblem('treatment-consent', checks, state([])), /同意します|計画に同意/)
+  assert.match(consentProblem('treatment-consent', checks, state([more])), /追加説明を希望/)
+  assert.match(consentProblem('treatment-consent', checks, state([agree, more])), /追加説明を希望/)
+  assert.equal(consentProblem('treatment-consent', checks, state([agree])), null)
+  // ほかの書類には関係しない
+  assert.equal(consentProblem('visit-frequency', checks, state([])), null)
 })
 
 console.log(`\n${passed} 件 OK`)

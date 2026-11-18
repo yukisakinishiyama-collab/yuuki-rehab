@@ -60,7 +60,8 @@ export const VOICE_SOAP_FIELDS: readonly VoiceSoapField[] = [
   { key: 'recommendedFrequency', section: 'P', label: '通院目安', hint: '次の来院の目安（例: 週2回）', singleLine: true },
 ]
 
-export type HomeExerciseAdherence = 'done' | 'partial' | 'not_done'
+/** unknown＝未確認（カルテの欄の値。音声の結果では使わない＝話に出なければ欄を変えない） */
+export type HomeExerciseAdherence = 'done' | 'partial' | 'not_done' | 'unknown'
 
 /** AIが振り分けた結果（空の欄は入れない） */
 export interface VoiceSoapResult {

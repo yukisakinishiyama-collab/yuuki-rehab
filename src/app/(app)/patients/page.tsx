@@ -25,10 +25,18 @@ import { openOrCreateKarte } from '@/lib/karte-auto-create'
 import { nameKey } from '@/lib/noah-import'
 import { birthdayLabel, isBirthdaySoon, BIRTHDAY_SOON_DAYS } from '@/lib/birthday'
 import { useLineLinks } from '@/lib/line-link-client'
+import { reevalPlansById } from '@/lib/reeval/store'
+import { jstToday, reevalStatus, type ReevalStatus } from '@/lib/reeval/schedule'
+import ReevalMark from '@/components/rehab-management/ReevalMark'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+
+/** 再評価のマークを出す状態（評価まもなく・要再評価・評価期限超過） */
+function isReevalMarked(st: ReevalStatus | undefined): boolean {
+  return st?.state === 'soon' || st?.state === 'due' || st?.state === 'overdue'
+}
 
 /** 一覧で一度に描く人数 */
 const PAGE_SIZE = 40
@@ -42,6 +50,7 @@ const FILTER_OPTIONS = [
   { label: '腰部',       value: 'lumbar' },
   { label: '頚部',       value: 'cervical' },
   { label: '離脱リスク高', value: 'high_risk' },
+  { label: '再評価が近い', value: 'reeval' },
   { label: '🎂 誕生日が近い', value: 'birthday' },
   { label: 'LINE連携済み', value: 'line' },
 ]
@@ -170,6 +179,24 @@ export default function PatientsPage() {
     return map
   }, [patients, notesByPatient, cancelByPatient])
 
+  // 再評価の時期（予定日を決めた方だけ。日本時間の今日で数える。カルテが「終了」の方には出さない）
+  const reevalToday = jstToday()
+  const reevalByPatient = useMemo(() => {
+    const map = new Map<string, ReevalStatus>()
+    if (patients.length === 0) return map
+    const plans = reevalPlansById()
+    for (const p of patients) {
+      const plan = plans.get(p.id)
+      if (!plan) continue
+      map.set(p.id, reevalStatus(plan, reevalToday, { ended: p.status === 'discharged' }))
+    }
+    return map
+  }, [patients, reevalToday])
+  const reevalCount = useMemo(
+    () => patients.filter(p => isReevalMarked(reevalByPatient.get(p.id))).length,
+    [patients, reevalByPatient],
+  )
+
   // 公式LINEと結びついている方（サーバーの一覧をキーで引く）
   const { linkFor } = useLineLinks()
   const lineLinkedCount = useMemo(() => patients.filter(p => Boolean(linkFor(p))).length, [patients, linkFor])
@@ -204,9 +231,20 @@ export default function PatientsPage() {
       if (filter === 'all') return true
       if (filter === 'high_risk') return riskByPatient.get(p.id)?.level === 'high'
       if (filter === 'birthday') return isBirthdaySoon(p.birthDate)
+      if (filter === 'reeval') return isReevalMarked(reevalByPatient.get(p.id))
       if (filter === 'line') return Boolean(linkFor(p))
       return p.bodyRegion === filter
     })
+
+    // 「再評価が近い」で絞ったときは、予定日が早い順（過ぎている方が上）
+    if (filter === 'reeval') {
+      const due = (p: Patient) => reevalByPatient.get(p.id)?.dueDate ?? '9999-12-31'
+      const sortedByDue = [...matched].sort((a, b) => due(a).localeCompare(due(b)))
+      return {
+        pinned: sortedByDue.filter(p => pins.includes(p.id)),
+        others: sortedByDue.filter(p => !pins.includes(p.id)),
+      }
+    }
 
     const lastVisit = (p: Patient) =>
       notesByPatient.get(p.id)?.[0]?.visitDate ?? p.updatedAt.split('T')[0]
@@ -223,7 +261,7 @@ export default function PatientsPage() {
       pinned: sorted.filter(p => pins.includes(p.id)),
       others: sorted.filter(p => !pins.includes(p.id)),
     }
-  }, [patients, search, filter, sortKey, pins, riskByPatient, notesByPatient])
+  }, [patients, search, filter, sortKey, pins, riskByPatient, notesByPatient, reevalByPatient])
 
   // 最近閲覧（現在の患者リストに存在するもののみ）
   const recentPatients = useMemo(() => {
@@ -277,6 +315,16 @@ export default function PatientsPage() {
                 border border-red-200 rounded-full px-2 py-0.5">
                 <AlertTriangle className="w-3 h-3" />離脱リスク高 {highRiskCount}名
               </span>
+            )}
+            {reevalCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('reeval')}
+                title="再評価の予定日が3日以内・当日・過ぎている方"
+                className="inline-flex items-center gap-1 text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded-full px-2 py-0.5 hover:bg-sky-100 max-lg:min-h-10"
+              >
+                再評価が近い {reevalCount}名
+              </button>
             )}
             {birthdaySoonCount > 0 && (
               <button
@@ -439,6 +487,9 @@ export default function PatientsPage() {
                     riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
                     cancelSummary={cancelByPatient.get(patient.id)}
                     lineLinked={Boolean(linkFor(patient))}
+                    reeval={reevalByPatient.get(patient.id)}
+                    reevalToday={reevalToday}
+                    onOpenReeval={() => router.push(`/patients/${patient.id}?reeval=1`)}
                     pinned
                     onTogglePin={() => handleTogglePin(patient.id)}
                     onClick={() => router.push(`/patients/${patient.id}`)}
@@ -456,6 +507,9 @@ export default function PatientsPage() {
                 riskLevel={riskByPatient.get(patient.id)?.level ?? 'low'}
                 cancelSummary={cancelByPatient.get(patient.id)}
                 lineLinked={Boolean(linkFor(patient))}
+                reeval={reevalByPatient.get(patient.id)}
+                reevalToday={reevalToday}
+                onOpenReeval={() => router.push(`/patients/${patient.id}?reeval=1`)}
                 pinned={false}
                 onTogglePin={() => handleTogglePin(patient.id)}
                 onClick={() => router.push(`/patients/${patient.id}`)}
@@ -480,13 +534,18 @@ export default function PatientsPage() {
   )
 }
 
-function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pinned, onTogglePin, onClick }: {
+function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, reeval, reevalToday, onOpenReeval, pinned, onTogglePin, onClick }: {
   patient: Patient
   notes: SOAPNote[]
   riskLevel: 'low' | 'medium' | 'high'
   cancelSummary?: CancellationSummary
   /** 公式LINEと結びついているか */
   lineLinked?: boolean
+  /** 再評価の時期（予定日を決めた方だけ） */
+  reeval?: ReevalStatus
+  reevalToday?: string
+  /** 再評価のマークを押したとき（カルテの評価・測定の再評価の欄を開く） */
+  onOpenReeval?: () => void
   pinned: boolean
   onTogglePin: () => void
   onClick: () => void
@@ -539,6 +598,7 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, pin
               </span>
             )}
             <Badge variant="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>
+            {reeval && <ReevalMark status={reeval} today={reevalToday} onClick={onOpenReeval} />}
             <Badge variant={riskVariant[riskLevel]}>
               離脱リスク{RISK_LABELS[riskLevel]}
             </Badge>
