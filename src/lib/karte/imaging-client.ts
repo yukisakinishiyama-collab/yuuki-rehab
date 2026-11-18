@@ -76,15 +76,30 @@ export interface ReaderJob {
   warnings?: string[]
 }
 
+/**
+ * 読影プログラム（このパソコンの 127.0.0.1）を呼ぶ。
+ * Chrome・Edge は、https のページからパソコンの中（http://127.0.0.1）を呼ぶときに
+ * 「このページがパソコンの中のアプリにつなぐこと」の許可をたずね、要求に targetAddressSpace: 'loopback' の指定を求める
+ * （Local Network Access）。この指定を知らないブラウザ・古い版では、付けずにやり直す。
+ */
+async function readerFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const base: RequestInit = { ...init, mode: 'cors', cache: 'no-store' }
+  try {
+    return await fetch(`${READER_URL}${path}`, { ...base, targetAddressSpace: 'loopback' } as RequestInit)
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e
+    return fetch(`${READER_URL}${path}`, base)
+  }
+}
+
 async function reader<T>(path: string, init?: RequestInit, timeoutMs = 20_000): Promise<T> {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), timeoutMs)
   try {
-    const res = await fetch(`${READER_URL}${path}`, {
+    const res = await readerFetch(path, {
       ...init,
       headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
       signal: ctl.signal,
-      cache: 'no-store',
     })
     const data = (await res.json().catch(() => ({}))) as T & { error?: string }
     if (!res.ok) throw new Error(data.error ?? `読影プログラムがエラーを返しました（${res.status}）`)
@@ -141,7 +156,7 @@ export async function readerRemove(id: string): Promise<void> {
 
 /** 下書きのPDF（このパソコンの中だけにある） */
 export async function readerPdf(id: string): Promise<Blob> {
-  const res = await fetch(`${READER_URL}/jobs/${encodeURIComponent(id)}/pdf`, { cache: 'no-store' })
+  const res = await readerFetch(`/jobs/${encodeURIComponent(id)}/pdf`)
   if (!res.ok) throw new Error('下書きのPDFを読めませんでした')
   const blob = await res.blob()
   return blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' })

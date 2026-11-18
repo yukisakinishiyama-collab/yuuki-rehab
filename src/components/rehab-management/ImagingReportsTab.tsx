@@ -382,7 +382,7 @@ export default function ImagingReportsTab({ patient, reports, onUpdate }: Props)
             <p>読み取りは、<b>読影プログラムを入れた院のパソコン</b>で行います。この端末では、提出済みのレポートを見ることだけできます。</p>
             <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600">
               <li>院のパソコンで出ているときは、読影プログラムが止まっています。デスクトップの「読影プログラムを起動」を開いてから、下のボタンを押してください。</li>
-              <li>ブラウザに「ローカル ネットワーク上のデバイスへのアクセス」を聞かれたら「許可」を選んでください。</li>
+              <li>ブラウザが「このパソコンの中のアプリ（ローカル ネットワーク）へのアクセス」の許可を聞いてきたら「許可」を選んでください。「ブロック」にしたときは、アドレス欄の左のアイコン →「サイトの設定」で「許可」に直せます。</li>
             </ul>
             <Button type="button" variant="outline" size="sm" onClick={() => { setHealth('checking'); void refresh() }}>もう一度確かめる</Button>
           </div>
