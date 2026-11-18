@@ -29,35 +29,39 @@ interface Reg {
   x?: number; y?: number; w?: number; h?: number
 }
 
+// 左右の決まり（2026-11-18 に直した。lib/anatomy/layout.ts）
+//   前面＝向かい合って見た向き：向かって左が患者さんの右（右肩・右膝…は x が小さい側）
+//   背面＝後ろから見た向き：向かって左が患者さんの左
+// ID と名前（fkl＝左膝 など）はカルテの保存値なので変えない。直したのは絵の中の位置だけ
 const REGS: Reg[] = [
   // ── 前面 ──────────────────────────────────────────
   { id:'fh',   label:'頭部',      view:'front', shape:'e', cx:100, cy:36,  rx:26, ry:30 },
   { id:'fn',   label:'頚部',      view:'front', shape:'r', x:89,  y:65,  w:22, h:16 },
-  { id:'fsl',  label:'左肩',      view:'front', shape:'e', cx:61,  cy:97,  rx:21, ry:17 },
-  { id:'fsr',  label:'右肩',      view:'front', shape:'e', cx:139, cy:97,  rx:21, ry:17 },
-  { id:'fcl',  label:'胸部左',    view:'front', shape:'r', x:73,  y:81,  w:27, h:52 },
-  { id:'fcr',  label:'胸部右',    view:'front', shape:'r', x:100, y:81,  w:27, h:52 },
+  { id:'fsl',  label:'左肩',      view:'front', shape:'e', cx:139, cy:97,  rx:21, ry:17 },
+  { id:'fsr',  label:'右肩',      view:'front', shape:'e', cx:61,  cy:97,  rx:21, ry:17 },
+  { id:'fcl',  label:'胸部左',    view:'front', shape:'r', x:100, y:81,  w:27, h:52 },
+  { id:'fcr',  label:'胸部右',    view:'front', shape:'r', x:73,  y:81,  w:27, h:52 },
   { id:'fab',  label:'腹部',      view:'front', shape:'r', x:76,  y:133, w:48, h:45 },
-  { id:'fual', label:'左上腕',    view:'front', shape:'r', x:46,  y:113, w:16, h:48 },
-  { id:'fuar', label:'右上腕',    view:'front', shape:'r', x:138, y:113, w:16, h:48 },
-  { id:'fel',  label:'左肘',      view:'front', shape:'e', cx:54,  cy:166, rx:12, ry:11 },
-  { id:'fer',  label:'右肘',      view:'front', shape:'e', cx:146, cy:166, rx:12, ry:11 },
-  { id:'ffl',  label:'左前腕',    view:'front', shape:'r', x:45,  y:177, w:16, h:44 },
-  { id:'ffr',  label:'右前腕',    view:'front', shape:'r', x:139, y:177, w:16, h:44 },
-  { id:'fhdl', label:'左手',      view:'front', shape:'r', x:41,  y:221, w:22, h:28 },
-  { id:'fhdr', label:'右手',      view:'front', shape:'r', x:137, y:221, w:22, h:28 },
-  { id:'fhil', label:'左股関節',  view:'front', shape:'r', x:73,  y:178, w:27, h:32 },
-  { id:'fhir', label:'右股関節',  view:'front', shape:'r', x:100, y:178, w:27, h:32 },
-  { id:'ftl',  label:'左大腿',    view:'front', shape:'r', x:74,  y:210, w:25, h:68 },
-  { id:'ftr',  label:'右大腿',    view:'front', shape:'r', x:101, y:210, w:25, h:68 },
-  { id:'fkl',  label:'左膝',      view:'front', shape:'e', cx:86,  cy:284, rx:15, ry:13 },
-  { id:'fkr',  label:'右膝',      view:'front', shape:'e', cx:114, cy:284, rx:15, ry:13 },
-  { id:'fll',  label:'左下腿',    view:'front', shape:'r', x:74,  y:297, w:22, h:65 },
-  { id:'flr',  label:'右下腿',    view:'front', shape:'r', x:104, y:297, w:22, h:65 },
-  { id:'fal',  label:'左足関節',  view:'front', shape:'e', cx:85,  cy:368, rx:14, ry:10 },
-  { id:'far',  label:'右足関節',  view:'front', shape:'e', cx:115, cy:368, rx:14, ry:10 },
-  { id:'fftl', label:'左足',      view:'front', shape:'r', x:67,  y:378, w:32, h:16 },
-  { id:'fftr', label:'右足',      view:'front', shape:'r', x:101, y:378, w:32, h:16 },
+  { id:'fual', label:'左上腕',    view:'front', shape:'r', x:138, y:113, w:16, h:48 },
+  { id:'fuar', label:'右上腕',    view:'front', shape:'r', x:46,  y:113, w:16, h:48 },
+  { id:'fel',  label:'左肘',      view:'front', shape:'e', cx:146, cy:166, rx:12, ry:11 },
+  { id:'fer',  label:'右肘',      view:'front', shape:'e', cx:54,  cy:166, rx:12, ry:11 },
+  { id:'ffl',  label:'左前腕',    view:'front', shape:'r', x:139, y:177, w:16, h:44 },
+  { id:'ffr',  label:'右前腕',    view:'front', shape:'r', x:45,  y:177, w:16, h:44 },
+  { id:'fhdl', label:'左手',      view:'front', shape:'r', x:137, y:221, w:22, h:28 },
+  { id:'fhdr', label:'右手',      view:'front', shape:'r', x:41,  y:221, w:22, h:28 },
+  { id:'fhil', label:'左股関節',  view:'front', shape:'r', x:100, y:178, w:27, h:32 },
+  { id:'fhir', label:'右股関節',  view:'front', shape:'r', x:73,  y:178, w:27, h:32 },
+  { id:'ftl',  label:'左大腿',    view:'front', shape:'r', x:101, y:210, w:25, h:68 },
+  { id:'ftr',  label:'右大腿',    view:'front', shape:'r', x:74,  y:210, w:25, h:68 },
+  { id:'fkl',  label:'左膝',      view:'front', shape:'e', cx:114, cy:284, rx:15, ry:13 },
+  { id:'fkr',  label:'右膝',      view:'front', shape:'e', cx:86,  cy:284, rx:15, ry:13 },
+  { id:'fll',  label:'左下腿',    view:'front', shape:'r', x:104, y:297, w:22, h:65 },
+  { id:'flr',  label:'右下腿',    view:'front', shape:'r', x:74,  y:297, w:22, h:65 },
+  { id:'fal',  label:'左足関節',  view:'front', shape:'e', cx:115, cy:368, rx:14, ry:10 },
+  { id:'far',  label:'右足関節',  view:'front', shape:'e', cx:85,  cy:368, rx:14, ry:10 },
+  { id:'fftl', label:'左足',      view:'front', shape:'r', x:101, y:378, w:32, h:16 },
+  { id:'fftr', label:'右足',      view:'front', shape:'r', x:67,  y:378, w:32, h:16 },
 
   // ── 背面 ──────────────────────────────────────────
   { id:'bn',   label:'頚部後',    view:'back',  shape:'r', x:89,  y:65,  w:22, h:16 },
@@ -180,6 +184,7 @@ export default function BodyMap({ selected, onChange, readOnly = false, marks, o
         ))}
         <span className="text-xs text-gray-500 ml-1">
           {readOnly ? '選択済み部位' : pen.drawMode ? markHint(tool) : '痛い部位をタップ'}
+          <span className="ml-1">（図の「右」「左」は患者さんの右・左）</span>
         </span>
       </div>
 
@@ -213,6 +218,11 @@ export default function BodyMap({ selected, onChange, readOnly = false, marks, o
                   onHover={setHovered}
                 />
               ))}
+            </g>
+            {/* 患者さんの右・左（前面は向かって左が右、背面は向かって左が左）。幅 200 を 160px で出すので 15 で 12px */}
+            <g fontSize={15} fontWeight="bold" fill="#64748b" pointerEvents="none" aria-hidden>
+              <text x={8} y={20}>{view === 'front' ? '右' : '左'}</text>
+              <text x={192} y={20} textAnchor="end">{view === 'front' ? '左' : '右'}</text>
             </g>
             <MarksLayer marks={viewMarks} liveStroke={pen.liveStroke} width={200} markScale={1.8} />
             {/* ホバーラベル（この図は幅 200 を 160px で出す＝0.8倍。15 で 12px。色は灰色の地でも読める teal-700） */}

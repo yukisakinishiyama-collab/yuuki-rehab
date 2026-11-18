@@ -10,7 +10,8 @@ export const BODY_REGION_TO_JOINT: Record<string, string> = {
   fkl: '膝関節', fkr: '膝関節', bkl: '膝関節', bkr: '膝関節',
   fsl: '肩関節', fsr: '肩関節', bsl: '肩関節', bsr: '肩関節',
   fhil: '股関節', fhir: '股関節', bgl: '股関節', bgr: '股関節',
-  fal: '足関節', far: '足関節', bhal: '足関節', bher: '足関節',
+  // bhel＝左踵（以前は bhal と書きまちがえていて、背面の左踵だけ足関節の図が出なかった）
+  fal: '足関節', far: '足関節', bhel: '足関節', bhal: '足関節', bher: '足関節',
   fab: '腰部', blb: '腰部',
   fn: '頚部', bn: '頚部',
   fel: '肘関節', fer: '肘関節', bel: '肘関節', ber: '肘関節',
