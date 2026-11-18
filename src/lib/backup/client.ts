@@ -7,9 +7,12 @@
 // - 「パソコンに保存する」で、そのフォルダに次の2つを書く
 //     ゆうき整骨院_アプリのバックアップ_YYYY-MM-DD_HHmm.json … カルテ全部・契約書（署名入りの本文）・写真の一覧
 //     写真/患者さんのID/写真のID.jpg                       … 患部の写真（まだ無いものだけ足す）
+//     資料/カルテのID/資料のID.pdf など                      … カルテの資料（論文・プロトコルなど。まだ無いものだけ足す）
 // - フォルダを選べないブラウザ（スマホ・Safari など）では、ファイルのダウンロードになる
 // - 「今日」の画面を開いたとき、許可が残っていれば1日1回だまって保存する（BackupReminder）
 // ──────────────────────────────────────────────
+
+import { docFilePathsOf } from '@/lib/karte/doc-rules'
 
 const DB_NAME = 'yuuki-backup'
 const STORE = 'kv'
@@ -151,7 +154,7 @@ export async function collectBackup(onProgress?: (p: BackupProgress) => void): P
     version: core.version,
     kind: 'full',
     createdAt: core.createdAt,
-    note: 'ゆうき整骨院 院内アプリのバックアップ。karte.data は各端末の localStorage と同じ形（キー → JSON の文字列）。contracts は署名入りの契約書の本文。写真の画像は同じフォルダの「写真」、画像レポートのPDFは「画像レポート」にある',
+    note: 'ゆうき整骨院 院内アプリのバックアップ。karte.data は各端末の localStorage と同じ形（キー → JSON の文字列）。contracts は署名入りの契約書の本文。写真の画像は同じフォルダの「写真」、画像レポートのPDFは「画像レポート」、資料のファイルは「資料」にある',
     counts: core.counts,
     karte: core.karte,
     photosMeta: core.photosMeta,
@@ -232,12 +235,41 @@ async function saveImagingReports(dir: FsDirHandle, core: CoreBackup, onProgress
   return added
 }
 
+/** 資料のファイルをフォルダの「資料/カルテのID/」に足す（すでにあるものはそのまま）。足した数を返す */
+async function saveDocs(dir: FsDirHandle, core: CoreBackup, onProgress?: (p: BackupProgress) => void): Promise<number> {
+  const paths = docFilePathsOf(core.karte.data.pt_karte_docs)
+  if (paths.length === 0) return 0
+  const root = await dir.getDirectoryHandle('資料', { create: true })
+  let added = 0
+  for (let i = 0; i < paths.length; i++) {
+    onProgress?.({ step: '資料を保存しています', done: i, total: paths.length })
+    const [pid, file] = paths[i].split('/')
+    const sub = await root.getDirectoryHandle(pid, { create: true })
+    if (await exists(sub, file)) continue
+    try {
+      // 大きいファイルは API で中継できないので、1時間だけ使える URL をもらって、クラウドから直接受け取る
+      const ticket = await fetch(`/api/karte/docs?path=${encodeURIComponent(paths[i])}`, { cache: 'no-store' })
+      if (!ticket.ok) continue
+      const { url } = (await ticket.json()) as { url?: string }
+      if (!url) continue
+      const res = await fetch(url)
+      if (!res.ok) continue
+      await writeFile(sub, file, await res.blob())
+      added += 1
+    } catch {
+      // 1つ受け取れなくても、ほかの控えは続ける
+    }
+  }
+  return added
+}
+
 export interface SaveResult {
   ok: boolean
   where: 'folder' | 'download' | 'none'
   fileName?: string
   folderName?: string
   photosAdded?: number
+  docsAdded?: number
   counts?: Record<string, number>
   error?: string
 }
@@ -260,8 +292,9 @@ export async function saveBackupToPc(interactive: boolean, onProgress?: (p: Back
       await writeFile(dir, name, new Blob([json], { type: 'application/json' }))
       const photosAdded = await savePhotos(dir, core, onProgress)
       await saveImagingReports(dir, core, onProgress)
+      const docsAdded = await saveDocs(dir, core, onProgress)
       localStorage.setItem(LAST_PC_BACKUP_KEY, new Date().toISOString())
-      return { ok: true, where: 'folder', fileName: name, folderName: dir.name, photosAdded, counts: core.counts }
+      return { ok: true, where: 'folder', fileName: name, folderName: dir.name, photosAdded, docsAdded, counts: core.counts }
     }
     // フォルダを使えないとき：ふつうのダウンロード（写真の画像は入らない）
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))

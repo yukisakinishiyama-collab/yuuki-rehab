@@ -33,6 +33,8 @@ export const PATIENT_RECORD_KEYS = [
   'pt_problems',
   'outcomeScores_v1',
   'returnCriteria',
+  // 資料（論文・プロトコルなど）。保存場所は記録の中に持っているので、カルテをまとめても同じファイルを指す
+  'pt_karte_docs',
 ] as const
 
 /** 1人に1つだけの入れ物（目標・患者さん向けの説明の上書き）。まとめたときは更新日が新しい方を残す */
