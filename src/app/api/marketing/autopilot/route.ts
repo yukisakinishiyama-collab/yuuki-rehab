@@ -42,7 +42,7 @@ const SettingsSchema = z.object({
   cancelStoryFromHour: z.number().int().min(0).max(23).default(7),
   cancelStoryToHour: z.number().int().min(1).max(24).default(21),
   cancelStoryMaxPerDay: z.number().int().min(1).max(10).default(3),
-  dailyOpenings: z.boolean().default(false),
+  dailyOpenings: z.boolean().default(true),
   dailyOpeningsTimes: z
     .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
     .max(3)

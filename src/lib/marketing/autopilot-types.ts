@@ -133,8 +133,8 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   cancelStoryFromHour: 7,
   cancelStoryToHour: 21,
   cancelStoryMaxPerDay: 3,
-  // 今日の空き（毎日）は院長がオンにするまで出さない
-  dailyOpenings: false,
+  // 今日の空き（毎日）：院長が 2026-11-19 に「本番に入れてオンにする」を選んだので、最初からオン（設定画面でオフにできる）
+  dailyOpenings: true,
   dailyOpeningsTimes: ['08:00', '13:00'],
   dailyOpeningsStory: true,
   dailyOpeningsGoogle: true,
