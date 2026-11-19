@@ -4,6 +4,8 @@
  * テンプレート：/api/marketing/image?title=足首の捻挫&subtitle=応急処置のポイント&size=instagram
  * AI画像（写真＋見出し）：上に &photo=<下書きに付いた写真のURL（自分たちの Vercel Blob のものだけ）> を足す
  * Google検索向けの投稿：/api/marketing/image?kind=gbp-seo&id=<src/data/gbp-seo-posts.ts の id>
+ * 今日の空き（毎日）の Google の投稿：/api/marketing/image?kind=openings（fresh=1 で予約システムから取り直す。
+ *   format=text で本文。sample=1 で架空の空き）。投稿するときも、その時刻の空きで作り直す
  * ストーリー（空き状況）：/api/marketing/image?kind=story&scope=day&dates=2026-10-26
  *   または kind=story&range=today|next|week（本日・次の診療日・今週。fresh=1 で予約システムから取り直す）
  *   いまの予約システムの空きで作る（投稿するときも、その時刻の空きで作り直す）。
@@ -11,7 +13,16 @@
  * 生成ロジックは lib/marketing/image-template.tsx（Instagram自動投稿と共通）。
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { IMAGE_SIZES, loadPhotoDataUrl, renderPhotoPostImage, renderSeoPostImage, renderStoryImage, renderTemplateImage } from '@/lib/marketing/image-template'
+import {
+  IMAGE_SIZES,
+  loadPhotoDataUrl,
+  renderOpeningsCardImage,
+  renderPhotoPostImage,
+  renderSeoPostImage,
+  renderStoryImage,
+  renderTemplateImage,
+} from '@/lib/marketing/image-template'
+import { DAILY_OPENINGS_TITLE, dailyOpeningsText, dayLabel, openSlotsOf, shortTime } from '@/lib/marketing/daily-openings'
 import { GBP_SEO_CHIPS, getGbpSeoPost } from '@/data/gbp-seo-posts'
 import { addDays, jstParts, storyHasOpening, storyRange, storyRows, storyText, type OpeningDay } from '@/lib/marketing/autopilot-planner'
 import { fetchHubStatsFast } from '@/lib/marketing/booking-stats-fast'
@@ -41,6 +52,41 @@ export async function GET(request: NextRequest) {
       if (!post) return NextResponse.json({ error: '投稿が見つかりません' }, { status: 404 })
       const buf = await renderSeoPostImage({ photo: post.photo, photoPosition: post.photoPosition, title: post.title, subtitle: post.subtitle, chips: GBP_SEO_CHIPS })
       return png(buf, `google-${post.id}.png`)
+    }
+    // 今日の空き（毎日）の Google の投稿の見本（画像・本文）
+    if (params.get('kind') === 'openings') {
+      const now = jstParts(new Date())
+      const sample = params.get('sample') === '1'
+      const day: OpeningDay | undefined = sample
+        ? {
+            date: now.date,
+            closed: false,
+            am: 3,
+            pm: 5,
+            slots: ['10:30', '11:00', '12:30', '15:00', '15:30', '16:30', '17:00', '19:30'].map((time, i) => ({
+              time,
+              remaining: i % 3 === 0 ? 1 : 2,
+              first: !['12:30', '15:30', '19:30'].includes(time),
+            })),
+          }
+        : ((await fetchHubStatsFast(1, { force: params.get('fresh') === '1' }))?.openings ?? []).find((o) => o.date === now.date)
+      if (params.get('format') === 'text') {
+        const text = dailyOpeningsText(day, now.local)
+        const body = text ? text.body : day?.closed ? '今日は休みの日のため、出しません。' : 'いま案内できる空きが無いため、出しません。'
+        return new NextResponse(`${body}\n\n（見本。投稿するときは、その時刻の空きで作り直します。「予約」ボタンは院のホームページへ）`, {
+          headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+        })
+      }
+      if (!day || day.closed || openSlotsOf(day).length === 0) {
+        return NextResponse.json({ error: day?.closed ? '今日は休みの日のため、出しません' : 'いま案内できる空きが無いため、出しません' }, { status: 404 })
+      }
+      const buf = await renderOpeningsCardImage({
+        title: DAILY_OPENINGS_TITLE,
+        dayLabel: dayLabel(day.date),
+        asOfLabel: `${shortTime(now.local.slice(11, 16))} 時点`,
+        slots: openSlotsOf(day),
+      })
+      return png(buf, `google-openings-${now.date}.png`)
     }
     if (params.get('kind') === 'story') {
       const now = jstParts(new Date())

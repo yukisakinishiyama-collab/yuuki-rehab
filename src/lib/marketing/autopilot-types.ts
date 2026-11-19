@@ -82,6 +82,18 @@ export interface AutopilotSettings {
   cancelStoryToHour: number
   /** 1日に出すキャンセルのストーリーの上限 */
   cancelStoryMaxPerDay: number
+  /**
+   * 今日の空き（毎日）：決まった時刻（既定 8:00・13:00）に、その時刻の「本日の空き」を出す（2026-11-19 院長の依頼）。
+   * 出す時刻に予約システムから空きを取り直して作る。休みの日・空きが無いときは出さない。
+   * 院長がこの設定をオンにしたことを「毎回の承認」の代わりにする（出すのは空き状況の定型の画像・文だけ。患者さんの情報は載せない）
+   */
+  dailyOpenings: boolean
+  /** 出す時刻（'HH:MM'・日本時間。1〜3個） */
+  dailyOpeningsTimes: string[]
+  /** Instagram のストーリーに出す（24時間で消える） */
+  dailyOpeningsStory: boolean
+  /** Google（ビジネスプロフィール）の投稿に出す。新しく出したら、前の「今日の空き」の投稿は消して最新の1本だけ残す */
+  dailyOpeningsGoogle: boolean
   /** 下書きを作る時刻（日曜・日本時間の時。既定18時） */
   generateHour: number
   /** 来週の投稿で触れてほしいこと（院長メモ）。次の下書きで1本目のテーマになり、使ったら空に戻る */
@@ -121,6 +133,11 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   cancelStoryFromHour: 7,
   cancelStoryToHour: 21,
   cancelStoryMaxPerDay: 3,
+  // 今日の空き（毎日）は院長がオンにするまで出さない
+  dailyOpenings: false,
+  dailyOpeningsTimes: ['08:00', '13:00'],
+  dailyOpeningsStory: true,
+  dailyOpeningsGoogle: true,
   generateHour: 18,
   ownerNote: '',
 }

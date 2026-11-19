@@ -163,6 +163,11 @@ export interface StorySlot {
   time: string
   /** その時間にあと何人受けられるか */
   remaining: number
+  /**
+   * 初めての方（初診・既定60分）もこの時間から予約できるか（予約システム v3.22 以降。無ければ分からない）。
+   * 初診は2枠続けて空いている時間だけ取れるため、30分の空きのうち一部だけが true になる
+   */
+  first?: boolean
 }
 
 /**
@@ -248,7 +253,11 @@ export function storyRows(openings: OpeningDay[], dates: string[]): StoryRow[] {
     const slots = Array.isArray(d.slots)
       ? d.slots
           .filter((s) => s && /^\d{1,2}:\d{2}$/.test(String(s.time)) && Number(s.remaining) > 0)
-          .map((s) => ({ time: String(s.time).padStart(5, '0'), remaining: Math.floor(Number(s.remaining)) }))
+          .map((s) => ({
+            time: String(s.time).padStart(5, '0'),
+            remaining: Math.floor(Number(s.remaining)),
+            ...(typeof s.first === 'boolean' ? { first: s.first } : {}),
+          }))
       : undefined
     rows.push({
       date,

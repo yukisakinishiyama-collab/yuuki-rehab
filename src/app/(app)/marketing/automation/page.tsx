@@ -53,7 +53,13 @@ interface AutomationData {
     cancelStoryFromHour: number
     cancelStoryToHour: number
     cancelStoryMaxPerDay: number
+    dailyOpenings?: boolean
+    dailyOpeningsTimes?: string[]
+    dailyOpeningsStory?: boolean
+    dailyOpeningsGoogle?: boolean
   } | null
+  /** 今日の空き（毎日）の最近の予定と結果（古い院内アプリのサーバーは返さない） */
+  dailyOpenings?: Array<{ scheduledAt: string; channel: string; status: string; reason: string }>
   autopilotHistory: Array<{ weekStart: string; createdAt: string; status: string; items: number; proposed: number; approved: number; notifiedAt: string | null }>
   cancelStories: Array<{ at: string; scheduledAt: string; status: string }>
   birthday: { enabled: boolean; sent30: number; failed30: number } | null
@@ -67,6 +73,7 @@ const AUTOMATION_LABELS: Record<AutomationRun['automation'], string> = {
   autopilot: '投稿案の自動作成',
   cancel_story: 'キャンセルの空き枠ストーリー',
   birthday: '誕生日のご挨拶',
+  daily_openings: '今日の空き（毎日）',
 }
 
 const MODE_BADGE: Record<AutomationMode, 'success' | 'warning' | 'secondary'> = { on: 'success', test: 'warning', off: 'secondary' }
@@ -535,6 +542,60 @@ export default function AutomationPage() {
                   },
                 ]}
               />
+
+              {/* 今日の空き（毎日の決まった時刻） */}
+              <AutomationCard
+                title="今日の空き（毎日・Instagramのストーリー／Google）"
+                state={ap ? <Badge variant={ap.dailyOpenings ? 'success' : 'secondary'}>{ap.dailyOpenings ? 'ON' : 'OFF'}</Badge> : <Badge variant="warning">未取得</Badge>}
+                control={
+                  ap && (
+                    <Segmented
+                      label="今日の空き（毎日）"
+                      value={ap.dailyOpenings ? 'on' : 'off'}
+                      options={ONOFF}
+                      disabled={readOnly || saving !== ''}
+                      onChange={(v) => void save('daily_openings', { enabled: v === 'on' }, `今日の空き（毎日）を ${v.toUpperCase()} にしました`)}
+                    />
+                  )
+                }
+                facts={[
+                  {
+                    label: '出すとき',
+                    value: ap
+                      ? `毎日 ${(ap.dailyOpeningsTimes ?? []).map((t) => t.replace(/^0/, '')).join('・') || '—'}（Cron のずれで1時間ほど遅れることがあります）`
+                      : '—',
+                  },
+                  {
+                    label: '出す先',
+                    value: ap
+                      ? [ap.dailyOpeningsStory ? 'Instagramのストーリー' : '', ap.dailyOpeningsGoogle ? 'Google（前の空きの投稿は消して最新の1本だけ）' : '']
+                          .filter(Boolean)
+                          .join('／') || '—'
+                      : '—',
+                  },
+                  { label: '止まる条件', value: '休みの日・空きが無いときは出さない／予定から2時間たったら出さない／患者さんの情報は載せない' },
+                  {
+                    label: '動いた記録',
+                    value:
+                      (data.dailyOpenings ?? []).length === 0
+                        ? 'まだありません'
+                        : (
+                            <ul className="space-y-0.5">
+                              {(data.dailyOpenings ?? []).map((d) => (
+                                <li key={`${d.scheduledAt}-${d.channel}`} className="text-xs text-slate-700">
+                                  {d.scheduledAt.replace('T', ' ')} {d.channel === 'google_business' ? 'Google' : 'ストーリー'}（{d.status}）{d.reason ? `：${d.reason}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          ),
+                  },
+                ]}
+              >
+                <p className="mt-2 text-xs">
+                  <Link href="/marketing/autopilot" className="font-bold text-teal-800 underline">自動投稿の画面</Link>
+                  で、時刻・出す先を変えられます。
+                </p>
+              </AutomationCard>
 
               {/* 誕生日のご挨拶 */}
               <AutomationCard

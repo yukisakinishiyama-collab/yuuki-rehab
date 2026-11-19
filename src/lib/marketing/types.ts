@@ -124,6 +124,21 @@ export interface GeneratedContent {
    * 投稿する時刻に予約システムから空きを取り直して画像を作る（下書きのときの空きは snapshot）
    */
   story?: StoryContent
+  /**
+   * 今日の空き（毎日の決まった時刻。google_business のとき）。投稿する時刻に予約システムから空きを取り直し、
+   * 本文と画像をその時刻の空きで作る（daily-openings.ts）。空きが無い・休みの日は出さない
+   */
+  dailyOpenings?: DailyOpeningsContent
+}
+
+/** 今日の空き（毎日）の Google 投稿の中身。本文は出す時刻に作る */
+export interface DailyOpeningsContent {
+  /** 載せる日 'YYYY-MM-DD'（その日） */
+  date: string
+  /** 予定の時刻 'HH:MM'（例 '08:00'） */
+  time: string
+  /** この時刻（'YYYY-MM-DDTHH:MM'・日本時間）を過ぎたら、古い空きになるので出さない */
+  notAfter: string
 }
 
 /**
@@ -158,8 +173,10 @@ export interface StoryContent {
    * 予約システムが時間ごとの空きを返さないときは、その半日（午前・午後）に空きがあるかで見る
    */
   requireSlot?: string
-  /** どこから作ったストーリーか（cancel=キャンセルで空いた枠のお知らせ） */
-  trigger?: 'cancel'
+  /** どこから作ったストーリーか（cancel=キャンセルで空いた枠のお知らせ／daily=今日の空き（毎日の決まった時刻）） */
+  trigger?: 'cancel' | 'daily'
+  /** この時刻（'YYYY-MM-DDTHH:MM'・日本時間）を過ぎたら出さない（今日の空き：遅れて出ると古い空きになるため） */
+  notAfter?: string
 }
 
 /** ストーリー画像を出す前に院長が直せるところ */
