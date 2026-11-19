@@ -57,3 +57,16 @@ export function loadingText(elapsedMs: number, typicalSeconds: number | null): {
   }
   return { title, detail: `${typical}${sec > 0 ? `（${sec}秒）` : ''}` }
 }
+
+/**
+ * 予約の画面（予約システム）へ「いま見えているか」を知らせる合図（予約システム v3.23〜が受ける）。
+ * 院内アプリは予約の画面を裏で開いたままにするので、ほかの画面を見ているあいだも、予約システムは
+ * 20秒ごとに予約を読み直していた。何台もの端末の分が重なって、予約管理画面のどの操作も遅くなっていた
+ * （2026-11-19 院長「予約管理画面を早く動くように」。実行の記録で、1回の読みこみに10〜29秒）。
+ * 見えていないあいだは止め、戻ったらすぐ読み直す（どちらも予約システムの側で行う）
+ */
+export const FRAME_VISIBLE_MESSAGE = 'yuuki:karte-visible'
+
+export function frameVisibleMessage(visible: boolean): { type: typeof FRAME_VISIBLE_MESSAGE; visible: boolean } {
+  return { type: FRAME_VISIBLE_MESSAGE, visible: Boolean(visible) }
+}

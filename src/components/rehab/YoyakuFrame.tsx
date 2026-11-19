@@ -18,6 +18,7 @@ import { getPatients, initPatientStore } from '@/lib/patient-store'
 import { matchKartePatients } from '@/lib/karte-link'
 import { adminFrameAge, adminFrameNotice, shouldAutoRefresh, type AdminFrameAge } from '@/lib/yoyaku-ticket'
 import {
+  frameVisibleMessage,
   LOAD_HISTORY_KEY, PRELOAD_FALLBACK_DELAY_MS, PRELOAD_IDLE_TIMEOUT_MS,
   loadingText, parseLoadHistory, rememberLoadMs, typicalLoadSeconds,
 } from '@/lib/yoyaku-preload'
@@ -71,7 +72,20 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   const [age, setAge] = useState<AdminFrameAge>('fresh')
   const [refreshing, setRefreshing] = useState(false)
   const visibleRef = useRef(visible)
+  // 予約の画面の中（予約システムのページ）。「院内アプリの中です」の合図が届いたときに控え、見えているかを知らせる
+  const frameWindowRef = useRef<{ win: Window; origin: string } | null>(null)
   const router = useRouter()
+
+  // 予約の画面へ「いま見えているか」を知らせる（見えていないあいだは、予約システムが20秒ごとの読み直しを止める）
+  const postFrameVisible = useCallback(() => {
+    const target = frameWindowRef.current
+    if (!target) return
+    try {
+      target.win.postMessage(frameVisibleMessage(visibleRef.current), { targetOrigin: target.origin })
+    } catch {
+      // 送れなくても、予約の画面は今までどおり動く（読み直しが止まらないだけ）
+    }
+  }, [])
 
   // もらったURLで予約の画面を開く（iframe の行き先が変わるので、新しい管理チケットで読み直される）。
   // 取れなかったとき：最初は今までどおり（パスワードを入力）。読み直しのときは、今の画面をそのままにする
@@ -142,10 +156,11 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   // 「予約」に切りかえた・ほかの画面へ移ったとき：見はりに伝え、ほかの画面へ移ったときに古くなっていれば読み直す
   useEffect(() => {
     visibleRef.current = visible
+    postFrameVisible()
     if (visible) return
     const next = adminFrameAge(loadedAtRef.current, Date.now())
     if (shouldAutoRefresh({ age: next, frameVisible: false, awayMs: 0 })) void fetchAdminUrl().then(applyAdminUrl)
-  }, [visible, applyAdminUrl])
+  }, [visible, applyAdminUrl, postFrameVisible])
 
   // 初めて表示された時点でマウントし、以後はセッション中ずっと保持する
   // （レンダー中のstate調整パターン。effect不要でラッチできる）
@@ -212,6 +227,11 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
         source?.postMessage({ type: 'yuuki:karte-hello-ack' }, { targetOrigin: event.origin })
         // 予約画面の中身が動きはじめた合図でもある
         markReady()
+        // 見えているかを知らせる先として控える（読み直しで iframe ができ直しても、そのたびに合図が来る）
+        if (source) {
+          frameWindowRef.current = { win: source, origin: event.origin }
+          postFrameVisible()
+        }
         return
       }
       if (data.type !== 'yuuki:open-karte') return
@@ -225,7 +245,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [router, markReady])
+  }, [router, markReady, postFrameVisible])
 
   if (!mounted) return null
   const openUrl = adminUrl || RESERVATION_ADMIN_URL
