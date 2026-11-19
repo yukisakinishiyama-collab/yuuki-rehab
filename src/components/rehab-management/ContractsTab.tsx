@@ -519,6 +519,33 @@ function PdfButton({ html, record }: { html: string; record: ContractRecord }) {
   )
 }
 
+/**
+ * 中身が減っても、低くならない入れ物（いちばん高かったときの高さを保つ）。
+ * 署名欄の下に置く枠に使う：書いている途中で下の中身が縮むと、画面がずれて、書く場所が指の下から動いてしまうため
+ */
+function NoShrink({ className, children }: { className?: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let max = 0
+    const ro = new ResizeObserver(() => {
+      const h = el.offsetHeight
+      if (h > max) {
+        max = h
+        el.style.minHeight = `${h}px`
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div ref={ref} className={className}>
+      {children}
+    </div>
+  )
+}
+
 /** ほかの端末（パソコン）で「iPadで記入してもらう」を押してある書類。押すと、記入の画面（/patients/sign）が開く */
 function IncomingHandoffs({ patientId }: { patientId: string }) {
   const [items, setItems] = useState<HandoffListItem[]>([])
@@ -1131,24 +1158,30 @@ export function SignFlow({
         </div>
         <SignaturePad id="cf-sig-staff" label={`${tpl.staffLabel}の署名`} onChange={setSigStaff} missing={isMissing('cf-sig-staff')} />
 
-        {!ready && (
-          <div className={`rounded-lg p-3 text-sm ${attempted ? 'bg-red-50 text-red-800' : 'bg-slate-50 text-slate-700'}`}>
-            <p className="font-bold">完了の前に、あと{missing.length}つ</p>
-            <ul className="mt-1 flex flex-wrap gap-2">
-              {missing.map((m) => (
-                <li key={`${m.id}-${m.text}`}>
-                  <button
-                    type="button"
-                    onClick={() => jumpTo(m.id)}
-                    className="min-h-10 rounded-lg border border-current bg-white px-3 text-left text-sm underline-offset-2 hover:underline"
-                  >
-                    {m.text}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* まだのもの。署名を書いている途中で、この枠が縮んだり消えたりすると、画面全体がずれて、次の線が
+            ちがう場所に入る（2026-11-19「タブレットで書くと変に反応する」）。そろったあとも枠は残し、低くしない */}
+        <NoShrink className={`rounded-lg p-3 text-sm ${ready ? 'bg-teal-50 text-slate-800' : attempted ? 'bg-red-50 text-red-800' : 'bg-slate-50 text-slate-700'}`}>
+          {ready ? (
+            <p className="font-bold">✓ 記入がそろいました。下の「署名して完了する」を押してください。</p>
+          ) : (
+            <>
+              <p className="font-bold">完了の前に、あと{missing.length}つ</p>
+              <ul className="mt-1 flex flex-wrap gap-2">
+                {missing.map((m) => (
+                  <li key={`${m.id}-${m.text}`}>
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(m.id)}
+                      className="min-h-10 rounded-lg border border-current bg-white px-3 text-left text-sm underline-offset-2 hover:underline"
+                    >
+                      {m.text}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </NoShrink>
         {error && (
           <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-800">
             {error}
