@@ -310,6 +310,16 @@ export function pullAtStartup(): Promise<{ ok: boolean; changed: boolean }> {
   return startupPull
 }
 
+/**
+ * 起動時の取り込みで変わった分を、画面に反映し終えたことを伝える（AppShell が画面の中身を作り直したあとに呼ぶ）。
+ * 以前はアプリ全体を読み直していたので、この印は読み直しで自然に消えていた。
+ * いまは読み直さないので（予約の画面など、開いておいたものを捨てないため。2026-11-19）、ここで「変わっていない」にもどす。
+ * これをしないと、作り直した画面（予約の方のカルテを開く など）がまた「変わった＝読み直し待ち」と受け取ってしまう
+ */
+export function settleStartupChange(): void {
+  if (startupPull) startupPull = startupPull.then((r) => ({ ok: r.ok, changed: false }))
+}
+
 // 保存後に呼ぶ（デバウンス付き）
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 

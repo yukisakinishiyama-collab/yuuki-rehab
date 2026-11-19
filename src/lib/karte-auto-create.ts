@@ -25,7 +25,7 @@ export type OpenKarteResult =
   | { kind: 'open'; patient: Patient }
   | { kind: 'created'; patient: Patient }
   | { kind: 'ambiguous'; candidates: Patient[] }
-  /** 起動時の取り込みでカルテが変わり、画面を読み直すところ（読み直したあと、もう一度探す） */
+  /** 起動時の取り込みでカルテが変わり、画面を作り直すところ（AppShell が中身を作り直したあと、もう一度探す） */
   | { kind: 'reload' }
   /** お名前が無く、作れない */
   | { kind: 'none' }

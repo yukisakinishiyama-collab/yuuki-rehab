@@ -3,17 +3,24 @@
 // 予約管理の常駐フレーム
 // AppShell内に常駐させ、タブ切替では非表示にするだけにする。
 // これにより /yoyaku を再訪してもGAS画面を再読み込みせず、一瞬で表示される。
-// 院内アプリを開いて少ししたら、裏で先に読み込んでおく（予約システムは起動に3〜5秒かかるため、
-// 最初に「予約」を押したときに待たないように）。通信を節約する設定の端末では、開いたときだけ読み込む。
+// 院内アプリを開いて画面が落ち着いたらすぐ、裏で先に読み込んでおく（予約システムは起動・ログイン・予約の読みこみで
+// 数秒かかるため、最初に「予約」を押したときに待たないように。2026-11-19 までは2.5秒待ってから）。
+// 通信を節約する設定の端末では、開いたときだけ読み込む。
+// まだ開いている途中で「予約」に来たときは、白い画面のままにせず、待っていることと目安の秒数を出す（lib/yoyaku-preload.ts）。
 // 予約管理画面のログイン（管理チケット）は12時間で切れるので、切れる前に新しいチケットで読み直す
 // （見ていないとき・しばらく離れて戻ってきたときはだまって、見ている最中は「読み直す」ボタンで。lib/yoyaku-ticket.ts）。
 // ──────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { preconnect } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, RefreshCw } from 'lucide-react'
+import { ExternalLink, Loader2, RefreshCw } from 'lucide-react'
 import { getPatients, initPatientStore } from '@/lib/patient-store'
 import { matchKartePatients } from '@/lib/karte-link'
 import { adminFrameAge, adminFrameNotice, shouldAutoRefresh, type AdminFrameAge } from '@/lib/yoyaku-ticket'
+import {
+  LOAD_HISTORY_KEY, PRELOAD_FALLBACK_DELAY_MS, PRELOAD_IDLE_TIMEOUT_MS,
+  loadingText, parseLoadHistory, rememberLoadMs, typicalLoadSeconds,
+} from '@/lib/yoyaku-preload'
 
 const RESERVATION_ADMIN_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec?page=admin'
@@ -37,8 +44,25 @@ function isReservationOrigin(origin: string): boolean {
   return origin === 'https://script.google.com' || origin.endsWith('.googleusercontent.com')
 }
 
+function readLoadHistory(): number[] {
+  try {
+    return parseLoadHistory(localStorage.getItem(LOAD_HISTORY_KEY))
+  } catch {
+    return []
+  }
+}
+
 export default function YoyakuFrame({ visible }: { visible: boolean }) {
+  // 予約システムの入口へ、先に通り道をつないでおく（名前の引き・暗号の準備のぶん早くなる）
+  preconnect('https://script.google.com')
   const [mounted, setMounted] = useState(false)
+  // 予約の画面が開き終わったか（iframe の読みこみ、または予約画面からの合図）。読み直すたびに false に戻す
+  const [ready, setReady] = useState(false)
+  // 開きはじめた時刻（iframe ができた時刻。かかった時間を数える）と、待ちはじめてからの時間（表示用）
+  const startedAtRef = useRef(0)
+  const [elapsed, setElapsed] = useState(0)
+  // この端末で、ふだん何秒で開くか（前に開いたときに残した時間から）
+  const [typical, setTypical] = useState<number | null>(() => typicalLoadSeconds(readLoadHistory()))
   // 予約管理画面を開くURL。院内アプリから開くときは署名つきにして、
   // 予約システム側のパスワード入力を省く（院内アプリ自体がパスワードで守られているため）
   const [adminUrl, setAdminUrl] = useState('')
@@ -57,7 +81,14 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
       return
     }
     loadedAtRef.current = d.signed ? Date.now() : 0
-    setAdminUrl(d.url)
+    setAdminUrl((current) => {
+      // 行き先が変わる＝読み直し（iframe を作り直す）。開き終わるまで「開いています」を出す
+      if (current !== d.url) {
+        setReady(false)
+        setElapsed(0)
+      }
+      return d.url
+    })
     setAge('fresh')
   }, [])
 
@@ -120,13 +151,53 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   // （レンダー中のstate調整パターン。effect不要でラッチできる）
   if (visible && !mounted) setMounted(true)
 
+  // 先に裏で開いておく：画面が落ち着いたら（手が空いたら。遅くとも1.5秒で）すぐ。通信を節約する設定の端末では開かない
   useEffect(() => {
     if (mounted) return
     const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
     if (conn?.saveData) return
-    const id = window.setTimeout(() => setMounted(true), 2500)
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    if (w.requestIdleCallback && w.cancelIdleCallback) {
+      const id = w.requestIdleCallback(() => setMounted(true), { timeout: PRELOAD_IDLE_TIMEOUT_MS })
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const id = window.setTimeout(() => setMounted(true), PRELOAD_FALLBACK_DELAY_MS)
     return () => window.clearTimeout(id)
   }, [mounted])
+
+  // iframe ができた（＝予約システムを開きはじめた）時刻を残す。行き先が変わると iframe を作り直すので、そのたびに数えなおす
+  const startTimer = useCallback((el: HTMLIFrameElement | null) => {
+    if (el) startedAtRef.current = Date.now()
+  }, [])
+
+  // 開き終わったら、かかった時間を残す（次に待つときの目安）
+  const markReady = useCallback(() => {
+    const started = startedAtRef.current
+    startedAtRef.current = 0
+    setElapsed(0)
+    setReady(true)
+    if (!started) return
+    try {
+      const next = rememberLoadMs(readLoadHistory(), Date.now() - started)
+      localStorage.setItem(LOAD_HISTORY_KEY, JSON.stringify(next))
+      setTypical(typicalLoadSeconds(next))
+    } catch {
+      // 残せなくても表示には関係ない
+    }
+  }, [])
+
+  // 「予約」を見ていて、まだ開いている途中のときだけ、1秒ごとに待ち時間の表示を動かす
+  const waiting = visible && mounted && !ready
+  useEffect(() => {
+    if (!waiting) return
+    const id = window.setInterval(() => {
+      if (startedAtRef.current) setElapsed(Date.now() - startedAtRef.current)
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [waiting])
 
   // 予約管理画面で氏名を押したとき、その患者さんのカルテを開く
   // （予約システムから届くのは氏名と電話番号だけ。カルテは端末の中で探す）
@@ -139,6 +210,8 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
         // 「院内アプリの中にいます」と返す（予約画面はこれで、別タブではなくアプリ内でカルテを開く）
         const source = event.source as Window | null
         source?.postMessage({ type: 'yuuki:karte-hello-ack' }, { targetOrigin: event.origin })
+        // 予約画面の中身が動きはじめた合図でもある
+        markReady()
         return
       }
       if (data.type !== 'yuuki:open-karte') return
@@ -152,11 +225,12 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [router])
+  }, [router, markReady])
 
   if (!mounted) return null
   const openUrl = adminUrl || RESERVATION_ADMIN_URL
   const notice = adminFrameNotice(age)
+  const wait = loadingText(elapsed, typical)
 
   return (
     <div className={visible ? 'flex h-[calc(100dvh-13rem)] min-h-[480px] flex-col lg:h-[calc(100dvh-5.5rem)]' : 'hidden'}>
@@ -207,15 +281,24 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
       )}
 
       {/* 予約管理画面（GAS）を埋め込み（常駐。ログインの期限が近いときだけ、新しいチケットで読み直す） */}
-      <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {adminUrl ? (
+      <div className="relative flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {adminUrl && (
           <iframe
+            key={adminUrl}
+            ref={startTimer}
             src={adminUrl}
             title="予約管理（GAS）"
+            onLoad={markReady}
             className="w-full h-full border-0"
           />
-        ) : (
-          <p className="flex h-full items-center justify-center text-xs text-slate-500">予約管理を開いています…</p>
+        )}
+        {/* 開いている途中は、白い画面のままにせず、待っていることと目安の秒数を出す */}
+        {(!adminUrl || !ready) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/95 px-6 text-center" role="status" aria-live="polite">
+            <Loader2 className="h-7 w-7 animate-spin text-teal-700" aria-hidden />
+            <p className="text-base font-bold text-slate-900">{wait.title}</p>
+            <p className="max-w-md text-sm text-slate-700">{wait.detail}</p>
+          </div>
         )}
       </div>
 
