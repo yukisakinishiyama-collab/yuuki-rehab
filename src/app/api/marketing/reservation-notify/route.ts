@@ -21,7 +21,9 @@
  *      - 空き枠のお知らせは送ってよい時間帯（8時〜20時）だけ → 時間外は { delivered:false, deferred:true }
  *      - 同じお知らせは二度送らない → { duplicate:true }（送り済みなら delivered:true）
  *
- * 新しい予約（kind: 'new'）のときは、返事のあとで、カルテから LINE 連携した方へ「確定しました」を送る
+ * 新しい予約（kind: 'new'）のときは、返事のあとで、カルテが無い方のカルテを自動で作る
+ * （lib/karte/auto-register-server.ts。2026-11-19 院長の依頼）。
+ * さらに、カルテから LINE 連携した方へ「確定しました」を送る
  * （予約システムが LINE を知らない方。LINE から予約した方には予約システムが patient-confirm で送るので、二重には送らない）。
  * 予約を控えて、前日のお知らせも送る（lib/marketing/line-reservation-server.ts。2026-11-05 院長の依頼）
  *
@@ -66,6 +68,8 @@ type NotifyBody = {
   prevDate?: string
   prevTime?: string
   symptom?: string
+  /** 予約の区分（初診・再診 など。予約システムが送ってきたときだけ。カルテの自動登録で初回来院の日に使う） */
+  kubun?: string
   /** kind:'reminder' 用。指定時はこの本文をそのまま送る（GAS側で整形済みの前提） */
   text?: string
 }
@@ -207,6 +211,28 @@ export async function POST(request: NextRequest) {
   // 日時だけを渡す。お名前・電話などは渡さない）
   // 新しい予約：カルテから LINE 連携した方へ「確定しました」（予約システムへの返事を待たせないよう、返事のあとで）
   if (body.kind === 'new') {
+    // カルテが無い方のカルテを、予約のお名前・ふりがな・電話で自動で作る（2026-11-19 院長の依頼。
+    // lib/karte/auto-register-server.ts。今あるカルテは書きかえない。お名前などは記録に出さない）
+    const person = {
+      reservationNo: body.reservationNo,
+      name: body.name,
+      kana: body.kana,
+      phone: body.phone,
+      date: body.date,
+      time: body.time,
+      menu: body.menu,
+      symptom: body.symptom,
+      kubun: body.kubun,
+    }
+    after(async () => {
+      try {
+        const { registerPatientFromReservation } = await import('@/lib/karte/auto-register-server')
+        const r = await registerPatientFromReservation(person)
+        console.log('[karte-auto-register]', r.kind === 'created' ? 'カルテを作りました' : r.kind === 'exists' ? 'カルテがある方' : `作りません（${r.reason}）`)
+      } catch (error) {
+        console.error('[karte-auto-register] 失敗しました', error instanceof Error ? error.message : String(error))
+      }
+    })
     const rsv = { reservationNo: body.reservationNo, name: body.name, phone: body.phone, date: body.date, time: body.time }
     after(async () => {
       try {

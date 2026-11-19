@@ -14,6 +14,7 @@ import BodyMap from './BodyMap'
 import { SUPPORTED_JOINTS } from './JointDetailMap'
 import AnatomyMap from './AnatomyMap'
 import IntakeFlowchart, { type FlowchartResult } from './IntakeFlowchart'
+import { INTAKE_PREFILL_KEY, type IntakePrefill } from '@/lib/karte/intake-scan'
 
 interface Props {
   patientId: string
@@ -154,8 +155,45 @@ interface AIResult {
 
 type TabKey = 'basic' | 'pain_location' | 'flow' | 'detail' | 'life' | 'ai'
 
+/**
+ * 問診票の写真から読み取った下書き（「問診票を撮って登録」の完了の画面から来たとき。lib/karte/intake-scan.ts）。
+ * 欄に入れるだけで、保存はスタッフが確かめてから。保存するか「入れた内容を消す」を押すまで、この端末の画面の間だけ残る
+ */
+function readScanPrefill(patientId: string): Partial<FormState> | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(`${INTAKE_PREFILL_KEY}:${patientId}`)
+    if (!raw) return null
+    const p = JSON.parse(raw) as Partial<IntakePrefill>
+    const s = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
+    const out: Partial<FormState> = {
+      chiefComplaint: s(p.chiefComplaint, 300),
+      injuryDate: /^\d{4}-\d{2}-\d{2}$/.test(String(p.injuryDate ?? '')) ? String(p.injuryDate) : '',
+      injuryMechanism: s(p.injuryMechanism, 300),
+      occupation: s(p.occupation, 60),
+      sportsActivity: s(p.sportsActivity, 100),
+      pastMedicalHistory: s(p.pastMedicalHistory, 300),
+      currentMedications: s(p.currentMedications, 200),
+    }
+    return Object.values(out).some(Boolean) ? out : null
+  } catch {
+    return null
+  }
+}
+
+function clearScanPrefill(patientId: string) {
+  try {
+    sessionStorage.removeItem(`${INTAKE_PREFILL_KEY}:${patientId}`)
+  } catch {
+    // 消せなくても、画面を閉じれば消える
+  }
+}
+
 export default function IntakeForm({ patientId, onSaved }: Props) {
-  const [form, setForm] = useState<FormState>(defaultForm)
+  const [scanPrefill] = useState(() => readScanPrefill(patientId))
+  const [form, setForm] = useState<FormState>(() => (scanPrefill ? { ...defaultForm, ...scanPrefill } : defaultForm))
+  /** 問診票の写真から読み取った内容を欄に入れてある（保存するか、消すまで知らせを出す） */
+  const [fromScan, setFromScan] = useState(Boolean(scanPrefill))
   const [tab, setTab] = useState<TabKey>('basic')
   const [saved, setSaved] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
@@ -245,6 +283,8 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
       createdAt: new Date().toISOString(),
     }
     saveIntake(intake)
+    clearScanPrefill(patientId)
+    setFromScan(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
 
@@ -288,6 +328,25 @@ export default function IntakeForm({ patientId, onSaved }: Props) {
       </CardHeader>
 
       <CardContent className="space-y-4">
+
+        {fromScan && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-teal-50 p-3 text-sm text-slate-800">
+            <span className="min-w-0 flex-1 basis-64">
+              問診票の写真から読み取った内容を、主訴・受傷日・きっかけ・スポーツ・既往歴・服用中の薬の欄に入れてあります（「詳細」「生活情報」の欄も）。確かめて、足りないところを入れてから保存してください。
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                clearScanPrefill(patientId)
+                setFromScan(false)
+                setForm(defaultForm)
+              }}
+              className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              入れた内容を消す
+            </button>
+          </div>
+        )}
 
         {/* ── Tab 1: 基本情報 ── */}
         {tab === 'basic' && (

@@ -5,7 +5,7 @@
 // - 保存場所：<最初に入れたカルテのID>/<資料のID>.<拡張子>（クラウドの非公開の保存場所 karte-docs）
 // - リンク：http(s) の URL。DOI（10.xxxx/…）と PMID は、doi.org・PubMed の URL に直す
 // - ほかのカルテに入れた論文・プロトコルは、もう一度送らずにこのカルテへ入れられる（同じ保存場所を指す）。
-//   医療機関の書類・その他は、その方だけの書類のことがあるので、ほかのカルテには出さない
+//   医療機関の書類・問診票・その他は、その方だけの書類なので、ほかのカルテには出さない
 // - ファイルを消すのは、同じ保存場所を指す資料がほかに無いときだけ
 // ──────────────────────────────────────────────
 import type { KarteDoc, KarteDocCategory } from '@/types/karte-docs'
@@ -22,6 +22,7 @@ export const DOC_CATEGORIES: { value: KarteDocCategory; label: string }[] = [
   { value: 'paper', label: '論文' },
   { value: 'protocol', label: 'リハビリプロトコル' },
   { value: 'medical', label: '医療機関の書類' },
+  { value: 'intake', label: '問診票' },
   { value: 'other', label: 'その他' },
 ]
 
@@ -123,6 +124,7 @@ export function titleFromFileName(fileName: string): string {
 /** ファイル名から種類の見当（「プロトコル」が入っていればプロトコル。ほかは論文） */
 export function guessCategory(fileName: string): KarteDocCategory {
   if (/プロトコル|protocol|クリニカルパス|リハビリ計画/i.test(fileName)) return 'protocol'
+  if (/問診/.test(fileName)) return 'intake'
   if (/紹介状|診療情報|手術記録|指示書|検査結果|報告書/.test(fileName)) return 'medical'
   return 'paper'
 }

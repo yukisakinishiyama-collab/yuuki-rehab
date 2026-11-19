@@ -14,6 +14,10 @@ type Props = {
   /** 撮れた1枚（JPEG）。親がプレビュー→保存へ進める */
   onCapture: (file: File) => void
   onClose: () => void
+  /** 上に出す見出し（無ければ「患部を撮る」） */
+  title?: string
+  /** 書類（問診票など）を撮るとき。字が読めるように、できるだけ細かく撮る */
+  document?: boolean
 }
 
 /** この端末・この開き方でアプリ内カメラが使えるか */
@@ -35,7 +39,7 @@ function permissionHelp(): string {
   return 'カメラの使用が許可されていません。ブラウザのサイト設定でカメラを「許可」にしてから「もう一度試す」を押してください。'
 }
 
-export default function CameraCapture({ onCapture, onClose }: Props) {
+export default function CameraCapture({ onCapture, onClose, title = '患部を撮る', document: forDocument = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   // 向き・準備できたか・エラー はひとまとまり（向きを変えるときに一緒に初期化する）
@@ -58,7 +62,9 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+          video: forDocument
+            ? { facingMode: { ideal: facing }, width: { ideal: 3264 }, height: { ideal: 2448 } }
+            : { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } },
         })
         if (cancelled) {
           stream.getTracks().forEach(t => t.stop())
@@ -91,7 +97,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       cancelled = true
       stop()
     }
-  }, [facing, attempt, stop])
+  }, [facing, attempt, stop, forDocument])
 
   // 画面を離れたら必ず止める
   useEffect(() => stop, [stop])
@@ -129,7 +135,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       aria-label="カメラ"
     >
       <div className="flex items-center justify-between px-4 py-3 text-white">
-        <span className="text-sm font-medium">患部を撮る</span>
+        <span className="text-sm font-medium">{title}</span>
         <button
           type="button"
           onClick={() => { stop(); onClose() }}
