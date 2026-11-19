@@ -51,7 +51,7 @@ check('その方に正しい番号をもらえなかったときは送らない'
 check('おわびの文を送れたら印を外す', resend.includes('notified: true, notifyError: undefined, wrongNoNotified: undefined'))
 check('お知らせ済みで今回も番号が無い方には、重ねて送らない', resend.includes('if (!isPatientNo(link.patientNo) && stored.notified === true) {') && resend.indexOf('if (!isPatientNo(link.patientNo) && stored.notified === true) {') < resend.indexOf("fetch('https://api.line.me/v2/bot/message/push'"))
 check('前は番号が無かった方に番号が出たら、その文で送る', resend.includes('const issued = fresh.issued && stored.notified === true') && server.includes('issued: !wrong && Boolean(r.patientNo)'))
-check('連携し直すときも、数字でない控えは使わない', liff.includes('isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined'))
+check('連携し直すときも、数字でない控えは使わない', server.includes('isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined') && liff.includes('linkLineUser('))
 
 console.log(`\n結果: ${passed} 件成功 / ${failed} 件失敗`)
 process.exit(failed ? 1 : 0)

@@ -19,8 +19,10 @@ export interface LineLink {
   sealed: string
   /** 結びつけた日時（ISO） */
   linkedAt: string
-  /** どこで結びついたか */
-  via: 'liff-link' | 'reservation'
+  /** どこで結びついたか（karte-qr＝カルテの画面に出したQRコードを、患者さんがLINEで読み取った） */
+  via: 'liff-link' | 'reservation' | 'karte-qr'
+  /** カルテの ID（カルテの画面のQRコードで結びついたとき。カルテの電話番号・生年月日が無くても見分けられる） */
+  patientId?: string
   /** 生年月日（'YYYY-MM-DD'。誕生日のご挨拶に使う。患者さんが連携のときに入れたもの） */
   birthDate?: string
   /** 予約システム（患者マスタ）の患者番号。ネット予約の「患者番号をお持ちの方」で使える */
