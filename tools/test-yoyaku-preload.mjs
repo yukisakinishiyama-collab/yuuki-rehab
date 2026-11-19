@@ -89,4 +89,15 @@ t('起動時の取り込みで記録が変わっても、アプリ全体は読�
   assert.ok(!/location\.reload/.test(read('src/lib/karte-auto-create.ts')))
 })
 
+t('予約の画面へ「いま見えているか」を知らせる（予約システム v3.23 が、見えていないあいだ20秒ごとの読み直しを止める）', () => {
+  assert.deepEqual(P.frameVisibleMessage(true), { type: 'yuuki:karte-visible', visible: true })
+  assert.deepEqual(P.frameVisibleMessage(false), { type: 'yuuki:karte-visible', visible: false })
+  const frame = read('src/components/rehab/YoyakuFrame.tsx')
+  // 合図が届いた画面（event.source）を控え、そこへ送る。宛先は合図の出どころだけ
+  assert.ok(/'yuuki:karte-hello'[\s\S]{0,600}frameWindowRef\.current = \{ win: source, origin: event\.origin \}[\s\S]{0,80}postFrameVisible\(\)/.test(frame))
+  assert.ok(/postMessage\(frameVisibleMessage\(visibleRef\.current\), \{ targetOrigin: target\.origin \}\)/.test(frame))
+  // 「予約」に切りかえた・ほかの画面へ移ったときにも知らせる
+  assert.ok(/visibleRef\.current = visible\n\s+postFrameVisible\(\)/.test(frame))
+})
+
 console.log(`\n${n} 件すべて通過`)
