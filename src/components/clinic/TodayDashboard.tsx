@@ -8,7 +8,8 @@
  * - 昨日の締め（NOAHの来院数・金額）と次の一手 … 経営メニューを隠しコマンドで開いているときだけ
  * - 気にかけたい患者さん（しばらく記録がない・離脱リスクが高い）と最近ひらいたカルテ
  * - 承認を待っている投稿
- * - 患者さんに見せる（紹介の動画。料金と会員プランのご紹介＝2026-11-16、料金のしくみと健康保険のご案内＝2026-11-17 院長の依頼）
+ * - 患者さんに見せる（紹介の動画。料金と会員プランのご紹介＝2026-11-16、料金のしくみと健康保険のご案内＝2026-11-17、その短い版＝2026-11-19 院長の依頼。
+ *   動画ごとに「どんなときに見せるか」を一言出す）
  *
  * カードはすべて Panel（./Panel.tsx）で、見出し・余白・見出しの右のボタンの置き方をそろえている。
  * スマホでは上から「承認待ちのお知らせ → 今日の予約 → キャンセル → （昨日の締め）→ カルテ」の順に並ぶ。
@@ -375,6 +376,7 @@ function ShowToPatientPanel() {
   return (
     <Panel title="患者さんに見せる" icon={MonitorPlay}>
       {/* 動画ごとに別の枠（ページ）。並べる順は INTRO_VIDEOS */}
+      <p className="mb-2 text-xs text-slate-600">声の解説つきの動画です。押すと、画面いっぱいで見せられます。</p>
       <ul className="space-y-2">
         {INTRO_VIDEOS.map((v) => (
           <li key={v.id}>
@@ -383,8 +385,12 @@ function ShowToPatientPanel() {
               className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 hover:border-teal-600 hover:bg-teal-50/40"
             >
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-slate-900">{v.title}（動画）</span>
-                <span className="block text-xs text-slate-600">{lengthLabel(v.seconds)}・声の解説つき。画面いっぱいで見せられます</span>
+                <span className="block text-sm font-bold text-slate-900">{v.title}</span>
+                {/* 長さと、どんなときに見せるか（どれを選ぶか迷わないように） */}
+                <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-slate-700">
+                  <span className="rounded-full bg-teal-50 px-2 py-0.5 font-bold text-teal-900">動画・{lengthLabel(v.seconds)}</span>
+                  <span>{v.when}</span>
+                </span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
             </Link>
