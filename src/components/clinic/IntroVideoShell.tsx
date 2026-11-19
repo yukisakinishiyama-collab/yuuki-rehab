@@ -4,7 +4,8 @@
  *
  * 今日 →「患者さんに見せる」から開く。動画ごとにページがある（2026-11-17 院長の依頼で2本目を別の枠として足した）：
  * - 料金と会員プランのご紹介（/dashboard/price-video・IntroVideoPage.tsx）
- * - 料金のしくみと健康保険のご案内（/dashboard/fee-video・FeeVideoPage.tsx）
+ * - 料金のしくみと健康保険のご案内・短い版（/dashboard/fee-short-video・FeeShortVideoPage.tsx。2026-11-19）
+ * - 料金のしくみと健康保険のご案内・くわしい版（/dashboard/fee-video・FeeVideoPage.tsx）
  *
  * - この枠：題・説明、「患者さんに見せる（画面いっぱい）」、向きの選択、動画の確認（スタッフ用）
  * - その下（children）：動画ごとの「動画に出てくる内容」（聞かれたときの確認用）
@@ -48,12 +49,13 @@ export default function IntroVideoShell({ video: V, children }: { video: IntroVi
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <p className="text-sm font-bold text-teal-800">患者さんに見せる</p>
-        <h1 className="text-xl font-black text-slate-900 lg:text-2xl">{V.title}（動画）</h1>
+        <p className="text-sm font-bold text-teal-800">患者さんに見せる（動画・{lengthLabel(V.seconds)}）</p>
+        <h1 className="text-xl font-black text-slate-900 lg:text-2xl">{V.title}</h1>
         <p className="mt-1 text-sm text-slate-700">
           {V.summary}
-          {lengthLabel(V.seconds)}・音が出ます。
+          音が出ます。
         </p>
+        <p className="mt-1 text-sm font-bold text-slate-800">こんなときに：{V.when}</p>
       </div>
 
       <section className={cn(cardSurface, 'space-y-4 p-4 sm:p-5')}>

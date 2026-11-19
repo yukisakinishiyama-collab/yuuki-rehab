@@ -2,6 +2,7 @@
 // 患者さんにお見せする紹介動画（今日 → 「患者さんに見せる」）
 //   1. 料金と会員プランのご紹介（PRICE_GUIDE_VIDEO・/dashboard/price-video）
 //   2. 料金のしくみと健康保険のご案内（FEE_SYSTEM_VIDEO・/dashboard/fee-video。2026-11-17 院長の依頼で、別の枠として足した）
+//   3. 料金のしくみと健康保険のご案内・短い版（FEE_SHORT_VIDEO・/dashboard/fee-short-video。2026-11-19 院長の依頼。2 の最初の版＝約2分）
 //
 // 2026-11-16 院長の依頼で足した。声の解説つき・約2分。タブレットを患者さんに向けて、画面いっぱいで見せる。
 // 動画の本体は public/intro/（横向き＝タブレット・モニター用 1920x1080、縦向き＝スマホ用 1080x1920。中身は同じ）。
@@ -44,6 +45,8 @@ export interface IntroVideo {
   page: string
   /** スタッフ向けの一言（何の動画か） */
   summary: string
+  /** スタッフ向け：どんなときに見せるか（今日の「患者さんに見せる」の一覧に出す。どれを選ぶか迷わないように） */
+  when: string
   /** 長さ（秒） */
   seconds: number
   /** 動画の中の金額・条件を確かめた日 */
@@ -58,6 +61,7 @@ export const PRICE_GUIDE_VIDEO: IntroVideo = {
   title: '料金と会員プランのご紹介',
   page: '/dashboard/price-video',
   summary: '都度払いの料金、会員プランの内容・料金・都度払いとの比較・入る前に知っておいてほしいことを、声と画面でご案内します。',
+  when: '会員プランを考えている方に',
   seconds: 143,
   asOf: '2026-11-17',
   files: {
@@ -139,9 +143,10 @@ export const PRICE_GUIDE_FACTS = {
 
 export const FEE_SYSTEM_VIDEO: IntroVideo = {
   id: 'fee-insurance',
-  title: '料金のしくみと健康保険のご案内',
+  title: '料金のしくみと健康保険のご案内（くわしい版）',
   page: '/dashboard/fee-video',
   summary: '整骨院で健康保険が使えるケガと使えないもの、窓口の料金が全体の一部であること、当院のリハビリが自費である理由と料金に含まれるもの、料金の約束を、声と画面でご案内します。',
+  when: '「どうして自費もあるの？」と聞かれたときに。保険の日の金額・グラフ・保険＋自費・物理療法の料金まで',
   seconds: 263,
   asOf: '2026-11-17',
   files: {
@@ -149,6 +154,32 @@ export const FEE_SYSTEM_VIDEO: IntroVideo = {
     port: { src: '/intro/fee-insurance-port.mp4', poster: '/intro/fee-insurance-port.jpg', width: 1080, height: 1920 },
   },
   captions: '/intro/fee-insurance.vtt',
+}
+
+/**
+ * 3. 料金のしくみと健康保険のご案内（短い版・約2分）。2026-11-19 院長の依頼「これをアプリに入れて。分かりやすいように」。
+ *
+ * くわしい版（FEE_SYSTEM_VIDEO・約4分）を作る前の、最初の版（2026-11-17 に院長へお渡しした「約2分」のファイルと同じもの。
+ * 横向きは院長が送ってくれたファイルそのまま、縦向きは同じときに作った縦型）。作り直していない。
+ * 流れ：整骨院なのに、どうして保険だけじゃないの？ → 保険が使えるケガ・対象にならないもの → 窓口の料金は全体の一部（1〜3割）
+ *   → 当院のリハビリは目的がちがうから自費 → 2,850円に含まれるもの → 金額は先に伝える → 選び方 → 受付でどうぞ。
+ * くわしい版にある「保険の日の1か所の金額（676円）・グラフ・保険＋自費・物理療法の料金」は入っていない。
+ * 金額（2,850円・1,500円・初回料 2,000円）と言い方の決まりは、くわしい版と同じ（FEE_SYSTEM_FACTS。tools/test-intro-videos.mjs が確かめる）。
+ * 字幕は、動画の声から時刻を取って作った（public/intro/fee-short.vtt）。
+ */
+export const FEE_SHORT_VIDEO: IntroVideo = {
+  id: 'fee-short',
+  title: '料金のしくみと健康保険のご案内（短い版）',
+  page: '/dashboard/fee-short-video',
+  summary: '整骨院で健康保険が使えるケガと使えないもの、窓口の料金が全体の一部であること、当院のリハビリが自費である理由と料金に含まれるもの、料金の約束を、短くご案内します。',
+  when: '初めての方に。まず全体を短く',
+  seconds: 131,
+  asOf: '2026-11-17',
+  files: {
+    land: { src: '/intro/fee-short-land.mp4', poster: '/intro/fee-short-land.jpg', width: 1920, height: 1080 },
+    port: { src: '/intro/fee-short-port.mp4', poster: '/intro/fee-short-port.jpg', width: 1080, height: 1920 },
+  },
+  captions: '/intro/fee-short.vtt',
 }
 
 /** 「料金のしくみと健康保険のご案内」に出てくる内容（スタッフが聞かれたときの確認用。動画と同じ） */
@@ -236,7 +267,8 @@ export function windowPayment(total: number, rate: number): number {
 }
 
 /** 今日 →「患者さんに見せる」に並べる順 */
-export const INTRO_VIDEOS: readonly IntroVideo[] = [PRICE_GUIDE_VIDEO, FEE_SYSTEM_VIDEO]
+/** 今日の「患者さんに見せる」に並べる順（料金のしくみは、短い版 → くわしい版） */
+export const INTRO_VIDEOS: readonly IntroVideo[] = [PRICE_GUIDE_VIDEO, FEE_SHORT_VIDEO, FEE_SYSTEM_VIDEO]
 
 /** 都度払いの1回の基本（リハビリ＋施術1部位） */
 export function paygPerVisit(): number {
