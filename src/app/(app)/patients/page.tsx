@@ -130,7 +130,7 @@ export default function PatientsPage() {
         router.replace(`/patients/${r.patient.id}`)
         return
       }
-      if (r.kind === 'reload') return // 取り込みでカルテが変わり、画面が読み直される（読み直したあと、もう一度探す）
+      if (r.kind === 'reload') return // 取り込みでカルテが変わり、画面が作り直される（作り直したあと、もう一度探す）
       setKarteCreating('')
       setPatients(getPatients())
       if (r.kind === 'none') setKarteMiss(karte || tel)

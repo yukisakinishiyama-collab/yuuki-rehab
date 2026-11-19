@@ -5,10 +5,11 @@
  *
  * - 共通メニューは ClinicShell（PCは左、スマホは下のタブ）
  * - 予約管理（GASの予約画面）は常駐の iframe。/yoyaku を開くたびに読み込み直さない
- * - 起動時にクラウドの控えからカルテを取り込み（変わっていれば読み直す）
+ * - 起動時にクラウドの控えからカルテを取り込み（変わっていれば、画面の中身だけを作り直す。
+ *   アプリ全体は読み直さない＝裏で開いておいた予約の画面を捨てない。2026-11-19 院長「予約に移るのに時間がかかる」）
  * - カルテの画面（今日・カルテ）を開いている間は、15秒ごとにほかの端末の記録を取り込む。「すぐに反映する」で今すぐ
  */
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { RefreshCw, Smartphone } from 'lucide-react'
 import { useSyncStatus } from '@/lib/use-karte-sync'
@@ -24,6 +25,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const sync = useSyncStatus()
+  // 起動時の取り込みで記録が変わったら、これを1つ進めて画面の中身（children）だけを作り直す
+  const [contentVersion, setContentVersion] = useState(0)
 
   // カルテを使う画面（今日・カルテ）を開いたとき、クラウドの控えを取り込む（1回だけ）。
   // 集客・経営の画面では取り込まない（入力中に読み直しが起きないように）。
@@ -32,13 +35,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!usesKarte || pulledRef.current) return
     pulledRef.current = true
-    import('@/lib/sync-service').then(async ({ pullAtStartup, isSyncEnabled }) => {
+    import('@/lib/sync-service').then(async ({ pullAtStartup, isSyncEnabled, settleStartupChange }) => {
       if (!isSyncEnabled()) return
       setSyncing(true)
       // カルテの自動作成（lib/karte-auto-create.ts）も同じ1回の取り込みを待つ
       const { changed } = await pullAtStartup()
       setSyncing(false)
-      if (changed) window.location.reload()
+      if (!changed) return
+      // 記録が変わった：画面の中身だけを作り直して、新しい記録で読み直す。
+      // アプリ全体は読み直さない（予約の画面・録音など、枠に置いてあるものはそのまま残る）
+      settleStartupChange()
+      setContentVersion((v) => v + 1)
     })
   }, [usesKarte])
 
@@ -117,7 +124,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {() => (
         <VoiceSessionProvider>
           <ClinicShell extras={extras}>
-            {children}
+            {/* 起動時の取り込みで記録が変わったら、key を変えて中身だけを作り直す（上の contentVersion） */}
+            <Fragment key={contentVersion}>{children}</Fragment>
             {/* 予約管理（常駐iframe）：タブ切替で再読み込みせず一瞬で戻れる */}
             <YoyakuFrame visible={pathname === '/yoyaku'} />
           </ClinicShell>
