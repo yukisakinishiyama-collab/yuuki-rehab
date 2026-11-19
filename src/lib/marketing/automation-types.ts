@@ -92,7 +92,7 @@ export const RUN_RESULT_LABELS: Record<RunResult, string> = {
 /** 動いた記録1件（お名前・LINEのIDなど個人を特定できるものは入れない） */
 export interface AutomationRun {
   at: string
-  automation: AutomationKey | 'autopilot' | 'cancel_story' | 'birthday'
+  automation: AutomationKey | 'autopilot' | 'cancel_story' | 'birthday' | 'daily_openings'
   result: RunResult
   /** 何のときに動いたか（「予約の確定」「友だち追加」など） */
   note: string

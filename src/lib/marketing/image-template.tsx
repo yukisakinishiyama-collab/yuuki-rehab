@@ -413,6 +413,39 @@ export interface StoryImageInput {
   cta?: 'sticker' | 'profile' | 'qr'
 }
 
+/**
+ * 初めての方（初診・約60分）もえらべる時間の印「◎」。文字ではなく図形で描く（フォントに無くても□にならないように）
+ */
+function FirstMark({ size, color = MINT }: { size: number; color?: string }) {
+  const line = Math.max(2, Math.round(size / 9))
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: size,
+        height: size,
+        borderRadius: size,
+        border: `${line}px solid ${color}`,
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ display: 'flex', width: size * 0.42, height: size * 0.42, borderRadius: size, border: `${line}px solid ${color}` }} />
+    </div>
+  )
+}
+
+/** ◎ の説明（初めての方の印を出すときだけ） */
+function FirstLegend({ size, anyFirst }: { size: number; anyFirst: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: size, color: '#ccfbf1' }}>
+      {anyFirst ? <FirstMark size={Math.round(size * 1.1)} /> : null}
+      {anyFirst ? '初めての方（約60分）もご予約いただける時間' : '初めての方（約60分）は、本日はご予約いただける時間がありません'}
+    </div>
+  )
+}
+
 /** 時間ごとの枠（「15:30 残り2」）。午前・午後に分けて並べる */
 function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolean }) {
   const slots = row.slots ?? []
@@ -448,7 +481,10 @@ function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolea
                     border: `3px solid ${s.remaining <= 1 ? '#fbbf24' : '#14b8a6'}`,
                   }}
                 >
-                  <div style={{ display: 'flex', fontSize: many ? 38 : 46, fontWeight: 700 }}>{s.time}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', fontSize: many ? 38 : 46, fontWeight: 700 }}>{s.time}</div>
+                    {s.first ? <FirstMark size={many ? 26 : 32} /> : null}
+                  </div>
                   <div style={{ display: 'flex', fontSize: many ? 22 : 28, color: s.remaining <= 1 ? '#fde68a' : '#99f6e4' }}>
                     {showRemaining ? `残り${s.remaining}枠` : s.remaining <= 1 ? 'あと少し' : '空きあり'}
                   </div>
@@ -459,6 +495,100 @@ function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolea
         </div>
       ))}
     </div>
+  )
+}
+
+export interface OpeningsCardInput {
+  /** 例：'本日のご予約の空き' */
+  title: string
+  /** 例：'11/19（木）' */
+  dayLabel: string
+  /** 例：'8:00 時点' */
+  asOfLabel: string
+  slots: StoryRow['slots']
+}
+
+/**
+ * Google の投稿の画像（1200×900）：今日の空き（時間の一覧）。電話番号・URL・QR は入れない（Google の決まり）。
+ * 時間が多い日は小さめにして、1枚に収める（最大24個まで。それより多いときは「ほかにも空きがあります」）
+ */
+export async function renderOpeningsCardImage(input: OpeningsCardInput): Promise<Buffer> {
+  const { w, h } = IMAGE_SIZES.google
+  const p = DEFAULT_CLINIC_PROFILE
+  const all = input.slots ?? []
+  const slots = all.slice(0, 24)
+  const more = all.length - slots.length
+  const marks = all.some((x) => typeof x.first === 'boolean')
+  const anyFirst = all.some((x) => x.first)
+  const dense = slots.length > 12
+  const chip = dense ? { w: 158, font: 34, pad: '8px 0', mark: 22, gap: 10 } : { w: 196, font: 44, pad: '14px 0', mark: 28, gap: 14 }
+  const groups = [
+    { label: '午前', items: slots.filter((x) => x.time < '13:00') },
+    { label: '午後', items: slots.filter((x) => x.time >= '13:00') },
+  ].filter((g) => g.items.length > 0)
+  return render(
+    <div
+      style={{
+        width: w,
+        height: h,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '52px 64px 44px',
+        background: `linear-gradient(160deg, ${NAVY} 0%, ${NAVY_2} 100%)`,
+        fontFamily: FONT,
+        color: '#ffffff',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', fontSize: 26, fontWeight: 700, letterSpacing: 5, color: MINT }}>YUUKI SEIKOTSU-IN</div>
+        <div style={{ display: 'flex', fontSize: 28, fontWeight: 700 }}>{p.name}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 20, marginTop: 16 }}>
+        <div style={{ display: 'flex', fontSize: 64, fontWeight: 700 }}>{input.title}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginTop: 4 }}>
+        <div style={{ display: 'flex', fontSize: 40, fontWeight: 700, color: '#e2f3f8' }}>{input.dayLabel}</div>
+        <div style={{ display: 'flex', fontSize: 28, color: '#bfdbe8' }}>{input.asOfLabel}</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: dense ? 12 : 20, marginTop: dense ? 20 : 30 }}>
+        {groups.map((g) => (
+          <div key={g.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
+            <div style={{ display: 'flex', width: 84, paddingTop: dense ? 12 : 20, fontSize: 30, fontWeight: 700, color: '#bfdbe8' }}>{g.label}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: chip.gap, flex: 1 }}>
+              {g.items.map((x) => (
+                <div
+                  key={x.time}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    width: chip.w,
+                    padding: chip.pad,
+                    borderRadius: 18,
+                    background: 'rgba(20,184,166,0.2)',
+                    border: '3px solid #14b8a6',
+                  }}
+                >
+                  <div style={{ display: 'flex', fontSize: chip.font, fontWeight: 700 }}>{x.time.replace(/^0(\d):/, '$1:')}</div>
+                  {x.first ? <FirstMark size={chip.mark} /> : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {more > 0 ? <div style={{ display: 'flex', fontSize: 26, color: '#bfdbe8' }}>{`ほかにも ${more} つ空きがあります`}</div> : null}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
+        {marks ? <FirstLegend size={26} anyFirst={anyFirst} /> : null}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', fontSize: 36, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
+          <div style={{ display: 'flex', fontSize: 24, color: '#94a3b8' }}>空き状況は変わることがあります</div>
+        </div>
+      </div>
+    </div>,
+    w,
+    h,
   )
 }
 
@@ -504,6 +634,9 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
         <div style={{ ...fixed, flexDirection: 'column', marginTop: 28, gap: 14 }}>
           <div style={{ display: 'flex', fontSize: 46, fontWeight: 700 }}>{single!.label}</div>
           <SlotGrid row={single!} showRemaining={showRemaining} />
+          {(single!.slots ?? []).some((x) => typeof x.first === 'boolean') ? (
+            <FirstLegend size={28} anyFirst={(single!.slots ?? []).some((x) => x.first)} />
+          ) : null}
         </div>
       ) : single ? (
         <div style={{ ...fixed, flexDirection: 'column', marginTop: 60, gap: 34 }}>

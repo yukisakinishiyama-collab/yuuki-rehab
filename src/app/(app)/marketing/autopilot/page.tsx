@@ -386,12 +386,143 @@ function ItemCard({
   )
 }
 
+/** 今日の空き（毎日）で選べる時刻（7:00〜20:00 の30分ごと） */
+const DAILY_TIME_OPTIONS = Array.from({ length: 27 }, (_, i) => {
+  const minutes = 7 * 60 + i * 30
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+})
+
+/** 今日の空き（毎日の決まった時刻に、Instagramのストーリー・Googleへ「本日のご予約の空き」を出す） */
+function DailyOpeningsFields({
+  s,
+  setS,
+  disabled,
+  instagram,
+  googleApi,
+}: {
+  s: AutopilotSettings
+  setS: (next: AutopilotSettings) => void
+  disabled: boolean
+  instagram?: boolean
+  googleApi?: boolean
+}) {
+  const times = s.dailyOpeningsTimes ?? []
+  const slots = [0, 1, 2].map((i) => times[i] ?? '')
+  const setTime = (index: number, value: string) => {
+    const next = slots.map((t, i) => (i === index ? value : t)).filter(Boolean)
+    setS({ ...s, dailyOpeningsTimes: Array.from(new Set(next)).sort() })
+  }
+  const off = disabled || !s.dailyOpenings
+  return (
+    <fieldset className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3">
+      <legend className="px-1 text-sm font-bold text-slate-900">今日の空き（毎日の決まった時刻）</legend>
+      <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
+        <input
+          type="checkbox"
+          checked={Boolean(s.dailyOpenings)}
+          disabled={disabled}
+          onChange={(e) => setS({ ...s, dailyOpenings: e.target.checked })}
+          className="mt-0.5 h-5 w-5 shrink-0"
+        />
+        毎日、決まった時刻に「本日のご予約の空き」を出す（承認なしで出します）
+      </label>
+      <p className="text-xs leading-relaxed text-slate-600">
+        出す時刻に予約システムから空きを取り直し、その時刻の空き（時間の一覧）を画像と文にして出します。初めての方（約60分）もえらべる時間には ◎ を付けます。
+        休みの日・空きが無いときは出しません。患者さんのお名前などは載せません。出したことは毎回は知らせず、何度やり直しても出せなかったときだけ院長のLINEにお知らせします。
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {slots.map((value, i) => (
+          <label key={i} className="block">
+            <span className="text-xs font-bold text-slate-600">{`時刻${i + 1}`}</span>
+            <select
+              value={value}
+              disabled={off}
+              onChange={(e) => setTime(i, e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            >
+              <option value="">使わない</option>
+              {DAILY_TIME_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/^0/, '')}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-slate-500">
+        定期実行（Vercel の Cron）は1時間ごとで、少しずれることがあります。8:00 の分は 8時台に出ます。予定から2時間たっても出せなかった分は出しません（古い空きになるため）。
+      </p>
+      <div className="space-y-2">
+        <label className="flex items-start gap-2 text-sm max-lg:min-h-10">
+          <input
+            type="checkbox"
+            checked={Boolean(s.dailyOpeningsStory)}
+            disabled={off}
+            onChange={(e) => setS({ ...s, dailyOpeningsStory: e.target.checked })}
+            className="mt-0.5 h-5 w-5 shrink-0"
+          />
+          <span>
+            Instagramのストーリー（24時間で消えます）
+            {instagram === false && <span className="ml-1 text-xs font-bold text-amber-700">※いまInstagramとつながっていないため、出しません</span>}
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm max-lg:min-h-10">
+          <input
+            type="checkbox"
+            checked={Boolean(s.dailyOpeningsGoogle)}
+            disabled={off}
+            onChange={(e) => setS({ ...s, dailyOpeningsGoogle: e.target.checked })}
+            className="mt-0.5 h-5 w-5 shrink-0"
+          />
+          <span>
+            Google（ビジネスプロフィールの投稿）。新しく出したら、前の「今日の空き」の投稿は消して、最新の1本だけ残します
+            {googleApi === false && <span className="ml-1 text-xs font-bold text-amber-700">※いまGoogleとつながっていないため、出しません</span>}
+          </span>
+        </label>
+      </div>
+      <p className="text-xs text-slate-500">
+        Googleの投稿は、本文に電話番号・URLを書かず、「予約」ボタンから院のホームページへ案内します。Googleの審査で拒否が続いたら、Googleへの今日の空きは自動で止めます。
+        この設定がオンの間は、承認制の「空きが多い日の朝の空き状況」の案は作りません（同じ朝に2回出さないため）。
+      </p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <a
+          href={`/api/marketing/image?${new URLSearchParams({ kind: 'story', range: 'today', fresh: '1' }).toString()}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center text-xs font-bold text-teal-700 underline max-lg:min-h-10"
+        >
+          ストーリーの見本（いまの本日の空き）
+        </a>
+        <a
+          href={`/api/marketing/image?${new URLSearchParams({ kind: 'openings', fresh: '1' }).toString()}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center text-xs font-bold text-teal-700 underline max-lg:min-h-10"
+        >
+          Googleの投稿の見本（画像）
+        </a>
+        <a
+          href={`/api/marketing/image?${new URLSearchParams({ kind: 'openings', fresh: '1', format: 'text' }).toString()}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center text-xs font-bold text-teal-700 underline max-lg:min-h-10"
+        >
+          Googleの投稿の見本（本文）
+        </a>
+      </div>
+    </fieldset>
+  )
+}
+
 function SettingsPanel({
   initial,
   isAdmin,
   youtube,
   buffer,
   aiImage,
+  instagram,
+  googleApi,
   promoPlan,
   onSaved,
   onChanged,
@@ -401,6 +532,8 @@ function SettingsPanel({
   youtube?: YoutubeConnection
   buffer?: BufferConnection | null
   aiImage?: boolean
+  instagram?: boolean
+  googleApi?: boolean
   promoPlan?: PromoPlanItem[]
   onSaved: (message: string) => void
   onChanged: () => void
@@ -674,6 +807,8 @@ function SettingsPanel({
         </a>
       </fieldset>
 
+      <DailyOpeningsFields s={s} setS={setS} disabled={disabled} instagram={instagram} googleApi={googleApi} />
+
       <label className="block">
         <span className="text-xs font-bold text-slate-600">来週の投稿で触れてほしいこと（院長メモ・任意）</span>
         <textarea
@@ -932,6 +1067,8 @@ function AutopilotInner() {
             youtube={conn?.youtube}
             buffer={conn?.buffer}
             aiImage={conn?.aiImage}
+            instagram={conn?.instagram}
+            googleApi={conn?.googleApi}
             promoPlan={promoPlan}
             onSaved={(m) => {
               setMessage(m)

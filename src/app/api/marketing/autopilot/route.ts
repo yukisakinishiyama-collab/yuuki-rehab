@@ -42,6 +42,13 @@ const SettingsSchema = z.object({
   cancelStoryFromHour: z.number().int().min(0).max(23).default(7),
   cancelStoryToHour: z.number().int().min(1).max(24).default(21),
   cancelStoryMaxPerDay: z.number().int().min(1).max(10).default(3),
+  dailyOpenings: z.boolean().default(true),
+  dailyOpeningsTimes: z
+    .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
+    .max(3)
+    .default(['08:00', '13:00']),
+  dailyOpeningsStory: z.boolean().default(true),
+  dailyOpeningsGoogle: z.boolean().default(true),
   generateHour: z.number().int().min(6).max(22),
   ownerNote: z.string().max(400),
   clinicProfile: z.record(z.string(), z.string().max(2000)).optional(),
@@ -106,7 +113,25 @@ export async function PUT(request: NextRequest) {
   }
   const current = await getAutopilotSettings()
   const next = { ...DEFAULT_AUTOPILOT_SETTINGS, ...current, ...input }
+  {
+    const { normalizeTimes } = await import('@/lib/marketing/daily-openings')
+    next.dailyOpeningsTimes = normalizeTimes(next.dailyOpeningsTimes)
+    if (next.dailyOpenings && next.dailyOpeningsTimes.length === 0) {
+      return NextResponse.json({ error: '今日の空き：出す時刻を1つ以上えらんでください' }, { status: 400 })
+    }
+    if (next.dailyOpenings && !next.dailyOpeningsStory && !next.dailyOpeningsGoogle) {
+      return NextResponse.json({ error: '今日の空き：出す先（Instagramのストーリー・Google）を1つ以上えらんでください' }, { status: 400 })
+    }
+  }
   await saveAutopilotSettings(next)
+  // 今日の空き（毎日）：オフ・時刻や出す先を変えた分は取り消し、オンなら今日の分をすぐ予定に入れる（次の定期実行を待たない）
+  try {
+    const { cancelPendingDailyOpenings, scheduleDailyOpenings } = await import('@/lib/marketing/daily-openings-server')
+    await cancelPendingDailyOpenings(next)
+    if (next.dailyOpenings) await scheduleDailyOpenings(new Date(), next)
+  } catch (error) {
+    console.error('[autopilot] 今日の空きの予定を更新できませんでした', error)
+  }
   // Google検索向けの投稿をオフにしたら、予約済みでまだ出していない分も取り消す（すぐに止まるように）
   if (!next.googleSeo) {
     const { cancelPendingSeoPosts } = await import('@/lib/marketing/gbp-seo-server')

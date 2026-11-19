@@ -351,6 +351,8 @@ export async function addNextDayAvailabilityDraft(
 ): Promise<{ made: boolean; week?: string; itemId?: string; reason?: string }> {
   const settings = await getAutopilotSettings()
   if (!settings.enabled) return { made: false, reason: '自動投稿がオフです' }
+  // 今日の空き（毎日の決まった時刻）がオンなら、その朝の空きは毎日の分で出るので、承認の案は作らない（同じ朝に2回出さない）
+  if (settings.dailyOpenings) return { made: false, reason: '今日の空き（毎日）がオンのため、空き状況の案は作りません' }
   const wantsGoogle = settings.google && settings.availabilityPost
   if (!wantsGoogle && !settings.availabilityStory) return { made: false, reason: '空き状況の投稿（Google・ストーリー）がオフです' }
   const week = mondayOf(day.date)

@@ -258,14 +258,26 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   const { fetchHubStats } = await import('./booking-stats')
   const { jstParts } = await import('./autopilot-planner')
   const { buildStory } = await import('./story-server')
+  const now = jstParts(new Date())
+  // 今日の空き（毎日）：予定の時刻から時間がたちすぎたら出さない（古い空きになるため）。
+  // Instagram とつながっていないときは、画像も作らずに終える（1日2回、使わない画像を置かないため）
+  if (story.trigger === 'daily') {
+    const { isStaleDailyPost } = await import('./daily-openings')
+    if (isStaleDailyPost(story.notAfter, now.local)) {
+      return { kind: 'skipped', message: '予定の時刻から2時間たったため出しませんでした（古い空きになるため。次の時刻の分で出します）' }
+    }
+    const { isInstagramConnected } = await import('./instagram-token')
+    if (!(await isInstagramConnected())) {
+      return { kind: 'skipped', message: 'Instagramとつながっていないため出しませんでした（今日の空き）。自動投稿の設定の「Instagramとつなぐ」で直ります' }
+    }
+  }
   // 出す時刻のいまの空きで作る（控えは使わない）
   const fresh = await fetchHubStats(1, { fresh: true }).catch(() => null)
-  // キャンセルで空いた枠のお知らせは、いまの空きが取れないと枠が空いているか分からないので、出さずにやり直す
-  if (story.trigger === 'cancel' && !fresh) {
+  // キャンセルで空いた枠のお知らせ・今日の空きは、いまの空きが取れないと何を出せばよいか分からないので、出さずにやり直す
+  if ((story.trigger === 'cancel' || story.trigger === 'daily') && !fresh) {
     return { kind: 'error', message: '予約システムからいまの空きを取れませんでした（やり直します）' }
   }
   const openings = fresh?.openings?.length ? fresh.openings : story.snapshot
-  const now = jstParts(new Date())
   // 院長が画面で直したところ（見出し・ひとこと・出さない時間など）も、出す時刻の空きに当てはめる
   const built = buildStory(openings, story.dates, story.scope, now.local, story.title, story.edits ?? {})
   const rows = built.rows
@@ -317,6 +329,10 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
   const token = await getInstagramToken()
   const igUserId = await getInstagramUserId()
   if (!token || !igUserId) {
+    // 今日の空き（毎日2回）は、つながっていないときに毎回LINEへ届けると多すぎるので、出さずに終える（設定画面に出す）
+    if (story.trigger === 'daily') {
+      return { kind: 'skipped', message: 'Instagramとつながっていないため出しませんでした（今日の空き）。自動投稿の設定の「Instagramとつなぐ」で直ります' }
+    }
     return {
       kind: 'action_required',
       reason: 'Instagram API未接続のため手動投稿です。ストーリー用の画像を開いて保存し、Instagramアプリのストーリーで投稿してください（リンクのスタンプで予約ページを付けると便利です）。',
@@ -484,6 +500,10 @@ async function publishGoogleBusiness(content: GeneratedContent, jobKey?: string)
   const manualUrl = 'https://business.google.com/'
   const credentials = await getGbpCredentials()
   if (!credentials) {
+    // 今日の空き（毎日2回）は、つながっていないときに毎回LINEへ届けると多すぎるので、出さずに終える
+    if (content.dailyOpenings) {
+      return { kind: 'skipped', message: 'Googleとつながっていないため出しませんでした（今日の空き）。「投稿の予定と結果」の「Googleとつなぐ」で直ります' }
+    }
     return {
       kind: 'action_required',
       reason: 'Googleとの接続がまだのため手動投稿です。本文をコピーして管理画面から手動投稿し、完了チェックを付けてください。',
@@ -491,6 +511,17 @@ async function publishGoogleBusiness(content: GeneratedContent, jobKey?: string)
     }
   }
   const { clientId, clientSecret, refreshToken, location } = credentials
+
+  // 今日の空き（毎日）：本文と画像を、出す時刻の空きで作る。休みの日・空きが無いときは出さない
+  let dailyImageUrl: string | undefined
+  if (content.dailyOpenings) {
+    const { prepareDailyOpeningsGoogle } = await import('./daily-openings-server')
+    const prepared = await prepareDailyOpeningsGoogle(content.dailyOpenings)
+    if (prepared.kind === 'skipped') return { kind: 'skipped', message: prepared.message }
+    if (prepared.kind === 'error') return { kind: 'error', message: prepared.message }
+    content = { ...content, title: prepared.title, body: prepared.body }
+    dailyImageUrl = prepared.imageUrl
+  }
 
   try {
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -516,10 +547,12 @@ async function publishGoogleBusiness(content: GeneratedContent, jobKey?: string)
     // 投稿画像（4:3。AI画像があれば写真＋見出し、無ければテンプレート）。画像が作れなくても文章だけで投稿する
     let media: Array<{ mediaFormat: 'PHOTO'; sourceUrl: string }> | undefined
     try {
-      const url = content.seoPostId
-        ? await uploadSeoImage(content.seoPostId)
-        : await uploadPostImage(imageTextFor(content, 'google_business'), `marketing/gbp-${Date.now()}.png`, 'google', content.image?.photoUrl)
-      media = [{ mediaFormat: 'PHOTO', sourceUrl: url }]
+      const url = content.dailyOpenings
+        ? dailyImageUrl
+        : content.seoPostId
+          ? await uploadSeoImage(content.seoPostId)
+          : await uploadPostImage(imageTextFor(content, 'google_business'), `marketing/gbp-${Date.now()}.png`, 'google', content.image?.photoUrl)
+      media = url ? [{ mediaFormat: 'PHOTO', sourceUrl: url }] : undefined
     } catch {
       media = undefined
     }

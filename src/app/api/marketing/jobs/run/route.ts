@@ -9,6 +9,8 @@
  * - LINE連携の方への前日のお知らせ（日本時間10〜20時。明日の予約の控えの分。送り済みはすぐ終わる）
  * - YouTube・TikTok の動画：Buffer に渡した投稿が出たかを確かめる／前日に見本と「承認して投稿」ボタンを院長のLINEへ
  * - Google の投稿：Google の審査で拒否されていないかを確かめ、拒否なら「公開失敗」にして院長のLINEへ（gbp-posts-server.ts）
+ * - 今日の空き（毎日 8:00・13:00 など）：その日の投稿ジョブを作る（daily-openings-server.ts）。
+ *   Cron がずれると、予定の時刻から1時間ほど遅れて出ることがある（2時間を過ぎたら出さない）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { refreshInstagramTokenIfNeeded } from '@/lib/marketing/instagram-token'
@@ -23,6 +25,15 @@ async function run() {
   const startedAt = Date.now()
   // IGトークンの定期延長（60日期限対策）。失敗してもジョブ処理は続行する
   await refreshInstagramTokenIfNeeded()
+
+  // 今日の空き（毎日）：その日の分の予定を作る（同じ印は1回だけ。時刻になっていれば、すぐ下でそのまま出る）
+  let dailyOpenings: unknown = null
+  try {
+    const { scheduleDailyOpenings } = await import('@/lib/marketing/daily-openings-server')
+    dailyOpenings = await scheduleDailyOpenings()
+  } catch (error) {
+    console.error('今日の空きの予定づくりに失敗:', error instanceof Error ? error.message : error)
+  }
 
   const jobs = await dueJobs()
   const results: Array<{ id: string; channel: string; outcome: string }> = []
@@ -41,7 +52,16 @@ async function run() {
         console.error('キャンセルのストーリーのお知らせに失敗:', error instanceof Error ? error.message : error)
       }
     }
-    if (r.outcome === 'action_required' && r.job) manual.push(r.job)
+    // 今日の空き：Google は前の投稿を消して最新の1本だけ残す／出せなかったときだけ院長のLINEへ
+    if (job.idempotencyKey.startsWith('daily-openings:')) {
+      try {
+        const { afterDailyOpeningsJob } = await import('@/lib/marketing/daily-openings-server')
+        await afterDailyOpeningsJob(job, r)
+      } catch (error) {
+        console.error('今日の空きのあと片付けに失敗:', error instanceof Error ? error.message : error)
+      }
+    }
+    if (r.outcome === 'action_required' && r.job && !job.idempotencyKey.startsWith('daily-openings:')) manual.push(r.job)
     results.push({ id: job.id, channel: job.channel, outcome: r.outcome })
   }
 
@@ -106,7 +126,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, nudged, lineReminders, buffer, google, approvals, aiVideos }
+  return { ok: true, processed: results.length, results, dailyOpenings, nudged, lineReminders, buffer, google, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

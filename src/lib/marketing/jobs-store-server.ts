@@ -63,6 +63,8 @@ export interface PublishJob {
     done?: boolean
     /** 拒否を院長のLINEへ知らせた時刻 */
     notifiedAt?: string
+    /** アプリが Google から消した時刻（今日の空き：新しい投稿を出したら、前の投稿は消す） */
+    deletedAt?: string
   }
   createdAt: string
   updatedAt: string

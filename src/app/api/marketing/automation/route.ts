@@ -37,6 +37,8 @@ export const dynamic = 'force-dynamic'
 /** キャンセルのストーリーの投稿ジョブの印（cancel-story-server.ts の CANCEL_STORY_KEY_PREFIX と同じ。
  *  画像を作る処理まで読み込まないよう、ここでは文字だけ持つ） */
 const CANCEL_STORY_KEY_PREFIX = 'cancel-story:'
+/** 今日の空き（毎日）の投稿ジョブの印（daily-openings.ts の DAILY_OPENINGS_KEY_PREFIX と同じ） */
+const DAILY_OPENINGS_KEY_PREFIX = 'daily-openings:'
 
 const MODES: AutomationMode[] = ['on', 'test', 'off']
 const MENUS: LineMenuVariant[] = ['classic', 'three']
@@ -81,8 +83,17 @@ export async function GET() {
             cancelStoryFromHour: autopilot.cancelStoryFromHour,
             cancelStoryToHour: autopilot.cancelStoryToHour,
             cancelStoryMaxPerDay: autopilot.cancelStoryMaxPerDay,
+            dailyOpenings: autopilot.dailyOpenings,
+            dailyOpeningsTimes: autopilot.dailyOpeningsTimes,
+            dailyOpeningsStory: autopilot.dailyOpeningsStory,
+            dailyOpeningsGoogle: autopilot.dailyOpeningsGoogle,
           }
         : null,
+      dailyOpenings: jobs
+        .filter((j) => j.idempotencyKey.startsWith(DAILY_OPENINGS_KEY_PREFIX))
+        .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt) || a.channel.localeCompare(b.channel))
+        .slice(0, 6)
+        .map((j) => ({ scheduledAt: j.scheduledAt, channel: j.channel, status: j.status, reason: j.actionReason ?? '' })),
       autopilotHistory: proposals.slice(0, 4).map((p) => ({
         weekStart: p.weekStart,
         createdAt: p.createdAt,
@@ -157,7 +168,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ ok: true, rules })
   }
 
-  if (key === 'autopilot' || key === 'cancel_story' || key === 'birthday') {
+  if (key === 'autopilot' || key === 'cancel_story' || key === 'birthday' || key === 'daily_openings') {
     if (typeof body.enabled !== 'boolean') {
       return NextResponse.json({ ok: false, error: 'ON/OFF の指定が正しくありません' }, { status: 400 })
     }
@@ -165,6 +176,18 @@ export async function PUT(request: NextRequest) {
     if (key === 'birthday') {
       const current = await getBirthdaySettings()
       await saveBirthdaySettings({ ...current, enabled })
+    } else if (key === 'daily_openings') {
+      const current = await getAutopilotSettings()
+      const next = { ...current, dailyOpenings: enabled }
+      await saveAutopilotSettings(next)
+      // オフはまだ出していない分を取り消し、オンは今日の分をすぐ予定に入れる
+      try {
+        const { cancelPendingDailyOpenings, scheduleDailyOpenings } = await import('@/lib/marketing/daily-openings-server')
+        await cancelPendingDailyOpenings(next)
+        if (enabled) await scheduleDailyOpenings(new Date(), next)
+      } catch (error) {
+        console.error('今日の空きの予定を更新できませんでした:', error instanceof Error ? error.message : error)
+      }
     } else {
       const current = await getAutopilotSettings()
       await saveAutopilotSettings(key === 'autopilot' ? { ...current, enabled } : { ...current, cancelStory: enabled })
@@ -172,7 +195,14 @@ export async function PUT(request: NextRequest) {
     await recordAudit({
       role,
       action: '自動化設定を変更',
-      target: key === 'autopilot' ? '投稿案の自動作成' : key === 'cancel_story' ? 'キャンセルの空き枠ストーリー' : '誕生日のご挨拶',
+      target:
+        key === 'autopilot'
+          ? '投稿案の自動作成'
+          : key === 'cancel_story'
+            ? 'キャンセルの空き枠ストーリー'
+            : key === 'daily_openings'
+              ? '今日の空き（毎日）'
+              : '誕生日のご挨拶',
       detail: enabled ? 'ON にした' : 'OFF にした',
     })
     return NextResponse.json({ ok: true })
