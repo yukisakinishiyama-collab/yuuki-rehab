@@ -1,22 +1,24 @@
 /**
- * カルテ連携（患者さんがLINEから自分の名前・電話番号・生年月日を入れて、カルテとLINEを結びつける）
+ * カルテ連携（患者さんの LINE とカルテを結びつける）
  *
- * 流れ: LIFF で IDトークン → /api/liff/verify で短命チケット → ここへ {ticket, name, phone, birthDate}
+ * 流れ: LIFF で IDトークン → /api/liff/verify で短命チケット → ここへ
+ *   A. {ticket, name, phone, birthDate} … 患者さんが自分で入れる（今までどおり）
+ *   B. {ticket, code, peek: true}       … カルテの画面に出したQRコードの番号で、お名前の一部を見る（2026-11-19）
+ *      {ticket, code, phone?}           … その番号で結びつける（お名前・電話・生年月日はカルテのもの。電話が無い方だけ入れてもらう）
  * - チケットから userId を取り出し（本人がLINEでログインした証明）、封印してKVに保存する。
  *   生の userId はこのサーバーの外に出さない（lib/liff-ticket.ts の方針）。
- * - クラウドに控えたカルテに同じ人がいて生年月日が違えば、結びつけない（なりすまし・入力違いの防止）
+ * - A では、クラウドに控えたカルテに同じ人がいて生年月日が違えば、結びつけない（なりすまし・入力違いの防止）
  * - 予約システムに患者番号をもらう（無ければ発行）。ネット予約の「患者番号をお持ちの方」で使える
  * - 結びついたら、本人のLINEへ番号つきで1通送る（送れなくても結びつけは成功）
  *
- * 公開の入口（/api/liff は Basic 認証の外）。チケットが無いと何も保存できない。
+ * 公開の入口（/api/liff は Basic 認証の外）。チケットが無いと何も見られない・保存できない。
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { readTicket, sealUserId } from '@/lib/liff-ticket'
-import { isPatientNo, nameNoSpace, patientLinkKey, phoneDigits, type LineLink } from '@/lib/line-link'
-import { fetchPatientNo, findKartePatient, getLineLink, patientNoErrorText, saveLineLink } from '@/lib/line-link-server'
-import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
-
-const CLINIC = DEFAULT_CLINIC_PROFILE
+import { readTicket } from '@/lib/liff-ticket'
+import { nameNoSpace, patientLinkKey, phoneDigits } from '@/lib/line-link'
+import { findKartePatient, linkLineUser } from '@/lib/line-link-server'
+import { linkQrProblemText } from '@/lib/line-link-qr'
+import { previewLinkQr, redeemLinkQr } from '@/lib/line-link-qr-server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
   const secret = process.env.RESERVATION_NOTIFY_SECRET
   if (!secret) return NextResponse.json({ ok: false, error: 'not configured' }, { status: 503 })
 
-  let body: { ticket?: string; name?: string; phone?: string; birthDate?: string }
+  let body: { ticket?: string; name?: string; phone?: string; birthDate?: string; code?: string; peek?: boolean }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -56,6 +58,27 @@ export async function POST(request: NextRequest) {
 
   const userId = readTicket(String(body.ticket ?? ''), secret)
   if (!userId) return NextResponse.json({ ok: false, error: 'LINEの確認が切れました。もう一度開いてください' }, { status: 401 })
+
+  // B. カルテの画面に出したQRコードの番号で（お名前などを入れなくてよい）
+  if (body.code !== undefined) {
+    const code = String(body.code ?? '')
+    if (body.peek) {
+      const preview = await previewLinkQr(code)
+      if (!preview.ok) return NextResponse.json({ ok: false, reason: preview.reason, error: linkQrProblemText(preview.reason) }, { status: 410 })
+      return NextResponse.json({ ok: true, maskedName: preview.maskedName, needPhone: preview.needPhone })
+    }
+    try {
+      const used = await redeemLinkQr({ code, userId, phone: body.phone }, secret)
+      if (!used.ok) {
+        if (used.reason === 'phone') return NextResponse.json({ ok: false, reason: 'phone', error: '電話番号は10〜11桁の数字で入れてください' }, { status: 400 })
+        return NextResponse.json({ ok: false, reason: used.reason, error: linkQrProblemText(used.reason) }, { status: 410 })
+      }
+      const r = used.result
+      return NextResponse.json({ ok: true, name: r.name, notified: r.notified, again: r.again, patientNo: r.patientNo, patientNoMessage: r.patientNoMessage })
+    } catch (error) {
+      return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'うまくいきませんでした' }, { status: 500 })
+    }
+  }
 
   const name = cleanName(body.name)
   const phone = phoneDigits(String(body.phone ?? ''))
@@ -74,61 +97,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'お名前・電話番号・生年月日の組み合わせを確かめてください（院の記録と合いません）' }, { status: 400 })
   }
 
-  const existing = await getLineLink(key)
-  // 患者番号：前に発行できていればそれを使う。無ければ予約システムにもらう
-  let patientNo = isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined
-  let patientNoError: string | undefined
-  if (!patientNo) {
-    const r = await fetchPatientNo(name, phone)
-    patientNo = r.patientNo
-    patientNoError = r.error
-  }
-
-  const link: LineLink = {
-    key,
-    name,
-    phone,
-    sealed: sealUserId(userId, secret),
-    linkedAt: new Date().toISOString(),
-    via: 'liff-link',
-    birthDate,
-    patientNo,
-    patientNoError: patientNo ? undefined : patientNoError,
-  }
-  // 本人へ1通（送れなくても結びつけは成功あつかい）。送れなかった理由は控えておく
-  let notified = false
-  let notifyError = ''
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
-  if (!token) notifyError = 'LINE_CHANNEL_ACCESS_TOKEN 未設定'
-  if (token) {
-    const numberLine = patientNo
-      ? `\n\n患者番号：${patientNo}\nネット予約の「患者番号をお持ちの方」に、この番号と電話番号の下4桁を入れると、お名前などが自動で入ります。`
-      : `\n\n${patientNoErrorText(patientNoError)}`
-    const text = `${name}さんのカルテとこのLINEを${existing ? 'あらためて' : ''}結びつけました。\n誕生日のご挨拶など、院からのお知らせをこのLINEへお送りします。${numberLine}\n\n${CLINIC.name}`
-    try {
-      const res = await fetch('https://api.line.me/v2/bot/message/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
-      })
-      notified = res.ok
-      if (!res.ok) {
-        const detail = await res.text().catch(() => '')
-        notifyError = `HTTP ${res.status} ${detail}`.slice(0, 300)
-      }
-    } catch (error) {
-      notified = false
-      notifyError = (error instanceof Error ? error.message : String(error)).slice(0, 300)
-    }
-  }
-  await saveLineLink({ ...link, notified, notifyError: notified ? undefined : notifyError || undefined })
-
+  const r = await linkLineUser({ userId, name, phone, birthDate, via: 'liff-link' }, secret)
   return NextResponse.json({
     ok: true,
     name,
-    notified,
-    again: Boolean(existing),
-    patientNo: patientNo ?? null,
-    patientNoMessage: patientNo ? '' : patientNoErrorText(patientNoError),
+    notified: r.notified,
+    again: r.again,
+    patientNo: r.patientNo,
+    patientNoMessage: r.patientNoMessage,
   })
 }
+

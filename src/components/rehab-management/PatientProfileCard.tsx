@@ -3,12 +3,14 @@
 // カルテの「概要」に出す基本情報と保険証の情報（NOAHから取り込んだもの）
 // 自費カルテとして使うため、保険の情報は参考として表示するだけ（請求には使わない）
 // ──────────────────────────────────────────────
+import { useState } from 'react'
 import type { Patient } from '@/types/patient'
 import { calcAge } from '@/lib/rehab-algorithms'
 import { birthdayLabel } from '@/lib/birthday'
 import { useLineLinks } from '@/lib/line-link-client'
 import { patientLinkKey, phoneDigits } from '@/lib/line-link'
 import { Card, CardContent, SectionTitle } from './shared'
+import LineLinkQrDialog from './LineLinkQrDialog'
 
 function Row({ label, value }: { label: string; value?: string }) {
   if (!value) return null
@@ -24,11 +26,11 @@ export default function PatientProfileCard({ patient }: { patient: Patient }) {
   const ins = patient.insurance
   const age = calcAge(patient.birthDate)
   const bday = birthdayLabel(patient.birthDate)
-  const hasContact = patient.phone || patient.email || patient.address
   const hasIns = ins && Object.values(ins).some(Boolean)
-  const { linkFor, unlink } = useLineLinks()
+  const { linkFor, unlink, reload } = useLineLinks()
   const lineLink = linkFor(patient)
-  if (!patient.birthDate && !hasContact && !hasIns && !patient.noah) return null
+  // カルテの画面のQRコードで LINE と結びつける（2026-11-19。LineLinkQrDialog）
+  const [qrOpen, setQrOpen] = useState(false)
 
   const onUnlink = async () => {
     if (!lineLink) return
@@ -80,14 +82,26 @@ export default function PatientProfileCard({ patient }: { patient: Patient }) {
                       <button type="button" onClick={onUnlink} className="text-xs text-slate-500 underline hover:text-red-600 max-lg:min-h-10">
                         外す
                       </button>
+                      <button type="button" onClick={() => setQrOpen(true)} className="text-xs text-slate-500 underline hover:text-slate-800 max-lg:min-h-10">
+                        QRで結び直す
+                      </button>
                     </span>
                   ) : lineLink === undefined ? (
                     <span className="text-xs text-slate-500">確認中…</span>
-                  ) : patientLinkKey(patient.name, patient.phone) ? (
-                    <span className="text-xs text-slate-500">未連携（患者さんがLINEのメニュー「カルテ連携」で名前と電話番号を入れると結びつきます）</span>
                   ) : (
-                    <span className="text-xs text-slate-500">
-                      未連携（患者さんがLINEのメニュー「カルテ連携」で入れたお名前と生年月日が、このカルテと同じなら結びつきます。電話番号があれば電話番号でも照らします）
+                    <span className="flex flex-col items-start gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setQrOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-bold text-green-800 hover:bg-green-100 max-lg:min-h-10"
+                      >
+                        QRコードでLINEと結びつける
+                      </button>
+                      <span className="text-xs text-slate-500">
+                        {patientLinkKey(patient.name, patient.phone)
+                          ? '未連携（QRコードを患者さんのLINEで読み取ってもらうか、LINEのメニュー「カルテ連携」で名前と電話番号を入れてもらうと結びつきます）'
+                          : '未連携（QRコードを患者さんのLINEで読み取ってもらうか、LINEのメニュー「カルテ連携」で入れたお名前と生年月日が、このカルテと同じなら結びつきます）'}
+                      </span>
                     </span>
                   )}
                 </dd>
@@ -122,6 +136,16 @@ export default function PatientProfileCard({ patient }: { patient: Patient }) {
           )}
         </div>
       </CardContent>
+      {qrOpen && (
+        <LineLinkQrDialog
+          patient={{ id: patient.id, name: patient.name, phone: patient.phone, birthDate: patient.birthDate }}
+          onLinked={() => void reload()}
+          onClose={() => {
+            setQrOpen(false)
+            void reload()
+          }}
+        />
+      )}
     </Card>
   )
 }

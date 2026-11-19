@@ -9,6 +9,10 @@
 //
 // 流れ: LIFF SDK → IDトークン → /api/liff/verify（短命チケット）→ 入力 → /api/liff/link
 // LINE の外（ふつうのブラウザ）で開いたときは、LINE から開くよう案内するだけ。
+//
+// カルテの画面のQRコードから開いたとき（?c=番号。2026-11-19）は、入力の代わりに
+// 「山田◯◯ 様のカルテと、このLINEを結びつけます」を出して、押すだけで結びつける（lib/line-link-qr.ts）。
+// QRコードが使えないとき（10分過ぎた・もう使われた）は、そのことを出して、今までの入力に切りかえる。
 // ──────────────────────────────────────────────
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
@@ -23,7 +27,7 @@ interface LiffApi {
 /** 予約ページ（../page.tsx）と型が食い違わないよう、グローバルは拡張せずここで読む */
 const getLiff = (): LiffApi | undefined => (window as unknown as { liff?: LiffApi }).liff
 
-type Phase = 'loading' | 'form' | 'sending' | 'done' | 'outside' | 'error'
+type Phase = 'loading' | 'confirm' | 'form' | 'sending' | 'done' | 'outside' | 'error'
 
 const font = '"Hiragino Sans", "Noto Sans JP", sans-serif'
 
@@ -57,6 +61,11 @@ export default function LiffLinkPage() {
   const [done, setDone] = useState<{ patientNo: string | null; patientNoMessage: string; notified: boolean }>({ patientNo: null, patientNoMessage: '', notified: false })
   const [message, setMessage] = useState('')
   const [doneName, setDoneName] = useState('')
+  // カルテの画面のQRコードの番号と、そのお名前の一部（例 山田◯◯）。電話番号を入れてもらうか
+  const [code, setCode] = useState('')
+  const [preview, setPreview] = useState<{ maskedName: string; needPhone: boolean } | null>(null)
+  // QRコードが使えなかったときのお知らせ（入力の欄の上に出す）
+  const [qrNotice, setQrNotice] = useState('')
 
   useEffect(() => {
     const run = async () => {
@@ -85,6 +94,22 @@ export default function LiffLinkPage() {
         const data = (await res.json().catch(() => null)) as { ok?: boolean; ticket?: string } | null
         if (!data?.ok || !data.ticket) return setPhase('outside')
         setTicket(data.ticket)
+        // カルテの画面のQRコードから開いたとき：お名前の一部を見て、押すだけで結びつける
+        const qr = new URLSearchParams(window.location.search).get('c') || ''
+        if (qr) {
+          const peek = await fetch('/api/liff/link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket: data.ticket, code: qr, peek: true }),
+          })
+          const info = (await peek.json().catch(() => null)) as { ok?: boolean; maskedName?: string; needPhone?: boolean; error?: string } | null
+          if (info?.ok && info.maskedName) {
+            setCode(qr)
+            setPreview({ maskedName: info.maskedName, needPhone: Boolean(info.needPhone) })
+            return setPhase('confirm')
+          }
+          setQrNotice(`${info?.error || 'QRコードを読み取れませんでした。'}このページで、お名前・電話番号・生年月日を入れても結びつけられます。`)
+        }
         setPhase('form')
       } catch {
         setPhase('outside')
@@ -92,6 +117,48 @@ export default function LiffLinkPage() {
     }
     void run()
   }, [])
+
+  /** カルテの画面のQRコードで結びつける（お名前などはカルテのもの。電話番号が無い方だけ入れてもらう） */
+  const submitQr = async (e: FormEvent) => {
+    e.preventDefault()
+    if (phase === 'sending' || !preview) return
+    if (preview.needPhone) {
+      const digits = digitsOnly(phone, 11)
+      if (digits.length < 10) {
+        setMessage('電話番号を10〜11桁の数字で入れてください')
+        return
+      }
+    }
+    setMessage('')
+    setPhase('sending')
+    try {
+      const res = await fetch('/api/liff/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket, code, phone: preview.needPhone ? phone : undefined }),
+      })
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; reason?: string; patientNo?: string | null; patientNoMessage?: string; notified?: boolean } | null
+      if (!res.ok || !data?.ok) {
+        setMessage(data?.error || 'うまくいきませんでした。もう一度お試しください')
+        if (res.status === 401) return setPhase('error')
+        // QRコードが使えなくなった（期限切れ・使用済み）→ 今までの入力に切りかえる
+        if (res.status === 410) {
+          setPreview(null)
+          setMessage('')
+          setQrNotice(`${data?.error || 'QRコードが使えなくなりました。'}このページで、お名前・電話番号・生年月日を入れても結びつけられます。`)
+          return setPhase('form')
+        }
+        return setPhase('confirm')
+      }
+      // 画面には、お名前の一部だけを出す（QRコードはのぞき見られることがあるため）
+      setDoneName(preview.maskedName)
+      setDone({ patientNo: data.patientNo ?? null, patientNoMessage: data.patientNoMessage ?? '', notified: Boolean(data.notified) })
+      setPhase('done')
+    } catch {
+      setMessage('通信に失敗しました。電波のよいところでもう一度お試しください')
+      setPhase('confirm')
+    }
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -152,7 +219,9 @@ export default function LiffLinkPage() {
         </p>
         <h1 style={{ fontSize: 22, margin: '0 0 8px', lineHeight: 1.4 }}>LINEとカルテを結びつける</h1>
         <p style={{ fontSize: 14, lineHeight: 1.8, color: '#4b5b6e', margin: '0 0 22px' }}>
-          院で登録しているお名前・電話番号・生年月日を入れてください。
+          {preview
+            ? '「結びつける」を押すだけで、院のカルテとこのLINEが結びつきます。'
+            : '院で登録しているお名前・電話番号・生年月日を入れてください。'}
           結びつくと、誕生日のご挨拶や院からのお知らせがこのLINEに届き、ネット予約で使える患者番号もお知らせします。
         </p>
 
@@ -176,8 +245,62 @@ export default function LiffLinkPage() {
           </div>
         )}
 
-        {(phase === 'form' || phase === 'sending') && (
+        {(phase === 'confirm' || (phase === 'sending' && preview)) && preview && (
+          <form onSubmit={submitQr} style={{ display: 'grid', gap: 16 }}>
+            <div style={{ background: '#fff', border: '1px solid #cdeedb', borderRadius: 14, padding: 18, lineHeight: 1.8, fontSize: 15 }}>
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: '#06a04a', fontWeight: 700 }}>受付のQRコードから開きました</p>
+              <p style={{ margin: 0 }}>
+                <b style={{ fontSize: 20 }}>{preview.maskedName} 様</b>
+                <br />
+                のカルテと、このLINEを結びつけます。
+              </p>
+              <p style={{ margin: '8px 0 0', fontSize: 12.5, color: '#68788e' }}>
+                ご本人（またはご家族）のカルテでなければ、結びつけずに閉じて、受付にお知らせください。
+              </p>
+            </div>
+            {preview.needPhone && (
+              <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 700 }}>
+                電話番号（院にまだご登録がありません。ふだんお使いの番号を入れてください）
+                <input
+                  style={input}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="例：09012345678"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  required
+                />
+              </label>
+            )}
+            {message && (
+              <p style={{ fontSize: 13, color: '#b42318', margin: 0, lineHeight: 1.6 }}>{message}</p>
+            )}
+            <button
+              type="submit"
+              disabled={phase === 'sending'}
+              style={{
+                padding: '16px',
+                background: phase === 'sending' ? '#9fd9b8' : '#06c755',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: 16,
+                border: 0,
+                borderRadius: 12,
+                fontFamily: font,
+              }}
+            >
+              {phase === 'sending' ? '結びつけています…' : '結びつける'}
+            </button>
+          </form>
+        )}
+
+        {(phase === 'form' || (phase === 'sending' && !preview)) && (
           <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
+            {qrNotice && (
+              <p style={{ margin: 0, padding: '12px 14px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, fontSize: 13, lineHeight: 1.7, color: '#7c2d12' }}>
+                {qrNotice}
+              </p>
+            )}
             <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 700 }}>
               お名前（漢字）
               <input
@@ -281,7 +404,7 @@ export default function LiffLinkPage() {
         {phase === 'done' && (
           <div style={{ background: '#fff', border: '1px solid #cdeedb', borderRadius: 14, padding: 20, lineHeight: 1.8, fontSize: 15 }}>
             <p style={{ margin: '0 0 8px', fontWeight: 800, color: '#06a04a' }}>結びつきました</p>
-            <p style={{ margin: 0 }}>{doneName}さんのカルテと、このLINEを結びつけました。ありがとうございます。</p>
+            <p style={{ margin: 0 }}>{doneName}{preview ? ' 様' : 'さん'}のカルテと、このLINEを結びつけました。ありがとうございます。</p>
             {done.patientNo ? (
               <div style={{ marginTop: 14, padding: '12px 14px', background: '#f0fdf4', borderRadius: 12 }}>
                 <p style={{ margin: 0, fontSize: 12, color: '#166534', fontWeight: 700 }}>あなたの患者番号</p>

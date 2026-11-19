@@ -3,7 +3,8 @@
  */
 import { createHmac } from 'crypto'
 import { kvDelete, kvGet, kvList, kvSet } from '@/lib/marketing/kv-store-server'
-import { RESERVE_URL } from '@/lib/marketing/clinic'
+import { DEFAULT_CLINIC_PROFILE, RESERVE_URL } from '@/lib/marketing/clinic'
+import { sealUserId } from '@/lib/liff-ticket'
 import { isPatientNo, patientLinkKey, type LineLink, type LineLinkSummary } from '@/lib/line-link'
 
 const PREFIX = 'linelink:'
@@ -29,12 +30,13 @@ export async function listLineLinks(): Promise<LineLinkSummary[]> {
     .map(({ value }) => value)
     .filter((v): v is LineLink => Boolean(v && v.key))
     // 患者番号は数字のものだけを画面へ出す（古い控えには「院側手動登録」という文字が入っていることがある）
-    .map(({ key, name, phone, linkedAt, via, birthDate, patientNo, patientNoError, notified, notifyError }) => ({
+    .map(({ key, name, phone, linkedAt, via, patientId, birthDate, patientNo, patientNoError, notified, notifyError }) => ({
       key,
       name,
       phone,
       linkedAt,
       via,
+      patientId,
       birthDate,
       patientNo: isPatientNo(patientNo) ? patientNo.trim() : undefined,
       patientNoError,
@@ -108,3 +110,94 @@ export async function findKartePatient(key: string): Promise<SyncPatient | null>
     return null
   }
 }
+
+export interface LinkLineUserInput {
+  /** LINE の userId（LIFF のチケットから取り出した、本人がログインした証明つきのもの） */
+  userId: string
+  name: string
+  /** 電話番号（数字。10〜11桁） */
+  phone: string
+  /** 生年月日（'YYYY-MM-DD'。無ければ ''） */
+  birthDate: string
+  via: LineLink['via']
+  /** カルテの ID（カルテの画面のQRコードから結びつけるとき） */
+  patientId?: string
+}
+
+export interface LinkLineUserResult {
+  key: string
+  name: string
+  notified: boolean
+  again: boolean
+  patientNo: string | null
+  patientNoMessage: string
+}
+
+/**
+ * カルテと LINE を結びつける本体（患者さんが入れた名前・電話・生年月日でも、カルテの画面のQRコードでも同じ）。
+ * - 生の userId は封印して保存（KV の linelink:<電話＋氏名>）
+ * - 予約システムに患者番号をもらう（前にもらっていればそれを使う）
+ * - 本人の LINE へ番号つきで1通（送れなくても結びつけは成功。送れなかった理由は控える）
+ * 呼ぶ前に、名前・電話・生年月日を確かめておくこと（ここでは確かめない）
+ */
+export async function linkLineUser(input: LinkLineUserInput, secret: string): Promise<LinkLineUserResult> {
+  const key = patientLinkKey(input.name, input.phone)
+  if (!key) throw new Error('お名前と電話番号を確かめてください')
+  const existing = await getLineLink(key)
+  // 患者番号：前に発行できていればそれを使う。無ければ予約システムにもらう
+  let patientNo = isPatientNo(existing?.patientNo) ? existing?.patientNo : undefined
+  let patientNoError: string | undefined
+  if (!patientNo) {
+    const r = await fetchPatientNo(input.name, input.phone)
+    patientNo = r.patientNo
+    patientNoError = r.error
+  }
+  const link: LineLink = {
+    key,
+    name: input.name,
+    phone: input.phone,
+    sealed: sealUserId(input.userId, secret),
+    linkedAt: new Date().toISOString(),
+    via: input.via,
+    patientId: input.patientId || existing?.patientId || undefined,
+    birthDate: input.birthDate || existing?.birthDate || undefined,
+    patientNo,
+    patientNoError: patientNo ? undefined : patientNoError,
+  }
+  // 本人へ1通（送れなくても結びつけは成功あつかい）。送れなかった理由は控えておく
+  let notified = false
+  let notifyError = ''
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  if (!token) notifyError = 'LINE_CHANNEL_ACCESS_TOKEN 未設定'
+  if (token) {
+    const numberLine = patientNo
+      ? `\n\n患者番号：${patientNo}\nネット予約の「患者番号をお持ちの方」に、この番号と電話番号の下4桁を入れると、お名前などが自動で入ります。`
+      : `\n\n${patientNoErrorText(patientNoError)}`
+    const text = `${input.name}さんのカルテとこのLINEを${existing ? 'あらためて' : ''}結びつけました。\n誕生日のご挨拶など、院からのお知らせをこのLINEへお送りします。${numberLine}\n\n${DEFAULT_CLINIC_PROFILE.name}`
+    try {
+      const res = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ to: input.userId, messages: [{ type: 'text', text }] }),
+      })
+      notified = res.ok
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '')
+        notifyError = `HTTP ${res.status} ${detail}`.slice(0, 300)
+      }
+    } catch (error) {
+      notified = false
+      notifyError = (error instanceof Error ? error.message : String(error)).slice(0, 300)
+    }
+  }
+  await saveLineLink({ ...link, notified, notifyError: notified ? undefined : notifyError || undefined })
+  return {
+    key,
+    name: input.name,
+    notified,
+    again: Boolean(existing),
+    patientNo: patientNo ?? null,
+    patientNoMessage: patientNo ? '' : patientNoErrorText(patientNoError),
+  }
+}
+

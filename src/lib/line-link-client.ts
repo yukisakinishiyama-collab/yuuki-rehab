@@ -113,10 +113,13 @@ export function useLineLinks() {
    *    カルテに電話番号が無い方（NOAH から取り込んだカルテなど）や、カルテの電話（自宅）と
    *    患者さんが LINE で入れた電話（携帯）が違う方も、LINE 連携済みとして出す。
    *    生年月日は患者さんが連携のときに自分で入れたもの（サーバーでも、カルテと違えば結びつけない）
+   * 0. その前に、カルテの画面のQRコードで結びついた LINE（カルテの ID が同じ）。電話番号・生年月日が無いカルテでも見分けられる
    */
   const linkFor = useCallback(
-    (patient: Pick<Patient, 'name' | 'phone'> & { birthDate?: string }): LineLinkSummary | null | undefined => {
+    (patient: Pick<Patient, 'name' | 'phone'> & { birthDate?: string; id?: string }): LineLinkSummary | null | undefined => {
       if (links === null) return undefined
+      const byId = patient.id ? links.find((l) => l.patientId === patient.id) : undefined
+      if (byId) return byId
       const key = patientLinkKey(patient.name, patient.phone)
       const byKey = key ? links.find((l) => l.key === key) : undefined
       if (byKey) return byKey
