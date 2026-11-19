@@ -17,11 +17,15 @@
  * 「会員プランのご案内」（患者様にお見せする説明。MemberPlanGuide.tsx）もここから開く。最後のページから入会の契約書へ進める。
  * となりの「紹介動画を見せる」は、同じ内容を約2分にまとめた動画を、カルテを開いたまま画面いっぱいに再生する
  * （clinic/IntroVideoStage.tsx。今日 →「患者さんに見せる」のページと同じ動画。閉じるとこのタブに戻る）。
+ * パソコンで説明して、記入は iPad で（2026-11-19 院長の依頼）：署名欄の上の「iPadで記入してもらう」で QR コードを出す
+ * → iPad で同じ書類がここまでの中身のまま開く（/patients/sign。この画面の SignFlow をそのまま使う）→ 署名が終わると、
+ * パソコンの画面も数秒で完了の画面に変わる（lib/contracts/handoff.ts・ContractHandoffDialog.tsx）。
+ * iPad の院内アプリでこのタブを開いたときも、パソコンから届いている書類を出す。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { nanoid } from 'nanoid'
-import { CheckCircle2, ChevronLeft, CloudUpload, Eye, FileDown, FileSignature, MonitorPlay, Presentation, Printer } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, CloudUpload, Eye, FileDown, FileSignature, MonitorPlay, Presentation, Printer, TabletSmartphone } from 'lucide-react'
 import type { Patient } from '@/types/patient'
 import type { ContractRecord, MemberPlan, MemberStatus } from '@/types/contracts'
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templates'
@@ -57,6 +61,9 @@ import { fingerprint } from '@/lib/sync-merge'
 import ContractDocument from './ContractDocument'
 import MemberPlanGuide from './MemberPlanGuide'
 import SignaturePad from './SignaturePad'
+import ContractHandoffDialog from './ContractHandoffDialog'
+import type { HandoffDraft, HandoffListItem } from '@/lib/contracts/handoff'
+import { createHandoff, fetchHandoff, fetchOpenHandoffs } from '@/lib/contracts/handoff-client'
 
 const STAFF_NAME_KEY = 'contractStaffName'
 
@@ -225,6 +232,7 @@ export default function ContractsTab({
       )}
 
       <PendingList patientId={patient.id} onUpdate={onUpdate} />
+      <IncomingHandoffs patientId={patient.id} />
 
       {/* 会員プランのご案内（患者様にお見せする説明） */}
       <section className={cn(cardSurface, 'flex flex-wrap items-center gap-3 p-4')}>
@@ -427,7 +435,7 @@ function SignedDocumentView({ html, record, onClose }: { html: string; record: C
 }
 
 /** 署名済みの書類の控えを印刷する（印刷は患者様の控えが基本。院の分はクラウドに残る） */
-function CopyActions({ html: stored, record, compact = false }: { html: string; record: ContractRecord; compact?: boolean }) {
+export function CopyActions({ html: stored, record, compact = false }: { html: string; record: ContractRecord; compact?: boolean }) {
   const standalone = isStandaloneApp()
   // 前に署名した入会の書類にも、印刷のときに「ご契約内容」の枠を足す（保存した本文は書きかえない）
   const html = useMemo(() => withContractSummary(stored, record), [stored, record])
@@ -508,6 +516,39 @@ function PdfButton({ html, record }: { html: string; record: ContractRecord }) {
       )}
       {msg && <span className={`text-xs ${state === 'error' ? 'text-red-700' : 'text-slate-600'}`}>{msg}</span>}
     </span>
+  )
+}
+
+/** ほかの端末（パソコン）で「iPadで記入してもらう」を押してある書類。押すと、記入の画面（/patients/sign）が開く */
+function IncomingHandoffs({ patientId }: { patientId: string }) {
+  const [items, setItems] = useState<HandoffListItem[]>([])
+  useEffect(() => {
+    let alive = true
+    void fetchOpenHandoffs(patientId).then((list) => {
+      if (alive) setItems(list)
+    })
+    return () => {
+      alive = false
+    }
+  }, [patientId])
+  if (items.length === 0) return null
+  return (
+    <section className="space-y-2 rounded-2xl border border-teal-300 bg-teal-50 p-4">
+      <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+        <TabletSmartphone className="h-4 w-4 shrink-0 text-teal-700" aria-hidden />
+        ほかの端末から、記入待ちの書類が届いています
+      </h3>
+      <ul className="space-y-2">
+        {items.map((h) => (
+          <li key={h.token} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3">
+            <span className="min-w-0 text-sm font-bold text-slate-900">{h.title}</span>
+            <Link href={`/patients/sign?t=${encodeURIComponent(h.token)}`} className="inline-flex min-h-11 items-center rounded-xl bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800">
+              この端末で記入する
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -620,7 +661,7 @@ function PendingList({ patientId, onUpdate }: { patientId: string; onUpdate: () 
   )
 }
 
-function SignFlow({
+export function SignFlow({
   tpl,
   patient,
   contracts,
@@ -630,6 +671,8 @@ function SignFlow({
   today,
   onBack,
   onDone,
+  initial,
+  handoffToken,
 }: {
   tpl: ContractTemplate
   patient: Patient
@@ -642,18 +685,25 @@ function SignFlow({
   today: string
   onBack: () => void
   onDone: (record: ContractRecord, html: string) => void
+  /** ほかの端末（パソコン）で入れてあった中身（iPad で受け取ったとき。□・記入欄・会員の手続き・氏名。署名は入らない） */
+  initial?: HandoffDraft
+  /** 受け取った側（iPad）で開いているときの、受け渡しの番号。患者様に渡す画面なので、一覧へ戻る・白紙の印刷・「iPadで記入」は出さない */
+  handoffToken?: string
 }) {
   const parsed = useMemo(() => parseTemplate(tpl.body), [tpl.body])
   const described = useMemo(() => describeTemplate(parsed), [parsed])
-  const [checks, setChecks] = useState<boolean[]>(() => Array(parsed.checkCount).fill(false))
+  // 受け取った中身は、□ と記入欄の数がこの端末のひな形と同じときだけ使う（呼ぶ側でも版と文面を確かめている）
+  const seed = initial && initial.checks.length === parsed.checkCount && initial.inputs.length === parsed.blankCount ? initial : null
+  const [checks, setChecks] = useState<boolean[]>(() => (seed ? [...seed.checks] : Array(parsed.checkCount).fill(false)))
   /** 手で入れた値（null はまだ触っていない＝自動の値を使う） */
-  const [inputs, setInputs] = useState<Array<string | null>>(() => Array(parsed.blankCount).fill(null))
+  const [inputs, setInputs] = useState<Array<string | null>>(() => (seed ? [...seed.inputs] : Array(parsed.blankCount).fill(null)))
   const age = ageOf(patient.birthDate, today)
-  const [patientName, setPatientName] = useState(patient.name)
-  const [minor, setMinor] = useState(age !== null && age < 18)
-  const [guardianName, setGuardianName] = useState('')
-  const [relation, setRelation] = useState('')
+  const [patientName, setPatientName] = useState(seed?.patientName || patient.name)
+  const [minor, setMinor] = useState(seed ? seed.minor : age !== null && age < 18)
+  const [guardianName, setGuardianName] = useState(seed?.guardianName ?? '')
+  const [relation, setRelation] = useState(seed?.relation ?? '')
   const [staffName, setStaffName] = useState(() => {
+    if (seed?.staffName) return seed.staffName
     try {
       return localStorage.getItem(STAFF_NAME_KEY) ?? ''
     } catch {
@@ -674,7 +724,12 @@ function SignFlow({
     pauseMonths: 1,
     special: false,
     specialReason: '',
+    // 受け取った中身があれば、会員の手続きの欄もそのまま（空の欄は上の初期値のまま）
+    ...(seed ? Object.fromEntries(Object.entries(seed.member).filter(([, v]) => v !== '' && v != null)) : {}),
   }))
+  /** iPad に渡しているところ（パソコンの側。QR コードの画面を出している） */
+  const [handoff, setHandoff] = useState<{ token: string } | null>(null)
+  const [handoffBusy, setHandoffBusy] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   /** 「署名して完了する」を一度押した（まだのものを赤で知らせる） */
@@ -856,6 +911,20 @@ function SignFlow({
       return
     }
     setSaving(true)
+    if (handoffToken) {
+      // パソコンの側で取り消した・もう署名済みの受け渡しでは、2通目を作らない（確かめられないときは、そのまま進める）
+      const r = await fetchHandoff(handoffToken)
+      const state = r.kind === 'ok' ? r.session.status : r.kind === 'missing' ? 'missing' : null
+      if (state === 'cancelled' || state === 'signed' || state === 'missing') {
+        setSaving(false)
+        setError(
+          state === 'signed'
+            ? 'この書類は、もう署名が終わっています。スタッフにお知らせください。'
+            : 'パソコンの側で、この受け渡しを取り消しました。スタッフにお知らせください（パソコンで QR コードを出し直します）。',
+        )
+        return
+      }
+    }
     let signed: { record: ContractRecord; html: string }
     try {
       signed = buildSigned()
@@ -883,24 +952,56 @@ function SignFlow({
     else keepFailed(failed.record, failed.html, sendErrorText(r))
   }
 
+  /** パソコンで説明したあと、記入は iPad で：ここまでの中身を1時間だけクラウドに置いて、QR コードを出す */
+  async function startHandoff() {
+    setError('')
+    setHandoffBusy(true)
+    try {
+      // 直前に直したカルテ（ご住所など）も iPad に同じ中身で出るように、先にクラウドとそろえる
+      const { isSyncEnabled, syncNow } = await import('@/lib/sync-service')
+      if (isSyncEnabled()) await syncNow()
+      const draft: HandoffDraft = {
+        docId: tpl.id,
+        version: tpl.version,
+        bodyHash: fingerprint(tpl.body),
+        checks,
+        inputs,
+        member,
+        patientName: patientName.trim(),
+        minor,
+        guardianName: guardianName.trim(),
+        relation: relation.trim(),
+        staffName: staffName.trim(),
+      }
+      const created = await createHandoff({ patientId: patient.id, patientName: patient.name, title: tpl.title, draft })
+      setHandoff({ token: created.token })
+    } catch (e) {
+      setError(`QR コードを出せませんでした（${e instanceof Error ? e.message : String(e)}）。通信を確かめて、もう一度押してください。`)
+    } finally {
+      setHandoffBusy(false)
+    }
+  }
+
   const fieldTone = (id: string) => (isMissing(id) ? 'border-red-500 bg-red-50/40' : 'border-slate-300')
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
-          <ChevronLeft className="h-4 w-4" aria-hidden />
-          書類の一覧
-        </button>
-        <button
-          type="button"
-          onClick={printBlank}
-          className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
-        >
-          <Printer className="h-4 w-4" aria-hidden />
-          白紙を印刷
-        </button>
-      </div>
+      {!handoffToken && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+            書類の一覧
+          </button>
+          <button
+            type="button"
+            onClick={printBlank}
+            className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <Printer className="h-4 w-4" aria-hidden />
+            白紙を印刷
+          </button>
+        </div>
+      )}
 
       {parsed.blankCount > 0 && (
         <p className="flex items-start gap-2 rounded-xl bg-teal-50 px-3 py-2 text-sm text-slate-700">
@@ -930,6 +1031,39 @@ function SignFlow({
         <div id="cf-member" className="scroll-mt-24">
           <MemberForm kind={tpl.member} member={member} setMember={setMember} status={status} today={today} check={memberCheck} selfId={patient.id} />
         </div>
+      )}
+
+      {/* パソコンで説明して、記入は iPad で（受け取った側の画面には出さない） */}
+      {!handoffToken && (
+        <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 p-4">
+          <div className="min-w-0 flex-1 basis-64">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <TabletSmartphone className="h-4 w-4 shrink-0 text-teal-700" aria-hidden />
+              記入は iPad でしてもらう
+            </h3>
+            <p className="mt-1 text-sm text-slate-700">
+              QR コードを出します。iPad のカメラで読むと、この書類がここまでの中身のまま開きます。署名が終わると、この画面も完了に変わります。
+            </p>
+          </div>
+          <Button onClick={() => void startHandoff()} disabled={handoffBusy || saving}>
+            {handoffBusy ? '用意しています…' : 'iPadで記入してもらう（QRコード）'}
+          </Button>
+        </section>
+      )}
+      {handoff && (
+        <ContractHandoffDialog
+          patientId={patient.id}
+          patientName={patient.name}
+          docId={tpl.id}
+          title={tpl.title}
+          token={handoff.token}
+          onClose={() => setHandoff(null)}
+          onSigned={(record, html) => {
+            // iPad で署名した記録を、この端末の一覧にも入れて（同期を待たない）、完了の画面へ
+            setHandoff(null)
+            finish(record, html)
+          }}
+        />
       )}
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">

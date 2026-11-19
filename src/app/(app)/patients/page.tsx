@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   User, Plus, Search, AlertTriangle, ChevronRight, Activity,
-  Pin, PinOff, History, ArrowUpDown, CalendarX,
+  Pin, PinOff, History, ArrowUpDown, CalendarX, Camera,
 } from 'lucide-react'
 import type { Patient, SOAPNote, CancellationSummary } from '@/types/patient'
 import { BODY_REGION_LABELS, RISK_LABELS } from '@/types/patient'
@@ -38,6 +38,15 @@ function isReevalMarked(st: ReevalStatus | undefined): boolean {
   return st?.state === 'soon' || st?.state === 'due' || st?.state === 'overdue'
 }
 
+/**
+ * 予約から自動で登録したカルテで、まだ最初のカルテ（SOAP）を書いていない方
+ * （予約が入ったときにサーバーが作る＝lib/karte/auto-register-server.ts／予約の方のカルテを開いたときに作る）。
+ * 生年月日などは、問診票の読み取りか手入力で足す
+ */
+function isAutoNew(p: Patient, noteCount: number): boolean {
+  return p.autoCreatedFrom === 'reservation' && noteCount === 0
+}
+
 /** 一覧で一度に描く人数 */
 const PAGE_SIZE = 40
 
@@ -53,6 +62,7 @@ const FILTER_OPTIONS = [
   { label: '再評価が近い', value: 'reeval' },
   { label: '🎂 誕生日が近い', value: 'birthday' },
   { label: 'LINE連携済み', value: 'line' },
+  { label: '予約から自動登録', value: 'auto' },
 ]
 
 const SORT_OPTIONS = [
@@ -213,6 +223,11 @@ export default function PatientsPage() {
     return [...counts.values()].filter(n => n > 1).length
   }, [patients])
 
+  const autoNewCount = useMemo(
+    () => patients.filter(p => isAutoNew(p, notesByPatient.get(p.id)?.length ?? 0)).length,
+    [patients, notesByPatient],
+  )
+
   const highRiskCount = useMemo(
     () => patients.filter(p => riskByPatient.get(p.id)?.level === 'high').length,
     [patients, riskByPatient],
@@ -233,6 +248,7 @@ export default function PatientsPage() {
       if (filter === 'birthday') return isBirthdaySoon(p.birthDate)
       if (filter === 'reeval') return isReevalMarked(reevalByPatient.get(p.id))
       if (filter === 'line') return Boolean(linkFor(p))
+      if (filter === 'auto') return isAutoNew(p, notesByPatient.get(p.id)?.length ?? 0)
       return p.bodyRegion === filter
     })
 
@@ -336,6 +352,16 @@ export default function PatientsPage() {
                 🎂 誕生日が近い {birthdaySoonCount}名
               </button>
             )}
+            {autoNewCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('auto')}
+                title="予約から自動で登録したカルテ（まだ最初のカルテを書いていない方）"
+                className="inline-flex items-center gap-1 text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded-full px-2 py-0.5 hover:bg-sky-100 max-lg:min-h-10"
+              >
+                予約から自動登録 {autoNewCount}名
+              </button>
+            )}
             {lineLinkedCount > 0 && (
               <button
                 type="button"
@@ -356,6 +382,11 @@ export default function PatientsPage() {
           )}
           <Link href="/patients/import" className={cn(buttonVariants({ variant: 'outline' }))}>
             NOAHから取り込む
+          </Link>
+          {/* 問診票をカメラで撮り、AI で読み取って登録の欄に入れる（確かめてから保存。/patients/scan） */}
+          <Link href="/patients/scan" className={cn(buttonVariants({ variant: 'outline' }))}>
+            <Camera className="w-4 h-4" />
+            問診票を撮って登録
           </Link>
           <Link href="/patients/new" className={cn(buttonVariants({ variant: 'default' }))}>
             <Plus className="w-4 h-4" />
@@ -595,6 +626,11 @@ function PatientCard({ patient, notes, riskLevel, cancelSummary, lineLinked, ree
             {lineLinked && (
               <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700" title="公式LINEと結びついています">
                 LINE
+              </span>
+            )}
+            {isAutoNew(patient, notes.length) && (
+              <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-800" title="予約の情報（お名前・ふりがな・電話）から自動で登録しました">
+                予約から自動登録
               </span>
             )}
             <Badge variant="teal">{BODY_REGION_LABELS[patient.bodyRegion]}</Badge>

@@ -7,8 +7,8 @@
 // 2026-11-18 院長の依頼。DECISIONS.md
 // ──────────────────────────────────────────────
 
-/** 資料の種類（論文・リハビリプロトコル・医療機関の書類・その他） */
-export type KarteDocCategory = 'paper' | 'protocol' | 'medical' | 'other'
+/** 資料の種類（論文・リハビリプロトコル・医療機関の書類・問診票・その他）。問診票は、問診票の写真の読み取り（lib/karte/intake-scan.ts）で入る */
+export type KarteDocCategory = 'paper' | 'protocol' | 'medical' | 'intake' | 'other'
 
 export interface KarteDoc {
   id: string

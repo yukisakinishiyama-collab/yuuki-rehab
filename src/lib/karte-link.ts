@@ -25,7 +25,7 @@ export function nameKey(value: string | undefined): string {
 }
 
 /** 同じ電話番号か（先頭の0の有無は無視する） */
-function samePhone(a: string, b: string): boolean {
+export function samePhone(a: string, b: string): boolean {
   if (!a || !b) return false
   const trim = (v: string) => v.replace(/^0+/, '')
   return a === b || trim(a) === trim(b)

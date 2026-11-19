@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { kvGet, kvSet } from '@/lib/marketing/kv-store-server'
 import { applyOps, sanitizeOps } from '@/lib/sync-merge'
+import { nextVersion, SYNC_KEY, type SyncRecord } from '@/lib/sync-store-server'
 
 /**
  * リハビリアプリのクラウド同期（端末の localStorage の控え）
@@ -14,14 +15,9 @@ import { applyOps, sanitizeOps } from '@/lib/sync-merge'
  * POST {v:2, ops}   … 端末で変わったところ（sync-merge の KeyOp）だけを、クラウドの今の中身に重ねる。
  *                     返事 { updatedAt, prevAt }（prevAt＝重ねる前の版。端末が知っている版と違えば、ほかの端末も書いていた）
  * POST {data}       … 古い端末から（全体を送ってくる）。届いたキーだけを置きかえる（届かなかったキーは消さない）
+ *
+ * 入れ物の名前・版の進め方は lib/sync-store-server.ts（サーバーが自分でカルテを足すときと共通）
  */
-const SYNC_KEY = 'sync:clinic'
-
-type SyncRecord = {
-  payload: Record<string, string>
-  updatedAt: string
-}
-
 export const dynamic = 'force-dynamic'
 
 // リクエスト認証チェック
@@ -30,13 +26,6 @@ function isAuthorized(req: NextRequest): boolean {
   const expected = process.env.SYNC_SECRET
   if (!expected) return false
   return secret === expected
-}
-
-/** 同じ時刻の書き込みでも版が重ならないように、前の版より必ず後の時刻にする */
-function nextVersion(prev: string | null | undefined): string {
-  const now = new Date()
-  if (prev && now.toISOString() <= prev) return new Date(new Date(prev).getTime() + 1).toISOString()
-  return now.toISOString()
 }
 
 // GET: クラウドからデータを取得

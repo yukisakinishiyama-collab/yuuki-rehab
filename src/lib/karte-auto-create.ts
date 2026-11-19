@@ -9,55 +9,17 @@
 // 1. 起動時のクラウドの控えの取り込みが終わるのを待ってから探す（終わる前に作ると、取り込みで消えたり二重になったりする）
 // 2. 「電話＋お名前」→「電話」→「お名前（空白を除く）」の順で探す（予約管理画面から開くときと同じ）
 // 3. 作ったらすぐクラウドへ控えを送る（次に開いたときの取り込みで消えないように）
+// 4. 見つからないときは、作る前にもう一度クラウドとそろえる（予約が入ったときにサーバーが作ったカルテを取りこぼさない）
 // 同じ方のカルテが2つ以上見つかったときは作らずに、候補を一覧で見せる。
 // お名前・ふりがな・電話は予約のものをそのまま使う。生年月日などは NOAH の取り込みで足せる。
 // ──────────────────────────────────────────────
-import { nanoid } from 'nanoid'
 import type { Patient } from '@/types/patient'
 import { getPatients, savePatient } from './patient-store'
 import { matchKartePatients, nameKey } from './karte-link'
+import { buildPatientFromReservation, reservationName, type ReservationPerson } from './karte-from-reservation'
 
-export interface ReservationPerson {
-  name: string
-  kana?: string
-  phone?: string
-  /** 予約の日（初診のときは初回来院の日にする） */
-  date?: string
-  /** 予約の区分（初診・再診 など） */
-  kubun?: string
-}
-
-/** 予約のお名前を、カルテのお名前の形にする（前後の空白・「様」を除く） */
-export function reservationName(name: string): string {
-  return String(name || '')
-    .trim()
-    .replace(/\s*(様|さま)$/, '')
-    .trim()
-}
-
-/** 予約の情報からカルテを作る（保存はしない） */
-export function buildPatientFromReservation(person: ReservationPerson, note = ''): Patient {
-  const now = new Date().toISOString()
-  return {
-    id: nanoid(),
-    name: reservationName(person.name),
-    kana: (person.kana ?? '').trim(),
-    birthDate: '',
-    gender: 'other',
-    phone: (person.phone ?? '').trim(),
-    emergencyContact: '',
-    mainComplaint: '',
-    bodyRegion: 'other',
-    diagnosisLabel: '',
-    onsetDate: '',
-    firstVisitDate: person.kubun?.includes('初診') ? (person.date ?? '') : '',
-    status: 'active',
-    therapistNotes: note,
-    createdAt: now,
-    updatedAt: now,
-    autoCreatedFrom: 'reservation',
-  }
-}
+// 作り方そのものは、サーバー（予約が入ったときの自動登録）と共通（lib/karte-from-reservation.ts）
+export { buildPatientFromReservation, reservationName, type ReservationPerson }
 
 export type OpenKarteResult =
   | { kind: 'open'; patient: Patient }
@@ -97,7 +59,18 @@ async function findOrCreate(person: ReservationPerson): Promise<OpenKarteResult>
   if (sync.changed) return { kind: 'reload' }
 
   const name = reservationName(person.name)
-  const found = matchKartePatients(getPatients(), name, person.phone)
+  let found = matchKartePatients(getPatients(), name, person.phone)
+  if (found.length === 0 && sync.enabled && nameKey(name)) {
+    // 予約が入ったときにサーバーが作ったカルテ（lib/karte/auto-register-server.ts）や、ほかの端末が作ったばかりのカルテが、
+    // まだこの端末に届いていないことがある。作る前にもう一度クラウドとそろえて探す（同じ方を2つ作らない）
+    try {
+      const { syncNow } = await import('./sync-service')
+      await syncNow()
+      found = matchKartePatients(getPatients(), name, person.phone)
+    } catch {
+      // そろえられなくても、今までどおりこの端末で作る
+    }
+  }
   if (found.length === 1) return { kind: 'open', patient: found[0] }
   if (found.length > 1) return { kind: 'ambiguous', candidates: found }
   if (!nameKey(name)) return { kind: 'none' }

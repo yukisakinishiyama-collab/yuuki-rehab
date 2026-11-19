@@ -68,6 +68,8 @@ import { getAllContracts, getContracts, getOutcomeSport, getOutcomes } from '@/l
 import { jstToday, memberStatusForPatient } from '@/lib/contracts/member'
 import type { ContractRecord, OutcomeRecord, SportKey } from '@/types/contracts'
 import { useKarteSynced } from '@/lib/use-karte-sync'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { nanoid } from 'nanoid'
 import { getAssessments as getReturnAssessments } from '@/lib/return-criteria-store'
 import type { ReturnCriteriaAssessment } from '@/types/return-criteria'
@@ -880,10 +882,23 @@ function openedForReeval(): boolean {
   return new URLSearchParams(window.location.search).get('reeval') === '1'
 }
 
+/**
+ * アドレスの ?tab= で開けるタブ（問診票の読み取りの完了の画面などから来たとき。/patients/<id>?tab=intake）。
+ * ?tab= はアドレスに残す。開いた直後に、起動時の取り込みでカルテが変わって画面が読み直されることがあり
+ * （AppShell）、そこで消していると、読み直したあとに最初のタブへ戻ってしまうため
+ */
+const URL_TABS: TabKey[] = ['intake', 'docs', 'contract', 'overview']
+function tabFromUrl(): TabKey | null {
+  if (typeof window === 'undefined') return null
+  const tab = new URLSearchParams(window.location.search).get('tab')
+  return URL_TABS.find((t) => t === tab) ?? null
+}
+
 export default function PatientDetail({ patient }: Props) {
   // 再評価マークから来たときは「評価・測定」の再評価の欄を開く（このカルテは端末の記録を読んでから描くので、最初から URL を読める）
   const [fromReevalMark] = useState(openedForReeval)
-  const [activeTab, setActiveTab] = useState<TabKey>(fromReevalMark ? 'eval' : 'soap')
+  const [fromUrlTab] = useState(tabFromUrl)
+  const [activeTab, setActiveTab] = useState<TabKey>(fromReevalMark ? 'eval' : (fromUrlTab ?? 'soap'))
   const [evalTab, setEvalTab] = useState<EvalKey>('outcome')
   const [reevalPlan, setReevalPlan] = useState<ReevalPlan | null>(null)
   const [outcomeScores, setOutcomeScores] = useState<OutcomeScoreRecord[]>([])
@@ -1107,6 +1122,16 @@ export default function PatientDetail({ patient }: Props) {
             )}
           </div>
 
+          {/* 予約の情報（お名前・ふりがな・電話）だけのカルテ：問診票を撮って、生年月日・住所などを入れる */}
+          {patient.autoCreatedFrom === 'reservation' && !patient.birthDate && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              <span className="min-w-0 flex-1 basis-56">予約の情報（お名前・電話）から作ったカルテです。生年月日・住所などは、まだ入っていません。</span>
+              <Link href={`/patients/scan?id=${patient.id}`} className={cn(buttonVariants({ size: 'sm' }))}>
+                問診票を撮って基本情報を入れる
+              </Link>
+            </div>
+          )}
+
           {/* 患者さんの目標・希望（どのタブでも見える。その場で書ける・直せる） */}
           <PatientGoalsBanner key={patient.id} patient={patient} latestSoap={latestSoap} />
 
@@ -1223,6 +1248,12 @@ export default function PatientDetail({ patient }: Props) {
           <div className="space-y-6">
             {/* 基本情報と保険証（NOAHから取り込んだ方）。情報が無い方には出さない */}
             <PatientProfileCard patient={patient} />
+            {/* 基本情報（生年月日・ご連絡先・住所など）を入れる・直す。問診票の写真から読み取ることもできる */}
+            <div className="flex justify-end">
+              <Link href={`/patients/scan?id=${patient.id}`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+                基本情報を入れる・直す（問診票の読み取り）
+              </Link>
+            </div>
             {/* 目標と課題（NextGen v2.0・説明モードの表示元）
                 key=patient.id で患者切替時に必ず読み直す（別患者のデータ混入防止） */}
             {isFeatureEnabled('goalsProblems') && (

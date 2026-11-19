@@ -5,8 +5,10 @@ import type { Metadata } from 'next'
  *
  * Google の OAuth 同意画面（Googleビジネスプロフィールへの投稿連携）を「本番環境」に公開するには、
  * プライバシーポリシーの URL が必要なため設けた。院の個人情報の扱い全体を書いている。
- * 外部サービスの一覧は、実際に使っているもの（予約=GAS、LINE、Vercel/Supabase）と
+ * 外部サービスの一覧は、実際に使っているもの（予約=GAS、LINE、Vercel/Supabase、問診票の読み取り=Anthropic）と
  * 合わせること。使うサービスが変わったら、ここも直す。
+ * 2026-11-19：問診票の写真の読み取り（院内アプリの「問診票を撮って登録」。お名前などが写った写真を Anthropic へ送る。
+ * 院長の判断）を足した。紹介状の下書きなど、お名前が要らない機能では、今までどおりお名前を送らない。
  */
 export const metadata: Metadata = {
   title: 'プライバシーポリシー',
@@ -15,6 +17,8 @@ export const metadata: Metadata = {
 }
 
 const ESTABLISHED = '2026年10月29日'
+/** 最後に直した日（外部サービスの一覧などを変えたら、ここも直す） */
+const REVISED = '2026年11月19日'
 
 type Section = { title: string; body?: string[]; items?: string[]; after?: string[] }
 
@@ -60,6 +64,7 @@ const sections: Section[] = [
       '予約の管理：Google（スプレッドシート・Apps Script）',
       '公式LINE・LINEからのご予約：LINEヤフー株式会社',
       'ホームページ・院内システムの運用と記録の控えの保管：Vercel、Supabase',
+      '問診票の読み取り（手書きの問診票の内容を施術録に入力するため）：Anthropic（AIのサービス。お名前・生年月日・ご連絡先・症状などが書かれた問診票の写真を送ります）',
     ],
     after: [
       'これらには海外（米国など）の事業者が含まれ、情報が海外のサーバーで保管・処理される場合があります。個人情報を適切に扱う事業者を選び、必要な管理を行います。',
@@ -141,7 +146,9 @@ export default function PrivacyPage() {
             </p>
           </div>
 
-          <p className="mt-8 text-sm text-slate-500">制定日：{ESTABLISHED}</p>
+          <p className="mt-8 text-sm text-slate-500">
+            制定日：{ESTABLISHED}　最終改定日：{REVISED}
+          </p>
         </div>
       </section>
     </div>
