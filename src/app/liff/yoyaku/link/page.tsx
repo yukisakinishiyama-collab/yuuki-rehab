@@ -82,6 +82,8 @@ export default function LiffLinkPage() {
   const [qrNotice, setQrNotice] = useState('')
   // この LINE で、もう結びついていた（開き直した）
   const [already, setAlready] = useState(false)
+  // この LINE が、いま結びついているカルテ（入力の画面の上に出す。ご家族の分を足すときもあるので、入力は残す）
+  const [linkedNow, setLinkedNow] = useState<Array<{ name: string; patientNo?: string }>>([])
   // QRコードから開いたか（確認中の文を、最初から QR 用にする。サーバーで作るときは false）
   const fromQr = useSyncExternalStore(
     noSubscribe,
@@ -152,6 +154,20 @@ export default function LiffLinkPage() {
           // この LINE でもう結びついている（結びつけたあとに開き直した）
           if (info?.already) return showAlready(info.already)
           setQrNotice(`${info?.error || 'QRコードを読み取れませんでした。'}このページで、お名前・電話番号・生年月日を入れても結びつけられます。`)
+        }
+        // もう結びついている方には、どのカルテと結びついているかを出す（メニューから開き直した・QR の番号が消えたあと）
+        try {
+          const mine = await fetch('/api/liff/link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket: data.ticket, mine: true }),
+          })
+          const m = (await mine.json().catch(() => null)) as { ok?: boolean; linked?: Array<{ name?: string; patientNo?: string }> } | null
+          if (m?.ok && Array.isArray(m.linked)) {
+            setLinkedNow(m.linked.filter((l) => l?.name).slice(0, 6).map((l) => ({ name: String(l.name), patientNo: l.patientNo })))
+          }
+        } catch {
+          // 出せなくても、入力はできる
         }
         setPhase('form')
       } catch {
@@ -399,6 +415,22 @@ export default function LiffLinkPage() {
 
         {(phase === 'form' || (phase === 'sending' && !preview)) && (
           <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
+            {linkedNow.length > 0 && (
+              <div style={{ padding: '14px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, fontSize: 14, lineHeight: 1.8, color: '#14532d' }}>
+                <p style={{ margin: 0, fontWeight: 800 }}>このLINEは、次のカルテと結びついています</p>
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {linkedNow.map((l) => (
+                    <li key={`${l.name}-${l.patientNo ?? ''}`}>
+                      <b>{l.name} 様</b>
+                      {l.patientNo ? `（患者番号 ${l.patientNo}）` : ''}
+                    </li>
+                  ))}
+                </ul>
+                <p style={{ margin: '6px 0 0', fontSize: 12.5, color: '#3f6212' }}>
+                  ほかのご家族のカルテも結びつけるときだけ、下に入れてください。結びつけ終わっている方は、このまま閉じてかまいません。
+                </p>
+              </div>
+            )}
             {qrNotice && (
               <p style={{ margin: 0, padding: '12px 14px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, fontSize: 13, lineHeight: 1.7, color: '#7c2d12' }}>
                 {qrNotice}

@@ -36,16 +36,14 @@ export interface LinkQrSession {
   status: LinkQrStatus
   createdAt: string
   expiresAt: string
-  /** 結びついた日時・キー（電話＋氏名）・患者番号 */
+  /**
+   * 結びついた日時・キー（電話＋氏名）・患者番号。
+   * 同じ LINE でもう一度開いたとき（LINE が画面を読み直した・2回読み取った）は、linkKey の結びつけの記録（linelink:）の
+   * 封印した LINE と比べて「結びついています」を出す（2026-11-20。この番号にはお名前・LINE の ID を残さない）
+   */
   linkedAt?: string
   linkKey?: string
   patientNo?: string
-  /**
-   * 結びつけた LINE の印（userId を院の鍵で封じたもの。userId そのものは残さない）。
-   * 同じ LINE でもう一度開いたとき（LINE が画面を読み直した・2回読み取った）に「結びついています」を出すため（2026-11-20）。
-   * そのときのお名前は、結びつけの記録（linelink:<linkKey>）から読む（この番号にはお名前を残さない）
-   */
-  linkedBy?: string
 }
 
 export const isValidLinkCode = (code: unknown): code is string => typeof code === 'string' && CODE_RE.test(code)

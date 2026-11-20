@@ -177,15 +177,25 @@ try {
     const again = await (await post({ ticket, code: second.code })).json()
     assert.deepEqual(again.already, { name: '架空 花子', patientNo: '2948' })
     assert.equal(pushes.length, 0, 'もう一度お知らせは送らない')
-    // 番号に残すのは封じた印だけ（LINE の ID そのものは残さない）
+    // 番号には LINE の ID もお名前も残さない（結びつけの記録の封印と比べて見分ける。前に結びついた番号も同じ形）
     const s = await kvGet(`lqr:${second.code}`)
-    assert.equal(s.linkedBy, S.linkedByOf(HANAKO, SECRET))
     assert.ok(!JSON.stringify(s).includes(HANAKO))
-    assert.notEqual(S.linkedByOf(OTHER, SECRET), s.linkedBy)
+    assert.equal(s.name, '')
+    assert.deepEqual(Object.keys(s).sort(), ['birthDate', 'code', 'createdAt', 'expiresAt', 'linkKey', 'linkedAt', 'name', 'patientId', 'patientNo', 'phone', 'status'])
     // 別の LINE では「結びついています」を出さない（今までどおり「使えません」）
     const other = await (await post({ ticket: issueTicket(OTHER, SECRET), code: second.code, peek: true })).json()
     assert.equal(other.already, undefined)
     assert.equal(other.reason, 'used')
+  })
+  await test('この LINE がいま結びついているカルテ（お名前そのままと患者番号）。ほかの LINE の分は出さない（2026-11-20）', async () => {
+    const mine = await (await post({ ticket, mine: true })).json()
+    assert.equal(mine.ok, true)
+    assert.ok(mine.linked.some((l) => l.name === '架空 花子' && l.patientNo === '2948'))
+    assert.ok(mine.linked.every((l) => Object.keys(l).every((k) => k === 'name' || k === 'patientNo')), 'お名前と患者番号だけ')
+    const other = await (await post({ ticket: issueTicket('Ucccccccccccccccccccccccccccccccc', SECRET), mine: true })).json()
+    assert.deepEqual(other, { ok: true, linked: [] })
+    const noTicket = await post({ mine: true })
+    assert.equal(noTicket.status, 401)
   })
   await test('一覧（カルテの画面）にはカルテの ID が出る・封印は出さない', async () => {
     const list = await listLineLinks()
@@ -249,6 +259,7 @@ try {
     assert.ok(page.includes("'結びついています'") && page.includes('読み込み直す'))
     assert.ok(page.includes("fromQr ? 'QRコードを確かめています…'"))
     assert.ok(page.includes('inLine ? failInLine(liff)'))
+    assert.ok(page.includes('このLINEは、次のカルテと結びついています') && page.includes('mine: true'))
   })
 
   console.log(`\n${passed} 件すべて通過`)
