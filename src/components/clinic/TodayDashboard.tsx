@@ -20,6 +20,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { ChartColumn, ChevronRight, ClipboardList, MonitorPlay, Search, Send, UserPlus } from 'lucide-react'
 import YoyakuTodayCard from '@/components/rehab/YoyakuTodayCard'
 import LineReservationPanel from './LineReservationPanel'
+import ReminderReachPanel from './ReminderReachPanel'
 import NextReservationCard from './NextReservationCard'
 import YoyakuCancelSyncCard from '@/components/rehab-management/YoyakuCancelSyncCard'
 import { getCancellations, getPatients, getSOAPNotes, initPatientStore } from '@/lib/patient-store'
@@ -453,6 +454,8 @@ export default function TodayDashboard() {
           <YoyakuTodayCard />
           {/* お名前を入れると次の予約日が分かる */}
           <NextReservationCard />
+          {/* 明日の予約で前日のお知らせが届かない方（電話で確かめる）・今日来られる方で届く手段が無い方（2026-11-20） */}
+          <ReminderReachPanel />
           {/* LINE連携している方の予約を、LINEで送る（予約日・時間） */}
           <LineReservationPanel />
           <YoyakuCancelSyncCard />
