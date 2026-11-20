@@ -31,7 +31,7 @@ import type { ContractRecord, MemberPlan, MemberStatus } from '@/types/contracts
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/data/contract-templates'
 import { CONTRACT_PRINT_CSS, parseTemplate, renderTemplateHtml, escapeHtml, jaDate } from '@/lib/contracts/template'
 import { contractSummaryHtml, insertSummary, isSafeContractHtml, memberLineOf, withContractSummary } from '@/lib/contracts/summary'
-import { autofillContract, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
+import { autofillContract, cancelPlanOfCheck, describeTemplate, effectiveInputs, pauseMonthsOfCheck, planOfCheck } from '@/lib/contracts/autofill'
 import { consentProblem } from '@/lib/contracts/consent'
 import { CLINIC_STAFF } from '@/data/clinic-staff'
 import { Button } from '@/components/ui/button'
@@ -44,12 +44,14 @@ import { buildContractPdfFile, isStandaloneApp, shareOrOpenPdf } from '@/lib/con
 import {
   addMonthsYm,
   buildMemberEvent,
+  canUsePaperCancel,
   cancelEndOf,
   jstToday,
   MEMBER_FEES,
   MEMBER_PLANS,
   memberStatusForPatient,
   memberStatusOf,
+  statusBeforeOf,
   minEndOf,
   PAIR_PLAN,
   type MemberInput,
@@ -751,6 +753,8 @@ export function SignFlow({
     pauseMonths: 1,
     special: false,
     specialReason: '',
+    paper: false,
+    paperStart: '',
     // 受け取った中身があれば、会員の手続きの欄もそのまま（空の欄は上の初期値のまま）
     ...(seed ? Object.fromEntries(Object.entries(seed.member).filter(([, v]) => v !== '' && v != null)) : {}),
   }))
@@ -769,6 +773,8 @@ export function SignFlow({
     () => (member.partnerPatientId ? (getPatient(member.partnerPatientId) ?? null) : null),
     [member.partnerPatientId],
   )
+  /** 手続きの前の状態（紙の入会申込書の方の解約届なら、紙の内容から。最低利用期間・利用開始日・ご契約内容の枠に使う） */
+  const before = useMemo(() => (covered?.via ? status : statusBeforeOf(tpl.member, member, status, today)), [covered, tpl.member, member, status, today])
   const auto = useMemo(
     () =>
       autofillContract(parsed, {
@@ -776,11 +782,11 @@ export function SignFlow({
         today,
         patient,
         member: tpl.member ? member : undefined,
-        status,
+        status: before,
         partnerPatient,
         inputs,
       }),
-    [parsed, tpl.id, tpl.member, today, patient, member, status, partnerPatient, inputs],
+    [parsed, tpl.id, tpl.member, today, patient, member, before, partnerPatient, inputs],
   )
   const values = useMemo(() => effectiveInputs(inputs, auto), [inputs, auto])
   const edited = useMemo(() => inputs.map((v) => v !== null), [inputs])
@@ -800,6 +806,8 @@ export function SignFlow({
   // 会員プランの書類：文面の □ と、下の「会員の手続き」の欄が食いちがわないように
   const checkedPlans = tpl.member === 'join' ? described.checks.filter((c) => checks[c.i] && planOfCheck(c)).map((c) => planOfCheck(c) as string) : []
   const checkedMonths = tpl.member === 'pause' ? described.checks.filter((c) => checks[c.i] && pauseMonthsOfCheck(c)).map((c) => pauseMonthsOfCheck(c) as number) : []
+  const checkedCancelPlans =
+    tpl.member === 'cancel' ? described.checks.filter((c) => checks[c.i] && cancelPlanOfCheck(c)).map((c) => cancelPlanOfCheck(c) as string) : []
 
   function onCheck(i: number, v: boolean) {
     setChecks((prev) => prev.map((x, k) => (k === i ? v : x)))
@@ -809,6 +817,9 @@ export function SignFlow({
     if (plan) setMember((m) => ({ ...m, plan }))
     const months = tpl.member === 'pause' ? pauseMonthsOfCheck(info) : null
     if (months) setMember((m) => ({ ...m, pauseMonths: months }))
+    // 紙の申込書の方の解約届：文面の「会員種別」にチェックしたら、下の種別もそれにする
+    const cancelPlan = tpl.member === 'cancel' ? cancelPlanOfCheck(info) : null
+    if (cancelPlan) setMember((m) => (m.paper ? { ...m, plan: cancelPlan as MemberPlan } : m))
   }
 
   const memberCheck = tpl.member ? buildMemberEvent(tpl.member, member, contracts, today, covered) : null
@@ -828,6 +839,9 @@ export function SignFlow({
   if (checkedPlans.length > 1) missing.push({ id: 'cf-doc', text: '文面の「申し込む」のチェックが2つ以上あります。申し込むプランを1つにしてください。' })
   else if (checkedPlans.length === 1 && checkedPlans[0] !== member.plan)
     missing.push({ id: 'cf-member', text: `文面で選んだプラン（${checkedPlans[0]}）と、下の「会員の種別」（${member.plan}）がちがいます。` })
+  if (checkedCancelPlans.length > 1) missing.push({ id: 'cf-doc', text: '文面の「会員種別」のチェックが2つ以上あります。1つにしてください。' })
+  else if (checkedCancelPlans.length === 1 && before.plan && checkedCancelPlans[0] !== before.plan)
+    missing.push({ id: 'cf-member', text: `文面で選んだ会員種別（${checkedCancelPlans[0]}）と、ご契約のプラン（${before.plan}）がちがいます。` })
   if (checkedMonths.length > 1) missing.push({ id: 'cf-doc', text: '文面の「休会の月数」のチェックが2つ以上あります。1つにしてください。' })
   else if (checkedMonths.length === 1 && checkedMonths[0] !== Number(member.pauseMonths))
     missing.push({ id: 'cf-member', text: `文面の休会の月数（${checkedMonths[0]}か月）と、下の「休会の月数」（${member.pauseMonths}か月）がちがいます。` })
@@ -874,7 +888,7 @@ export function SignFlow({
     // 会員プランの書類は、いちばん上に「ご契約内容」の枠（直筆の署名も）を入れる。院保管用にも患者様控えにも同じものが出る
     const summary = contractSummaryHtml({
       record,
-      before: status,
+      before,
       parsed,
       described,
       checks,
@@ -1056,7 +1070,17 @@ export function SignFlow({
 
       {tpl.member && (
         <div id="cf-member" className="scroll-mt-24">
-          <MemberForm kind={tpl.member} member={member} setMember={setMember} status={status} today={today} check={memberCheck} selfId={patient.id} />
+          <MemberForm
+            kind={tpl.member}
+            member={member}
+            setMember={setMember}
+            status={status}
+            before={before}
+            paperAllowed={!covered?.via && canUsePaperCancel(status)}
+            today={today}
+            check={memberCheck}
+            selfId={patient.id}
+          />
         </div>
       )}
 
@@ -1221,6 +1245,8 @@ function MemberForm({
   member,
   setMember,
   status,
+  before,
+  paperAllowed,
   today,
   check,
   selfId,
@@ -1229,13 +1255,18 @@ function MemberForm({
   member: MemberInput
   setMember: (fn: (m: MemberInput) => MemberInput) => void
   status: MemberStatus
+  /** 手続きの前の状態（紙の入会申込書の方の解約届なら、紙の内容から） */
+  before: MemberStatus
+  /** アプリに入会の記録が無いので、紙の入会申込書の内容で解約届を書ける */
+  paperAllowed: boolean
   today: string
   check: ReturnType<typeof buildMemberEvent> | null
   selfId: string
 }) {
   const set = (patch: Partial<MemberInput>) => setMember((m) => ({ ...m, ...patch }))
   const cancelEnd = cancelEndOf(today)
-  const early = status.minEnd ? cancelEnd < status.minEnd : false
+  const early = before.minEnd ? cancelEnd < before.minEnd : false
+  const paper = kind === 'cancel' && paperAllowed && Boolean(member.paper)
   return (
     <section className="space-y-3 rounded-2xl border-2 border-teal-200 bg-teal-50/40 p-4 sm:p-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -1300,15 +1331,53 @@ function MemberForm({
         </div>
       )}
 
+      {kind === 'cancel' && paperAllowed && (
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-sm text-slate-700">
+            このカルテには、アプリでの入会の記録がありません。紙の入会申込書でご契約の方は、紙の申込書を見ながら、プランと利用開始日を入れてください（この解約届に一緒に残ります）。
+          </p>
+          <label className="flex items-center gap-2 max-lg:min-h-10">
+            <input type="checkbox" checked={Boolean(member.paper)} onChange={(e) => set({ paper: e.target.checked })} className="h-6 w-6 accent-teal-700" />
+            <span className="font-bold text-slate-900">紙の入会申込書で入会した方</span>
+          </label>
+          {paper && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <fieldset className="sm:col-span-2">
+                <legend className="text-sm font-bold text-slate-700">紙の申込書の会員の種別</legend>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {MEMBER_PLANS.map((p) => (
+                    <label key={p} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 max-lg:min-h-10 ${member.plan === p ? 'border-teal-600 bg-teal-50 font-bold' : 'border-slate-300 bg-white'}`}>
+                      <input type="radio" name="paper-plan" checked={member.plan === p} onChange={() => set({ plan: p })} className="accent-teal-700" />
+                      {p}（{MEMBER_FEES[p]}）
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="block text-sm">
+                <span className="font-bold text-slate-700">紙の申込書の利用開始日（最初の決済日）</span>
+                <input
+                  type="date"
+                  value={member.paperStart ?? ''}
+                  max={today}
+                  onChange={(e) => set({ paperStart: e.target.value })}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"
+                />
+              </label>
+              {member.plan === PAIR_PLAN && <PartnerFields member={member} set={set} selfId={selfId} />}
+            </div>
+          )}
+        </div>
+      )}
+
       {kind === 'cancel' && (
         <div className="space-y-2 text-sm text-slate-700">
           <p>
             今日（{jaDate(today)}）の提出のため、契約終了日は <b>{jaDate(cancelEnd)}</b>
             （{Number(today.slice(8)) <= 15 ? '15日までの提出なので当月末' : '16日以降の提出なので翌月末'}）です。
           </p>
-          {status.minEnd && (
+          {before.minEnd && (
             <p>
-              最低利用期間の満了日：<b>{jaDate(status.minEnd)}</b>
+              最低利用期間の満了日：<b>{jaDate(before.minEnd)}</b>
               {early ? '（まだ途中です）' : '（満了しています）'}
             </p>
           )}

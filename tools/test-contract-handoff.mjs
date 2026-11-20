@@ -95,7 +95,7 @@ try {
     assert.ok(!ok.patientName.includes('\n'))
     assert.equal(ok.inputs[0].length, 400)
     assert.equal(ok.inputs[1], null)
-    assert.deepEqual(ok.member, { plan: '学生会員', start: '', partnerName: '', partnerRelation: '', partnerBirthDate: '', partnerPatientId: '', pauseFrom: '', pauseMonths: 1, special: false, specialReason: '' })
+    assert.deepEqual(ok.member, { plan: '学生会員', start: '', partnerName: '', partnerRelation: '', partnerBirthDate: '', partnerPatientId: '', pauseFrom: '', pauseMonths: 1, special: false, specialReason: '', paper: false, paperStart: '' })
     assert.ok(!('extra' in ok))
     for (const bad of [null, 'x', [], { ...draftOf(TPL), docId: '' }, { ...draftOf(TPL), bodyHash: 'ZZZ' }, { ...draftOf(TPL), checks: ['true'] }, { ...draftOf(TPL), inputs: [1] }, { ...draftOf(TPL), checks: Array(401).fill(true) }]) {
       assert.equal(H.sanitizeHandoffDraft(bad), null)

@@ -25,7 +25,7 @@ import {
 } from '@/data/outcome-metrics'
 import { addOutcome, deleteOutcome, setOutcomeSport } from '@/lib/contracts/store'
 import { jstToday } from '@/lib/contracts/member'
-import { buildOutcomeValues, judgeTarget, latestByMetric, trmOver, type RotationInput } from '@/lib/outcomes/calc'
+import { buildOutcomeValues, judgeTarget, latestByMetric, outcomeInputProblem, trmOver, type OutcomeInput, type RotationInput } from '@/lib/outcomes/calc'
 
 function fmt(v: number) {
   return Number.isInteger(v) ? String(v) : v.toFixed(Math.abs(v) < 10 && !Number.isInteger(v * 10) ? 2 : 1)
@@ -81,6 +81,8 @@ function Stepper({
     const r = Math.round(v / step) * step
     return Math.min(max, Math.max(min, Number(r.toFixed(2))))
   }
+  // 空のとき（消して入れ直しているところ）に ＋／− を押したら、0（下限が 0 より上ならその値）から
+  const base = Number.isFinite(value) ? value : Math.max(min, Math.min(max, 0))
   const box = size === 'lg' ? 'h-12 w-12' : 'h-11 w-11'
   return (
     <div>
@@ -89,7 +91,7 @@ function Stepper({
         <button
           type="button"
           aria-label={`${said}を減らす`}
-          onClick={() => onChange(clamp(value - step))}
+          onClick={() => onChange(clamp(base - step))}
           className={`flex ${box} items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
         >
           <Minus className="h-5 w-5" aria-hidden />
@@ -101,7 +103,8 @@ function Stepper({
           min={min}
           max={max}
           step={step}
-          onChange={(e) => onChange(Number(e.target.value))}
+          // 消したときは 0 にしない（空のまま。記録するときに「値を入れてください」と出す）
+          onChange={(e) => onChange(e.target.value.trim() === '' ? Number.NaN : Number(e.target.value))}
           className={`${size === 'lg' ? 'h-12 w-24 text-2xl' : 'h-11 w-20 text-xl'} rounded-xl border border-slate-300 text-center font-black tabular-nums`}
           aria-label={`${said}の値`}
         />
@@ -109,7 +112,7 @@ function Stepper({
         <button
           type="button"
           aria-label={`${said}を増やす`}
-          onClick={() => onChange(clamp(value + step))}
+          onClick={() => onChange(clamp(base + step))}
           className={`flex ${box} items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
         >
           <Plus className="h-5 w-5" aria-hidden />
@@ -183,6 +186,8 @@ export default function OutcomeQuickTab({
   const [note, setNote] = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  /** 記録したことのお知らせ（記録の一覧は下にあり、画面の外のことがあるため） */
+  const [saved, setSaved] = useState('')
 
   function rotFrom(r: OutcomeRecord | undefined): RotationInput {
     const d = r?.detail
@@ -199,6 +204,7 @@ export default function OutcomeQuickTab({
     setRot(rotFrom(last))
     setSide(last?.side ?? '')
     setError('')
+    setSaved('')
   }
 
   function chooseSport(key: SportKey) {
@@ -211,22 +217,21 @@ export default function OutcomeQuickTab({
     onUpdate()
   }
 
-  const preview = useMemo(
-    () =>
-      buildOutcomeValues(
-        metric,
-        metric.rotation ? { kind: 'rotation', r: rot } : metric.pair ? { kind: 'pair', a: pairA, b: pairB } : { kind: 'single', value },
-      ),
+  const input: OutcomeInput = useMemo(
+    () => (metric.rotation ? { kind: 'rotation', r: rot } : metric.pair ? { kind: 'pair', a: pairA, b: pairB } : { kind: 'single', value }),
     [metric, rot, pairA, pairB, value],
   )
+  const preview = useMemo(() => buildOutcomeValues(metric, input), [metric, input])
+  /** 記録できない理由（範囲の外・空の欄など）。記録できれば null */
+  const problem = useMemo(() => outcomeInputProblem(metric, input), [metric, input])
 
   function record() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       setError('測定日を入れてください。')
       return
     }
-    if (!preview) {
-      setError(metric.pair?.calc === 'lsi' ? '健側の値を 0 より大きくしてください。' : metric.pair?.calc === 'lsi_time' ? '患側の時間を 0 より大きくしてください。' : '値を確かめてください。')
+    if (problem || !preview) {
+      setError(problem ?? '値を確かめてください。')
       return
     }
     addOutcome({
@@ -241,6 +246,7 @@ export default function OutcomeQuickTab({
     })
     setNote('')
     setError('')
+    setSaved(`${metric.label}を記録しました（${date}）`)
     onUpdate()
   }
 
@@ -412,7 +418,7 @@ export default function OutcomeQuickTab({
             <div className="min-w-[9rem] rounded-xl bg-slate-50 px-3 py-2" aria-live="polite">
               <p className="text-xs font-bold text-slate-600">{metric.rotation ? '自動で計算' : metric.pair?.calc === 'absdiff' ? '左右の差' : 'LSI（自動で計算）'}</p>
               <p className="text-xl font-black tabular-nums text-slate-900">
-                {preview ? (metric.rotation ? `GIRD ${fmt(preview.value)}° / TRM差 ${fmt(preview.detail?.trm ?? 0)}°` : `${fmt(preview.value)}${metric.unit}`) : '—'}
+                {preview && !problem ? (metric.rotation ? `GIRD ${fmt(preview.value)}° / TRM差 ${fmt(preview.detail?.trm ?? 0)}°` : `${fmt(preview.value)}${metric.unit}`) : '—'}
               </p>
             </div>
           )}
@@ -449,6 +455,11 @@ export default function OutcomeQuickTab({
         {error && (
           <p role="alert" className="mt-2 text-sm font-bold text-red-700">
             {error}
+          </p>
+        )}
+        {!error && saved && (
+          <p role="status" className="mt-2 text-sm font-bold text-teal-800">
+            ✓ {saved}
           </p>
         )}
       </section>

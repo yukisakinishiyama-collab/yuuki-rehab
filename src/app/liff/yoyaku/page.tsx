@@ -16,14 +16,24 @@
 // 短命チケットを予約サイトへ引き渡す（本人確認済みの証明）。
 //
 // LIFF IDはURLクエリ `lid` で受け取る（エンドポイントURLに ?lid={LIFF_ID} を付けて登録）。
+//
+// 【2026-11-20】カルテ連携（https://liff.line.me/{LIFF_ID}/link …。カルテのQRコード・メニューの「カルテ連携」）も、
+//   LINE はまずこのページを開き（?liff.state=/link…）、liff.init() の中でカルテ連携のページへ進む。
+//   そのときは予約へは進まない（前は4秒たつと予約へ進み、LINE の進む先と取り合って、予約のページが開くことがあった）。
+//   LINE が進めなかったときは、自分でカルテ連携のページへ進む（lib/liff-route.ts）。
 // ──────────────────────────────────────────────
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { liffSubpageOf, liffSubpageUrl, liffSubpageWaitText, type LiffSubpage } from '@/lib/liff-route'
 
 const RESERVATION_URL =
   'https://script.google.com/macros/s/AKfycby6httkx008ojq7MIBpC7pDmfsJQAtQx6xpYNkD67JM7K7jgGaWGkTky9RHW04M1qm9/exec'
 
 /** ここまでにチケットが取れなければ諦めて予約サイトへ進む（体感を損ねない範囲） */
 const GIVE_UP_MS = 4000
+/** カルテ連携などへ行くとき：liff.init() のあと、LINE が進めるのを待つ時間（過ぎたら自分で進む） */
+const SUBPAGE_AFTER_INIT_MS = 1500
+/** カルテ連携などへ行くとき：何があってもここまでに進む */
+const SUBPAGE_GIVE_UP_MS = 6000
 
 interface LiffApi {
   init(config: { liffId: string }): Promise<void>
@@ -37,11 +47,65 @@ declare global {
   }
 }
 
+/** アドレスはこのページの間は変わらないので、見張らない */
+const noSubscribe = () => () => {}
+
+/** LIFF SDK を読み込む（読み込み済みならそのまま） */
+function loadLiffSdk(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (window.liff) return resolve()
+    const script = document.createElement('script')
+    script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('sdk load failed'))
+    document.head.appendChild(script)
+  })
+}
+
 export default function LiffYoyakuPage() {
   const doneRef = useRef(false)
   const [slow, setSlow] = useState(false)
+  // カルテ連携など、予約ではないページへ行くところ（liff.state に行き先がある）。サーバーで作るときは null
+  const subpage = useSyncExternalStore<LiffSubpage | null>(
+    noSubscribe,
+    () => liffSubpageOf(window.location.search)?.page ?? null,
+    () => null,
+  )
+
+  // カルテ連携など：予約へは進まず、LINE がそのページへ進めるのを待つ（進まなければ自分で進む）
+  useEffect(() => {
+    const sub = liffSubpageOf(window.location.search)
+    if (!sub) return
+    const lid = new URLSearchParams(window.location.search).get('lid') || ''
+    const go = () => {
+      if (doneRef.current) return
+      doneRef.current = true
+      window.location.replace(liffSubpageUrl(sub, lid))
+    }
+    const giveUpTimer = setTimeout(go, SUBPAGE_GIVE_UP_MS)
+    let afterInitTimer: ReturnType<typeof setTimeout> | undefined
+    const run = async () => {
+      try {
+        if (!/^\d{5,}-\w+$/.test(lid)) return go()
+        await loadLiffSdk()
+        if (doneRef.current || !window.liff) return
+        // liff.init() が、LIFF URL の行き先（/link?c=…）へ進める
+        await window.liff.init({ liffId: lid })
+        afterInitTimer = setTimeout(go, SUBPAGE_AFTER_INIT_MS)
+      } catch {
+        go()
+      }
+    }
+    void run()
+    return () => {
+      clearTimeout(giveUpTimer)
+      if (afterInitTimer) clearTimeout(afterInitTimer)
+    }
+  }, [])
 
   useEffect(() => {
+    // カルテ連携などへ行くところは、上の effect が受け持つ（予約へは進まない）
+    if (liffSubpageOf(window.location.search)) return
     // 予約サイトへ進む（1度だけ）。ticketが取れていれば付ける
     const go = (ticket?: string) => {
       if (doneRef.current) return
@@ -61,14 +125,7 @@ export default function LiffYoyakuPage() {
         const liffId = new URLSearchParams(window.location.search).get('lid') || ''
         if (!/^\d{5,}-\w+$/.test(liffId)) return go()
 
-        await new Promise<void>((resolve, reject) => {
-          if (window.liff) return resolve()
-          const script = document.createElement('script')
-          script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js'
-          script.onload = () => resolve()
-          script.onerror = () => reject(new Error('sdk load failed'))
-          document.head.appendChild(script)
-        })
+        await loadLiffSdk()
         if (doneRef.current || !window.liff) return
 
         await window.liff.init({ liffId })
@@ -125,13 +182,13 @@ export default function LiffYoyakuPage() {
         }}
       />
       <style>{'@keyframes liffspin { to { transform: rotate(360deg) } }'}</style>
-      <p style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>予約ページを開いています…</p>
+      <p style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>{subpage ? liffSubpageWaitText(subpage) : '予約ページを開いています…'}</p>
       <p style={{ fontSize: 12.5, color: '#68788e', margin: 0, lineHeight: 1.8 }}>
-        ゆうき整骨院 ネット予約（24時間受付）
+        {subpage ? 'ゆうき整骨院 公式LINE' : 'ゆうき整骨院 ネット予約（24時間受付）'}
       </p>
 
-      {/* 万一この画面で止まっても、患者さんが自力で予約へ進めるようにする */}
-      {slow && (
+      {/* 万一この画面で止まっても、患者さんが自力で予約へ進めるようにする（カルテ連携へ行くところでは出さない） */}
+      {slow && !subpage && (
         <a
           href={RESERVATION_URL}
           style={{

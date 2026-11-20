@@ -3,21 +3,21 @@
  *
  * KV の lqr:<番号> に1件ずつ。使えるのは10分・1回だけ（lib/line-link-qr.ts）。
  * - 作る・状態を見る・取り消す … 院内アプリ（/api/line-link/qr。Basic 認証の内側）
- * - お名前の一部を見る・結びつける … 患者さんの LINE（/api/liff/link。LINE でログインした証明＝チケットが要る）
+ * - お名前を見る・結びつける … 患者さんの LINE（/api/liff/link。LINE でログインした証明＝チケットが要る）
  * 結びついたら、カルテのお名前・電話番号・生年月日は消して、印（状態・日時・キー・患者番号）だけを残す。
  * お名前・電話番号は記録（ログ）に出さない。
  */
 import { randomBytes } from 'node:crypto'
 import { kvDelete, kvGet, kvList, kvSet } from '@/lib/marketing/kv-store-server'
 import { nameNoSpace, phoneDigits } from '@/lib/line-link'
-import { linkLineUser, type LinkLineUserResult } from '@/lib/line-link-server'
+import { getLineLink, linkLineUser, type LinkLineUserResult } from '@/lib/line-link-server'
+import { unsealUserId } from '@/lib/liff-ticket'
 import {
   LINK_QR_PREFIX,
   LINK_QR_TTL_MS,
   isLinkQrExpired,
   isLinkQrOpen,
   isValidLinkCode,
-  maskedName,
   type LinkQrSession,
 } from '@/lib/line-link-qr'
 
@@ -104,6 +104,30 @@ export async function linkQrStatus(
 
 export type LinkQrProblem = 'missing' | 'expired' | 'used' | 'cancelled'
 
+/** この LINE で、もう結びついている番号か（同じ LINE で開き直したとき） */
+export interface LinkQrAlready {
+  /** カルテのお名前（結びつけの記録から。読めなければ ''） */
+  name: string
+  patientNo?: string
+}
+
+/** 開いた LINE（ログインの証明から取り出した userId と院の鍵） */
+export interface LinkQrViewer {
+  userId: string
+  secret: string
+}
+
+/**
+ * 結びついた番号を、結びつけた LINE で開き直したか。結びつけの記録（linelink:<linkKey>）の封印した LINE と比べる。
+ * 前に結びついた番号（2026-11-19〜）も、この比べ方で「結びついています」になる
+ */
+async function alreadyOf(s: LinkQrSession | null, viewer: LinkQrViewer | undefined): Promise<LinkQrAlready | null> {
+  if (!s || s.status !== 'linked' || !s.linkKey || !viewer?.userId) return null
+  const link = await getLineLink(s.linkKey).catch(() => null)
+  if (!link?.sealed || unsealUserId(link.sealed, viewer.secret) !== viewer.userId) return null
+  return { name: link.name ?? '', patientNo: s.patientNo ?? link.patientNo }
+}
+
 function problemOf(s: LinkQrSession | null, now: Date): LinkQrProblem | null {
   if (!s) return 'missing'
   if (s.status === 'linked') return 'used'
@@ -112,15 +136,19 @@ function problemOf(s: LinkQrSession | null, now: Date): LinkQrProblem | null {
   return null
 }
 
-/** 患者さんの LINE から：結びつける前に、お名前の一部と、電話番号を入れてもらうかを返す */
+/** 患者さんの LINE から：結びつける前に、カルテのお名前と、電話番号を入れてもらうかを返す */
 export async function previewLinkQr(
   code: string,
   now: Date = new Date(),
-): Promise<{ ok: true; maskedName: string; needPhone: boolean } | { ok: false; reason: LinkQrProblem }> {
+  /** 開いた LINE。この LINE でもう結びついていれば already を返す */
+  viewer?: LinkQrViewer,
+): Promise<{ ok: true; name: string; needPhone: boolean } | { ok: false; reason: LinkQrProblem; already?: LinkQrAlready }> {
   const s = await getLinkQr(code)
   const problem = problemOf(s, now)
+  const already = await alreadyOf(s, viewer)
+  if (already) return { ok: false, reason: 'used', already }
   if (problem || !s) return { ok: false, reason: problem ?? 'missing' }
-  return { ok: true, maskedName: maskedName(s.name), needPhone: !s.phone }
+  return { ok: true, name: s.name, needPhone: !s.phone }
 }
 
 /**
@@ -131,9 +159,11 @@ export async function redeemLinkQr(
   input: { code: string; userId: string; phone?: string },
   secret: string,
   now: Date = new Date(),
-): Promise<{ ok: true; result: LinkLineUserResult } | { ok: false; reason: LinkQrProblem | 'phone' }> {
+): Promise<{ ok: true; result: LinkLineUserResult } | { ok: false; reason: LinkQrProblem | 'phone'; already?: LinkQrAlready }> {
   const s = await getLinkQr(input.code)
   const problem = problemOf(s, now)
+  const already = await alreadyOf(s, { userId: input.userId, secret })
+  if (already) return { ok: false, reason: 'used', already }
   if (problem || !s) return { ok: false, reason: problem ?? 'missing' }
   let phone = s.phone
   if (!phone) {
@@ -147,7 +177,12 @@ export async function redeemLinkQr(
   )
   await kvSet(
     keyOf(s.code),
-    stripped(s, { status: 'linked', linkedAt: new Date().toISOString(), linkKey: result.key, patientNo: result.patientNo ?? undefined }),
+    stripped(s, {
+      status: 'linked',
+      linkedAt: new Date().toISOString(),
+      linkKey: result.key,
+      patientNo: result.patientNo ?? undefined,
+    }),
   )
   return { ok: true, result }
 }

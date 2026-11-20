@@ -89,6 +89,10 @@ export function memberStatusOf(records: ContractRecord[], today: string): Member
       cur = { plan: ev.plan, start: ev.start, partner: ev.plan === PAIR_PLAN ? ev.partner : undefined, pauses: [] }
     } else if (ev.kind === 'pause' && cur && ev.pauseFrom && YM.test(ev.pauseFrom) && ev.pauseMonths) {
       cur.pauses.push({ from: ev.pauseFrom, months: ev.pauseMonths })
+    } else if (ev.kind === 'cancel' && ev.paper && YMD.test(ev.paper.start) && ev.end && YMD.test(ev.end)) {
+      // 紙の入会申込書で入会した方の解約届：紙の契約（プラン・利用開始日）から始まり、この届で終わる
+      const p = ev.paper
+      cur = { plan: p.plan, start: p.start, partner: p.plan === PAIR_PLAN ? p.partner : undefined, pauses: [], end: ev.end }
     } else if (ev.kind === 'cancel' && cur && ev.end && YMD.test(ev.end)) {
       cur.end = ev.end
     }
@@ -120,7 +124,9 @@ export function memberStatusForPatient(patientId: string, allRecords: ContractRe
   if (own.state !== 'none' && own.state !== 'ended') return own
   const reps = new Map<string, string>()
   for (const r of allRecords) {
-    if (!r.voided && r.member?.kind === 'join' && r.member.partner?.patientId === patientId && r.patientId !== patientId) reps.set(r.patientId, r.patientName)
+    if (r.voided || r.patientId === patientId || !r.member) continue
+    const partnerId = r.member.kind === 'join' ? r.member.partner?.patientId : r.member.kind === 'cancel' ? r.member.paper?.partner?.patientId : undefined
+    if (partnerId === patientId) reps.set(r.patientId, r.patientName)
   }
   const order: MemberStatus['state'][] = ['active', 'paused', 'ending', 'upcoming', 'ended']
   let best: MemberStatus | null = null
@@ -150,6 +156,52 @@ export interface MemberInput {
   pauseMonths?: number
   special?: boolean
   specialReason?: string
+  /** 解約届：紙の入会申込書で入会した方（アプリに入会の記録が無い）。プラン（plan）ともう1名（partner…）は入会と同じ欄を使う */
+  paper?: boolean
+  /** 紙の入会申込書の利用開始日（最初の決済日） */
+  paperStart?: string
+}
+
+/** 兄弟・親子プランのもう1名（入会・紙の契約の解約で同じ確かめ方） */
+function partnerOf(input: MemberInput): { ok: true; partner: MemberPartner } | { ok: false; error: string } {
+  const name = String(input.partnerName ?? '').trim().slice(0, 40)
+  if (!name) return { ok: false, error: '兄弟・親子プランの、もう1名の利用者のお名前を入れてください。' }
+  const relation = String(input.partnerRelation ?? '').trim().slice(0, 20)
+  if (!relation) return { ok: false, error: 'もう1名の方の続柄（契約者との関係）を入れてください。' }
+  const birthDate = input.partnerBirthDate && YMD.test(input.partnerBirthDate) ? input.partnerBirthDate : undefined
+  const patientId = input.partnerPatientId && /^[A-Za-z0-9_-]{1,64}$/.test(input.partnerPatientId) ? input.partnerPatientId : undefined
+  return { ok: true, partner: { name, relation, birthDate, patientId } }
+}
+
+/** アプリに会員の記録が無い（または終わっている）ので、紙の入会申込書の内容で解約届を書ける */
+export function canUsePaperCancel(status: MemberStatus): boolean {
+  return !status.via && (status.state === 'none' || status.state === 'ended')
+}
+
+/**
+ * 解約届で入れた紙の契約の内容から、「解約の前の状態」を作る（最低利用期間・ご契約内容の枠・記入欄の利用開始日に使う）。
+ * プランか利用開始日がまだなら null
+ */
+export function paperStatusOf(input: MemberInput, today: string): MemberStatus | null {
+  const plan = MEMBER_PLANS.find((p) => p === input.plan)
+  const start = input.paperStart && YMD.test(input.paperStart) && input.paperStart <= today ? input.paperStart : ''
+  if (!plan || !start) return null
+  const partner = plan === PAIR_PLAN ? partnerOf(input) : null
+  return {
+    state: 'active',
+    label: LABELS.active,
+    plan,
+    start,
+    minEnd: minEndOf(start),
+    pausedMonths: 0,
+    partner: partner && partner.ok ? partner.partner : undefined,
+  }
+}
+
+/** 署名する書類の「手続きの前の状態」。紙の契約の解約届なら、紙の内容から */
+export function statusBeforeOf(kind: MemberEvent['kind'] | undefined, input: MemberInput, status: MemberStatus, today: string): MemberStatus {
+  if (kind === 'cancel' && input.paper && canUsePaperCancel(status)) return paperStatusOf(input, today) ?? status
+  return status
 }
 
 /**
@@ -181,13 +233,9 @@ export function buildMemberEvent(
     if (!plan) return { ok: false, error: '会員の種別（一般会員・学生会員・兄弟・親子プラン）を選んでください。' }
     if (!input.start || !YMD.test(input.start)) return { ok: false, error: '利用開始日（最初の決済日）を入れてください。' }
     if (plan !== PAIR_PLAN) return { ok: true, event: { kind, plan, start: input.start } }
-    const name = String(input.partnerName ?? '').trim().slice(0, 40)
-    if (!name) return { ok: false, error: '兄弟・親子プランの、もう1名の利用者のお名前を入れてください。' }
-    const relation = String(input.partnerRelation ?? '').trim().slice(0, 20)
-    if (!relation) return { ok: false, error: 'もう1名の方の続柄（契約者との関係）を入れてください。' }
-    const birthDate = input.partnerBirthDate && YMD.test(input.partnerBirthDate) ? input.partnerBirthDate : undefined
-    const patientId = input.partnerPatientId && /^[A-Za-z0-9_-]{1,64}$/.test(input.partnerPatientId) ? input.partnerPatientId : undefined
-    return { ok: true, event: { kind, plan, start: input.start, partner: { name, relation, birthDate, patientId } } }
+    const partner = partnerOf(input)
+    if (!partner.ok) return partner
+    return { ok: true, event: { kind, plan, start: input.start, partner: partner.partner } }
   }
   if (kind === 'pause') {
     if (st.state !== 'active') {
@@ -200,14 +248,36 @@ export function buildMemberEvent(
     return { ok: true, event: { kind, pauseFrom: input.pauseFrom, pauseMonths: months } }
   }
   // 解約
-  if (st.state === 'none' || st.state === 'ended') return { ok: false, error: '会員プランのご契約がありません。' }
-  if (st.state === 'ending') return { ok: false, error: `すでに解約届を受け付けています（契約終了日 ${jaDate(st.end ?? '')}）。` }
+  let paper: MemberEvent['paper']
+  let before = st
+  if (st.state === 'none' || st.state === 'ended') {
+    // アプリに入会の記録が無い：紙の入会申込書で入会した方なら、紙の契約の内容を入れて解約届を書ける（2026-11-20）
+    if (!input.paper) {
+      return {
+        ok: false,
+        error: '会員プランの入会の記録がアプリにありません。紙の入会申込書でご契約の方は、下の「紙の入会申込書で入会した方」にチェックして、プランと利用開始日を入れてください。',
+      }
+    }
+    const plan = MEMBER_PLANS.find((p) => p === input.plan)
+    if (!plan) return { ok: false, error: '紙の申込書の会員の種別（一般会員・学生会員・兄弟・親子プラン）を選んでください。' }
+    if (!input.paperStart || !YMD.test(input.paperStart)) return { ok: false, error: '紙の申込書の利用開始日（最初の決済日）を入れてください。' }
+    if (input.paperStart > today) return { ok: false, error: '紙の申込書の利用開始日が今日より後になっています。日付を確かめてください。' }
+    let partner: MemberPartner | undefined
+    if (plan === PAIR_PLAN) {
+      const p = partnerOf(input)
+      if (!p.ok) return p
+      partner = p.partner
+    }
+    paper = { plan, start: input.paperStart, partner }
+    before = paperStatusOf(input, today) ?? st
+  }
+  if (before.state === 'ending') return { ok: false, error: `すでに解約届を受け付けています（契約終了日 ${jaDate(before.end ?? '')}）。` }
   const end = cancelEndOf(today)
-  const early = st.minEnd ? end < st.minEnd : false
+  const early = before.minEnd ? end < before.minEnd : false
   if (early && !input.special) {
     return {
       ok: false,
-      error: `最低利用期間（${jaDate(st.minEnd ?? '')}まで）の途中です。入院・転居・災害・医師による運動制限などの特別な事情がある場合だけ、「特別な事情あり」にして理由を入れてください。`,
+      error: `最低利用期間（${jaDate(before.minEnd ?? '')}まで）の途中です。入院・転居・災害・医師による運動制限などの特別な事情がある場合だけ、「特別な事情あり」にして理由を入れてください。`,
     }
   }
   if (early && !String(input.specialReason ?? '').trim()) return { ok: false, error: '特別な事情の内容を入れてください。' }
@@ -219,6 +289,7 @@ export function buildMemberEvent(
       end,
       special: early ? true : undefined,
       specialReason: early ? String(input.specialReason ?? '').trim().slice(0, 100) : undefined,
+      ...(paper ? { paper } : {}),
     },
   }
 }
@@ -248,6 +319,11 @@ export function memberEventRows(ev: MemberEvent, before: MemberStatus): Array<[s
     if (before.start) rows.push(['最低利用期間の満了日（休会分を延長）', jaDate(minEndOf(before.start, before.pausedMonths + ev.pauseMonths))])
   } else if (ev.kind === 'cancel' && ev.submitted && ev.end) {
     const day = Number(ev.submitted.slice(8, 10))
+    if (ev.paper) {
+      // 紙の入会申込書で入会した方：紙の契約の内容も、この届に残す
+      rows.push(['会員の種別', `${ev.paper.plan}（${MEMBER_FEES[ev.paper.plan]}）`])
+      rows.push(['ご入会', `紙の入会申込書（利用開始日 ${jaDate(ev.paper.start)}）`])
+    }
     if (before.partner) rows.push(['対象', `兄弟・親子プラン（契約者と ${before.partner.name}さんの2名分）`])
     rows.push(['解約届の提出日', jaDate(ev.submitted)])
     rows.push(['契約終了日', `${jaDate(ev.end)}（${day <= 15 ? '15日までの提出のため当月末' : '16日以降の提出のため翌月末'}）`])

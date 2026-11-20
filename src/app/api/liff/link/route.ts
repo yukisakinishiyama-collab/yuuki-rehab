@@ -3,8 +3,9 @@
  *
  * 流れ: LIFF で IDトークン → /api/liff/verify で短命チケット → ここへ
  *   A. {ticket, name, phone, birthDate} … 患者さんが自分で入れる（今までどおり）
- *   B. {ticket, code, peek: true}       … カルテの画面に出したQRコードの番号で、お名前の一部を見る（2026-11-19）
+ *   B. {ticket, code, peek: true}       … カルテの画面に出したQRコードの番号で、カルテのお名前を見る（2026-11-19）
  *      {ticket, code, phone?}           … その番号で結びつける（お名前・電話・生年月日はカルテのもの。電話が無い方だけ入れてもらう）
+ *   C. {ticket, mine: true}             … この LINE がいま結びついているカルテ（お名前と患者番号。2026-11-20）
  * - チケットから userId を取り出し（本人がLINEでログインした証明）、封印してKVに保存する。
  *   生の userId はこのサーバーの外に出さない（lib/liff-ticket.ts の方針）。
  * - A では、クラウドに控えたカルテに同じ人がいて生年月日が違えば、結びつけない（なりすまし・入力違いの防止）
@@ -16,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readTicket } from '@/lib/liff-ticket'
 import { nameNoSpace, patientLinkKey, phoneDigits } from '@/lib/line-link'
-import { findKartePatient, linkLineUser } from '@/lib/line-link-server'
+import { findKartePatient, linkLineUser, linksForLineUser } from '@/lib/line-link-server'
 import { linkQrProblemText } from '@/lib/line-link-qr'
 import { previewLinkQr, redeemLinkQr } from '@/lib/line-link-qr-server'
 
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   const secret = process.env.RESERVATION_NOTIFY_SECRET
   if (!secret) return NextResponse.json({ ok: false, error: 'not configured' }, { status: 503 })
 
-  let body: { ticket?: string; name?: string; phone?: string; birthDate?: string; code?: string; peek?: boolean }
+  let body: { ticket?: string; name?: string; phone?: string; birthDate?: string; code?: string; peek?: boolean; mine?: boolean }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -59,18 +60,27 @@ export async function POST(request: NextRequest) {
   const userId = readTicket(String(body.ticket ?? ''), secret)
   if (!userId) return NextResponse.json({ ok: false, error: 'LINEの確認が切れました。もう一度開いてください' }, { status: 401 })
 
+  // この LINE が、いま結びついているカルテ（お名前と患者番号だけ。2026-11-20：結びついた方が開き直したときに「結びついています」を出す）
+  if (body.mine) {
+    const linked = await linksForLineUser(userId, secret).catch(() => [])
+    return NextResponse.json({ ok: true, linked })
+  }
+
   // B. カルテの画面に出したQRコードの番号で（お名前などを入れなくてよい）
   if (body.code !== undefined) {
     const code = String(body.code ?? '')
     if (body.peek) {
-      const preview = await previewLinkQr(code)
+      const preview = await previewLinkQr(code, new Date(), { userId, secret })
+      // この LINE でもう結びついている（LINE が画面を読み直した・2回読み取った）：「結びついています」を出す
+      if (!preview.ok && preview.already) return NextResponse.json({ ok: false, reason: 'used', already: preview.already }, { status: 410 })
       if (!preview.ok) return NextResponse.json({ ok: false, reason: preview.reason, error: linkQrProblemText(preview.reason) }, { status: 410 })
-      return NextResponse.json({ ok: true, maskedName: preview.maskedName, needPhone: preview.needPhone })
+      return NextResponse.json({ ok: true, name: preview.name, needPhone: preview.needPhone })
     }
     try {
       const used = await redeemLinkQr({ code, userId, phone: body.phone }, secret)
       if (!used.ok) {
         if (used.reason === 'phone') return NextResponse.json({ ok: false, reason: 'phone', error: '電話番号は10〜11桁の数字で入れてください' }, { status: 400 })
+        if (used.already) return NextResponse.json({ ok: false, reason: 'used', already: used.already }, { status: 410 })
         return NextResponse.json({ ok: false, reason: used.reason, error: linkQrProblemText(used.reason) }, { status: 410 })
       }
       const r = used.result

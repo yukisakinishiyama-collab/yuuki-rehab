@@ -66,12 +66,11 @@ try {
     assert.equal(Q.linkQrUrl(LIFF, 'short'), '')
     assert.equal(Q.linkQrUrl(LIFF, 'a b'.repeat(10)), '')
   })
-  await test('LINE の画面に出すお名前は一部だけ（例 山田◯◯）', () => {
-    assert.equal(Q.maskedName('山田 太郎'), '山田◯◯')
-    assert.equal(Q.maskedName('佐藤'), '佐藤')
-    assert.equal(Q.maskedName('林'), '林◯')
-    assert.equal(Q.maskedName('ﾔﾏﾀﾞ ﾀﾛｳﾀﾛｳ'), 'ヤマ◯◯◯◯')
-    assert.equal(Q.maskedName(''), '')
+  await test('LINE の画面に出すお名前は、カルテのお名前そのまま（2026-11-20 院長「名前の◯◯に患者様の名前が入っていませんでした」）', () => {
+    assert.equal(Q.maskedName, undefined, '一部を伏せる関数は使わない')
+    const page = read('src/app/liff/yoyaku/link/page.tsx')
+    assert.ok(page.includes('{preview.name} 様'))
+    assert.ok(!page.includes('maskedName'))
   })
   await test('10分・残り時間の表示', () => {
     assert.equal(Q.LINK_QR_TTL_MS, 10 * 60 * 1000)
@@ -127,13 +126,13 @@ try {
 
   console.log('\n【患者さんの LINE で読み取る】')
   const ticket = issueTicket(HANAKO, SECRET)
-  await test('チケット（LINE でログインした証明）が無いと、お名前の一部も見せない', async () => {
+  await test('チケット（LINE でログインした証明）が無いと、お名前も見せない', async () => {
     const res = await post({ ticket: 'x', code: second.code, peek: true })
     assert.equal(res.status, 401)
   })
-  await test('読み取る：お名前の一部（架空◯◯）だけを出す', async () => {
+  await test('読み取る：カルテのお名前（架空 花子）を出す', async () => {
     const d = await (await post({ ticket, code: second.code, peek: true })).json()
-    assert.deepEqual(d, { ok: true, maskedName: '架空◯◯', needPhone: false })
+    assert.deepEqual(d, { ok: true, name: '架空 花子', needPhone: false })
   })
   await test('「結びつける」：お名前・電話・生年月日はカルテのもの。今までと同じ入れ物に、封印した LINE の ID で', async () => {
     pushes.length = 0
@@ -168,6 +167,35 @@ try {
     const d = await res.json()
     assert.equal(d.reason, 'used')
     assert.equal(unsealUserId((await getLineLink('09011112222|架空花子')).sealed, SECRET), HANAKO)
+  })
+  await test('同じ LINE で開き直す・もう一度押す（LINE が画面を読み直した）：「結びついています」（お名前と患者番号。2026-11-20）', async () => {
+    const peek = await post({ ticket, code: second.code, peek: true })
+    assert.equal(peek.status, 410)
+    const d = await peek.json()
+    assert.deepEqual(d, { ok: false, reason: 'used', already: { name: '架空 花子', patientNo: '2948' } })
+    pushes.length = 0
+    const again = await (await post({ ticket, code: second.code })).json()
+    assert.deepEqual(again.already, { name: '架空 花子', patientNo: '2948' })
+    assert.equal(pushes.length, 0, 'もう一度お知らせは送らない')
+    // 番号には LINE の ID もお名前も残さない（結びつけの記録の封印と比べて見分ける。前に結びついた番号も同じ形）
+    const s = await kvGet(`lqr:${second.code}`)
+    assert.ok(!JSON.stringify(s).includes(HANAKO))
+    assert.equal(s.name, '')
+    assert.deepEqual(Object.keys(s).sort(), ['birthDate', 'code', 'createdAt', 'expiresAt', 'linkKey', 'linkedAt', 'name', 'patientId', 'patientNo', 'phone', 'status'])
+    // 別の LINE では「結びついています」を出さない（今までどおり「使えません」）
+    const other = await (await post({ ticket: issueTicket(OTHER, SECRET), code: second.code, peek: true })).json()
+    assert.equal(other.already, undefined)
+    assert.equal(other.reason, 'used')
+  })
+  await test('この LINE がいま結びついているカルテ（お名前そのままと患者番号）。ほかの LINE の分は出さない（2026-11-20）', async () => {
+    const mine = await (await post({ ticket, mine: true })).json()
+    assert.equal(mine.ok, true)
+    assert.ok(mine.linked.some((l) => l.name === '架空 花子' && l.patientNo === '2948'))
+    assert.ok(mine.linked.every((l) => Object.keys(l).every((k) => k === 'name' || k === 'patientNo')), 'お名前と患者番号だけ')
+    const other = await (await post({ ticket: issueTicket('Ucccccccccccccccccccccccccccccccc', SECRET), mine: true })).json()
+    assert.deepEqual(other, { ok: true, linked: [] })
+    const noTicket = await post({ mine: true })
+    assert.equal(noTicket.status, 401)
   })
   await test('一覧（カルテの画面）にはカルテの ID が出る・封印は出さない', async () => {
     const list = await listLineLinks()
@@ -224,8 +252,14 @@ try {
   await test('LINE の中の画面：QR から開いたら確かめて押すだけ。使えない QR は、今までの入力に切りかえる', () => {
     const page = read('src/app/liff/yoyaku/link/page.tsx')
     assert.ok(page.includes("get('c')") && page.includes('peek: true') && page.includes('submitQr'))
-    assert.ok(page.includes('setDoneName(preview.maskedName)'), '終わった画面にも、お名前の一部だけを出す')
+    assert.ok(page.includes('setDoneName(preview.name)'), '終わった画面にも、カルテのお名前を出す')
     assert.ok(page.includes('if (res.status === 410) {'))
+    // 2026-11-20：開き直したら「結びついています」・LINE の中で確認に失敗したら「読み込み直す」・QR から開いたときの文
+    assert.ok(page.includes('if (info?.already) return showAlready(info.already)'))
+    assert.ok(page.includes("'結びついています'") && page.includes('読み込み直す'))
+    assert.ok(page.includes("fromQr ? 'QRコードを確かめています…'"))
+    assert.ok(page.includes('inLine ? failInLine(liff)'))
+    assert.ok(page.includes('このLINEは、次のカルテと結びついています') && page.includes('mine: true'))
   })
 
   console.log(`\n${passed} 件すべて通過`)

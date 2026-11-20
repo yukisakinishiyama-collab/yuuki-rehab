@@ -100,6 +100,9 @@ export function sanitizeHandoffDraft(input: unknown): HandoffDraft | null {
     pauseMonths: months,
     special: m.special === true,
     specialReason: str(m.specialReason, 100),
+    // 解約届：紙の入会申込書で入会した方（2026-11-20）
+    paper: m.paper === true,
+    paperStart: YMD_RE.test(String(m.paperStart ?? '')) ? String(m.paperStart) : '',
   }
   return {
     docId: d.docId,

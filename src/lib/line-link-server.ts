@@ -4,7 +4,7 @@
 import { createHmac } from 'crypto'
 import { kvDelete, kvGet, kvList, kvSet } from '@/lib/marketing/kv-store-server'
 import { DEFAULT_CLINIC_PROFILE, RESERVE_URL } from '@/lib/marketing/clinic'
-import { sealUserId } from '@/lib/liff-ticket'
+import { sealUserId, unsealUserId } from '@/lib/liff-ticket'
 import { isPatientNo, patientLinkKey, type LineLink, type LineLinkSummary } from '@/lib/line-link'
 
 const PREFIX = 'linelink:'
@@ -45,6 +45,20 @@ export async function listLineLinks(): Promise<LineLinkSummary[]> {
       notifyError,
     }))
     .sort((a, b) => (a.linkedAt < b.linkedAt ? 1 : -1))
+}
+
+/**
+ * この LINE（ログインの証明から取り出した userId）が、いま結びついているカルテ（お名前と患者番号だけ）。
+ * 患者さんの LINE の「カルテ連携」の画面で「結びついています」を出すため（2026-11-20）。ほかの方の情報は返さない
+ */
+export async function linksForLineUser(userId: string, secret: string): Promise<Array<{ name: string; patientNo?: string }>> {
+  if (!userId) return []
+  const rows = await kvList<LineLink>(PREFIX)
+  return rows
+    .map(({ value }) => value)
+    .filter((v): v is LineLink => Boolean(v && v.key && v.sealed) && unsealUserId(v.sealed, secret) === userId)
+    .sort((a, b) => (a.linkedAt < b.linkedAt ? -1 : 1))
+    .map((v) => ({ name: v.name, patientNo: isPatientNo(v.patientNo) ? v.patientNo.trim() : undefined }))
 }
 
 /**
