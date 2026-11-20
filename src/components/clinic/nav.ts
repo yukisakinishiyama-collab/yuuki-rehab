@@ -13,6 +13,7 @@
  */
 import {
   CalendarCheck,
+  CalendarX,
   CalendarClock,
   ChartColumn,
   ChartLine,
@@ -78,6 +79,7 @@ export const NAV: NavSection[] = [
       { href: '/marketing/sales', label: '売上・来院', icon: ChartColumn },
       { href: '/marketing/sales/monthly', label: '月次レポート', icon: CalendarCheck },
       { href: '/marketing/sales/patients', label: '患者さんの動き', icon: Users },
+      { href: '/marketing/sales/cancellations', label: 'キャンセル分析', icon: CalendarX },
       { href: '/marketing/sales/goal', label: '月の目標への道すじ', icon: Mountain },
       { href: '/marketing/sales/profit', label: '経費・利益', icon: Wallet },
       { href: '/marketing/sales/pdca', label: 'PDCA（施策）', icon: RefreshCcw },
