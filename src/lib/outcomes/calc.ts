@@ -74,6 +74,52 @@ export function buildOutcomeValues(
   return { value: round1(clamped) }
 }
 
+const fmtNum = (v: number) => String(Number(v.toFixed(2)))
+
+/**
+ * 記録する前に、入れた値を確かめる。記録できないときは、画面に出す理由（どの欄を・どの範囲で）を返す。記録できれば null。
+ * 2026-11-20 院長「アウトカムの評価で記録がつかないものがあります」：範囲の外の値は、前は理由が分からないまま
+ * 記録されなかった（左右の指標は「健側を 0 より大きく」と出ていた）・1つの値の指標は黙って上限に丸めていた
+ */
+export function outcomeInputProblem(metric: OutcomeMetric, input: OutcomeInput): string | null {
+  if (metric.rotation) {
+    if (input.kind !== 'rotation') return '値を確かめてください。'
+    const names: Array<[keyof RotationInput, string]> = [
+      ['irThrow', '投げる側 内旋'],
+      ['erThrow', '投げる側 外旋'],
+      ['irNon', '投げない側 内旋'],
+      ['erNon', '投げない側 外旋'],
+    ]
+    for (const [k, label] of names) {
+      const v = input.r[k]
+      if (!Number.isFinite(v)) return `${label}の値を入れてください。`
+      if (v < 0 || v > 180) return `${label}は 0〜180° の範囲で入れてください。`
+    }
+    return null
+  }
+  if (metric.pair) {
+    if (input.kind !== 'pair') return '値を確かめてください。'
+    const p = metric.pair
+    const sides: Array<[number, string]> = [
+      [input.a, p.labels[0]],
+      [input.b, p.labels[1]],
+    ]
+    for (const [v, label] of sides) {
+      if (!Number.isFinite(v)) return `${label}の値を入れてください。`
+      if (v < p.min || v > p.max) return `${label}は ${fmtNum(p.min)}〜${fmtNum(p.max)}${p.unit} の範囲で入れてください。`
+    }
+    if (p.calc === 'lsi' && input.b <= 0) return `${p.labels[1]}の値を 0 より大きくしてください（LSI は ${p.labels[0]}÷${p.labels[1]} で出すため）。`
+    if (p.calc === 'lsi_time' && input.a <= 0) return `${p.labels[0]}の時間を 0 より大きくしてください（LSI は ${p.labels[1]}÷${p.labels[0]} で出すため）。`
+    return null
+  }
+  if (input.kind !== 'single') return '値を確かめてください。'
+  if (!Number.isFinite(input.value)) return '値を入れてください。'
+  if (input.value < metric.min || input.value > metric.max) {
+    return `値は ${fmtNum(metric.min)}〜${fmtNum(metric.max)}${metric.unit} の範囲で入れてください。`
+  }
+  return null
+}
+
 export type TargetJudge =
   | { state: 'none' }
   | { state: 'reached' | 'notyet'; gap: number }

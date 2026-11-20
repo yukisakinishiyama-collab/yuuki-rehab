@@ -53,6 +53,9 @@ export interface OutcomeMetric {
   hint?: string
 }
 
+// 2026-11-20：左右の値の上限を広げた（前は筋力 150kg・ホップ 300cm などを超えると、理由が出ないまま記録できなかった）
+const HHD_HINT = 'HHD など・左右とも同じ姿勢と道具で'
+
 const GRINDEM = 'Grindem 2016（ACL再建後の復帰の研究）で使われた LSI 90%'
 const LSI90: OutcomeTarget = { value: 90, type: 'reach', label: '目安 90%', source: GRINDEM }
 
@@ -66,8 +69,8 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
   { key: 'run_nrs', label: '走るときの痛み NRS', group: '痛み', unit: '', min: 0, max: 10, step: 1, better: 'low', start: 3 },
 
   // ── 可動域 ──
-  { key: 'rom_knee_flex', label: '膝 屈曲', group: '可動域', unit: '°', min: 0, max: 160, step: 5, better: 'high', start: 120 },
-  { key: 'rom_knee_ext', label: '膝 伸展', group: '可動域', unit: '°', min: -30, max: 15, step: 1, better: 'high', start: 0 },
+  { key: 'rom_knee_flex', label: '膝 屈曲', group: '可動域', unit: '°', min: 0, max: 170, step: 5, better: 'high', start: 120 },
+  { key: 'rom_knee_ext', label: '膝 伸展', group: '可動域', unit: '°', min: -40, max: 20, step: 1, better: 'high', start: 0 },
   {
     key: 'gird',
     label: '肩の内旋・外旋（GIRD）',
@@ -118,7 +121,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     better: 'high',
     start: 80,
     target: LSI90,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 150, start: [20, 25], hint: 'HHD など・左右とも同じ姿勢と道具で' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 999, start: [20, 25], hint: HHD_HINT },
   },
   {
     key: 'lsi_ham',
@@ -131,7 +134,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     better: 'high',
     start: 80,
     target: LSI90,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 150, start: [12, 15], hint: 'HHD など・左右とも同じ姿勢と道具で' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 999, start: [12, 15], hint: HHD_HINT },
   },
   {
     key: 'lsi_hip_add',
@@ -143,7 +146,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     step: 1,
     better: 'high',
     start: 85,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 100, start: [15, 18], hint: 'HHD・仰向けで' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 999, start: [15, 18], hint: 'HHD・仰向けで' },
   },
   {
     key: 'lsi_hip_abd',
@@ -155,7 +158,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     step: 1,
     better: 'high',
     start: 85,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 100, start: [15, 18], hint: 'HHD・仰向けで' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'kg', step: 0.5, min: 0, max: 999, start: [15, 18], hint: 'HHD・仰向けで' },
   },
   {
     key: 'add_squeeze',
@@ -179,7 +182,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     step: 1,
     better: 'high',
     start: 80,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: '回', step: 1, min: 0, max: 100, start: [15, 25], hint: '片脚で、かかとを上げられなくなるまでの回数' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: '回', step: 1, min: 0, max: 300, start: [15, 25], hint: '片脚で、かかとを上げられなくなるまでの回数' },
   },
 
   // ── ホップ（左右を入れると LSI を出す） ──
@@ -194,7 +197,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     better: 'high',
     start: 80,
     target: LSI90,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'cm', step: 1, min: 0, max: 300, start: [120, 140], hint: '片脚で1回とんだ距離' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'cm', step: 1, min: 0, max: 500, start: [120, 140], hint: '片脚で1回とんだ距離' },
   },
   {
     key: 'lsi_hop_triple',
@@ -207,7 +210,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     better: 'high',
     start: 80,
     target: LSI90,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'cm', step: 1, min: 0, max: 900, start: [380, 430], hint: '片脚で3回続けてとんだ距離' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'cm', step: 1, min: 0, max: 1500, start: [380, 430], hint: '片脚で3回続けてとんだ距離' },
   },
   {
     key: 'lsi_hop_cross',
@@ -220,7 +223,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     better: 'high',
     start: 80,
     target: LSI90,
-    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'cm', step: 1, min: 0, max: 900, start: [350, 400], hint: '線をまたいでジグザグに3回とんだ距離' },
+    pair: { calc: 'lsi', labels: ['患側', '健側'], unit: 'cm', step: 1, min: 0, max: 1500, start: [350, 400], hint: '線をまたいでジグザグに3回とんだ距離' },
   },
   {
     key: 'lsi_hop_timed',
@@ -233,7 +236,7 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     better: 'high',
     start: 80,
     target: LSI90,
-    pair: { calc: 'lsi_time', labels: ['患側', '健側'], unit: '秒', step: 0.01, min: 0, max: 20, start: [2.6, 2.3], hint: '6mを片脚でとぶ時間（短いほど良いので、健側÷患側で出す）' },
+    pair: { calc: 'lsi_time', labels: ['患側', '健側'], unit: '秒', step: 0.01, min: 0, max: 30, start: [2.6, 2.3], hint: '6mを片脚でとぶ時間（短いほど良いので、健側÷患側で出す）' },
   },
 
   // ── バランス・競技動作 ──

@@ -18,7 +18,7 @@ import { readTicket } from '@/lib/liff-ticket'
 import { nameNoSpace, patientLinkKey, phoneDigits } from '@/lib/line-link'
 import { findKartePatient, linkLineUser } from '@/lib/line-link-server'
 import { linkQrProblemText } from '@/lib/line-link-qr'
-import { previewLinkQr, redeemLinkQr } from '@/lib/line-link-qr-server'
+import { linkedByOf, previewLinkQr, redeemLinkQr } from '@/lib/line-link-qr-server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -63,7 +63,9 @@ export async function POST(request: NextRequest) {
   if (body.code !== undefined) {
     const code = String(body.code ?? '')
     if (body.peek) {
-      const preview = await previewLinkQr(code)
+      const preview = await previewLinkQr(code, new Date(), linkedByOf(userId, secret))
+      // この LINE でもう結びついている（LINE が画面を読み直した・2回読み取った）：「結びついています」を出す
+      if (!preview.ok && preview.already) return NextResponse.json({ ok: false, reason: 'used', already: preview.already }, { status: 410 })
       if (!preview.ok) return NextResponse.json({ ok: false, reason: preview.reason, error: linkQrProblemText(preview.reason) }, { status: 410 })
       return NextResponse.json({ ok: true, maskedName: preview.maskedName, needPhone: preview.needPhone })
     }
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
       const used = await redeemLinkQr({ code, userId, phone: body.phone }, secret)
       if (!used.ok) {
         if (used.reason === 'phone') return NextResponse.json({ ok: false, reason: 'phone', error: '電話番号は10〜11桁の数字で入れてください' }, { status: 400 })
+        if (used.already) return NextResponse.json({ ok: false, reason: 'used', already: used.already }, { status: 410 })
         return NextResponse.json({ ok: false, reason: used.reason, error: linkQrProblemText(used.reason) }, { status: 410 })
       }
       const r = used.result

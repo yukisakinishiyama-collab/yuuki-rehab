@@ -13,6 +13,8 @@ import type { ScoreId, OutcomeScoreRecord } from '@/types/outcome-scores'
 import type { Patient, BodyRegion } from '@/types/patient'
 import { BODY_REGION_LABELS } from '@/types/patient'
 import { ClearTextButton, CLEARABLE_PADDING } from '@/components/rehab-management/shared'
+import { jstToday } from '@/lib/contracts/member'
+import { unansweredItems } from '@/lib/outcome-score-answers'
 
 // 表示名とアイコン（部位別タブ）
 const REGION_TABS: { id: BodyRegion; label: string; icon: string }[] = [
@@ -40,7 +42,8 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
   const [activeRegion, setActiveRegion] = useState<BodyRegion>('knee')
   const [selectedScoreId, setSelectedScoreId] = useState<ScoreId>('lysholm')
   const [answers, setAnswers] = useState<Record<string, number>>({})
-  const [scoreDate, setScoreDate] = useState(new Date().toISOString().split('T')[0])
+  // 日本時間の今日（前は世界時の日付で、朝9時前は前日になっていた）
+  const [scoreDate, setScoreDate] = useState(jstToday())
   const [notes, setNotes] = useState('')
   const [history, setHistory] = useState<OutcomeScoreRecord[]>([])
   const [saving, setSaving] = useState(false)
@@ -55,24 +58,30 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
     // 患者の主訴部位に合わせてデフォルトタブを設定
     const r = p.bodyRegion as BodyRegion
     const tabExists = REGION_TABS.find(t => t.id === r)
-    if (tabExists) setActiveRegion(r)
+    if (tabExists) {
+      setActiveRegion(r)
+      const scores = REGION_SCORES[r] ?? []
+      if (scores.length > 0) setSelectedScoreId(scores[0])
+    }
   }, [patientId, router])
 
   useEffect(() => {
     setHistory(getScores(patientId))
   }, [patientId])
 
-  // 部位変更時にスコアをリセット
-  useEffect(() => {
-    const scores = REGION_SCORES[activeRegion] ?? []
+  // 部位を変えたら、その部位の最初のスコアにして回答を空にする（押したときにする。前は effect でしていた）
+  function selectRegion(r: BodyRegion) {
+    setActiveRegion(r)
+    const scores = REGION_SCORES[r] ?? []
     if (scores.length > 0) setSelectedScoreId(scores[0])
     setAnswers({})
-  }, [activeRegion])
+  }
 
-  // スコア変更時に回答をリセット
-  useEffect(() => {
+  // スコアを変えたら回答を空にする
+  function selectScore(sid: ScoreId) {
+    setSelectedScoreId(sid)
     setAnswers({})
-  }, [selectedScoreId])
+  }
 
   const scoreDef = SCORE_DEFS[selectedScoreId]
   const result = (() => {
@@ -82,6 +91,13 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
   })()
 
   const historyForScore = history.filter(h => h.scoreId === selectedScoreId)
+  /** まだ答えていない項目（番号は画面の番号。答えの値 0 として計算される） */
+  const unanswered = unansweredItems(scoreDef.items, answers)
+
+  /** スライダー：動かさずに今の位置のまま押しても、その値で答えたことにする（前は動かさないと記録されなかった） */
+  function answerSlider(id: string, value: number) {
+    setAnswers(a => ({ ...a, [id]: value }))
+  }
 
   function handleSave() {
     if (!result) return
@@ -92,6 +108,8 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
       scoreDate,
       answers,
       totalScore: result.total,
+      // 部分の点（ASES の痛み・機能 など）も残す（前は保存していなかった）
+      subscores: result.subscores,
       interpretation: result.interp,
       interpretationColor: result.color,
       notes,
@@ -135,7 +153,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveRegion(tab.id)}
+              onClick={() => selectRegion(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all max-lg:min-h-10 ${
                 activeRegion === tab.id
                   ? 'bg-teal-700 text-white shadow-sm'
@@ -163,7 +181,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
             return (
               <button
                 key={sid}
-                onClick={() => setSelectedScoreId(sid)}
+                onClick={() => selectScore(sid)}
                 className={`flex flex-col items-start px-4 py-2.5 rounded-xl border text-left transition-all ${
                   selectedScoreId === sid
                     ? 'bg-teal-700 text-white border-teal-700 shadow-sm'
@@ -267,12 +285,28 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                               <input type="range"
                                 min={item.min ?? 0} max={item.max ?? 10} step={1}
                                 value={answers[item.id] ?? item.min ?? 0}
-                                onChange={e => setAnswers(a => ({ ...a, [item.id]: Number(e.target.value) }))}
-                                className="flex-1 accent-teal-600" />
-                              <span className="w-10 text-center font-bold text-teal-700 bg-teal-50 rounded-lg px-2 py-1 text-sm">
-                                {answers[item.id] ?? item.min ?? 0}
-                              </span>
+                                aria-label={`${idx + 1}. ${item.question}`}
+                                onChange={e => answerSlider(item.id, Number(e.target.value))}
+                                onPointerUp={e => answerSlider(item.id, Number(e.currentTarget.value))}
+                                onKeyUp={e => answerSlider(item.id, Number(e.currentTarget.value))}
+                                className={`flex-1 ${answers[item.id] === undefined ? 'accent-gray-400 opacity-70' : 'accent-teal-600'}`} />
+                              {answers[item.id] === undefined ? (
+                                <button
+                                  type="button"
+                                  onClick={() => answerSlider(item.id, item.min ?? 0)}
+                                  className="shrink-0 rounded-lg border border-gray-300 px-2 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 max-lg:min-h-10"
+                                >
+                                  {item.min ?? 0} で答える
+                                </button>
+                              ) : (
+                                <span className="w-10 text-center font-bold text-teal-700 bg-teal-50 rounded-lg px-2 py-1 text-sm">
+                                  {answers[item.id]}
+                                </span>
+                              )}
                             </div>
+                            {answers[item.id] === undefined && (
+                              <p className="text-xs text-amber-700">まだ答えていません（つまみを動かすか、さわると記録します）</p>
+                            )}
                             <div className="flex justify-between text-xs text-gray-500">
                               <span>{item.min ?? 0}</span>
                               <span>{item.max ?? 10}{item.unit ? ` ${item.unit}` : ''}</span>
@@ -284,7 +318,16 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                             <input type="number"
                               min={item.min} max={item.max}
                               value={answers[item.id] ?? ''}
-                              onChange={e => setAnswers(a => ({ ...a, [item.id]: Number(e.target.value) }))}
+                              onChange={e => {
+                                const raw = e.target.value.trim()
+                                // 消したときは「答えていない」に戻す（前は 0 として記録されていた）
+                                setAnswers(a => {
+                                  const next = { ...a }
+                                  if (raw === '' || !Number.isFinite(Number(raw))) delete next[item.id]
+                                  else next[item.id] = Number(raw)
+                                  return next
+                                })
+                              }}
                               className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
                             {item.unit && <span className="text-sm text-gray-500">{item.unit}</span>}
                           </div>
@@ -356,6 +399,11 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
                     {scoreDef.items.filter(i => answers[i.id] !== undefined).length} / {scoreDef.items.length} 項目回答済み
                   </span>
                 </div>
+                {result && unanswered.length > 0 && (
+                  <p className="rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                    まだ答えていない項目：{unanswered.map(u => u.no).join('・')}（答えの値 0 として計算するため、点数が実際とちがうことがあります）
+                  </p>
+                )}
                 <button
                   onClick={handleSave}
                   disabled={!result || saving}

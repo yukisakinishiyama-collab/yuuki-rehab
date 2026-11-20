@@ -269,6 +269,15 @@ export function planOfCheck(info: CheckInfo | undefined): string | null {
   return null
 }
 
+/** 解約届の「会員種別」の □ が、どの種別か（2026-11-20。紙の申込書の方は、チェックしたら下の種別もそれにする） */
+export function cancelPlanOfCheck(info: CheckInfo | undefined): string | null {
+  if (!info || info.row !== '会員種別') return null
+  if (info.after.startsWith('一般会員')) return '一般会員'
+  if (info.after.startsWith('学生会員')) return '学生会員'
+  if (info.after.startsWith('兄弟・親子プラン')) return PAIR_PLAN
+  return null
+}
+
 /** 休会届の「□ 1か月」などが何か月か */
 export function pauseMonthsOfCheck(info: CheckInfo | undefined): number | null {
   if (!info || info.row !== '休会の月数') return null

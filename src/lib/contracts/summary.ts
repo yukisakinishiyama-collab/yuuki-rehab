@@ -222,7 +222,10 @@ export function memberLineOf(record: ContractRecord): string {
     const [y, m] = ev.pauseFrom.split('-').map(Number)
     return `休会：${y}年${m}月から${ev.pauseMonths}か月`
   }
-  if (ev.kind === 'cancel' && ev.end) return `解約：契約終了日 ${jaDate(ev.end)}${ev.special ? '（最低利用期間の途中・特別な事情）' : ''}`
+  if (ev.kind === 'cancel' && ev.end) {
+    const paper = ev.paper ? `（紙の入会申込書：${ev.paper.plan}・利用開始 ${jaDate(ev.paper.start)}）` : ''
+    return `解約${paper}：契約終了日 ${jaDate(ev.end)}${ev.special ? '（最低利用期間の途中・特別な事情）' : ''}`
+  }
   return ''
 }
 

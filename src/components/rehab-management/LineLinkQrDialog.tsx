@@ -153,7 +153,7 @@ export default function LineLinkQrDialog({
               読み取りを待っています（{remainingText(expiresAt, new Date(now))}）
             </p>
             <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
-              <li>患者さんのスマホで、LINE のQRコードリーダー（ホームの右上）か、カメラでこのQRコードを読み取ってもらいます。</li>
+              <li>患者さんのスマホの LINE で、QRコードリーダー（LINE の「ホーム」の上、検索欄の右のマーク）からこのQRコードを読み取ってもらいます。スマホのカメラで読むと、機種によっては LINE の外のブラウザで開き、先へ進めません。</li>
               <li>LINE の中に「{maskedName(patient.name)} 様のカルテと、このLINEを結びつけます」が出たら、「結びつける」を押してもらいます。</li>
               <li>結びつくと、この画面が自動で「結びつきました」に変わり、患者さんの LINE に患者番号つきのお知らせが届きます。</li>
             </ol>

@@ -7,7 +7,7 @@
  * 結びついたら、カルテのお名前・電話番号・生年月日は消して、印（状態・日時・キー・患者番号）だけを残す。
  * お名前・電話番号は記録（ログ）に出さない。
  */
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { kvDelete, kvGet, kvList, kvSet } from '@/lib/marketing/kv-store-server'
 import { nameNoSpace, phoneDigits } from '@/lib/line-link'
 import { linkLineUser, type LinkLineUserResult } from '@/lib/line-link-server'
@@ -104,6 +104,22 @@ export async function linkQrStatus(
 
 export type LinkQrProblem = 'missing' | 'expired' | 'used' | 'cancelled'
 
+/** 結びつけた LINE の印（院の鍵で封じる。同じ LINE かどうかを見分けるだけで、userId には戻せない） */
+export function linkedByOf(userId: string, secret: string): string {
+  return createHmac('sha256', secret).update(`lqr-user:${userId}`).digest('base64url').slice(0, 22)
+}
+
+/** この LINE で、もう結びついている番号か（同じ LINE で開き直したとき） */
+export interface LinkQrAlready {
+  maskedName: string
+  patientNo?: string
+}
+
+function alreadyOf(s: LinkQrSession | null, linkedBy: string | undefined): LinkQrAlready | null {
+  if (!s || s.status !== 'linked' || !linkedBy || !s.linkedBy || s.linkedBy !== linkedBy) return null
+  return { maskedName: s.maskedName ?? '', patientNo: s.patientNo }
+}
+
 function problemOf(s: LinkQrSession | null, now: Date): LinkQrProblem | null {
   if (!s) return 'missing'
   if (s.status === 'linked') return 'used'
@@ -116,9 +132,13 @@ function problemOf(s: LinkQrSession | null, now: Date): LinkQrProblem | null {
 export async function previewLinkQr(
   code: string,
   now: Date = new Date(),
-): Promise<{ ok: true; maskedName: string; needPhone: boolean } | { ok: false; reason: LinkQrProblem }> {
+  /** 開いた LINE の印（linkedByOf）。この LINE でもう結びついていれば already を返す */
+  linkedBy?: string,
+): Promise<{ ok: true; maskedName: string; needPhone: boolean } | { ok: false; reason: LinkQrProblem; already?: LinkQrAlready }> {
   const s = await getLinkQr(code)
   const problem = problemOf(s, now)
+  const already = alreadyOf(s, linkedBy)
+  if (already) return { ok: false, reason: 'used', already }
   if (problem || !s) return { ok: false, reason: problem ?? 'missing' }
   return { ok: true, maskedName: maskedName(s.name), needPhone: !s.phone }
 }
@@ -131,9 +151,12 @@ export async function redeemLinkQr(
   input: { code: string; userId: string; phone?: string },
   secret: string,
   now: Date = new Date(),
-): Promise<{ ok: true; result: LinkLineUserResult } | { ok: false; reason: LinkQrProblem | 'phone' }> {
+): Promise<{ ok: true; result: LinkLineUserResult } | { ok: false; reason: LinkQrProblem | 'phone'; already?: LinkQrAlready }> {
   const s = await getLinkQr(input.code)
   const problem = problemOf(s, now)
+  const linkedBy = linkedByOf(input.userId, secret)
+  const already = alreadyOf(s, linkedBy)
+  if (already) return { ok: false, reason: 'used', already }
   if (problem || !s) return { ok: false, reason: problem ?? 'missing' }
   let phone = s.phone
   if (!phone) {
@@ -147,7 +170,14 @@ export async function redeemLinkQr(
   )
   await kvSet(
     keyOf(s.code),
-    stripped(s, { status: 'linked', linkedAt: new Date().toISOString(), linkKey: result.key, patientNo: result.patientNo ?? undefined }),
+    stripped(s, {
+      status: 'linked',
+      linkedAt: new Date().toISOString(),
+      linkKey: result.key,
+      patientNo: result.patientNo ?? undefined,
+      linkedBy,
+      maskedName: maskedName(s.name),
+    }),
   )
   return { ok: true, result }
 }

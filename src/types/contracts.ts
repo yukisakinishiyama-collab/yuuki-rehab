@@ -31,6 +31,11 @@ export interface MemberEvent {
   /** 最低利用期間の途中で、特別な事情により解約する */
   special?: boolean
   specialReason?: string
+  /**
+   * 解約：アプリで入会の手続きをしていない（紙の入会申込書で入会した）方の、紙の契約の内容（2026-11-20 院長の依頼）。
+   * この解約届1枚で「その日から会員だった」ことと解約を記録する（紙の契約の休会は数えない）
+   */
+  paper?: { plan: MemberPlan; start: string; partner?: MemberPartner }
 }
 
 /** 署名済みの書類1件（一覧の情報。署名入りの本文はクラウドの kcdoc:<id> に保存） */

@@ -39,6 +39,12 @@ export interface LinkQrSession {
   linkedAt?: string
   linkKey?: string
   patientNo?: string
+  /**
+   * 結びつけた LINE の印（userId を院の鍵で封じたもの。userId そのものは残さない）と、お名前の一部（例 山田◯◯）。
+   * 同じ LINE でもう一度開いたとき（LINE が画面を読み直した・2回読み取った）に「結びついています」を出すため（2026-11-20）
+   */
+  linkedBy?: string
+  maskedName?: string
 }
 
 export const isValidLinkCode = (code: unknown): code is string => typeof code === 'string' && CODE_RE.test(code)

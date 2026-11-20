@@ -169,6 +169,25 @@ try {
     assert.equal(d.reason, 'used')
     assert.equal(unsealUserId((await getLineLink('09011112222|架空花子')).sealed, SECRET), HANAKO)
   })
+  await test('同じ LINE で開き直す・もう一度押す（LINE が画面を読み直した）：「結びついています」（お名前の一部と患者番号だけ。2026-11-20）', async () => {
+    const peek = await post({ ticket, code: second.code, peek: true })
+    assert.equal(peek.status, 410)
+    const d = await peek.json()
+    assert.deepEqual(d, { ok: false, reason: 'used', already: { maskedName: '架空◯◯', patientNo: '2948' } })
+    pushes.length = 0
+    const again = await (await post({ ticket, code: second.code })).json()
+    assert.deepEqual(again.already, { maskedName: '架空◯◯', patientNo: '2948' })
+    assert.equal(pushes.length, 0, 'もう一度お知らせは送らない')
+    // 番号に残すのは封じた印だけ（LINE の ID そのものは残さない）
+    const s = await kvGet(`lqr:${second.code}`)
+    assert.equal(s.linkedBy, S.linkedByOf(HANAKO, SECRET))
+    assert.ok(!JSON.stringify(s).includes(HANAKO))
+    assert.notEqual(S.linkedByOf(OTHER, SECRET), s.linkedBy)
+    // 別の LINE では「結びついています」を出さない（今までどおり「使えません」）
+    const other = await (await post({ ticket: issueTicket(OTHER, SECRET), code: second.code, peek: true })).json()
+    assert.equal(other.already, undefined)
+    assert.equal(other.reason, 'used')
+  })
   await test('一覧（カルテの画面）にはカルテの ID が出る・封印は出さない', async () => {
     const list = await listLineLinks()
     const row = list.find((l) => l.key === '09011112222|架空花子')
@@ -226,6 +245,11 @@ try {
     assert.ok(page.includes("get('c')") && page.includes('peek: true') && page.includes('submitQr'))
     assert.ok(page.includes('setDoneName(preview.maskedName)'), '終わった画面にも、お名前の一部だけを出す')
     assert.ok(page.includes('if (res.status === 410) {'))
+    // 2026-11-20：開き直したら「結びついています」・LINE の中で確認に失敗したら「読み込み直す」・QR から開いたときの文
+    assert.ok(page.includes('if (info?.already) return showAlready(info.already)'))
+    assert.ok(page.includes("'結びついています'") && page.includes('読み込み直す'))
+    assert.ok(page.includes("fromQr ? 'QRコードを確かめています…'"))
+    assert.ok(page.includes('inLine ? failInLine(liff)'))
   })
 
   console.log(`\n${passed} 件すべて通過`)
