@@ -4,7 +4,8 @@
 // 2026-11-19 院長の依頼「患者様のカルテ画面で個別のQRコードを出して、それを読みとることで既存のLINE連携ができるように」。
 // 1. カルテの「公式LINE」の欄 →「QRコードでLINEと結びつける」→ その方だけの番号を10分だけクラウドに置き、QR を出す
 //    （QR の中は https://liff.line.me/{LIFF_ID}/link?c=番号 だけ。お名前・電話番号は入れない）
-// 2. 患者さんのスマホの LINE で読み取る → 今までの「カルテ連携」のページが開き、お名前の一部（例：山田◯◯ 様）を出す
+// 2. 患者さんのスマホの LINE で読み取る → 今までの「カルテ連携」のページが開き、カルテのお名前（例：山田 太郎 様）を出す
+//    （2026-11-20 院長「名前の◯◯に患者様の名前が入っていませんでした」→ 一部を伏せるのをやめた）
 // 3.「結びつける」を押す → 今までと同じ結びつけ（KV の linelink:・患者番号・LINEへのお知らせ）。お名前・電話番号・生年月日を入れなくてよい
 //    （カルテに電話番号が無い方だけ、電話番号を入れてもらう）
 // 4. 番号は1回だけ使える。カルテの画面は数秒ごとに見て「結びつきました」を出す
@@ -40,11 +41,11 @@ export interface LinkQrSession {
   linkKey?: string
   patientNo?: string
   /**
-   * 結びつけた LINE の印（userId を院の鍵で封じたもの。userId そのものは残さない）と、お名前の一部（例 山田◯◯）。
-   * 同じ LINE でもう一度開いたとき（LINE が画面を読み直した・2回読み取った）に「結びついています」を出すため（2026-11-20）
+   * 結びつけた LINE の印（userId を院の鍵で封じたもの。userId そのものは残さない）。
+   * 同じ LINE でもう一度開いたとき（LINE が画面を読み直した・2回読み取った）に「結びついています」を出すため（2026-11-20）。
+   * そのときのお名前は、結びつけの記録（linelink:<linkKey>）から読む（この番号にはお名前を残さない）
    */
   linkedBy?: string
-  maskedName?: string
 }
 
 export const isValidLinkCode = (code: unknown): code is string => typeof code === 'string' && CODE_RE.test(code)
@@ -61,22 +62,6 @@ export const isLinkQrOpen = (s: Pick<LinkQrSession, 'status' | 'expiresAt'>, now
 export function linkQrUrl(liffId: string, code: string): string {
   if (!isValidLiffId(liffId) || !isValidLinkCode(code)) return ''
   return `https://liff.line.me/${liffId}/link?c=${code}`
-}
-
-/**
- * LINE の画面に出すお名前（ご本人が「自分のことだ」と分かり、のぞき見た人には分かりにくいように）。
- * 空白を取った最初の2文字を出し、あとは ◯（最大4つ）。1文字の方は1文字＋◯。
- * 例：山田 太郎 → 山田◯◯ ／ 佐藤 → 佐藤 ／ 林 → 林◯
- */
-export function maskedName(name: string): string {
-  const compact = String(name ?? '')
-    .normalize('NFKC')
-    .replace(/[\s　]/g, '')
-  const chars = Array.from(compact)
-  if (chars.length === 0) return ''
-  if (chars.length === 1) return `${chars[0]}◯`
-  const rest = Math.min(4, chars.length - 2)
-  return chars.slice(0, 2).join('') + '◯'.repeat(rest)
 }
 
 /** 残り時間の表示（例「あと 9分12秒」・過ぎたら「期限切れ」） */

@@ -3,7 +3,7 @@
  *
  * 流れ: LIFF で IDトークン → /api/liff/verify で短命チケット → ここへ
  *   A. {ticket, name, phone, birthDate} … 患者さんが自分で入れる（今までどおり）
- *   B. {ticket, code, peek: true}       … カルテの画面に出したQRコードの番号で、お名前の一部を見る（2026-11-19）
+ *   B. {ticket, code, peek: true}       … カルテの画面に出したQRコードの番号で、カルテのお名前を見る（2026-11-19）
  *      {ticket, code, phone?}           … その番号で結びつける（お名前・電話・生年月日はカルテのもの。電話が無い方だけ入れてもらう）
  * - チケットから userId を取り出し（本人がLINEでログインした証明）、封印してKVに保存する。
  *   生の userId はこのサーバーの外に出さない（lib/liff-ticket.ts の方針）。
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       // この LINE でもう結びついている（LINE が画面を読み直した・2回読み取った）：「結びついています」を出す
       if (!preview.ok && preview.already) return NextResponse.json({ ok: false, reason: 'used', already: preview.already }, { status: 410 })
       if (!preview.ok) return NextResponse.json({ ok: false, reason: preview.reason, error: linkQrProblemText(preview.reason) }, { status: 410 })
-      return NextResponse.json({ ok: true, maskedName: preview.maskedName, needPhone: preview.needPhone })
+      return NextResponse.json({ ok: true, name: preview.name, needPhone: preview.needPhone })
     }
     try {
       const used = await redeemLinkQr({ code, userId, phone: body.phone }, secret)

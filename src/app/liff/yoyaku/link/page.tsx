@@ -11,7 +11,7 @@
 // LINE の外（ふつうのブラウザ）で開いたときは、LINE から開くよう案内するだけ。
 //
 // カルテの画面のQRコードから開いたとき（?c=番号。2026-11-19）は、入力の代わりに
-// 「山田◯◯ 様のカルテと、このLINEを結びつけます」を出して、押すだけで結びつける（lib/line-link-qr.ts）。
+// 「山田 太郎 様のカルテと、このLINEを結びつけます」を出して、押すだけで結びつける（lib/line-link-qr.ts）。
 // QRコードが使えないとき（10分過ぎた・もう使われた）は、そのことを出して、今までの入力に切りかえる。
 //
 // 2026-11-20 院長「カルテでLINE連携した時に患者様側の表示がおかしくなったりします」で直したこと：
@@ -75,9 +75,9 @@ export default function LiffLinkPage() {
   const [done, setDone] = useState<{ patientNo: string | null; patientNoMessage: string; notified: boolean }>({ patientNo: null, patientNoMessage: '', notified: false })
   const [message, setMessage] = useState('')
   const [doneName, setDoneName] = useState('')
-  // カルテの画面のQRコードの番号と、そのお名前の一部（例 山田◯◯）。電話番号を入れてもらうか
+  // カルテの画面のQRコードの番号と、そのカルテのお名前（例 山田 太郎）。電話番号を入れてもらうか
   const [code, setCode] = useState('')
-  const [preview, setPreview] = useState<{ maskedName: string; needPhone: boolean } | null>(null)
+  const [preview, setPreview] = useState<{ name: string; needPhone: boolean } | null>(null)
   // QRコードが使えなかったときのお知らせ（入力の欄の上に出す）
   const [qrNotice, setQrNotice] = useState('')
   // この LINE で、もう結びついていた（開き直した）
@@ -129,7 +129,7 @@ export default function LiffLinkPage() {
           // 覚えられないだけ
         }
         setTicket(data.ticket)
-        // カルテの画面のQRコードから開いたとき：お名前の一部を見て、押すだけで結びつける
+        // カルテの画面のQRコードから開いたとき：カルテのお名前を見て、押すだけで結びつける
         const qr = new URLSearchParams(window.location.search).get('c') || ''
         if (qr) {
           const peek = await fetch('/api/liff/link', {
@@ -139,14 +139,14 @@ export default function LiffLinkPage() {
           })
           const info = (await peek.json().catch(() => null)) as {
             ok?: boolean
-            maskedName?: string
+            name?: string
             needPhone?: boolean
             error?: string
-            already?: { maskedName?: string; patientNo?: string }
+            already?: { name?: string; patientNo?: string }
           } | null
-          if (info?.ok && info.maskedName) {
+          if (info?.ok && info.name) {
             setCode(qr)
-            setPreview({ maskedName: info.maskedName, needPhone: Boolean(info.needPhone) })
+            setPreview({ name: info.name, needPhone: Boolean(info.needPhone) })
             return setPhase('confirm')
           }
           // この LINE でもう結びついている（結びつけたあとに開き直した）
@@ -162,9 +162,9 @@ export default function LiffLinkPage() {
   }, [])
 
   /** この LINE で、もう結びついている：入力の欄ではなく「結びついています」を出す */
-  function showAlready(a: { maskedName?: string; patientNo?: string }) {
+  function showAlready(a: { name?: string; patientNo?: string }) {
     setAlready(true)
-    setDoneName(a.maskedName || '')
+    setDoneName(a.name || '')
     setDone({ patientNo: a.patientNo ?? null, patientNoMessage: '', notified: true })
     setPhase('done')
   }
@@ -218,10 +218,10 @@ export default function LiffLinkPage() {
         patientNo?: string | null
         patientNoMessage?: string
         notified?: boolean
-        already?: { maskedName?: string; patientNo?: string }
+        already?: { name?: string; patientNo?: string }
       } | null
       // 2回押した・通信のやり直しで、もう結びついていた
-      if (data?.already) return showAlready({ maskedName: data.already.maskedName || preview.maskedName, patientNo: data.already.patientNo })
+      if (data?.already) return showAlready({ name: data.already.name || preview.name, patientNo: data.already.patientNo })
       if (!res.ok || !data?.ok) {
         setMessage(data?.error || 'うまくいきませんでした。もう一度お試しください')
         if (res.status === 401) return setPhase('error')
@@ -234,8 +234,7 @@ export default function LiffLinkPage() {
         }
         return setPhase('confirm')
       }
-      // 画面には、お名前の一部だけを出す（QRコードはのぞき見られることがあるため）
-      setDoneName(preview.maskedName)
+      setDoneName(preview.name)
       setDone({ patientNo: data.patientNo ?? null, patientNoMessage: data.patientNoMessage ?? '', notified: Boolean(data.notified) })
       setPhase('done')
     } catch {
@@ -354,7 +353,7 @@ export default function LiffLinkPage() {
             <div style={{ background: '#fff', border: '1px solid #cdeedb', borderRadius: 14, padding: 18, lineHeight: 1.8, fontSize: 15 }}>
               <p style={{ margin: '0 0 6px', fontSize: 12, color: '#06a04a', fontWeight: 700 }}>受付のQRコードから開きました</p>
               <p style={{ margin: 0 }}>
-                <b style={{ fontSize: 20 }}>{preview.maskedName} 様</b>
+                <b style={{ fontSize: 20 }}>{preview.name} 様</b>
                 <br />
                 のカルテと、このLINEを結びつけます。
               </p>

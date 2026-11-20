@@ -3,21 +3,20 @@
  *
  * KV の lqr:<番号> に1件ずつ。使えるのは10分・1回だけ（lib/line-link-qr.ts）。
  * - 作る・状態を見る・取り消す … 院内アプリ（/api/line-link/qr。Basic 認証の内側）
- * - お名前の一部を見る・結びつける … 患者さんの LINE（/api/liff/link。LINE でログインした証明＝チケットが要る）
+ * - お名前を見る・結びつける … 患者さんの LINE（/api/liff/link。LINE でログインした証明＝チケットが要る）
  * 結びついたら、カルテのお名前・電話番号・生年月日は消して、印（状態・日時・キー・患者番号）だけを残す。
  * お名前・電話番号は記録（ログ）に出さない。
  */
 import { createHmac, randomBytes } from 'node:crypto'
 import { kvDelete, kvGet, kvList, kvSet } from '@/lib/marketing/kv-store-server'
 import { nameNoSpace, phoneDigits } from '@/lib/line-link'
-import { linkLineUser, type LinkLineUserResult } from '@/lib/line-link-server'
+import { getLineLink, linkLineUser, type LinkLineUserResult } from '@/lib/line-link-server'
 import {
   LINK_QR_PREFIX,
   LINK_QR_TTL_MS,
   isLinkQrExpired,
   isLinkQrOpen,
   isValidLinkCode,
-  maskedName,
   type LinkQrSession,
 } from '@/lib/line-link-qr'
 
@@ -111,13 +110,15 @@ export function linkedByOf(userId: string, secret: string): string {
 
 /** この LINE で、もう結びついている番号か（同じ LINE で開き直したとき） */
 export interface LinkQrAlready {
-  maskedName: string
+  /** カルテのお名前（結びつけの記録から。読めなければ ''） */
+  name: string
   patientNo?: string
 }
 
-function alreadyOf(s: LinkQrSession | null, linkedBy: string | undefined): LinkQrAlready | null {
+async function alreadyOf(s: LinkQrSession | null, linkedBy: string | undefined): Promise<LinkQrAlready | null> {
   if (!s || s.status !== 'linked' || !linkedBy || !s.linkedBy || s.linkedBy !== linkedBy) return null
-  return { maskedName: s.maskedName ?? '', patientNo: s.patientNo }
+  const link = s.linkKey ? await getLineLink(s.linkKey).catch(() => null) : null
+  return { name: link?.name ?? '', patientNo: s.patientNo }
 }
 
 function problemOf(s: LinkQrSession | null, now: Date): LinkQrProblem | null {
@@ -128,19 +129,19 @@ function problemOf(s: LinkQrSession | null, now: Date): LinkQrProblem | null {
   return null
 }
 
-/** 患者さんの LINE から：結びつける前に、お名前の一部と、電話番号を入れてもらうかを返す */
+/** 患者さんの LINE から：結びつける前に、カルテのお名前と、電話番号を入れてもらうかを返す */
 export async function previewLinkQr(
   code: string,
   now: Date = new Date(),
   /** 開いた LINE の印（linkedByOf）。この LINE でもう結びついていれば already を返す */
   linkedBy?: string,
-): Promise<{ ok: true; maskedName: string; needPhone: boolean } | { ok: false; reason: LinkQrProblem; already?: LinkQrAlready }> {
+): Promise<{ ok: true; name: string; needPhone: boolean } | { ok: false; reason: LinkQrProblem; already?: LinkQrAlready }> {
   const s = await getLinkQr(code)
   const problem = problemOf(s, now)
-  const already = alreadyOf(s, linkedBy)
+  const already = await alreadyOf(s, linkedBy)
   if (already) return { ok: false, reason: 'used', already }
   if (problem || !s) return { ok: false, reason: problem ?? 'missing' }
-  return { ok: true, maskedName: maskedName(s.name), needPhone: !s.phone }
+  return { ok: true, name: s.name, needPhone: !s.phone }
 }
 
 /**
@@ -155,7 +156,7 @@ export async function redeemLinkQr(
   const s = await getLinkQr(input.code)
   const problem = problemOf(s, now)
   const linkedBy = linkedByOf(input.userId, secret)
-  const already = alreadyOf(s, linkedBy)
+  const already = await alreadyOf(s, linkedBy)
   if (already) return { ok: false, reason: 'used', already }
   if (problem || !s) return { ok: false, reason: problem ?? 'missing' }
   let phone = s.phone
@@ -176,7 +177,6 @@ export async function redeemLinkQr(
       linkKey: result.key,
       patientNo: result.patientNo ?? undefined,
       linkedBy,
-      maskedName: maskedName(s.name),
     }),
   )
   return { ok: true, result }
