@@ -12,9 +12,16 @@
  * 2. 予約のキャンセル（kind:'cancel'）→ 控えを消す（前日のお知らせを送らない）
  * 3. 前日のお知らせ（投稿ジョブの定期実行から。日本時間 REMIND_FROM_HOUR〜REMIND_TO_HOUR 時）
  *    → 明日の控えの方へ送る（前日のお知らせの設定・本人の受け取りに従う）。予約システムと同じ印を使うので1通だけ
+ *    → 予約システム v3.27〜が毎朝その日の分を送ったら（7.）、控えからは送らない（予約システムが動かなかった日の予備）
  * 4. 「今日」の画面の「LINEで予約日時を送る」を開いたとき、その一覧（予約システムから読んだもの）で控えを最新にする
  * 5. 患者さんが予約ページで日時を変更した（kind:'change'。予約システム v3.20〜。2026-11-16 院長の依頼）
  *    → 控えの日時を直し（前日のお知らせは新しい日にちで送る）、ご本人の LINE へ「日時を変更しました」を1通
+ *
+ * 6. 院で登録した予約（予約システム v3.27〜。kind:'confirm-linked'。2026-11-21 院長の依頼「予約確定・前日の2回、患者様のLINEに」）
+ *    → 予約システムが LINE を知らない方（カルテの QR などで連携した方）へ、その場で「確定しました」を1通
+ * 7. 前日のお知らせ（予約システム v3.27〜の毎朝8時の処理。kind:'remind-linked'）
+ *    → 明日の確定の予約（予約システムの表がそのときの正しい予約）のうち、LINE 連携の方へ送る。
+ *      予約システムが送った日は、3. の控えからは送らない（院の画面でのキャンセル・日時の変更は、控えに届かないため）
  *
  * 確定・前日・変更のお知らせには、日時の変更・キャンセルを入力なしで開けるリンクを入れる（lib/reservation-change-link.ts）。
  *
@@ -27,7 +34,7 @@ import { patientLinkKey, nameNoSpace, phoneDigits, type LineLink } from '@/lib/l
 import { unsealUserId } from '@/lib/liff-ticket'
 import { lineMark } from './consent-store-server'
 import { getRule, markSent } from './automation-store-server'
-import { dedupeMark, pushToPatient } from './patient-line-push-server'
+import { dedupeMark, pushToPatient, type PushResult } from './patient-line-push-server'
 import { jstTomorrow, patientChangeText, patientConfirmText, patientRemindText } from '@/lib/reservation-message'
 import { reservationChangeUrl } from '@/lib/reservation-change-link'
 
@@ -73,8 +80,27 @@ function jstParts(now = new Date()): { date: string; hour: number } {
   return { date: t.toISOString().slice(0, 10), hour: t.getUTCHours() }
 }
 
+/** LINE 連携を探すときに一度だけ読むもの（前日のお知らせのように、何人分も続けて探すときに使い回す） */
+export interface LinkFinderCache {
+  patients?: Array<{ name?: string; phone?: string; birthDate?: string }>
+  links?: Awaited<ReturnType<typeof listLineLinks>>
+}
+
+async function cloudPatients(cache: LinkFinderCache): Promise<NonNullable<LinkFinderCache['patients']>> {
+  if (!cache.patients) {
+    try {
+      const record = await kvGet<{ payload?: Record<string, string> }>('sync:clinic')
+      const raw = record?.payload?.pt_patients
+      cache.patients = raw ? (JSON.parse(raw) as NonNullable<LinkFinderCache['patients']>) : []
+    } catch {
+      cache.patients = []
+    }
+  }
+  return cache.patients
+}
+
 /** 予約の方の LINE 連携を探す（電話＋お名前 → 無ければ、クラウドのカルテの「お名前＋生年月日」） */
-export async function findLinkForPerson(name: string, phone: string): Promise<LineLink | null> {
+export async function findLinkForPerson(name: string, phone: string, cache: LinkFinderCache = {}): Promise<LineLink | null> {
   const key = patientLinkKey(name, phone)
   if (key) {
     const direct = await getLineLink(key)
@@ -84,17 +110,15 @@ export async function findLinkForPerson(name: string, phone: string): Promise<Li
   const digits = phoneDigits(phone)
   if (!compact) return null
   try {
-    const record = await kvGet<{ payload?: Record<string, string> }>('sync:clinic')
-    const raw = record?.payload?.pt_patients
-    if (!raw) return null
-    const patients = JSON.parse(raw) as Array<{ name?: string; phone?: string; birthDate?: string }>
+    const patients = await cloudPatients(cache)
+    if (patients.length === 0) return null
     const same = patients.filter((p) => nameNoSpace(p.name ?? '').normalize('NFKC') === compact)
     // 同じお名前のカルテが1人だけ（または電話も同じ方が1人だけ）のときに使う
     const byPhone = digits ? same.filter((p) => phoneDigits(p.phone ?? '') === digits) : []
     const karte = byPhone.length === 1 ? byPhone[0] : same.length === 1 ? same[0] : null
     if (!karte?.birthDate) return null
-    const links = await listLineLinks()
-    const hit = links.filter((l) => l.birthDate === karte.birthDate && nameNoSpace(l.name).normalize('NFKC') === compact)
+    if (!cache.links) cache.links = await listLineLinks()
+    const hit = cache.links.filter((l) => l.birthDate === karte.birthDate && nameNoSpace(l.name).normalize('NFKC') === compact)
     return hit.length === 1 ? getLineLink(hit[0].key) : null
   } catch {
     return null
@@ -169,6 +193,107 @@ export async function onCancelReservation(reservationNo?: string): Promise<void>
   if (NO_RE.test(no)) await kvDelete(`${RSV_PREFIX}${no}`)
 }
 
+/** 予約システムが毎朝の前日のお知らせを済ませた日の印（linesent:_remindrun:<予約の日>。予約番号とは重ならない形） */
+const remindRunKey = (date: string) => `${SENT_PREFIX}_remindrun:${date}`
+
+/** 院で登録した予約・前日のお知らせで、LINE 連携の方に送ったか（予約システムへ返す。お名前・宛先は返さない） */
+export interface LinkedNotice {
+  reservationNo: string
+  /** LINE 連携の方だった */
+  linked: boolean
+  /** ご本人の LINE に届いた（テストの見本は false） */
+  delivered: boolean
+  /** ご本人が「予約のお知らせ停止」と送っている（メールにも切り替えない） */
+  optedOut?: boolean
+  result?: PushResult['result'] | 'not_linked' | 'invalid'
+  note: string
+}
+
+/**
+ * 6. 院で登録した予約（予約システムの管理画面・急患のすぐ登録。v3.27〜）
+ * 予約システムが LINE を知らない方（LINE から予約したことが無い）へ、その場で「確定しました」を1通。
+ * 予約システムの返事（「LINE に確定を送りました」の表示）に使うので、待たずに送る。控え（linersv:）は作らない
+ * （前日のお知らせは、予約システムの毎朝の処理がそのときの予約の表から頼む＝7.）
+ */
+export async function confirmClinicReservation(
+  body: { reservationNo?: string; name?: string; phone?: string; date?: string; time?: string },
+  opts: { now?: Date } = {},
+): Promise<LinkedNotice> {
+  const no = String(body.reservationNo ?? '')
+  const date = String(body.date ?? '')
+  const time = hhmm(body.time)
+  if (!NO_RE.test(no) || !DATE_RE.test(date) || !time) return { reservationNo: no, linked: false, delivered: false, result: 'invalid', note: '予約番号・日時が読めません' }
+  const link = await findLinkForPerson(String(body.name ?? ''), String(body.phone ?? ''))
+  if (!link) return { reservationNo: no, linked: false, delivered: false, result: 'not_linked', note: 'LINE連携していない方' }
+  const userId = unsealUserId(link.sealed, process.env.RESERVATION_NOTIFY_SECRET ?? '')
+  if (!userId) return { reservationNo: no, linked: false, delivered: false, result: 'not_linked', note: 'LINEの宛先を開けません' }
+  if (date < jstParts(opts.now).date) return { reservationNo: no, linked: true, delivered: false, result: 'skipped', note: '過ぎた日の予約' }
+  const r = await pushToPatient({
+    automation: 'reservation_confirm',
+    userId,
+    text: patientConfirmText({ name: link.name, date, time, reservationNo: no, changeUrl: reservationChangeUrl(no) }),
+    note: '予約の確定（院で登録・LINE連携の方）',
+    // ネット予約の確定（1.）・予約システムの確定と同じ印（同じ予約・同じ日時なら1通）
+    dedupe: { day: date, mark: (test) => dedupeMark({ kind: 'patient-confirm', userMark: lineMark(userId), time, reservationNo: no }, test) },
+  })
+  if (r.delivered) {
+    const sent: SentRecord = { reservationNo: no, key: link.key, date, time, sentAt: new Date().toISOString() }
+    await kvSet(`${SENT_PREFIX}${no}`, sent)
+  }
+  return { reservationNo: no, linked: true, delivered: r.delivered, result: r.result, note: r.reason ?? r.result }
+}
+
+/**
+ * 7. 前日のお知らせ（予約システムの毎朝8時の処理から。v3.27〜）
+ * rows … 明日の確定の予約のうち、予約システムが LINE を知らないもの（予約の表のそのときの中身）。
+ * LINE 連携の方へ送る（前日のお知らせの設定・本人の受け取り・二度送りの印は、今までの前日のお知らせと同じ）。
+ * 届かなかった方は、予約システムがメールのある方へメールで送る。rows が空でも呼ばれ、その日は控え（3.）から送らない。
+ */
+export async function remindLinkedReservations(
+  input: { date: string; rows: Array<{ reservationNo?: string; name?: string; phone?: string; time?: string }> },
+  opts: { now?: Date } = {},
+): Promise<LinkedNotice[]> {
+  const now = opts.now ?? new Date()
+  const date = String(input.date ?? '')
+  if (!DATE_RE.test(date)) throw new Error('date（YYYY-MM-DD）が要ります')
+  await kvSet(remindRunKey(date), { at: now.toISOString() })
+  const secret = process.env.RESERVATION_NOTIFY_SECRET ?? ''
+  const cache: LinkFinderCache = {}
+  const results: LinkedNotice[] = []
+  for (const row of input.rows.slice(0, 50)) {
+    const no = String(row.reservationNo ?? '')
+    const time = hhmm(row.time)
+    if (!NO_RE.test(no) || !time) {
+      results.push({ reservationNo: no, linked: false, delivered: false, result: 'invalid', note: '予約番号・時刻が読めません' })
+      continue
+    }
+    const link = await findLinkForPerson(String(row.name ?? ''), String(row.phone ?? ''), cache)
+    const userId = link ? unsealUserId(link.sealed, secret) : null
+    if (!link || !userId) {
+      results.push({ reservationNo: no, linked: false, delivered: false, result: 'not_linked', note: 'LINE連携していない方' })
+      continue
+    }
+    const r = await pushToPatient({
+      automation: 'reservation_remind',
+      userId,
+      text: patientRemindText({ name: link.name, date, time, reservationNo: no, changeUrl: reservationChangeUrl(no) }, now),
+      note: '前日のお知らせ（LINE連携の方）',
+      requireConsent: true,
+      // 予約システムの前日のお知らせ・控え（3.）と同じ印（どこから送っても1通）
+      dedupe: { day: date, mark: (test) => dedupeMark({ kind: 'patient-remind', userMark: lineMark(userId), time, reservationNo: no }, test) },
+    })
+    results.push({
+      reservationNo: no,
+      linked: true,
+      delivered: r.delivered,
+      optedOut: r.result === 'opted_out' || undefined,
+      result: r.result,
+      note: r.reason ?? r.result,
+    })
+  }
+  return results
+}
+
 /**
  * 5. 患者さんが予約ページで日時を変更した（予約システムからの通知 kind:'change'）
  * - 控え（linersv:<予約番号>）の日時を直す。前日のお知らせは、新しい日にちで送れるように戻す
@@ -236,6 +361,9 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
   const rows = await kvList<LineReservation>(RSV_PREFIX)
   const secret = process.env.RESERVATION_NOTIFY_SECRET ?? ''
   const testing = (await getRule('reservation_remind')).mode === 'test'
+  // 予約システム（v3.27〜）が毎朝、そのときの予約の表から明日の分を送った日は、控えからは送らない
+  // （控えは、院の画面でのキャンセル・日時の変更を知らないため。予約システムが動かなかった日だけ、控えから送る）
+  const handledBySystem = Boolean(await kvGet(remindRunKey(tomorrow)))
   let sent = 0
   let skipped = 0
   for (const { key, value } of rows) {
@@ -245,7 +373,7 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
       await kvDelete(key)
       continue
     }
-    if (value.date !== tomorrow) continue
+    if (value.date !== tomorrow || handledBySystem) continue
     // 送り済み（見本だけのものは、「動かす」になったらご本人へ）
     if (value.remindedAt && (!value.remindedTest || testing)) continue
     const link = await getLineLink(value.key)
@@ -279,7 +407,7 @@ export async function runLineReminders(now = new Date()): Promise<{ sent: number
       await kvSet(key, { ...value, remindedAt: new Date().toISOString(), remindedTest: sample || undefined })
     }
   }
-  return { sent, skipped }
+  return handledBySystem ? { sent, skipped, reason: '明日の分は予約システムの毎朝の処理で送りました' } : { sent, skipped }
 }
 
 /**

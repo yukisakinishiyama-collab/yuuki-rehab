@@ -21,6 +21,13 @@
  *      - 空き枠のお知らせは送ってよい時間帯（8時〜20時）だけ → 時間外は { delivered:false, deferred:true }
  *      - 同じお知らせは二度送らない → { duplicate:true }（送り済みなら delivered:true）
  *
+ * 3) LINE 連携の方（カルテの QR などで院内アプリと結びついた方。予約システムは LINE を知らない）へ（予約システム v3.27〜。
+ *    2026-11-21 院長の依頼「予約確定・前日の2回、患者様のLINEに」。lib/marketing/line-reservation-server.ts）
+ *    - kind: 'confirm-linked' … 院で登録した予約（管理画面・急患のすぐ登録）。お名前・電話で連携を探し、「確定しました」を1通
+ *      → { linked, delivered, result }（院長の LINE には知らせない）
+ *    - kind: 'remind-linked'  … 毎朝8時の前日のお知らせ。date＋rows（明日の確定の予約のうち、予約システムが LINE を知らないもの）
+ *      → { results: [{ reservationNo, linked, delivered, optedOut }] }。届かなかった方は予約システムがメールで送る
+ *
  * 新しい予約（kind: 'new'）のときは、返事のあとで、カルテが無い方のカルテを自動で作る
  * （lib/karte/auto-register-server.ts。2026-11-19 院長の依頼）。
  * さらに、カルテから LINE 連携した方へ「確定しました」を送る
@@ -52,7 +59,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 type NotifyBody = {
-  kind?: 'new' | 'cancel' | 'change' | 'reminder' | PatientKind
+  kind?: 'new' | 'cancel' | 'change' | 'reminder' | 'confirm-linked' | 'remind-linked' | PatientKind
+  /** kind:'remind-linked' 用：明日の予約（予約番号・お名前・電話・時刻） */
+  rows?: unknown
   /** patient-confirm用：LIFF検証済みの短命チケット */
   ticket?: string
   /** patient-cancel用：予約行に保存された長期参照 */
@@ -205,6 +214,34 @@ export async function POST(request: NextRequest) {
     body = (await request.json()) as NotifyBody
   } catch {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 })
+  }
+
+  // LINE 連携の方への確定・前日のお知らせ（予約システム v3.27〜）。院長の LINE には知らせない
+  if (body.kind === 'confirm-linked') {
+    const { confirmClinicReservation } = await import('@/lib/marketing/line-reservation-server')
+    const r = await confirmClinicReservation({ reservationNo: body.reservationNo, name: body.name, phone: body.phone, date: body.date, time: body.time })
+    console.log('[line-reservation] 院で登録した予約の確定:', r.note)
+    return NextResponse.json({ ok: true, linked: r.linked, delivered: r.delivered, result: r.result })
+  }
+  if (body.kind === 'remind-linked') {
+    const rows = Array.isArray(body.rows) ? (body.rows as Array<Record<string, unknown>>) : null
+    if (!DATE_RE.test(String(body.date ?? '')) || !rows) {
+      return NextResponse.json({ ok: false, error: 'date（YYYY-MM-DD）と rows が要ります' }, { status: 400 })
+    }
+    const { remindLinkedReservations } = await import('@/lib/marketing/line-reservation-server')
+    const results = await remindLinkedReservations({
+      date: String(body.date),
+      rows: rows
+        .filter((r) => r && typeof r === 'object')
+        .map((r) => ({ reservationNo: String(r.reservationNo ?? ''), name: String(r.name ?? ''), phone: String(r.phone ?? ''), time: String(r.time ?? '') })),
+    })
+    const delivered = results.filter((r) => r.delivered).length
+    console.log('[line-reservation] 前日のお知らせ（LINE連携の方）:', `${rows.length}件中 連携 ${results.filter((r) => r.linked).length}・届いた ${delivered}`)
+    // お名前・宛先は返さない（予約番号と結果だけ）
+    return NextResponse.json({
+      ok: true,
+      results: results.map((r) => ({ reservationNo: r.reservationNo, linked: r.linked, delivered: r.delivered, optedOut: r.optedOut, result: r.result })),
+    })
   }
 
   // キャンセル：空いた枠をストーリーで知らせる（予約システムへの返事を待たせないよう、返事のあとで行う。

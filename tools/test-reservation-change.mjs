@@ -263,6 +263,38 @@ try {
     await post({ kind: 'patient-cancel', sealed, reservationNo: 'E5F6G7', name: '架空 三郎', date: dayAfter(1), time: '10:30' })
     assert.ok(!pushes[2].text.includes('rk='))
   })
+
+  await test('受け口：院で登録した予約（confirm-linked）・毎朝の前日のお知らせ（remind-linked）は、院長には知らせず、ご本人へ', async () => {
+    pushes.length = 0
+    await saveRule('reservation_confirm', { mode: 'on', dailyLimit: 60 })
+    await saveRule('reservation_remind', { mode: 'on', dailyLimit: 60 })
+    const confirm = await (await post({ kind: 'confirm-linked', reservationNo: 'F6G7H8', name: '山田 花子', phone: '090-1111-2222', date: dayAfter(4), time: '15:00' })).json()
+    assert.deepEqual([confirm.linked, confirm.delivered], [true, true])
+    assert.deepEqual(pushes.map((p) => p.to), [HANAKO], '院長への「新規予約が入りました」は送らない')
+    assert.match(pushes[0].text, /以下の内容で確定しました。/)
+    assert.ok(pushes[0].text.includes(urlOf('F6G7H8')))
+    const none = await (await post({ kind: 'confirm-linked', reservationNo: 'F6G7H9', name: '架空 次郎', phone: '09099998888', date: dayAfter(4), time: '15:30' })).json()
+    assert.deepEqual([none.linked, none.delivered], [false, false])
+    assert.equal(pushes.length, 1)
+
+    const res = await post({
+      kind: 'remind-linked',
+      date: dayAfter(1),
+      rows: [
+        { reservationNo: 'G7H8J9', name: '山田花子', phone: '09011112222', time: '09:00' },
+        { reservationNo: 'G7H8K1', name: '架空 次郎', phone: '09099998888', time: '09:30' },
+      ],
+    })
+    assert.equal(res.status, 200)
+    const data = await res.json()
+    assert.deepEqual(data.results.map((r) => [r.reservationNo, r.linked, r.delivered]), [['G7H8J9', true, true], ['G7H8K1', false, false]])
+    assert.ok(!JSON.stringify(data).includes('花子') && !JSON.stringify(data).includes('0901111'), '返事にお名前・電話は入れない')
+    assert.deepEqual(pushes.map((p) => p.to), [HANAKO, HANAKO])
+    assert.match(pushes[1].text, /09:00/)
+    assert.equal((await post({ kind: 'remind-linked', date: '明日', rows: [] })).status, 400)
+    assert.equal((await post({ kind: 'remind-linked', date: dayAfter(1) })).status, 400)
+    assert.equal((await post({ kind: 'confirm-linked', reservationNo: 'F6G7H8', date: dayAfter(4), time: '15:00' }, 'wrong')).status, 401)
+  })
 } finally {
   globalThis.fetch = realFetch
   for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]

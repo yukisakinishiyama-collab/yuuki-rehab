@@ -245,6 +245,85 @@ try {
     assert.equal(pushes.length, before)
     assert.equal((await kvGet('linersv:R950')).remindedAt, undefined)
   })
+
+  // ── 予約システム v3.27〜：院で登録した予約の確定・毎朝の前日のお知らせ（2026-11-21 院長の依頼「予約確定・前日の2回」）
+  await test('院で登録した予約：LINE連携の方へ、その場で「確定しました」を1通（控えは作らない）', async () => {
+    await saveRule('reservation_confirm', { mode: 'on', dailyLimit: 60 })
+    const before = pushes.length
+    const r = await rsv.confirmClinicReservation({ reservationNo: 'C100', name: '山田 花子', phone: '090-1111-2222', date: '2030-01-14', time: '9:30' }, { now: NOW })
+    assert.deepEqual({ linked: r.linked, delivered: r.delivered, result: r.result }, { linked: true, delivered: true, result: 'sent' })
+    assert.equal(pushes.length, before + 1)
+    assert.equal(pushes.at(-1).to, HANAKO)
+    assert.match(pushes.at(-1).text, /山田花子 様/)
+    assert.match(pushes.at(-1).text, /09:30/)
+    assert.ok(await rsv.confirmSentFor('C100', '2030-01-14', '09:30'), '「今日」の画面で「送信済み」と出す印')
+    assert.equal(await kvGet('linersv:C100'), null, '前日のお知らせは予約システムの毎朝の処理から')
+    // 同じ予約の知らせがもう一度来ても1通（予約システムの送り直し）
+    const again = await rsv.confirmClinicReservation({ reservationNo: 'C100', name: '山田花子', phone: '09011112222', date: '2030-01-14', time: '09:30' }, { now: NOW })
+    assert.equal(again.result, 'duplicate')
+    assert.equal(again.delivered, true)
+    assert.equal(pushes.length, before + 1)
+  })
+
+  await test('院で登録した予約：連携していない方・過ぎた日・テスト中', async () => {
+    const before = pushes.length
+    const none = await rsv.confirmClinicReservation({ reservationNo: 'C101', name: '架空 次郎', phone: '09099998888', date: '2030-01-14', time: '10:00' }, { now: NOW })
+    assert.deepEqual({ linked: none.linked, delivered: none.delivered }, { linked: false, delivered: false })
+    const past = await rsv.confirmClinicReservation({ reservationNo: 'C102', name: '山田花子', phone: '09011112222', date: '2030-01-09', time: '10:00' }, { now: NOW })
+    assert.deepEqual({ linked: past.linked, delivered: past.delivered }, { linked: true, delivered: false })
+    const bad = await rsv.confirmClinicReservation({ reservationNo: 'C 1/2', name: '山田花子', phone: '09011112222', date: '2030-01-14', time: '10:00' }, { now: NOW })
+    assert.equal(bad.result, 'invalid')
+    assert.equal(pushes.length, before)
+    // 電話の無い急患のすぐ登録でも、カルテのお名前＋生年月日で連携の方とわかれば送る
+    const noPhone = await rsv.confirmClinicReservation({ reservationNo: 'C103', name: '佐藤太郎', phone: '', date: '2030-01-14', time: '11:00' }, { now: NOW })
+    assert.equal(noPhone.linked, true)
+    assert.equal(pushes.at(-1).to, TARO)
+    // テスト中：院長の LINE に見本（予約システムには「届いていない」と返す）
+    await saveRule('reservation_confirm', { mode: 'test', dailyLimit: 60 })
+    const sample = await rsv.confirmClinicReservation({ reservationNo: 'C104', name: '山田花子', phone: '09011112222', date: '2030-01-14', time: '12:00' }, { now: NOW })
+    assert.deepEqual({ linked: sample.linked, delivered: sample.delivered, result: sample.result }, { linked: true, delivered: false, result: 'test' })
+    assert.equal(pushes.at(-1).to, OWNER)
+    assert.equal(await rsv.confirmSentFor('C104', '2030-01-14', '12:00'), false, '見本だけのときは「送信済み」にしない')
+    await saveRule('reservation_confirm', { mode: 'on', dailyLimit: 60 })
+  })
+
+  await test('毎朝の前日のお知らせ（予約システムから）：予約の表の明日の分のうち、LINE連携の方へ送る', async () => {
+    await saveRule('reservation_remind', { mode: 'on', dailyLimit: 80 })
+    // 控えにだけ残っている予約（院の画面でキャンセルした・日時を動かした。控えには届かない）
+    await kvSet('linersv:S900', { reservationNo: 'S900', key: '09011112222|山田花子', date: TOMORROW, time: '17:30', savedAt: NOW.toISOString() })
+    const before = pushes.length
+    const results = await rsv.remindLinkedReservations(
+      {
+        date: TOMORROW,
+        rows: [
+          { reservationNo: 'S100', name: '山田 花子', phone: '090-1111-2222', time: '10:00' },
+          { reservationNo: 'S101', name: '架空 次郎', phone: '09099998888', time: '10:30' },
+          { reservationNo: 'S102', name: '佐藤太郎', phone: '07055556666', time: '11:00' },
+          { reservationNo: 'S 1', name: '山田花子', phone: '09011112222', time: '11:30' },
+        ],
+      },
+      { now: at(8) },
+    )
+    const byNo = Object.fromEntries(results.map((r) => [r.reservationNo, r]))
+    assert.deepEqual([byNo.S100.linked, byNo.S100.delivered], [true, true])
+    assert.deepEqual([byNo.S101.linked, byNo.S101.delivered], [false, false])
+    assert.deepEqual([byNo.S102.linked, byNo.S102.delivered, byNo.S102.optedOut], [true, false, true], '「予約のお知らせ停止」の方（メールにも切り替えない）')
+    assert.equal(byNo['S 1'].result, 'invalid')
+    assert.equal(pushes.length, before + 1)
+    assert.equal(pushes.at(-1).to, HANAKO)
+    assert.match(pushes.at(-1).text, /10:00/)
+    assert.match(pushes.at(-1).text, /S100/)
+    // 同じ日の知らせがもう一度来ても1通
+    const again = await rsv.remindLinkedReservations({ date: TOMORROW, rows: [{ reservationNo: 'S100', name: '山田花子', phone: '09011112222', time: '10:00' }] }, { now: at(8) })
+    assert.deepEqual([again[0].delivered, again[0].result], [true, 'duplicate'])
+    assert.equal(pushes.length, before + 1)
+    // 予約システムが送った日は、控えからは送らない（控えだけに残った S900 に間違って送らない）
+    const backup = await rsv.runLineReminders(at(11))
+    assert.equal(backup.sent, 0)
+    assert.match(backup.reason, /予約システムの毎朝の処理/)
+    assert.equal(pushes.length, before + 1)
+    await assert.rejects(rsv.remindLinkedReservations({ date: '明日', rows: [] }))
+  })
 } finally {
   globalThis.fetch = realFetch
   for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
