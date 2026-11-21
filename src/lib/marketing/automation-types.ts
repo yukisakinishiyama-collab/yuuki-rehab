@@ -3,10 +3,11 @@
  *
  * ここで ON/OFF するのは、このアプリの中で実際に止められるものだけ（止めても動いて見える、を作らない）。
  * - reservation_confirm … 予約確認の LINE（LINE予約の方の本人の LINE へ。予約システムからの通知で送る。
- *                         カルテから LINE 連携した方へは line-reservation-server が送る）
+ *                         カルテから LINE 連携した方へは line-reservation-server が送る。院で登録した予約も、予約システム v3.27〜）
  * - line_auto_reply     … 公式LINE の自動案内（友だち追加のときの選択肢・相談の案内）
  * - reservation_remind  … 前日のお知らせ（予約の前日に本人の LINE へ。予約システムの毎朝の処理から。
- *                         カルテから LINE 連携した方へは、投稿ジョブの定期実行から line-reservation-server が送る）
+ *                         カルテから LINE 連携した方へも、予約システム v3.27〜の毎朝の処理から line-reservation-server が送る。
+ *                         予約システムが動かなかった日だけ、投稿ジョブの定期実行から控えで送る）
  * - waitlist_notify     … 空き枠のお知らせ（キャンセル待ちに登録した方へ。予約システムから、先着順に1人ずつ）
  *
  * mode
