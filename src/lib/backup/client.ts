@@ -209,16 +209,19 @@ async function savePhotos(dir: FsDirHandle, core: CoreBackup, onProgress?: (p: B
   return added
 }
 
-/** 画像レポートのPDFをフォルダの「画像レポート/患者さんのID/」に足す（すでにあるものはそのまま）。足した数を返す */
+/** 画像レポートのPDF（AIへの相談のPDFも）をフォルダの「画像レポート/患者さんのID/」に足す（すでにあるものはそのまま）。足した数を返す */
 async function saveImagingReports(dir: FsDirHandle, core: CoreBackup, onProgress?: (p: BackupProgress) => void): Promise<number> {
-  let reports: Array<{ patientId?: string; storagePath?: string }> = []
+  let reports: Array<{ patientId?: string; storagePath?: unknown; consults?: Array<{ storagePath?: unknown }> }> = []
   try {
     const parsed = JSON.parse(core.karte.data['pt_imaging_reports'] ?? '[]')
     if (Array.isArray(parsed)) reports = parsed
   } catch {
     return 0
   }
-  const valid = reports.filter((r) => typeof r.storagePath === 'string' && /^[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\.pdf$/.test(r.storagePath))
+  const paths = reports.flatMap((r) => [r.storagePath, ...(Array.isArray(r.consults) ? r.consults.map((c) => c?.storagePath) : [])])
+  const valid = paths
+    .filter((p): p is string => typeof p === 'string' && /^[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\.pdf$/.test(p))
+    .map((storagePath) => ({ storagePath }))
   if (valid.length === 0) return 0
   const root = await dir.getDirectoryHandle('画像レポート', { create: true })
   let added = 0

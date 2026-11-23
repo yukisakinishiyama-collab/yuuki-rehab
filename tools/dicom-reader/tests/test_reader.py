@@ -159,7 +159,8 @@ def test_report_is_repaired_or_the_reason_is_said(env, monkeypatch):
     monkeypatch.setenv("FAKE_CLAUDE", "loggedout")
     env["server"].Handler._login_cache = {}
     h = call("GET", "/health")[1]
-    assert h == {"ok": True, "version": env["server"].VERSION, "claude": True, "loggedIn": False, "pdf": True, "running": None}
+    assert h == {"ok": True, "version": env["server"].VERSION, "features": ["read", "consult"], "claude": True, "loggedIn": False,
+                 "pdf": True, "running": None}
 
 
 def test_cancel_stops_the_reading(env, monkeypatch):
@@ -172,6 +173,82 @@ def test_cancel_stops_the_reading(env, monkeypatch):
     assert call("POST", f"/jobs/{jid}/cancel")[0] == 200
     j = wait(call, jid, timeout=20)
     assert j["status"] == "cancelled" and call("GET", "/health")[1]["running"] is None
+
+
+PRIOR = {"region": "右足関節", "headline": "骨折を示す所見なし。前方に少量の液体", "summary": ["**骨折なし。** 前方に少量の液体"],
+         "estimates": [{"condition": "前方の関節包の刺激", "percent": 60}]}
+
+
+def start_consult(env, **over):
+    body = {"kind": "consult", "path": str(env["cd"]), "studies": [], "patient": PATIENT, "complaint": "右足関節の前方の痛み",
+            "confirmedNoText": True, "reportId": "rep_1", "observation": "試験花子さんの外側の骨に高信号があるように見えます",
+            "location": "MRI s02 の 4〜6枚目", "prior": PRIOR}
+    body.update(over)
+    return env["call"]("POST", "/jobs", body)
+
+
+def test_consult_rechecks_the_images_without_giving_names_to_the_ai(env):
+    call = env["call"]
+    assert start_consult(env, observation=" ")[0] == 400                                     # 気づいたことは必ず
+    assert start_consult(env, reportId="../x")[0] == 400
+    assert start_consult(env, confirmedNoText=False)[0] == 400
+    assert call("GET", "/health")[1]["features"] == ["read", "consult"]
+    st, j, _ = start_consult(env)
+    assert st == 200 and j["kind"] == "consult" and j["reportId"] == "rep_1"
+    assert start(env)[0] == 409                                                             # 読影と見直しも、同時に1件だけ
+    j = wait(call, j["id"])
+    assert j["status"] == "done", j
+    r = j["result"]
+    assert r["kind"] == "consult" and r["verdict"] == "partly" and r["verdict_label"] == "一部を確認"
+    assert r["headline"].startswith("外側に淡い高信号") and len(r["answer"]) == 2 and r["next"][0] == "外側の圧痛を確かめる"
+    assert r["title_region"] == "右足関節" and r["study_date"] == "2026-10-27" and r["file_name"].startswith("画像の見直し_0099887766_")
+    assert any("見直しています" in x for x in j["log"]) and j["observation"].startswith("試験花子さん") and j["location"] == "MRI s02 の 4〜6枚目"
+    st, pdf, _ = call("GET", f"/jobs/{j['id']}/pdf", raw=True)
+    assert st == 200 and pdf[:5] == b"%PDF-" and len(pdf) == r["bytes"]
+    jd = env["data"] / "jobs" / j["id"]
+    html = (jd / "out" / "report.html").read_text(encoding="utf-8")
+    for word in ("院長の気づきへの、AIの見直し", "試験 花子 様", "0099887766", "院長が気づいたこと", "試験花子さんの外側の骨に高信号",
+                 "MRI s02 の 4〜6枚目", "見直しの結果：一部を確認", "<b>外側の骨に淡い高信号があります。</b>", "次に確かめること",
+                 "確定診断ではありません", "右足関節 単純X線・MRI"):
+        assert word in html, word
+    assert "<script>" not in html and html.count("data:image/jpeg;base64,") == 1
+    work = jd / "work"
+    note = (work / "consult.md").read_text(encoding="utf-8")
+    assert "■" in note and "試験" not in note                                               # 気づいたことに書かれたお名前も消す
+    for f in list(work.glob("*.md")) + list(work.glob("out/*.json")) + list(work.glob("out/*.log")):
+        t = f.read_text(encoding="utf-8")
+        assert "試験" not in t and "0099887766" not in t and "架空病院" not in t, f
+    assert not (work / "series").exists()
+    listed = call("GET", "/jobs?patientId=pt_abc123")[1]["jobs"][0]
+    assert listed["kind"] == "consult" and listed["reportId"] == "rep_1" and listed["result"]["verdict"] == "partly"
+
+
+def test_consult_answer_is_repaired(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE", "needs_repair")
+    j = wait(env["call"], start_consult(env)[1]["id"])
+    assert j["status"] == "done" and j["result"]["verdict"] == "partly" and len(j["usage"]) == 2 and any("形を整えて" in x for x in j["log"])
+
+
+def test_consult_shape_is_checked(tmp_path):
+    from reader import reportschema
+    (tmp_path / "figures").mkdir()
+    (tmp_path / "figures" / "fig1.jpg").write_bytes(b"x")
+    good = {"verdict": "not_seen", "headline": "h", "answer": ["a"], "next": ["n", ""],
+            "sections": [{"heading": "1", "blocks": [{"type": "figure", "file": "figures/fig1.jpg", "caption": "c"}]}]}
+    out, problems = reportschema.validate_consult(good, tmp_path)
+    assert problems == [] and out["verdict_label"] == "確認できず" and out["next"] == ["n"]
+    out, problems = reportschema.validate_consult({"verdict": "cannot_judge", "headline": "h", "answer": ["a"]}, tmp_path)
+    assert problems == [] and out["sections"] == []                                         # 判断できないときは図が無くてよい
+    bad = {"verdict": "yes", "answer": [], "sections": [{"heading": "1", "blocks": [{"type": "estimates"}, {"type": "series_table"}]}]}
+    _, problems = reportschema.validate_consult(bad, tmp_path)
+    text = " ".join(problems)
+    for word in ("verdict は", "headline", "answer", "type は p, h3"):
+        assert word in text, word
+    _, problems = reportschema.validate_consult({"verdict": "seen", "headline": "h", "answer": ["a"]}, tmp_path)
+    assert problems == ["図が1枚もありません（見直した所を図で示してください）"]               # 確かめたと言うなら図が要る
+    assert reportschema.check_consult_file(tmp_path)[1] == ["out/consult.json がまだありません"]
+    (tmp_path / "consult.md").write_text("x", encoding="utf-8")
+    assert reportschema.check_work(tmp_path)[1] == ["out/consult.json がまだありません"]     # rt.py check は見直しのほうを見る
 
 
 def test_report_shape_is_checked(tmp_path):

@@ -1,4 +1,5 @@
-"""確かめ済みのレポート内容（reportschema.validate の結果）を A4 の HTML → PDF にする。
+"""確かめ済みのレポート内容（reportschema.validate の結果）と、院長の気づきの見直し（validate_consult の結果）を
+A4 の HTML → PDF にする。
 
 見出し（氏名・患者ID・撮影日・施設・装置）と免責の文はここで入れる。AIには書かせない。
 PDF はパソコンの Chrome／Edge（画面なし）で作る。
@@ -137,12 +138,8 @@ def _blocks(blocks: list[dict], ctx: dict) -> str:
     return "\n".join(out)
 
 
-def build_html(report: dict, header: dict, series: list[dict], work: Path, fig_bytes: int = 520_000) -> str:
-    """header: name, patient_id, age_text, sex_ja, study_date, times, institution, weight_kg, equipment, counts,
-    complaint, created, author"""
-    counts = header.get("counts") or {}
-    mods = "・".join(counts.keys())
-    count_text = "・".join(f"{k} {v}枚" for k, v in counts.items())
+def _meta_html(header: dict) -> str:
+    """見出しの表（氏名・患者ID・年齢・撮影日・施設・装置・作成）。AIには書かせない"""
     times = header.get("times") or {}
     when = header.get("study_date") or ""
     tparts = [f"{k} {v[1]}" for k, v in times.items() if v and v[1]]
@@ -159,13 +156,22 @@ def build_html(report: dict, header: dict, series: list[dict], work: Path, fig_b
     for k, v in (header.get("equipment") or {}).items():
         meta.append((f"{k}装置", v))
     meta.append(("作成", f"{header.get('created') or ''} {header.get('author') or 'Claude（AI）'}".strip()))
+    return "<div class='meta'>" + "".join(f"<div><span>{esc(k)}</span>{esc(v)}</div>" for k, v in meta) + "</div>"
+
+
+def build_html(report: dict, header: dict, series: list[dict], work: Path, fig_bytes: int = 520_000) -> str:
+    """header: name, patient_id, age_text, sex_ja, study_date, times, institution, weight_kg, equipment, counts,
+    complaint, created, author"""
+    counts = header.get("counts") or {}
+    mods = "・".join(counts.keys())
+    count_text = "・".join(f"{k} {v}枚" for k, v in counts.items())
     ctx = {"work": work, "series": series, "estimates": report.get("estimates") or [], "fig_bytes": fig_bytes}
     parts = [
         "<!doctype html><html lang='ja'><head><meta charset='utf-8'>",
         f"<title>画像所見レポート {esc(report.get('title_region'))}</title><style>{CSS}</style></head><body>",
         f"<h1>画像所見レポート（参考意見）<small>— {esc(report.get('title_region'))} {esc(mods)}</small></h1>",
         f"<div class='sub'>柔道整復師の施術方針決定を補助するための二次読影。患者CDのDICOM原画像（{esc(count_text)}）を全スライス読んで作成。</div>",
-        "<div class='meta'>" + "".join(f"<div><span>{esc(k)}</span>{esc(v)}</div>" for k, v in meta) + "</div>",
+        _meta_html(header),
     ]
     if header.get("complaint"):
         parts.append(f"<div class='complaint'><b>主訴（ご提供情報）</b>：{rich(header['complaint'])}</div>")
@@ -175,6 +181,40 @@ def build_html(report: dict, header: dict, series: list[dict], work: Path, fig_b
         parts.append(_blocks(sec["blocks"], ctx))
     if report.get("references"):
         parts.append("<h2>文献</h2><ol class='refs'>" + "".join(f"<li>{esc(r)}</li>" for r in report["references"]) + "</ol>")
+    parts.append(f"<div class='disclaimer'>{esc(DISCLAIMER)}</div></body></html>")
+    return "\n".join(parts)
+
+
+def build_consult_html(consult: dict, header: dict, series: list[dict], work: Path, observation: str, location: str,
+                       region: str, fig_bytes: int = 520_000) -> str:
+    """院長の気づきの見直し（相談）の PDF。院長の書いた文はそのまま（PDFは院の中だけ）、AIの文は rich（強調だけ）"""
+    counts = header.get("counts") or {}
+    mods = "・".join(counts.keys())
+    count_text = "・".join(f"{k} {v}枚" for k, v in counts.items())
+    ctx = {"work": work, "series": series, "estimates": [], "fig_bytes": fig_bytes}
+    ask = f"<b>院長が気づいたこと</b>：{esc(observation)}"
+    if location:
+        ask += f"<br><b>場所</b>：{esc(location)}"
+    parts = [
+        "<!doctype html><html lang='ja'><head><meta charset='utf-8'>",
+        f"<title>画像の見直し {esc(region)}</title><style>{CSS}</style></head><body>",
+        f"<h1>院長の気づきへの、AIの見直し（参考意見）<small>— {esc(region)} {esc(mods)}</small></h1>",
+        f"<div class='sub'>カルテの画像レポートについて、院長が気づいたことを、患者CDのDICOM原画像（{esc(count_text)}）でAIが見直した結果。</div>",
+        _meta_html(header),
+        f"<div class='complaint'>{ask}</div>",
+        f"<div class='summary'><h2>見直しの結果：{esc(consult.get('verdict_label') or '')}</h2>"
+        f"<p><b>{rich(consult.get('headline') or '')}</b></p><ul>"
+        + "".join(f"<li>{rich(s)}</li>" for s in consult.get("answer") or []) + "</ul></div>",
+    ]
+    for sec in consult.get("sections") or []:
+        parts.append(f"<h2>{esc(sec['heading'])}</h2>")
+        parts.append(_blocks(sec["blocks"], ctx))
+    if consult.get("next"):
+        parts.append("<h2>次に確かめること</h2><ul>" + "".join(f"<li>{rich(x)}</li>" for x in consult["next"]) + "</ul>")
+    if consult.get("references"):
+        parts.append("<h2>文献</h2><ol class='refs'>" + "".join(f"<li>{esc(r)}</li>" for r in consult["references"]) + "</ol>")
+    if header.get("complaint"):
+        parts.append(f"<p class='note'>主訴（ご提供情報）：{rich(header['complaint'])}</p>")
     parts.append(f"<div class='disclaimer'>{esc(DISCLAIMER)}</div></body></html>")
     return "\n".join(parts)
 
@@ -225,10 +265,15 @@ def html_to_pdf(html_path: Path, pdf_path: Path, browser: str | None = None, tim
 def make_pdf(report: dict, header: dict, series: list[dict], work: Path, out_dir: Path, max_bytes: int,
              browser: str | None = None) -> tuple[Path, Path]:
     """大きすぎたら図を圧縮し直して、max_bytes に収める。"""
+    return make_pdf_with(lambda fig_bytes: build_html(report, header, series, work, fig_bytes), out_dir, max_bytes, browser)
+
+
+def make_pdf_with(build, out_dir: Path, max_bytes: int, browser: str | None = None) -> tuple[Path, Path]:
+    """build(図の大きさの上限) → HTML。out/report.html・report.pdf に作る（見直しも同じ置き場所）"""
     out_dir.mkdir(parents=True, exist_ok=True)
     html_path, pdf_path = out_dir / "report.html", out_dir / "report.pdf"
     for fig_bytes in (520_000, 300_000, 180_000, 110_000):
-        html_path.write_text(build_html(report, header, series, work, fig_bytes), encoding="utf-8")
+        html_path.write_text(build(fig_bytes), encoding="utf-8")
         html_to_pdf(html_path, pdf_path, browser)
         if pdf_path.stat().st_size <= max_bytes:
             return html_path, pdf_path

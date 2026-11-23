@@ -12,7 +12,7 @@
   python rt.py dist S K r1,c1 r2,c2                   2点の距離（mm）
   python rt.py xref S K r,c T                         S の点が T のどのスライス・画素にあたるか
   python rt.py figure out/figN.json                   レポートの図を作る（figures/ に JPEG）
-  python rt.py check                                  out/report.json を確かめる（OK と出るまで直す）
+  python rt.py check                                  out/report.json（見直しのときは out/consult.json）を確かめる（OK と出るまで直す）
 
 S はシリーズ名（list の key。先頭の s02 だけでも可）。K はスライス番号（1から）。
 """
@@ -142,7 +142,7 @@ def cmd_figure(series, a):
 
 
 def cmd_check(series, a):
-    data, problems = rtcheck.check_file(HERE)
+    data, problems = rtcheck.check_work(HERE)
     if problems:
         print("直してください:")
         for x in problems:

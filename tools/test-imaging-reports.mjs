@@ -1,6 +1,10 @@
 // 画像レポート（DICOMの読み取り）の決まりを確かめる（外には送らない・データは架空）
 // 実行: npx tsx tools/test-imaging-reports.mjs
-import { checkIdentity, countsLabel, sameName, splitEmphasis, toImagingReport } from '../src/lib/karte/imaging.ts'
+import { readFileSync } from 'node:fs'
+import {
+  CONSULT_VERDICTS, checkIdentity, consultPrior, countsLabel, readerCanConsult, reportFilePaths, sameName, splitEmphasis, studiesForReport,
+  toImagingConsult, toImagingReport,
+} from '../src/lib/karte/imaging.ts'
 import { isValidReportPath } from '../src/lib/karte/imaging-storage-server.ts'
 
 let passed = 0
@@ -53,6 +57,35 @@ ok(splitEmphasis('<b>x</b>')[0].text === '<b>x</b>', 'タグは文字のまま�
 // ── 保存先 ──
 ok(isValidReportPath('pt_abc-1/rep_1.pdf'), '保存先：患者ID/レポートID.pdf')
 ok(!isValidReportPath('../x/y.pdf') && !isValidReportPath('a/b.jpg') && !isValidReportPath('a/b/c.pdf') && !isValidReportPath('a/.pdf'), '保存先：ほかの形は受けない')
+
+// ── 院長が気づいたことの見直し（相談。2026-11-23） ──
+ok(readerCanConsult({ features: ['read', 'consult'] }) && !readerCanConsult({ version: '1.0.0' }) && !readerCanConsult(null), '相談は読影プログラム v1.1.0〜（features に consult）だけ')
+const studies = [{ uid: 'a', date: '2026-10-27' }, { uid: 'b', date: '2026-10-27' }, { uid: 'c', date: '2025-03-01' }]
+ok(JSON.stringify(studiesForReport(studies, { studyDate: '2026-10-27' })) === JSON.stringify({ uids: ['a', 'b'], matched: true }), 'CDの検査は、レポートと同じ撮影日のものを選ぶ')
+ok(JSON.stringify(studiesForReport(studies, { studyDate: '2024-01-01' })) === JSON.stringify({ uids: ['a', 'b', 'c'], matched: false }), '同じ日が無ければ全部を選び、ちがうことを知らせる')
+ok(JSON.stringify(studiesForReport(studies, { studyDate: '' })) === JSON.stringify({ uids: ['a', 'b', 'c'], matched: true }), '撮影日が分からなければ全部（知らせない）')
+const prior = consultPrior({ ...rep, summary: Array(10).fill('段落'), estimates: [{ condition: '前方の刺激', percent: 35, basis: '圧痛と一致' }] })
+ok(prior.region === '右足関節' && prior.summary.length === 8 && JSON.stringify(prior.estimates) === JSON.stringify([{ condition: '前方の刺激', percent: 35 }]) &&
+  !('storagePath' in prior) && !('complaint' in prior), '前回の読影として渡すのは、AIが書いた要点だけ（根拠・PDFの場所・主訴は渡さない）', prior)
+const cres = {
+  kind: 'consult', verdict: 'partly', verdict_label: '一部を確認', headline: '外側に淡い高信号。骨折線は追えない',
+  answer: ['**外側の骨に淡い高信号。**', '', 'T1 で骨折線なし'], next: ['外側の圧痛を確かめる', ''], title_region: '右足関節', modalities: ['MRI'],
+  counts: { MRI: 16 }, study_date: '2026-10-27', institution: '架空病院', bytes: 900, file_name: '画像の見直し_0099887766_20261123.pdf', minutes: 7,
+}
+const con = toImagingConsult({ id: 'c1', result: cres, observation: '外側の骨に高信号', location: '', storagePath: 'p1/c1.pdf', bytes: 1000, askedAt: '2026-11-23T10:00:00.000Z', askedBy: '院長' })
+ok(con.verdict === 'partly' && con.answer.length === 2 && con.next.length === 1 && con.location === undefined && con.author === 'Claude（AI）' && con.bytes === 1000,
+  '相談の答え → カルテの記録（空の段落は落とす・場所が空なら持たない）', con)
+const weird = toImagingConsult({ id: 'c2', result: { ...cres, verdict: 'yes', answer: 'x', next: null, file_name: 'a/b.pdf' }, observation: 'x'.repeat(900), storagePath: 'p1/c2.pdf', bytes: 1, askedAt: 'x' })
+ok(weird.verdict === 'cannot_judge' && weird.answer.length === 0 && weird.next.length === 0 && weird.fileName === 'ab.pdf' && weird.observation.length === 600,
+  '形のおかしい答えはそのまま入れない（見立てが読めなければ「判断できない」）', weird)
+ok(JSON.stringify(reportFilePaths({ ...rep, consults: [con, { ...con, storagePath: 'p1/c9.pdf' }] })) === JSON.stringify(['p1/r1.pdf', 'p1/c1.pdf', 'p1/c9.pdf']) &&
+  JSON.stringify(reportFilePaths(rep)) === JSON.stringify(['p1/r1.pdf']), '削除・バックアップの対象：レポートと相談のPDF')
+ok(isValidReportPath('p1/' + 'V1StGXR8_Z5jdHi6B-myT' + '.pdf'), '相談のPDFも、同じ保存先の形（患者ID/相談ID.pdf）')
+// 見立ての言葉は、読影プログラム（Python）と同じにする（PDFと画面でちがう言葉にならないように）
+const py = readFileSync(new URL('./dicom-reader/reader/reportschema.py', import.meta.url), 'utf8')
+const pyVerdicts = Object.fromEntries([...py.match(/VERDICTS = \{([^}]*)\}/)[1].matchAll(/"(\w+)": "([^"]+)"/g)].map(m => [m[1], m[2]]))
+ok(JSON.stringify(pyVerdicts) === JSON.stringify(Object.fromEntries(Object.entries(CONSULT_VERDICTS).map(([k, v]) => [k, v.label]))),
+  '見立ての言葉が読影プログラムと同じ', pyVerdicts)
 
 console.log(`\n${passed} 件成功 / ${failed} 件失敗`)
 if (failed) process.exit(1)

@@ -65,7 +65,8 @@ npm run lint     # ESLint
 - 氏名・患者ID・生年月日・施設名・撮影日はAIに渡さない。PDFの見出し・免責・「見積もりは主観的」の注記は読影プログラムが入れる（AIは決まった形の `report.json` と図の指定だけを書く）
 - 保存：PDFは Supabase Storage の非公開バケット `karte-imaging`（`/api/karte/imaging`。`src/lib/karte/imaging-storage-server.ts`。4MBまで・書きかえない）、要点（部位・総括・見積もり・場所）は `pt_imaging_reports`（ほかのカルテの記録と同じく `/api/sync` で同期）。パソコンのフォルダへのバックアップには「画像レポート」フォルダとしてPDFも入る
 - ブラウザから読影プログラムへは `src/lib/karte/imaging-client.ts`（`READER_URL`）。読影プログラムは決めたアドレス（本番の2つ）のページからしか受けない。プレビューで試すときは、パソコンの `config.json` の `origins` にそのアドレスを足す
-- テスト：`npx tsx tools/test-imaging-reports.mjs`（比べ方・記録の形）、`python -m pytest tools/dicom-reader/tests -q`（架空のDICOMと Claude Code の代わりで、読み込み → 読影 → PDF まで。氏名などがAIの作業フォルダに無いことも確かめる）
+- 院長が気づいたことの相談（2026-11-23 院長「カルテの画像所見ですがこちらがきづいたことをAI相談できるように」。DECISIONS.md）：提出済みのレポートごとの「気づいたことをAIに相談」→「気づいたこと（必須）・場所（任意）」→ CDをもう一度読み込む（画像は提出のときに消しているため。レポートと同じ撮影日の検査を選んでおく `studiesForReport`）→ 読影プログラムの見直しの仕事（`kind: consult`。`reader/workspace/CONSULT.md`・`out/consult.json`。5〜15分）→ 答え（見立て＝気づいた所見を確認・一部を確認・確認できず・この画像では判断できない、一行、答え、次に確かめること、図つきのPDF）を確かめて「カルテに残す」。記録はレポートの `consults`（`ImagingConsult`。PDFは同じ非公開バケット `patientId/相談ID.pdf`。レポートを消すと相談のPDFも消す・バックアップにも入る）。前回の読影として渡すのはAIが書いた要点だけ（`consultPrior`）。読影プログラム v1.1.0〜（`/health` の `features` に consult）でだけ出す。見立ての言葉は Python の `VERDICTS` と `CONSULT_VERDICTS` で同じ（テストで比べる）
+- テスト：`npx tsx tools/test-imaging-reports.mjs`（比べ方・記録の形・相談）、`python -m pytest tools/dicom-reader/tests -q`（架空のDICOMと Claude Code の代わりで、読み込み → 読影 → PDF まで・相談の見直しまで。氏名などがAIの作業フォルダに無いことも確かめる）
 
 ### 解剖図（関節の部位えらび）
 

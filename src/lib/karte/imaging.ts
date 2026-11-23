@@ -3,8 +3,9 @@
  *
  * - CDに入っている方と、開いているカルテの方が同じかを見る（別の方のカルテに提出しないため）
  * - 読影プログラム（院のパソコン）から届いた結果を、カルテの記録の形にする
+ * - 院長が気づいたことの見直し（相談。2026-11-23）：CDのどの検査を読み直すか・前回の読影として何を渡すか・答えの記録の形
  */
-import type { ImagingEstimate, ImagingReport, Patient } from '@/types/patient'
+import type { ImagingConsult, ImagingConsultVerdict, ImagingEstimate, ImagingReport, Patient } from '@/types/patient'
 
 /** CDから読んだ方（読影プログラムの /scan） */
 export interface CdPatient {
@@ -145,4 +146,105 @@ export function splitEmphasis(textValue: string): Array<{ text: string; bold: bo
   }
   if (last < textValue.length) out.push({ text: textValue.slice(last), bold: false })
   return out
+}
+
+// ──────────────────────────────────────────────
+// 院長が気づいたことの見直し（相談）
+// ──────────────────────────────────────────────
+
+export const CONSULT_VERDICTS: Record<ImagingConsultVerdict, { label: string; tone: 'teal' | 'amber' | 'slate' }> = {
+  seen: { label: '気づいた所見を確認', tone: 'teal' },
+  partly: { label: '一部を確認', tone: 'amber' },
+  not_seen: { label: '確認できず', tone: 'slate' },
+  cannot_judge: { label: 'この画像では判断できない', tone: 'slate' },
+}
+
+export const MAX_OBSERVATION_CHARS = 600
+export const MAX_LOCATION_CHARS = 200
+
+/** 読影プログラムが返す、見直しの結果 */
+export interface ReaderConsultResult {
+  kind: 'consult'
+  verdict: ImagingConsultVerdict
+  verdict_label: string
+  headline: string
+  answer: string[]
+  next: string[]
+  title_region: string
+  modalities: string[]
+  counts: Record<string, number>
+  study_date: string
+  institution: string
+  bytes: number
+  file_name: string
+  minutes: number
+}
+
+/** 読影プログラムが見直し（相談）に対応しているか（v1.1.0〜。古い版は features が無い） */
+export function readerCanConsult(health: { features?: string[] } | null | undefined): boolean {
+  return Array.isArray(health?.features) && health.features.includes('consult')
+}
+
+/**
+ * CDのどの検査を読み直すか。レポートの撮影日と同じ日の検査を選ぶ（同じ日が無い・撮影日が分からないときは全部）。
+ * matched が false なら、画面で「撮影日がちがいます」と知らせる
+ */
+export function studiesForReport(
+  studies: Array<{ uid: string; date: string }>,
+  report: Pick<ImagingReport, 'studyDate'>,
+): { uids: string[]; matched: boolean } {
+  const same = report.studyDate ? studies.filter(s => s.date === report.studyDate) : []
+  if (same.length > 0) return { uids: same.map(s => s.uid), matched: true }
+  return { uids: studies.map(s => s.uid), matched: !report.studyDate }
+}
+
+/** 前回の読影として渡すもの（AIが書いた要点だけ。PDF・お名前は渡さない） */
+export function consultPrior(report: ImagingReport): {
+  region: string
+  headline: string
+  summary: string[]
+  estimates: Array<{ condition: string; percent: number }>
+} {
+  return {
+    region: text(report.region, 40),
+    headline: text(report.headline, 80),
+    summary: (report.summary ?? []).slice(0, 8).map(s => text(s, 500)),
+    estimates: (report.estimates ?? []).slice(0, 10).map(e => ({ condition: text(e.condition, 80), percent: e.percent })),
+  }
+}
+
+/** 見直しの結果を、カルテに残す記録の形にする（届いた値はそのまま信じず、形と長さを整える） */
+export function toImagingConsult(input: {
+  id: string
+  result: ReaderConsultResult
+  observation: string
+  location?: string
+  storagePath: string
+  bytes: number
+  askedAt: string
+  askedBy?: string
+}): ImagingConsult {
+  const r = input.result
+  const verdict: ImagingConsultVerdict = r.verdict in CONSULT_VERDICTS ? r.verdict : 'cannot_judge'
+  const lines = (v: unknown, n: number, max: number) => (Array.isArray(v) ? v : []).slice(0, n).map(x => text(x, max)).filter(Boolean)
+  return {
+    id: input.id,
+    observation: text(input.observation, MAX_OBSERVATION_CHARS),
+    location: text(input.location, MAX_LOCATION_CHARS) || undefined,
+    verdict,
+    headline: text(r.headline, 80),
+    answer: lines(r.answer, 6, 600),
+    next: lines(r.next, 8, 300),
+    storagePath: input.storagePath,
+    fileName: text(r.file_name, 80).replace(/[\\/:*?"<>|]/g, '') || '画像の見直し.pdf',
+    bytes: input.bytes,
+    author: 'Claude（AI）',
+    askedAt: input.askedAt,
+    askedBy: input.askedBy,
+  }
+}
+
+/** 画像レポートと、その相談のPDFの場所（削除・バックアップで使う） */
+export function reportFilePaths(report: Pick<ImagingReport, 'storagePath' | 'consults'>): string[] {
+  return [report.storagePath, ...(report.consults ?? []).map(c => c.storagePath)].filter(Boolean)
 }

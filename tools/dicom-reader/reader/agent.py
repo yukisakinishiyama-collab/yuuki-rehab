@@ -24,6 +24,17 @@ PROMPT = """このフォルダの INSTRUCTIONS.md を最初に読み、その手
 - このフォルダの外は読まない・書かない。質問はせず、最後まで自分で進めてください
 - 終わったら「完了」とだけ答えてください
 """
+CONSULT_PROMPT = """このフォルダの CONSULT.md を最初に読み、その手順どおりに、院長が気づいたこと（consult.md）を原画像で見直してください。
+
+- 読影の方法（左右と向き・連続評価・直接所見・過剰読影の防止・図の作り方）は INSTRUCTIONS.md の §2〜§6 に従います
+- 道具は `python rt.py …` だけです（`python rt.py -h`）。画像は views/ に出るので Read で開きます
+- 成果物は out/consult.json と figures/ の図です。`python rt.py check` が OK と出るまで直してください
+- このフォルダの外は読まない・書かない。質問はせず、最後まで自分で進めてください
+- 終わったら「完了」とだけ答えてください
+"""
+CONSULT_REPAIR_PROMPT = """out/consult.json に直す所が残っています。`python rt.py check` を実行し、指摘をすべて直して OK にしてください。
+見直しのやり直しは不要です（CONSULT.md の「out/consult.json の形」に合わせるだけ）。終わったら「完了」とだけ答えてください。
+"""
 REPAIR_PROMPT = """out/report.json に直す所が残っています。`python rt.py check` を実行し、指摘をすべて直して OK にしてください。
 読影のやり直しは不要です（INSTRUCTIONS.md の「out/report.json の形」に合わせるだけ）。終わったら「完了」とだけ答えてください。
 """
@@ -175,8 +186,11 @@ def run(claude: list[str], work: Path, cfg: dict, prompt: str, on_stage, proc_ho
                             on_stage(ja, counts)
                             break
                     else:
-                        if c.get("name") in ("Write", "Edit") and "report.json" in str(inp.get("file_path") or ""):
+                        target = str(inp.get("file_path") or "")
+                        if c.get("name") in ("Write", "Edit") and "report.json" in target:
                             on_stage("レポートを書いています", counts)
+                        elif c.get("name") in ("Write", "Edit") and "consult.json" in target:
+                            on_stage("答えを書いています", counts)
             elif t == "result":
                 result.update(ev)
                 log.write(json.dumps({k: ev.get(k) for k in ("subtype", "is_error", "num_turns", "total_cost_usd", "duration_ms", "usage")},

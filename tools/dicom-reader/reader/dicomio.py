@@ -405,6 +405,25 @@ def write_case(work: Path, series: list[dict], age_text: str, sex_ja: str, compl
     (Path(work) / "case.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_consult(work: Path, observation: str, location: str, prior: dict) -> None:
+    """見直し（相談）のときに、case.md とならべて置く consult.md（院長の気づき・前回のAIの読影。氏名などは除いたもの）"""
+    lines = ["# 院長が気づいたこと（相談）", "", f"- 気づいたこと: {observation or '（記載なし）'}",
+             f"- 場所（院長の記載）: {location or '（記載なし。気づいたことの文から部位を決めて探す）'}", "",
+             "# 前回のAIの読影（参考。まちがっていることもある）", ""]
+    if prior.get("region"):
+        lines.append(f"- 部位: {prior['region']}")
+    if prior.get("headline"):
+        lines.append(f"- 一行: {prior['headline']}")
+    if prior.get("summary"):
+        lines.append("- 総括:")
+        lines += [f"  - {x}" for x in prior["summary"]]
+    if prior.get("estimates"):
+        lines.append("- 見積もり: " + "／".join(f"{e['condition']} 約{e['percent']}%" for e in prior["estimates"]))
+    if len(lines) == 7:
+        lines.append("（前回の読影の記録はありません）")
+    (Path(work) / "consult.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def series_rows(series: list[dict]) -> list[list[str]]:
     """レポートの「撮像シリーズ」の表（DICOMの値から作る）"""
     rows = []
