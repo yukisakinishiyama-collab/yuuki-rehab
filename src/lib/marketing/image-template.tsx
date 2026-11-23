@@ -414,6 +414,36 @@ export interface StoryImageInput {
 }
 
 /**
+ * 空き状況のストーリーに、いつも入れる「急なケガ」の一文（2026-11-23 院長の依頼。DECISIONS.md）。
+ * 空きが無い時間でも、急なケガ（急性外傷）は相談してよいことを伝える。効果・受け入れを約束する言い方はしない
+ */
+export const STORY_ACUTE_INJURY_LINES = [
+  '急なケガ（急性外傷）は、この限りではありません',
+  '空きが無い時間でも、まずはお電話でご相談ください',
+] as const
+
+/** 「急なケガ」の枠（電話番号のすぐ上に置く） */
+function AcuteInjuryNote({ compact }: { compact: boolean }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+        gap: compact ? 2 : 6,
+        padding: compact ? '12px 22px' : '18px 26px',
+        borderRadius: 24,
+        background: 'rgba(251,191,36,0.14)',
+        border: '3px solid #fbbf24',
+      }}
+    >
+      <div style={{ display: 'flex', fontSize: compact ? 32 : 36, fontWeight: 700, color: '#fde68a' }}>{STORY_ACUTE_INJURY_LINES[0]}</div>
+      <div style={{ display: 'flex', fontSize: compact ? 26 : 30, color: '#fef3c7' }}>{STORY_ACUTE_INJURY_LINES[1]}</div>
+    </div>
+  )
+}
+
+/**
  * 初めての方（初診・約60分）もえらべる時間の印「◎」。文字ではなく図形で描く（フォントに無くても□にならないように）
  */
 function FirstMark({ size, color = MINT }: { size: number; color?: string }) {
@@ -449,7 +479,7 @@ function FirstLegend({ size, anyFirst }: { size: number; anyFirst: boolean }) {
 /** 時間ごとの枠（「15:30 残り2」）。午前・午後に分けて並べる */
 function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolean }) {
   const slots = row.slots ?? []
-  // 時間が多い日は5列・小さめにして、下のQR・電話番号にかからないようにする
+  // 時間が多い日は6列・小さめにして、下の「急なケガ」・電話番号にかからないようにする
   const many = slots.length > 10
   const groups: Array<{ label: string; items: typeof slots }> = [
     { label: '午前', items: slots.filter((s) => s.time < '13:00') },
@@ -465,7 +495,7 @@ function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolea
               <Pill level={row.closed ? 'closed' : 'full'} size={34} />
             </div>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: many ? 10 : 14 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: many ? 8 : 14 }}>
               {g.items.map((s) => (
                 <div
                   key={s.time}
@@ -474,18 +504,18 @@ function SlotGrid({ row, showRemaining }: { row: StoryRow; showRemaining: boolea
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: many ? 170 : 207,
-                    padding: many ? '8px 0' : '16px 0',
-                    borderRadius: many ? 18 : 22,
+                    width: many ? 140 : 207,
+                    padding: many ? '6px 0' : '16px 0',
+                    borderRadius: many ? 16 : 22,
                     background: s.remaining <= 1 ? 'rgba(251,191,36,0.18)' : 'rgba(20,184,166,0.2)',
                     border: `3px solid ${s.remaining <= 1 ? '#fbbf24' : '#14b8a6'}`,
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ display: 'flex', fontSize: many ? 38 : 46, fontWeight: 700 }}>{s.time}</div>
-                    {s.first ? <FirstMark size={many ? 26 : 32} /> : null}
+                    <div style={{ display: 'flex', fontSize: many ? 34 : 46, fontWeight: 700 }}>{s.time}</div>
+                    {s.first ? <FirstMark size={many ? 22 : 32} /> : null}
                   </div>
-                  <div style={{ display: 'flex', fontSize: many ? 22 : 28, color: s.remaining <= 1 ? '#fde68a' : '#99f6e4' }}>
+                  <div style={{ display: 'flex', fontSize: many ? 20 : 28, color: s.remaining <= 1 ? '#fde68a' : '#99f6e4' }}>
                     {showRemaining ? `残り${s.remaining}枠` : s.remaining <= 1 ? 'あと少し' : '空きあり'}
                   </div>
                 </div>
@@ -607,6 +637,9 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
   // 縮まないように（上から順に積む。日が多い週は文字を少し小さく）
   const fixed = { display: 'flex', flexShrink: 0 } as const
   const many = input.rows.length >= 5
+  // 中身が多いとき（日が多い週・時間が多い日・ひとことあり・午前午後の大きな枠）は、全体を少し詰める。
+  // 「急なケガ」の枠を足しても、電話番号が下の帯（返信の欄など）にかからないように
+  const compact = many || (single?.slots?.length ?? 0) > 10 || Boolean(input.note) || Boolean(single && !withSlots)
   return render(
     <div
       style={{
@@ -620,19 +653,45 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
         color: '#ffffff',
       }}
     >
-      <div style={{ ...fixed, fontSize: 28, fontWeight: 700, letterSpacing: 6, color: MINT }}>YUUKI SEIKOTSU-IN</div>
-      <div style={{ ...fixed, fontSize: 42, fontWeight: 700, marginTop: 6 }}>{p.name}</div>
-      <div style={{ ...fixed, fontSize: single ? (withSlots ? 80 : 96) : 72, fontWeight: 700, marginTop: withSlots ? 36 : single ? 70 : 50, lineHeight: 1.2 }}>{input.title}</div>
-      <div style={{ ...fixed, fontSize: 32, color: '#bfdbe8', marginTop: 10 }}>{input.asOfLabel}</div>
+      {/* 中身が多いときは英字の院名を省く（下の帯に電話番号がかからないように） */}
+      {compact ? null : <div style={{ ...fixed, fontSize: 28, fontWeight: 700, letterSpacing: 6, color: MINT }}>YUUKI SEIKOTSU-IN</div>}
+      <div style={{ ...fixed, fontSize: 42, fontWeight: 700, marginTop: compact ? 0 : 6 }}>{p.name}</div>
+      <div
+        style={{
+          ...fixed,
+          fontSize: single ? (withSlots ? 80 : 96) : 72,
+          fontWeight: 700,
+          marginTop: withSlots ? (compact ? 24 : 36) : single ? 70 : compact ? 36 : 50,
+          lineHeight: 1.2,
+        }}
+      >
+        {input.title}
+      </div>
+      <div style={{ ...fixed, flexWrap: 'wrap', alignItems: 'baseline', columnGap: 16, marginTop: 10 }}>
+        <div style={{ display: 'flex', fontSize: 32, color: '#bfdbe8' }}>{input.asOfLabel}</div>
+        <div style={{ display: 'flex', fontSize: 24, color: '#94a3b8' }}>（空き状況は変わることがあります）</div>
+      </div>
       {input.note && (
-        <div style={{ ...fixed, marginTop: 24, padding: '18px 26px', borderRadius: 24, background: 'rgba(94,234,212,0.14)', border: `2px solid ${MINT}`, fontSize: 34, fontWeight: 700, color: '#ccfbf1' }}>
+        <div
+          style={{
+            ...fixed,
+            marginTop: compact ? 18 : 24,
+            padding: compact ? '12px 22px' : '18px 26px',
+            borderRadius: 24,
+            background: 'rgba(94,234,212,0.14)',
+            border: `2px solid ${MINT}`,
+            fontSize: compact ? 32 : 34,
+            fontWeight: 700,
+            color: '#ccfbf1',
+          }}
+        >
           {input.note}
         </div>
       )}
 
       {withSlots ? (
-        <div style={{ ...fixed, flexDirection: 'column', marginTop: 28, gap: 14 }}>
-          <div style={{ display: 'flex', fontSize: 46, fontWeight: 700 }}>{single!.label}</div>
+        <div style={{ ...fixed, flexDirection: 'column', marginTop: compact ? 20 : 28, gap: compact ? 10 : 14 }}>
+          <div style={{ display: 'flex', fontSize: compact ? 42 : 46, fontWeight: 700 }}>{single!.label}</div>
           <SlotGrid row={single!} showRemaining={showRemaining} />
           {(single!.slots ?? []).some((x) => typeof x.first === 'boolean') ? (
             <FirstLegend size={28} anyFirst={(single!.slots ?? []).some((x) => x.first)} />
@@ -659,8 +718,8 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
           ))}
         </div>
       ) : (
-        <div style={{ ...fixed, flexDirection: 'column', marginTop: 44, gap: many ? 14 : 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, paddingRight: 26, fontSize: 28, color: '#bfdbe8' }}>
+        <div style={{ ...fixed, flexDirection: 'column', marginTop: many ? 22 : 44, gap: many ? 10 : 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, paddingRight: 26, fontSize: many ? 24 : 28, color: '#bfdbe8' }}>
             <div style={{ display: 'flex', width: 220, justifyContent: 'center' }}>午前</div>
             <div style={{ display: 'flex', width: 220, justifyContent: 'center' }}>午後</div>
           </div>
@@ -671,12 +730,12 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: many ? '18px 26px' : '24px 26px',
+                padding: many ? '8px 24px' : '24px 26px',
                 borderRadius: 26,
                 background: 'rgba(255,255,255,0.07)',
               }}
             >
-              <div style={{ display: 'flex', fontSize: many ? 40 : 44, fontWeight: 700 }}>{r.label}</div>
+              <div style={{ display: 'flex', fontSize: many ? 38 : 44, fontWeight: 700 }}>{r.label}</div>
               {r.closed ? (
                 <div style={{ display: 'flex', width: 460, justifyContent: 'center' }}>
                   <Pill level="closed" size={30} />
@@ -688,9 +747,9 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
                       ? r.slots.filter((s) => (half === 'am' ? s.time < '13:00' : s.time >= '13:00')).reduce((n, s) => n + s.remaining, 0)
                       : 0
                     return (
-                      <div key={half} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 220, gap: 4 }}>
-                        <Pill level={r[half]} size={30} />
-                        {count > 0 && <div style={{ display: 'flex', fontSize: 22, color: '#bfdbe8' }}>{`残り${count}枠`}</div>}
+                      <div key={half} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 220, gap: many ? 2 : 4 }}>
+                        <Pill level={r[half]} size={many ? 26 : 30} />
+                        {count > 0 && <div style={{ display: 'flex', fontSize: many ? 20 : 22, color: '#bfdbe8' }}>{`残り${count}枠`}</div>}
                       </div>
                     )
                   })}
@@ -701,32 +760,34 @@ export async function renderStoryImage(input: StoryImageInput): Promise<Buffer> 
         </div>
       )}
 
-      <div style={{ ...fixed, marginTop: 'auto', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', fontSize: 46, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
-          <div style={{ display: 'flex', fontSize: 30 }}>
-            {cta === 'qr' && input.qrDataUrl
-              ? 'QRから、その場で予約が確定します'
-              : cta === 'profile'
-                ? 'プロフィールのリンクから、その場で予約が確定します'
-                : 'リンクを押すと、その場で予約が確定します'}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: 10 }}>
-            <div style={{ display: 'flex', fontSize: 30, color: '#bfdbe8' }}>お電話</div>
-            <div style={{ display: 'flex', fontSize: 50, fontWeight: 700, letterSpacing: 2 }}>{p.phone}</div>
-          </div>
-          <div style={{ display: 'flex', fontSize: 28, color: '#bfdbe8' }}>{p.address.replace(/^山口県/, '')}（駐車場あり）</div>
-          <div style={{ display: 'flex', fontSize: 24, color: '#94a3b8', marginTop: 4 }}>（空き状況は変わることがあります）</div>
-        </div>
-        {cta === 'qr' && input.qrDataUrl && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <div style={{ display: 'flex', padding: 12, borderRadius: 24, background: '#ffffff' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- next/og（Satori）で描く画像の中 */}
-              <img src={input.qrDataUrl} width={232} height={232} alt="" />
+      <div style={{ ...fixed, flexDirection: 'column', marginTop: 'auto', paddingTop: compact ? 14 : 24, gap: compact ? 14 : 26 }}>
+        <AcuteInjuryNote compact={compact} />
+        <div style={{ ...fixed, alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 4 : 8, flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', fontSize: compact ? 40 : 46, fontWeight: 700, color: MINT }}>ネット予約は24時間受付</div>
+            <div style={{ display: 'flex', fontSize: compact ? 28 : 30 }}>
+              {cta === 'qr' && input.qrDataUrl
+                ? 'QRから、その場で予約が確定します'
+                : cta === 'profile'
+                  ? 'プロフィールのリンクから、その場で予約が確定します'
+                  : 'リンクを押すと、その場で予約が確定します'}
             </div>
-            <div style={{ display: 'flex', fontSize: 26, fontWeight: 700, color: MINT }}>ネット予約</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: compact ? 4 : 10 }}>
+              <div style={{ display: 'flex', fontSize: 30, color: '#bfdbe8' }}>お電話</div>
+              <div style={{ display: 'flex', fontSize: compact ? 46 : 50, fontWeight: 700, letterSpacing: 2 }}>{p.phone}</div>
+            </div>
+            <div style={{ display: 'flex', fontSize: 28, color: '#bfdbe8' }}>{p.address.replace(/^山口県/, '')}（駐車場あり）</div>
           </div>
-        )}
+          {cta === 'qr' && input.qrDataUrl && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <div style={{ display: 'flex', padding: 12, borderRadius: 24, background: '#ffffff' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- next/og（Satori）で描く画像の中 */}
+                <img src={input.qrDataUrl} width={232} height={232} alt="" />
+              </div>
+              <div style={{ display: 'flex', fontSize: 26, fontWeight: 700, color: MINT }}>ネット予約</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>,
     w,
