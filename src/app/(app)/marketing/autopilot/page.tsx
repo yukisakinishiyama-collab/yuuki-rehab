@@ -392,6 +392,135 @@ const DAILY_TIME_OPTIONS = Array.from({ length: 27 }, (_, i) => {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 })
 
+
+/** 求人ストーリー（募集の動画を毎日決まった時刻に Instagram のストーリーへ）。2026-11-23 院長の依頼 */
+function RecruitStoryFields({
+  s,
+  setS,
+  disabled,
+  instagram,
+}: {
+  s: AutopilotSettings
+  setS: (next: AutopilotSettings) => void
+  disabled: boolean
+  instagram?: boolean
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [message, setMessage] = useState('')
+  const times = s.recruitStoryTimes ?? []
+  const slots = [0, 1, 2, 3].map((i) => times[i] ?? '')
+  const setTime = (index: number, value: string) => {
+    const next = slots.map((t, i) => (i === index ? value : t)).filter(Boolean)
+    setS({ ...s, recruitStoryTimes: Array.from(new Set(next)).sort() })
+  }
+  const off = disabled || !s.recruitStory
+
+  async function pickVideo(file: File | undefined) {
+    if (!file) return
+    setUploading(true)
+    setMessage('アップロード中…')
+    try {
+      const { upload } = await import('@vercel/blob/client')
+      const blob = await upload(`marketing/recruit/${Date.now()}-${file.name}`, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload',
+      })
+      setS({ ...s, recruitStoryVideoUrl: blob.url })
+      setMessage('アップロードできました。下の「保存」を押すと、この動画で出すようになります。')
+    } catch (e) {
+      setMessage(`アップロードに失敗しました: ${e instanceof Error ? e.message : '不明'}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <fieldset className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-3">
+      <legend className="px-1 text-sm font-bold text-slate-900">求人ストーリー（毎日の決まった時刻）</legend>
+      <label className="flex items-start gap-2 font-bold max-lg:min-h-10">
+        <input
+          type="checkbox"
+          checked={Boolean(s.recruitStory)}
+          disabled={disabled}
+          onChange={(e) => setS({ ...s, recruitStory: e.target.checked })}
+          className="mt-0.5 h-5 w-5 shrink-0"
+        />
+        毎日、決まった時刻に募集の動画をInstagramのストーリーへ出す（承認なしで出します）
+        {instagram === false && <span className="ml-1 text-xs font-bold text-amber-700">※いまInstagramとつながっていないため、出しません</span>}
+      </label>
+      <p className="text-xs leading-relaxed text-slate-600">
+        院長が登録した動画を、そのまま出します（中身は毎回同じです）。ストーリーには投稿文もリンクのスタンプも付けられないので、
+        詳しい労働条件は動画の中でDM・お電話へご案内する作りにしてください。採用が決まったら、このチェックを外すか、下の「掲載の終わりの日」を入れてください。
+      </p>
+
+      <div className="space-y-2">
+        <span className="text-xs font-bold text-slate-600">出す動画</span>
+        {s.recruitStoryVideoUrl ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <video src={s.recruitStoryVideoUrl} controls playsInline className="h-40 rounded-lg border border-slate-300 bg-black" />
+            <button
+              type="button"
+              disabled={off}
+              onClick={() => setS({ ...s, recruitStoryVideoUrl: '' })}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 max-lg:min-h-10"
+            >
+              動画を外す
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-amber-700">まだ動画がありません。縦（9:16）・60秒までのmp4をえらんでください。</p>
+        )}
+        <input
+          type="file"
+          accept="video/mp4,video/quicktime,video/*"
+          disabled={off || uploading}
+          onChange={(e) => pickVideo(e.target.files?.[0])}
+          className="block w-full text-xs"
+        />
+        {message && <p className="text-xs text-slate-600">{message}</p>}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-4">
+        {slots.map((value, i) => (
+          <label key={i} className="block">
+            <span className="text-xs font-bold text-slate-600">{`時刻${i + 1}`}</span>
+            <select
+              value={value}
+              disabled={off}
+              onChange={(e) => setTime(i, e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            >
+              <option value="">使わない</option>
+              {DAILY_TIME_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/^0/, '')}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+
+      <label className="block max-w-xs">
+        <span className="text-xs font-bold text-slate-600">掲載の終わりの日（空なら、オフにするまで続けます）</span>
+        <input
+          type="date"
+          value={s.recruitStoryUntil ?? ''}
+          disabled={off}
+          onChange={(e) => setS({ ...s, recruitStoryUntil: e.target.value })}
+          className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+        />
+      </label>
+
+      <p className="text-xs text-slate-500">
+        定期実行（Vercel の Cron）は1時間ごとで、少しずれることがあります。9:00 の分は9時台に出ます。予定から3時間たっても出せなかった分は出しません。
+        出したことは毎回は知らせず、何度やり直しても出せなかったときだけ院長のLINEにお知らせします。
+      </p>
+    </fieldset>
+  )
+}
+
+
 /** 今日の空き（毎日の決まった時刻に、Instagramのストーリー・Googleへ「本日のご予約の空き」を出す） */
 function DailyOpeningsFields({
   s,
@@ -808,6 +937,7 @@ function SettingsPanel({
       </fieldset>
 
       <DailyOpeningsFields s={s} setS={setS} disabled={disabled} instagram={instagram} googleApi={googleApi} />
+      <RecruitStoryFields s={s} setS={setS} disabled={disabled} instagram={instagram} />
 
       <label className="block">
         <span className="text-xs font-bold text-slate-600">来週の投稿で触れてほしいこと（院長メモ・任意）</span>

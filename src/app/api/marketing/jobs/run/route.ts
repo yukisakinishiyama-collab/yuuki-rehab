@@ -35,6 +35,15 @@ async function run() {
     console.error('今日の空きの予定づくりに失敗:', error instanceof Error ? error.message : error)
   }
 
+  // 求人ストーリー（毎日 9:00・14:00・19:00 など）：その日の分の予定を作る（同じ印は1回だけ）
+  let recruitStory: unknown = null
+  try {
+    const { scheduleRecruitStories } = await import('@/lib/marketing/recruit-story-server')
+    recruitStory = await scheduleRecruitStories()
+  } catch (error) {
+    console.error('求人ストーリーの予定づくりに失敗:', error instanceof Error ? error.message : error)
+  }
+
   const jobs = await dueJobs()
   const results: Array<{ id: string; channel: string; outcome: string }> = []
   const manual: PublishJob[] = []
@@ -59,6 +68,15 @@ async function run() {
         await afterDailyOpeningsJob(job, r)
       } catch (error) {
         console.error('今日の空きのあと片付けに失敗:', error instanceof Error ? error.message : error)
+      }
+    }
+    // 求人ストーリー：出せなかったときだけ院長のLINEへ
+    if (job.idempotencyKey.startsWith('recruit-story:')) {
+      try {
+        const { afterRecruitStoryJob } = await import('@/lib/marketing/recruit-story-server')
+        await afterRecruitStoryJob(job, r)
+      } catch (error) {
+        console.error('求人ストーリーのあと片付けに失敗:', error instanceof Error ? error.message : error)
       }
     }
     if (r.outcome === 'action_required' && r.job && !job.idempotencyKey.startsWith('daily-openings:')) manual.push(r.job)
@@ -126,7 +144,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, dailyOpenings, nudged, lineReminders, buffer, google, approvals, aiVideos }
+  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, buffer, google, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

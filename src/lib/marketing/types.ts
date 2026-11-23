@@ -129,6 +129,21 @@ export interface GeneratedContent {
    * 本文と画像をその時刻の空きで作る（daily-openings.ts）。空きが無い・休みの日は出さない
    */
   dailyOpenings?: DailyOpeningsContent
+  /**
+   * 求人ストーリー（instagram_story のとき）。院長が登録した動画を、決まった時刻にそのまま出す。
+   * 空き状況のストーリーとちがい、中身は作り直さない（recruit-story.ts）
+   */
+  recruitStory?: RecruitStoryContent
+}
+
+/** 求人ストーリーの中身（動画をそのまま出す） */
+export interface RecruitStoryContent {
+  /** 外から取りに来られる動画のアドレス（Vercel Blob。Instagram が取りに来る） */
+  videoUrl: string
+  /** この時刻（'YYYY-MM-DDTHH:MM'・日本時間）を過ぎたら出さない */
+  notAfter: string
+  /** 予定の時刻 'HH:MM'（例 '09:00'） */
+  time: string
 }
 
 /** 今日の空き（毎日）の Google 投稿の中身。本文は出す時刻に作る */
