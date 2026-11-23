@@ -123,6 +123,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '今日の空き：出す先（Instagramのストーリー・Google）を1つ以上えらんでください' }, { status: 400 })
     }
   }
+  if (next.recruitStory) {
+    const { isUsableVideoUrl, normalizeRecruitTimes } = await import('@/lib/marketing/recruit-story')
+    if (!isUsableVideoUrl(next.recruitStoryVideoUrl)) {
+      return NextResponse.json({ error: '求人ストーリー：出す動画をえらんでください' }, { status: 400 })
+    }
+    if (normalizeRecruitTimes(next.recruitStoryTimes).length === 0) {
+      return NextResponse.json({ error: '求人ストーリー：出す時刻を1つ以上えらんでください' }, { status: 400 })
+    }
+  }
   await saveAutopilotSettings(next)
   // 今日の空き（毎日）：オフ・時刻や出す先を変えた分は取り消し、オンなら今日の分をすぐ予定に入れる（次の定期実行を待たない）
   try {
@@ -131,6 +140,14 @@ export async function PUT(request: NextRequest) {
     if (next.dailyOpenings) await scheduleDailyOpenings(new Date(), next)
   } catch (error) {
     console.error('[autopilot] 今日の空きの予定を更新できませんでした', error)
+  }
+  // 求人ストーリー：オフ・時刻や動画を変えた分は取り消し、オンなら今日の分をすぐ予定に入れる（次の定期実行を待たない）
+  try {
+    const { cancelPendingRecruitStories, scheduleRecruitStories } = await import('@/lib/marketing/recruit-story-server')
+    await cancelPendingRecruitStories(next)
+    if (next.recruitStory) await scheduleRecruitStories(new Date(), next)
+  } catch (error) {
+    console.error('[autopilot] 求人ストーリーの予定を更新できませんでした', error)
   }
   // Google検索向けの投稿をオフにしたら、予約済みでまだ出していない分も取り消す（すぐに止まるように）
   if (!next.googleSeo) {

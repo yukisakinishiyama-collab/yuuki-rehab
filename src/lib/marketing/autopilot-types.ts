@@ -94,6 +94,19 @@ export interface AutopilotSettings {
   dailyOpeningsStory: boolean
   /** Google（ビジネスプロフィール）の投稿に出す。新しく出したら、前の「今日の空き」の投稿は消して最新の1本だけ残す */
   dailyOpeningsGoogle: boolean
+  /**
+   * 求人ストーリー（毎日）：院長が登録した募集の動画を、決まった時刻（既定 9:00・14:00・19:00）に
+   * Instagram のストーリーへ出す（2026-11-23 院長の依頼）。中身は毎回同じなので作り直さない。
+   * 院長がこの設定をオンにしたことを「毎回の承認」の代わりにする（出すのは院長が確認した動画だけ）。
+   * 採用が決まったらオフにする（または recruitStoryUntil に終わりの日を入れる）
+   */
+  recruitStory: boolean
+  /** 出す時刻（'HH:MM'・日本時間。1〜4個） */
+  recruitStoryTimes: string[]
+  /** 出す動画のアドレス（Vercel Blob。設定画面から動画を選ぶと入る。Instagram が外から取りに来る） */
+  recruitStoryVideoUrl: string
+  /** 掲載の終わりの日 'YYYY-MM-DD'（空なら、オフにするまで続ける） */
+  recruitStoryUntil: string
   /** 下書きを作る時刻（日曜・日本時間の時。既定18時） */
   generateHour: number
   /** 来週の投稿で触れてほしいこと（院長メモ）。次の下書きで1本目のテーマになり、使ったら空に戻る */
@@ -138,6 +151,11 @@ export const DEFAULT_AUTOPILOT_SETTINGS: AutopilotSettings = {
   dailyOpeningsTimes: ['08:00', '13:00'],
   dailyOpeningsStory: true,
   dailyOpeningsGoogle: true,
+  // 求人ストーリー：動画を登録して院長がオンにするまで出さない
+  recruitStory: false,
+  recruitStoryTimes: ['09:00', '14:00', '19:00'],
+  recruitStoryVideoUrl: '',
+  recruitStoryUntil: '',
   generateHour: 18,
   ownerNote: '',
 }

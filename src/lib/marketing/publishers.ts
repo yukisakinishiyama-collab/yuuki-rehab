@@ -39,7 +39,8 @@ export async function publishToChannel(channel: Channel, content: GeneratedConte
       // 宣伝の短い動画（promoVideoId あり）はリールとして出す。AIの投稿案のリールは動画が無いので手で（これまでどおり）
       return content.promoVideoId ? publishPromoVideo(channel, content, ctx.jobKey) : publishInstagram(channel, content)
     case 'instagram_story':
-      return publishInstagramStory(content)
+      // 求人ストーリーは、院長が登録した動画をそのまま出す。空き状況のストーリーは、出す時刻の空きで画像を作る
+      return content.recruitStory ? publishInstagramVideoStory(content) : publishInstagramStory(content)
     case 'google_business':
       return publishGoogleBusiness(content, ctx.jobKey)
     case 'line_broadcast':
@@ -345,6 +346,56 @@ async function publishInstagramStory(content: GeneratedContent): Promise<Publish
     return { kind: 'published', url: postUrl, message: 'Instagramのストーリーに出しました' }
   } catch (error) {
     return { kind: 'error', message: `Instagram APIエラー（ストーリー）: ${error instanceof Error ? error.message : '不明'}` }
+  }
+}
+
+/**
+ * 求人ストーリー（院長が登録した動画を、そのまま Instagram のストーリーへ）。
+ * 2026-11-23 院長の依頼。空き状況のストーリーとちがい、中身は作り直さない（毎回同じ動画）。
+ * 動画は Instagram が URL から取りに来るので、外から読める置き場（Vercel Blob）にあるものだけ。
+ * ストーリーには「リンク」のスタンプも投稿文も付けられない（Instagram の決まり）ので、
+ * 詳しい労働条件は動画の中で DM・お電話へ案内している。
+ */
+async function publishInstagramVideoStory(content: GeneratedContent): Promise<PublishOutcome> {
+  const recruit = content.recruitStory
+  if (!recruit) return { kind: 'error', message: '求人ストーリーの動画の情報がありません' }
+  const { isStaleRecruitStory } = await import('./recruit-story')
+  const { jstParts } = await import('./autopilot-planner')
+  if (isStaleRecruitStory(recruit.notAfter, jstParts(new Date()).local)) {
+    return { kind: 'skipped', message: '予定の時刻から3時間たったため出しませんでした（次の時刻の分で出します）' }
+  }
+  const manual = (reason: string): PublishOutcome => ({
+    kind: 'action_required',
+    reason: `${reason}今回は手で投稿してください（動画を開いて保存できます）。`,
+    manualUrl: recruit.videoUrl,
+  })
+  const { isFetchableFromOutside } = await import('./promo-video-server')
+  if (!isFetchableFromOutside(recruit.videoUrl)) {
+    return manual('動画が院内アプリの中にあり、Instagramから取りに来られません（設定画面から動画を登録し直してください）。')
+  }
+  const { getInstagramToken, getInstagramUserId, INSTAGRAM_GRAPH_HOST } = await import('./instagram-token')
+  const token = await getInstagramToken()
+  const igUserId = await getInstagramUserId()
+  // 1日に何回も出すので、つながっていないときに毎回LINEへ届けると多すぎる（設定画面に出す）
+  if (!token || !igUserId) {
+    return { kind: 'skipped', message: 'Instagramとつながっていないため出しませんでした（求人ストーリー）。自動投稿の設定の「Instagramとつなぐ」で直ります' }
+  }
+  try {
+    const creationId = await igCreateContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, {
+      media_type: 'STORIES',
+      video_url: recruit.videoUrl,
+    })
+    // 動画の取り込みは画像より長い（リールと同じだけ待つ）
+    await igWaitForContainer(INSTAGRAM_GRAPH_HOST, token, creationId, 40)
+    const postUrl = await igPublishContainer(INSTAGRAM_GRAPH_HOST, igUserId, token, creationId)
+    return { kind: 'published', url: postUrl, message: 'Instagramのストーリーに求人の動画を出しました' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '不明'
+    // 動画の形式などが合わないときは、やり直しても同じなので手で
+    if (/取り込めませんでした|video|format|aspect|duration|codec/i.test(message)) {
+      return manual(`Instagramが動画を受け付けませんでした（${message.slice(0, 200)}）。`)
+    }
+    return { kind: 'error', message: `Instagram APIエラー（求人ストーリー）: ${message}` }
   }
 }
 
