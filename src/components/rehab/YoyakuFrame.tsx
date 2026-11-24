@@ -9,11 +9,15 @@
 // まだ開いている途中で「予約」に来たときは、白い画面のままにせず、待っていることと目安の秒数を出す（lib/yoyaku-preload.ts）。
 // 予約管理画面のログイン（管理チケット）は12時間で切れるので、切れる前に新しいチケットで読み直す
 // （見ていないとき・しばらく離れて戻ってきたときはだまって、見ている最中は「読み直す」ボタンで。lib/yoyaku-ticket.ts）。
+// 上の切りかえで「来院予定（日にち）」＝時間を決めない来院予定の一覧（VisitPlansPanel。2026-11-24）も開ける。
+// そちらを見ている間も予約の画面は捨てず、隠すだけ（予約システムには「見えていない」と知らせる）。
 // ──────────────────────────────────────────────
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { preconnect } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, Loader2, RefreshCw } from 'lucide-react'
+import { CalendarCheck, CalendarClock, ExternalLink, Loader2, RefreshCw } from 'lucide-react'
+import VisitPlansPanel, { useTodayPlanCount } from '@/components/clinic/VisitPlansPanel'
+import { getYoyakuView, setYoyakuView, subscribeYoyakuView } from '@/lib/yoyaku-view'
 import { getPatients, initPatientStore } from '@/lib/patient-store'
 import { matchKartePatients } from '@/lib/karte-link'
 import { adminFrameAge, adminFrameNotice, shouldAutoRefresh, type AdminFrameAge } from '@/lib/yoyaku-ticket'
@@ -56,6 +60,10 @@ function readLoadHistory(): number[] {
 export default function YoyakuFrame({ visible }: { visible: boolean }) {
   // 予約システムの入口へ、先に通り道をつないでおく（名前の引き・暗号の準備のぶん早くなる）
   preconnect('https://script.google.com')
+  // 予約表（時間）と来院予定（日にち）の、どちらを見ているか。予約の画面（iframe）が見えているのは予約表のときだけ
+  const view = useSyncExternalStore(subscribeYoyakuView, getYoyakuView, () => 'slots' as const)
+  const frameShown = visible && view === 'slots'
+  const todayPlans = useTodayPlanCount()
   const [mounted, setMounted] = useState(false)
   // 予約の画面が開き終わったか（iframe の読みこみ、または予約画面からの合図）。読み直すたびに false に戻す
   const [ready, setReady] = useState(false)
@@ -71,7 +79,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   const loadedAtRef = useRef(0)
   const [age, setAge] = useState<AdminFrameAge>('fresh')
   const [refreshing, setRefreshing] = useState(false)
-  const visibleRef = useRef(visible)
+  const visibleRef = useRef(frameShown)
   // 予約の画面の中（予約システムのページ）。「院内アプリの中です」の合図が届いたときに控え、見えているかを知らせる
   const frameWindowRef = useRef<{ win: Window; origin: string } | null>(null)
   const router = useRouter()
@@ -153,14 +161,14 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
     }
   }, [applyAdminUrl])
 
-  // 「予約」に切りかえた・ほかの画面へ移ったとき：見はりに伝え、ほかの画面へ移ったときに古くなっていれば読み直す
+  // 「予約」（予約表）に切りかえた・ほかの画面や来院予定へ移ったとき：見はりに伝え、移ったときに古くなっていれば読み直す
   useEffect(() => {
-    visibleRef.current = visible
+    visibleRef.current = frameShown
     postFrameVisible()
-    if (visible) return
+    if (frameShown) return
     const next = adminFrameAge(loadedAtRef.current, Date.now())
     if (shouldAutoRefresh({ age: next, frameVisible: false, awayMs: 0 })) void fetchAdminUrl().then(applyAdminUrl)
-  }, [visible, applyAdminUrl, postFrameVisible])
+  }, [frameShown, applyAdminUrl, postFrameVisible])
 
   // 初めて表示された時点でマウントし、以後はセッション中ずっと保持する
   // （レンダー中のstate調整パターン。effect不要でラッチできる）
@@ -205,7 +213,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   }, [])
 
   // 「予約」を見ていて、まだ開いている途中のときだけ、1秒ごとに待ち時間の表示を動かす
-  const waiting = visible && mounted && !ready
+  const waiting = frameShown && mounted && !ready
   useEffect(() => {
     if (!waiting) return
     const id = window.setInterval(() => {
@@ -284,8 +292,45 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
         </div>
       </div>
 
+      {/* 予約表（時間の予約）と、来院予定（日にちだけ）の切りかえ */}
+      <div role="tablist" aria-label="予約の見方" className="mb-3 flex w-full gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit">
+        {([
+          { key: 'slots', label: '予約表', sub: '（時間）', icon: CalendarClock },
+          { key: 'plans', label: '来院予定', sub: '（日にち）', icon: CalendarCheck },
+        ] as const).map(t => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={view === t.key}
+            onClick={() => setYoyakuView(t.key)}
+            className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-bold transition-colors sm:flex-none ${
+              view === t.key ? 'bg-white text-teal-800 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <t.icon size={15} aria-hidden />
+            <span className="whitespace-nowrap">
+              {t.label}
+              {/* スマホでは幅が足りないので（時間）（日にち）を省く */}
+              <span className="hidden sm:inline">{t.sub}</span>
+            </span>
+            {t.key === 'plans' && todayPlans > 0 && (
+              <span className="whitespace-nowrap rounded-full bg-teal-700 px-1.5 py-0.5 text-xs leading-none text-white" aria-label={`今日 ${todayPlans}人`}>
+                今日{todayPlans}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {view === 'plans' && (
+        <div className="min-h-0 flex-1 overflow-y-auto pb-4" role="tabpanel" aria-label="来院予定（日にち）">
+          <VisitPlansPanel shown={visible && view === 'plans'} />
+        </div>
+      )}
+
       {/* ログイン（管理チケット）の期限が近い・切れたときの案内（見ている最中は勝手に読み直さない） */}
-      {notice && (
+      {view === 'slots' && notice && (
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2" role="status">
           <p className="text-sm font-bold text-amber-900">{notice}</p>
           <button
@@ -301,7 +346,7 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
       )}
 
       {/* 予約管理画面（GAS）を埋め込み（常駐。ログインの期限が近いときだけ、新しいチケットで読み直す） */}
-      <div className="relative flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className={view === 'slots' ? 'relative flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm' : 'hidden'}>
         {adminUrl && (
           <iframe
             key={adminUrl}
@@ -322,9 +367,11 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
         )}
       </div>
 
-      <p className="text-xs text-slate-500 mt-2">
-        画面が表示されない・ログインがうまくいかない場合は「新しいタブで開く」をご利用ください。
-      </p>
+      {view === 'slots' && (
+        <p className="text-xs text-slate-500 mt-2">
+          画面が表示されない・ログインがうまくいかない場合は「新しいタブで開く」をご利用ください。
+        </p>
+      )}
     </div>
   )
 }

@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 import { MoreLink, Panel } from './Panel'
 import { INTRO_VIDEOS, lengthLabel } from '@/data/intro-videos'
 import BackupReminder from './BackupReminder'
+import { TodayVisitPlans } from './VisitPlansPanel'
 
 function todayLabel(): string {
   try {
@@ -452,6 +453,8 @@ export default function TodayDashboard() {
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="min-w-0 space-y-5 lg:col-span-2">
           <YoyakuTodayCard />
+          {/* 時間を決めずに「今日行きます」と聞いた方（来院予定・日にちだけ。2026-11-24） */}
+          <TodayVisitPlans />
           {/* お名前を入れると次の予約日が分かる */}
           <NextReservationCard />
           {/* 明日の予約で前日のお知らせが届かない方（電話で確かめる）・今日来られる方で届く手段が無い方（2026-11-20） */}
