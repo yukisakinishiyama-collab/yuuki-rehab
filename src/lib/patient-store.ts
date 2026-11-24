@@ -8,6 +8,7 @@ import type {
   ExplanationOverride, CancellationRecord
 } from '@/types/patient'
 import type { KarteDoc } from '@/types/karte-docs'
+import type { VisitPlan } from '@/lib/visit-plans'
 
 const STORE_VERSION = '1'
 
@@ -30,6 +31,8 @@ const KEYS = {
   kartePhotos: 'pt_karte_photos',
   imagingReports: 'pt_imaging_reports',
   karteDocs: 'pt_karte_docs',
+  // 来院予定（日にちだけ。時間の予約とは別。2026-11-24）
+  visitPlans: 'pt_visit_plans',
   intakes: 'pt_intakes',
   explanationOverrides: 'pt_explanation_overrides',
   initialized: 'pt_initialized',
@@ -292,6 +295,23 @@ export function saveImagingReport(report: ImagingReport): void {
 
 export function deleteImagingReport(id: string): void {
   set(KEYS.imagingReports, getImagingReports().filter(r => r.id !== id))
+}
+
+// ── 来院予定（日にちだけ。予約システムの時間の枠とは別。lib/visit-plans.ts） ──
+export function getVisitPlans(): VisitPlan[] {
+  return get<VisitPlan>(KEYS.visitPlans)
+}
+
+export function saveVisitPlan(plan: VisitPlan): void {
+  const list = getVisitPlans()
+  const idx = list.findIndex(p => p.id === plan.id)
+  if (idx >= 0) list[idx] = plan
+  else list.push(plan)
+  set(KEYS.visitPlans, list)
+}
+
+export function deleteVisitPlan(id: string): void {
+  set(KEYS.visitPlans, getVisitPlans().filter(p => p.id !== id))
 }
 
 // ── 資料（論文・リハビリプロトコルなど。題名・メモと保存場所。ファイル本体はクラウド） ──

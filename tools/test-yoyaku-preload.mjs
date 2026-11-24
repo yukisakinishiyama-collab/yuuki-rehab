@@ -96,8 +96,9 @@ t('予約の画面へ「いま見えているか」を知らせる（予約シ�
   // 合図が届いた画面（event.source）を控え、そこへ送る。宛先は合図の出どころだけ
   assert.ok(/'yuuki:karte-hello'[\s\S]{0,600}frameWindowRef\.current = \{ win: source, origin: event\.origin \}[\s\S]{0,80}postFrameVisible\(\)/.test(frame))
   assert.ok(/postMessage\(frameVisibleMessage\(visibleRef\.current\), \{ targetOrigin: target\.origin \}\)/.test(frame))
-  // 「予約」に切りかえた・ほかの画面へ移ったときにも知らせる
-  assert.ok(/visibleRef\.current = visible\n\s+postFrameVisible\(\)/.test(frame))
+  // 「予約」に切りかえた・ほかの画面や来院予定（日にち）へ移ったときにも知らせる（見えているのは予約表のときだけ。2026-11-24）
+  assert.ok(/const frameShown = visible && view === 'slots'/.test(frame))
+  assert.ok(/visibleRef\.current = frameShown\n\s+postFrameVisible\(\)/.test(frame))
 })
 
 console.log(`\n${n} 件すべて通過`)
