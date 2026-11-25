@@ -15,8 +15,8 @@ import { Check, MessageCircle, Send } from 'lucide-react'
 import type { Patient } from '@/types/patient'
 import { getPatients, initPatientStore } from '@/lib/patient-store'
 import { useLineLinks } from '@/lib/line-link-client'
-import { patientLinkKey, type LineLinkSummary } from '@/lib/line-link'
-import { matchKartePatients } from '@/lib/karte-link'
+import type { LineLinkSummary } from '@/lib/line-link'
+import { matchLinkForReservation, nearMissFor, nearMissText } from '@/lib/line-link-match'
 import { formatDateJa, patientConfirmText } from '@/lib/reservation-message'
 import { cn } from '@/lib/utils'
 import { Panel } from './Panel'
@@ -48,6 +48,11 @@ interface Item {
   name: string
   reservationNo: string
   link: LineLinkSummary
+  /**
+   * 自動のお知らせ（確定・前日）は届かない予約（カルテには LINE があるが、予約からは決められない）。理由と直し方。
+   * 送る先を院長が確かめてから、手で送ることはできる
+   */
+  caution?: string
 }
 
 interface SentInfo {
@@ -101,7 +106,7 @@ async function readUpcoming(): Promise<Upcoming> {
 }
 
 export default function LineReservationPanel() {
-  const { links, linkFor } = useLineLinks()
+  const { links } = useLineLinks()
   const [rows, setRows] = useState<(FeedRow & { date: string })[] | null>(null)
   const [until, setUntil] = useState('')
   const [noKey, setNoKey] = useState(false)
@@ -153,21 +158,26 @@ export default function LineReservationPanel() {
     }
   }, [load])
 
-  /** 予約の方のLINE（電話＋お名前が同じLINE → 無ければ、カルテを通して（お名前＋生年月日）） */
+  /**
+   * 予約の方の LINE。サーバーが確定・前日のお知らせを自動で送るときと同じ決まりで探す（lib/line-link-match.ts）。
+   * 見つからないが「近いカルテ」（同じお名前のカルテが2つ以上・同じ電話でお名前の字がちがう）に LINE が1つだけあるときは、
+   * 「自動では届きません」の理由つきで出す（送る先のお名前を確かめて、手で送れる。2026-11-25）
+   */
   const items = useMemo<Item[]>(() => {
     if (!rows || !links) return []
     const out: Item[] = []
     for (const row of rows) {
-      const key = patientLinkKey(row.name, row.phone)
-      let link: LineLinkSummary | null | undefined = key ? links.find((l) => l.key === key) : undefined
-      if (!link) {
-        const kartes = matchKartePatients(patients, row.name, row.phone)
-        if (kartes.length === 1) link = linkFor(kartes[0])
+      const base = { date: row.date, time: hhmm(row.time), name: row.name, reservationNo: row.reservationNo }
+      const m = matchLinkForReservation(row, patients, links)
+      if (m.linked) {
+        out.push({ ...base, link: m.link })
+        continue
       }
-      if (link) out.push({ date: row.date, time: hhmm(row.time), name: row.name, reservationNo: row.reservationNo, link })
+      const near = nearMissFor(row, patients, links)
+      if (near && new Set(near.kartes.map((k) => k.link.key)).size === 1) out.push({ ...base, link: near.kartes[0].link, caution: nearMissText(near) })
     }
     return out.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  }, [rows, links, patients, linkFor])
+  }, [rows, links, patients])
 
   // 前日のお知らせの控えを、いま読んだ一覧で最新にする（予約の通知の前からある予約・日時の変更・キャンセルをそろえる）
   const syncBody = useMemo(() => {
@@ -180,7 +190,8 @@ export default function LineReservationPanel() {
       from: now.date,
       to,
       rows: rows.map((r) => ({ reservationNo: r.reservationNo, date: r.date, time: hhmm(r.time) })),
-      items: items.map((i) => ({ key: i.link.key, reservationNo: i.reservationNo, date: i.date, time: i.time })),
+      // 自動では決められない予約（caution）は控えに入れない（控えからの前日のお知らせを、ちがう方へ送らない）
+      items: items.filter((i) => !i.caution).map((i) => ({ key: i.link.key, reservationNo: i.reservationNo, date: i.date, time: i.time })),
     })
   }, [rows, until, links, items])
   useEffect(() => {
@@ -270,6 +281,7 @@ export default function LineReservationPanel() {
                           {formatDateJa(item.date)} {item.time}
                         </p>
                         <p className="text-sm text-slate-800">{item.name} 様</p>
+                        {item.caution && <p className="mt-1 text-xs leading-relaxed text-amber-900">{item.caution}</p>}
                         <div className="mt-1">
                           {status === 'sent' && s && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-800">
@@ -305,6 +317,11 @@ export default function LineReservationPanel() {
                     {open && (
                       <div className="mt-2 space-y-2 rounded-lg border border-green-200 bg-white p-3">
                         <p className="text-xs font-bold text-slate-600">この文面を {item.link.name} 様のLINEへ送ります</p>
+                        {item.caution && (
+                          <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-900">
+                            予約のお名前は「{item.name} 様」です。同じ方のLINEであることを確かめてから送ってください。
+                          </p>
+                        )}
                         <p className="whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm text-slate-800">
                           {patientConfirmText({ name: item.link.name, date: item.date, time: item.time, reservationNo: item.reservationNo, changeUrl: changeLinks[item.reservationNo] })}
                         </p>

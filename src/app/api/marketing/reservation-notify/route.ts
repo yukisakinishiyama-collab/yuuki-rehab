@@ -24,9 +24,9 @@
  * 3) LINE 連携の方（カルテの QR などで院内アプリと結びついた方。予約システムは LINE を知らない）へ（予約システム v3.27〜。
  *    2026-11-21 院長の依頼「予約確定・前日の2回、患者様のLINEに」。lib/marketing/line-reservation-server.ts）
  *    - kind: 'confirm-linked' … 院で登録した予約（管理画面・急患のすぐ登録）。お名前・電話で連携を探し、「確定しました」を1通
- *      → { linked, delivered, result }（院長の LINE には知らせない）
+ *      → { linked, delivered, result, why }（院長の LINE には知らせない。why は LINE 連携を見つけた道すじ・見つからなかった理由）
  *    - kind: 'remind-linked'  … 毎朝8時の前日のお知らせ。date＋rows（明日の確定の予約のうち、予約システムが LINE を知らないもの）
- *      → { results: [{ reservationNo, linked, delivered, optedOut }] }。届かなかった方は予約システムがメールで送る
+ *      → { results: [{ reservationNo, linked, delivered, optedOut, why }] }。届かなかった方は予約システムがメールで送る
  *
  * 新しい予約（kind: 'new'）のときは、返事のあとで、カルテが無い方のカルテを自動で作る
  * （lib/karte/auto-register-server.ts。2026-11-19 院長の依頼）。
@@ -221,7 +221,8 @@ export async function POST(request: NextRequest) {
     const { confirmClinicReservation } = await import('@/lib/marketing/line-reservation-server')
     const r = await confirmClinicReservation({ reservationNo: body.reservationNo, name: body.name, phone: body.phone, date: body.date, time: body.time })
     console.log('[line-reservation] 院で登録した予約の確定:', r.note)
-    return NextResponse.json({ ok: true, linked: r.linked, delivered: r.delivered, result: r.result })
+    // why … 見つけた道すじ・見つからなかった理由（予約システムの実行ログで原因がわかるように。お名前などは入らない）
+    return NextResponse.json({ ok: true, linked: r.linked, delivered: r.delivered, result: r.result, why: r.why })
   }
   if (body.kind === 'remind-linked') {
     const rows = Array.isArray(body.rows) ? (body.rows as Array<Record<string, unknown>>) : null
@@ -236,11 +237,15 @@ export async function POST(request: NextRequest) {
         .map((r) => ({ reservationNo: String(r.reservationNo ?? ''), name: String(r.name ?? ''), phone: String(r.phone ?? ''), time: String(r.time ?? '') })),
     })
     const delivered = results.filter((r) => r.delivered).length
-    console.log('[line-reservation] 前日のお知らせ（LINE連携の方）:', `${rows.length}件中 連携 ${results.filter((r) => r.linked).length}・届いた ${delivered}`)
+    const ambiguous = results.filter((r) => r.why === 'karte_ambiguous').length
+    console.log(
+      '[line-reservation] 前日のお知らせ（LINE連携の方）:',
+      `${rows.length}件中 連携 ${results.filter((r) => r.linked).length}・届いた ${delivered}${ambiguous ? `・同じお名前のカルテが2つ以上で決められない ${ambiguous}` : ''}`,
+    )
     // お名前・宛先は返さない（予約番号と結果だけ）
     return NextResponse.json({
       ok: true,
-      results: results.map((r) => ({ reservationNo: r.reservationNo, linked: r.linked, delivered: r.delivered, optedOut: r.optedOut, result: r.result })),
+      results: results.map((r) => ({ reservationNo: r.reservationNo, linked: r.linked, delivered: r.delivered, optedOut: r.optedOut, result: r.result, why: r.why })),
     })
   }
 

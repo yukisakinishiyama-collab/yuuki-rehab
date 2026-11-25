@@ -7,6 +7,7 @@
  * - CRON_SECRET 設定時は Authorization: Bearer で保護
  * - 自動投稿（autopilot）のジョブが手動対応になったら、本文と「投稿した」ボタンを院長のLINEへ送る
  * - LINE連携の方への前日のお知らせ（日本時間10〜20時。明日の予約の控えの分。送り済みはすぐ終わる）
+ * - 見張り：10時を過ぎても、予約システムの毎朝の依頼（前日のお知らせ）が届いていなければ、院長のLINEへ1日1回（2026-11-25）
  * - YouTube・TikTok の動画：Buffer に渡した投稿が出たかを確かめる／前日に見本と「承認して投稿」ボタンを院長のLINEへ
  * - Google の投稿：Google の審査で拒否されていないかを確かめ、拒否なら「公開失敗」にして院長のLINEへ（gbp-posts-server.ts）
  * - 今日の空き（毎日 8:00・13:00 など）：その日の投稿ジョブを作る（daily-openings-server.ts）。
@@ -125,6 +126,15 @@ async function run() {
     console.error('前日のお知らせに失敗:', error instanceof Error ? error.message : error)
   }
 
+  // 見張り：予約システムの毎朝の依頼が届いていなければ、院長のLINEへ1日1回（2026-11-25。許可が外れて止まったことに気づけるように）
+  let reminderHeartbeat: unknown = null
+  try {
+    const { watchReminderHeartbeat } = await import('@/lib/marketing/line-reservation-server')
+    reminderHeartbeat = await watchReminderHeartbeat()
+  } catch (error) {
+    console.error('予約システムの見張りに失敗:', error instanceof Error ? error.message : error)
+  }
+
   // YouTube・TikTok の動画：投稿の前日に、見本の動画と「承認して投稿」ボタンを院長のLINEへ（見本は1回に1本まで作る）
   let approvals: unknown = null
   try {
@@ -144,7 +154,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, buffer, google, approvals, aiVideos }
+  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, reminderHeartbeat, buffer, google, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

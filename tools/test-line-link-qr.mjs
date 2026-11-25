@@ -245,9 +245,14 @@ try {
     assert.ok(dlg.includes("fetch('/api/line-link/qr'") && dlg.includes('linkQrUrl(liffId, code)') && dlg.includes('LINK_QR_POLL_MS'))
     assert.ok(dlg.includes("method: 'DELETE'"), '閉じたら（まだなら）番号を取り消す')
   })
-  await test('カルテの画面は、カルテの ID でも LINE を見分ける（電話・生年月日の無いカルテでも）', () => {
+  await test('カルテの画面は、カルテの ID でも LINE を見分ける（電話・生年月日の無いカルテでも）', async () => {
+    // 見分け方は lib/line-link-match.ts の1か所（2026-11-25。サーバーが予約のお知らせを送るときと同じ決まり）
     const client = read('src/lib/line-link-client.ts')
-    assert.ok(client.includes('const byId = patient.id ? links.find((l) => l.patientId === patient.id) : undefined'))
+    assert.ok(client.includes('return matchLinkForKarte(patient, links)'))
+    const { matchLinkForKarte } = await imp('src/lib/line-link-match.ts')
+    const links = [{ key: '08012345678|架空三郎', name: '架空 三郎', phone: '08012345678', patientId: 'p_nophone', linkedAt: '2030-01-01T00:00:00Z' }]
+    assert.equal(matchLinkForKarte({ id: 'p_nophone', name: '架空 三郎', phone: '' }, links)?.key, '08012345678|架空三郎')
+    assert.equal(matchLinkForKarte({ id: 'p_other', name: '架空 三郎', phone: '' }, links), null, 'ID も電話も生年月日も合わないカルテ')
   })
   await test('LINE の中の画面：QR から開いたら確かめて押すだけ。使えない QR は、今までの入力に切りかえる', () => {
     const page = read('src/app/liff/yoyaku/link/page.tsx')
