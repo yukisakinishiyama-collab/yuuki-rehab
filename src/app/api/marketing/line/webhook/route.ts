@@ -5,6 +5,8 @@
  * - シミュレーター: 管理画面から x-marketing-simulator ヘッダー付きで呼び出し、
  *   返信を実際に送らずレスポンスで返す（チャネル未接続でもE2E検証できる）
  *
+ * - 「予約確認」と送られたら、その LINE と結びついた方のこれからの予約を返事する（lib/reservation-check.ts。2026-11-25）
+ *
  * （以前あった /api/karada-line/webhook は削除済み。LINE の Webhook URL はこのルート）
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -18,6 +20,7 @@ import { handleOwnerPostback } from '@/lib/marketing/autopilot-server'
 import { getRule, recordAudit, recordRun } from '@/lib/marketing/automation-store-server'
 import { CONSENT_PURPOSE_LABELS, consentReply, parseConsentCommand, type ConsentCommand } from '@/lib/marketing/consent'
 import { applyConsent } from '@/lib/marketing/consent-store-server'
+import { parseReservationCheck } from '@/lib/reservation-check'
 import { DEFAULT_CLINIC_PROFILE } from '@/lib/marketing/clinic'
 import type { AutomationRule, RunResult } from '@/lib/marketing/automation-types'
 
@@ -293,6 +296,21 @@ export async function POST(request: NextRequest) {
             console.error('お知らせの受け取りの処理に失敗:', error instanceof Error ? error.message : error)
           }
           continue
+        }
+        // 「予約確認」：その LINE と結びついた方の、これからの予約を返事する（2026-11-25 院長の依頼。lib/reservation-check.ts）。
+        // 患者さんのメッセージへの返信なので、月の通数には数えない。自動案内の会話には流さない
+        if (parseReservationCheck(message.text ?? '')) {
+          const { answerReservationCheck, reservationCheckEnabled } = await import('@/lib/marketing/reservation-check-server')
+          if (reservationCheckEnabled()) {
+            const replyToken = event.replyToken as string | undefined
+            try {
+              const text = await answerReservationCheck(userId)
+              if (replyToken) await replyToLine(replyToken, [{ type: 'text', text }])
+            } catch (error) {
+              console.error('予約確認の返事に失敗:', error instanceof Error ? error.message : error)
+            }
+            continue
+          }
         }
         input = { kind: 'text', text: message.text ?? '' }
       }
