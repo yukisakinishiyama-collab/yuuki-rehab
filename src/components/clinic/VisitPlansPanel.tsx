@@ -7,7 +7,7 @@
 // 予約システムの時間の枠とは別（予約表の空きは減らさない）。患者さんには何も送らない。
 // 記録は pt_visit_plans（ほかのカルテの記録と同じく、クラウドとそろう）。決まりは lib/visit-plans.ts
 // ──────────────────────────────────────────────
-import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useState, useSyncExternalStore, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { nanoid } from 'nanoid'
@@ -55,7 +55,7 @@ function notifyPlansChanged(): void {
 }
 
 /** 予定の記録を読む（ほかの端末の分を取り込んだとき・この端末で変えたときに読み直す。サーバーでは空） */
-function usePlans(): [VisitPlan[], () => void] {
+export function usePlans(): [VisitPlan[], () => void] {
   const raw = useSyncExternalStore(subscribePlans, readPlansRaw, () => '[]')
   const plans = useMemo(() => (raw === '[]' ? [] : getVisitPlans()), [raw])
   return [plans, notifyPlansChanged]
@@ -66,7 +66,7 @@ function setStatus(plan: VisitPlan, status: VisitPlanStatus): void {
 }
 
 /** 1人分の行（名前・メモ・状態・ボタン）。今日の画面では日にちを変えない（compact） */
-function PlanRow({ plan, today, onChange, compact = false, showDate = false }: {
+export function PlanRow({ plan, today, onChange, compact = false, showDate = false }: {
   plan: VisitPlan
   today: string
   onChange: () => void
@@ -143,44 +143,26 @@ function PlanRow({ plan, today, onChange, compact = false, showDate = false }: {
   )
 }
 
-/** 予約の画面の「来院予定（日にち）」。shown の間は、ほかの端末で入れた分を15秒ごとに取り込む */
-export default function VisitPlansPanel({ shown }: { shown: boolean }) {
-  const [plans, reload] = usePlans()
+/**
+ * 来院予定を入れる欄（日にち・患者さん・メモ）。
+ * 予約の画面の「来院予定（日にち）」と、予約表の「時間未定」の欄から開く小さな画面（VisitPlanDialog）で使う。
+ * initialDate … はじめに選んでおく日にち／onAdded … 入れたあと（小さな画面を閉じる など）
+ */
+export function PlanAddForm({ initialDate, onAdded, autoFocus = false }: { initialDate?: string; onAdded?: (plan: VisitPlan) => void; autoFocus?: boolean }) {
+  const [, reload] = usePlans()
   const today = jstToday()
-  const [date, setDate] = useState(today)
+  const uid = useId()
+  const [date, setDate] = useState(initialDate || today)
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<Patient | null>(null)
   const [note, setNote] = useState('')
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
   const [patients, setPatients] = useState<Patient[]>([])
 
-  // 見ている間だけ：すぐにクラウドとそろえ、そのあと15秒ごとに（カルテの画面と同じ）
-  useEffect(() => {
-    if (!shown) return
-    let stop: (() => void) | null = null
-    let cancelled = false
-    initPatientStore()
-    import('@/lib/sync-service').then(({ startLiveSync, syncNow, isSyncEnabled }) => {
-      if (cancelled || !isSyncEnabled()) return
-      void syncNow()
-      stop = startLiveSync()
-    })
-    return () => {
-      cancelled = true
-      stop?.()
-    }
-  }, [shown])
-
   const candidates = useMemo(() => (picked ? [] : findPatientsForPlan(patients, query)), [patients, query, picked])
-  const grouped = useMemo(() => groupVisitPlans(plans, today), [plans, today])
 
   function loadPatients() {
     if (patients.length === 0) setPatients(getPatients())
-  }
-
-  function changed() {
-    reload()
-    setMessage(null)
   }
 
   function add(e: FormEvent) {
@@ -205,6 +187,7 @@ export default function VisitPlansPanel({ shown }: { shown: boolean }) {
     setPicked(null)
     setNote('')
     setMessage({ tone: 'ok', text: `${planDateLabel(plan.date, today)} に ${plan.name} さんを入れました` })
+    onAdded?.(plan)
   }
 
   const quick = [
@@ -214,80 +197,109 @@ export default function VisitPlansPanel({ shown }: { shown: boolean }) {
   ]
 
   return (
+    <form onSubmit={add} className="space-y-3">
+      <div>
+        <p className="mb-1 text-sm font-medium text-slate-700">日にち</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {quick.map(q => (
+            <button key={q.label} type="button" onClick={() => setDate(q.value)} aria-pressed={date === q.value}
+              className={cn('min-h-10 rounded-lg px-3 text-sm font-bold ring-1 transition-colors',
+                date === q.value ? 'bg-teal-700 text-white ring-teal-700' : 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50')}>
+              {q.label}
+            </button>
+          ))}
+          <label className="sr-only" htmlFor={`${uid}-date`}>日にちを選ぶ</label>
+          <input id={`${uid}-date`} type="date" value={date} min={addDaysYmd(today, -PAST_UNMARKED_DAYS)} onChange={e => setDate(e.target.value)}
+            className={cn(fieldClass, 'w-44')} />
+          <span className="text-sm font-semibold text-teal-800">{planDateLabel(date, today)}</span>
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor={`${uid}-name`} className="mb-1 block text-sm font-medium text-slate-700">患者さん（カルテから選ぶ・カルテが無い方はお名前を入れる）</label>
+        {picked ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm">
+            <span className="font-bold text-slate-900">{picked.name}</span>
+            {picked.kana && <span className="text-slate-600">{picked.kana}</span>}
+            <span className="text-xs text-teal-800">カルテの方</span>
+            <button type="button" onClick={() => setPicked(null)} className="ml-auto inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-slate-600 hover:bg-white">
+              <X className="h-4 w-4" aria-hidden />選び直す
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <input id={`${uid}-name`} value={query} onFocus={loadPatients} onChange={e => { loadPatients(); setQuery(e.target.value) }} maxLength={MAX_PLAN_NAME_CHARS}
+              autoComplete="off" autoFocus={autoFocus} placeholder="お名前・ふりがなで探す（例：やまだ）" className={fieldClass} />
+            {candidates.length > 0 && (
+              <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white shadow-sm" aria-label="カルテの候補">
+                {candidates.map(p => (
+                  <li key={p.id}>
+                    <button type="button" onClick={() => { setPicked(p); setQuery('') }}
+                      className="flex min-h-10 w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-teal-50">
+                      <span className="font-bold text-slate-900">{p.name}</span>
+                      <span className="text-slate-600">{p.kana}</span>
+                      {p.birthDate && <span className="ml-auto text-xs text-slate-500">{p.birthDate}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {query.trim() && candidates.length === 0 && (
+              <p className="mt-1 text-xs text-slate-500">カルテに見つかりません。このお名前のまま入れられます（カルテなし）。</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor={`${uid}-note`} className="mb-1 block text-sm font-medium text-slate-700">メモ（任意）</label>
+        <input id={`${uid}-note`} value={note} onChange={e => setNote(e.target.value)} maxLength={MAX_PLAN_NOTE_CHARS}
+          placeholder="例：夕方ごろ・部活のあと・テーピングだけ" className={fieldClass} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" className="h-11 rounded-lg font-bold">来院予定に入れる</Button>
+        {message && (
+          <p role={message.tone === 'error' ? 'alert' : 'status'} className={cn('text-sm', message.tone === 'error' ? 'text-red-700' : 'text-teal-800')}>
+            {message.text}
+          </p>
+        )}
+      </div>
+    </form>
+  )
+}
+
+/** 予約の画面の「来院予定（日にち）」。shown の間は、ほかの端末で入れた分を15秒ごとに取り込む */
+export default function VisitPlansPanel({ shown }: { shown: boolean }) {
+  const [plans, reload] = usePlans()
+  const today = jstToday()
+
+  // 見ている間だけ：すぐにクラウドとそろえ、そのあと15秒ごとに（カルテの画面と同じ）
+  useEffect(() => {
+    if (!shown) return
+    let stop: (() => void) | null = null
+    let cancelled = false
+    initPatientStore()
+    import('@/lib/sync-service').then(({ startLiveSync, syncNow, isSyncEnabled }) => {
+      if (cancelled || !isSyncEnabled()) return
+      void syncNow()
+      stop = startLiveSync()
+    })
+    return () => {
+      cancelled = true
+      stop?.()
+    }
+  }, [shown])
+
+  const grouped = useMemo(() => groupVisitPlans(plans, today), [plans, today])
+
+  return (
     <div className="space-y-4">
       <Panel title="来院予定を入れる（日にちだけ）" icon={CalendarDays}>
         <p className="mb-3 text-sm text-slate-600">
-          時間を決めずに「◯日に行きます」と聞いた方を書いておく一覧です。予約表の空きは減りません。患者さんには何も送りません。
+          時間を決めずに「◯日に行きます」と聞いた方を書いておく一覧です。予約表の空きは減りません。患者さんには何も送りません。予約表の「時間未定」の欄にも、同じ予定が出ます。
         </p>
-        <form onSubmit={add} className="space-y-3">
-          <div>
-            <p className="mb-1 text-sm font-medium text-slate-700">日にち</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {quick.map(q => (
-                <button key={q.label} type="button" onClick={() => setDate(q.value)} aria-pressed={date === q.value}
-                  className={cn('min-h-10 rounded-lg px-3 text-sm font-bold ring-1 transition-colors',
-                    date === q.value ? 'bg-teal-700 text-white ring-teal-700' : 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50')}>
-                  {q.label}
-                </button>
-              ))}
-              <label className="sr-only" htmlFor="plan-date">日にちを選ぶ</label>
-              <input id="plan-date" type="date" value={date} min={addDaysYmd(today, -PAST_UNMARKED_DAYS)} onChange={e => setDate(e.target.value)}
-                className={cn(fieldClass, 'w-44')} />
-              <span className="text-sm font-semibold text-teal-800">{planDateLabel(date, today)}</span>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="plan-name" className="mb-1 block text-sm font-medium text-slate-700">患者さん（カルテから選ぶ・カルテが無い方はお名前を入れる）</label>
-            {picked ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm">
-                <span className="font-bold text-slate-900">{picked.name}</span>
-                {picked.kana && <span className="text-slate-600">{picked.kana}</span>}
-                <span className="text-xs text-teal-800">カルテの方</span>
-                <button type="button" onClick={() => setPicked(null)} className="ml-auto inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-slate-600 hover:bg-white">
-                  <X className="h-4 w-4" aria-hidden />選び直す
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input id="plan-name" value={query} onFocus={loadPatients} onChange={e => { loadPatients(); setQuery(e.target.value) }} maxLength={MAX_PLAN_NAME_CHARS}
-                  autoComplete="off" placeholder="お名前・ふりがなで探す（例：やまだ）" className={fieldClass} />
-                {candidates.length > 0 && (
-                  <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white shadow-sm" aria-label="カルテの候補">
-                    {candidates.map(p => (
-                      <li key={p.id}>
-                        <button type="button" onClick={() => { setPicked(p); setQuery('') }}
-                          className="flex min-h-10 w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-teal-50">
-                          <span className="font-bold text-slate-900">{p.name}</span>
-                          <span className="text-slate-600">{p.kana}</span>
-                          {p.birthDate && <span className="ml-auto text-xs text-slate-500">{p.birthDate}</span>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {query.trim() && candidates.length === 0 && (
-                  <p className="mt-1 text-xs text-slate-500">カルテに見つかりません。このお名前のまま入れられます（カルテなし）。</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="plan-note" className="mb-1 block text-sm font-medium text-slate-700">メモ（任意）</label>
-            <input id="plan-note" value={note} onChange={e => setNote(e.target.value)} maxLength={MAX_PLAN_NOTE_CHARS}
-              placeholder="例：夕方ごろ・部活のあと・テーピングだけ" className={fieldClass} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" className="h-11 rounded-lg font-bold">来院予定に入れる</Button>
-            {message && (
-              <p role={message.tone === 'error' ? 'alert' : 'status'} className={cn('text-sm', message.tone === 'error' ? 'text-red-700' : 'text-teal-800')}>
-                {message.text}
-              </p>
-            )}
-          </div>
-        </form>
+        <PlanAddForm />
       </Panel>
 
       <Panel title="これからの来院予定" icon={CalendarCheck} meta={grouped.upcoming.length ? `${grouped.upcoming.reduce((n, d) => n + d.plans.length, 0)}人` : undefined}>
@@ -301,7 +313,7 @@ export default function VisitPlansPanel({ shown }: { shown: boolean }) {
                   {day.label}<span className="ml-2 font-normal text-slate-500">{day.plans.length}人</span>
                 </h3>
                 <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 px-3 py-2.5">
-                  {day.plans.map(p => <PlanRow key={p.id} plan={p} today={today} onChange={changed} />)}
+                  {day.plans.map(p => <PlanRow key={p.id} plan={p} today={today} onChange={reload} />)}
                 </ul>
               </section>
             ))}
@@ -313,7 +325,7 @@ export default function VisitPlansPanel({ shown }: { shown: boolean }) {
       {grouped.unmarked.length > 0 && (
         <Panel title="来院したかの記録がまだの予定" meta={`過去${PAST_UNMARKED_DAYS}日`} attention>
           <ul className="divide-y divide-slate-100">
-            {grouped.unmarked.map(p => <PlanRow key={p.id} plan={p} today={today} onChange={changed} showDate />)}
+            {grouped.unmarked.map(p => <PlanRow key={p.id} plan={p} today={today} onChange={reload} showDate />)}
           </ul>
         </Panel>
       )}
