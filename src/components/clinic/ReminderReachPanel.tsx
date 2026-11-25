@@ -14,7 +14,7 @@ import { BellOff, Phone } from 'lucide-react'
 import type { Patient } from '@/types/patient'
 import { getPatients, initPatientStore } from '@/lib/patient-store'
 import { useLineLinks } from '@/lib/line-link-client'
-import { patientLinkKey } from '@/lib/line-link'
+import { matchLinkForReservation, nearMissFor, nearMissText } from '@/lib/line-link-match'
 import { matchKartePatients } from '@/lib/karte-link'
 import { formatDateJa } from '@/lib/reservation-message'
 import { buildReachSummary, REACH_LABELS, telHref, type ReachItem, type ReachRow, type RemindMode } from '@/lib/reminder-reach'
@@ -92,7 +92,7 @@ async function load(): Promise<Loaded> {
 }
 
 export default function ReminderReachPanel() {
-  const { links, linkFor } = useLineLinks()
+  const { links } = useLineLinks()
   const [rows, setRows] = useState<ReachRow[] | null>(null)
   const [mode, setMode] = useState<RemindMode>('unknown')
   const [noKey, setNoKey] = useState(false)
@@ -132,16 +132,13 @@ export default function ReminderReachPanel() {
     [patients],
   )
 
+  // LINE 連携の方かは、サーバーが前日のお知らせを送るときと同じ決まりで見る（lib/line-link-match.ts。
+  // 2026-11-25 まで、ここは電話だけ・お名前だけでもカルテを当てていて、「届く」と出るのに届かない方がいた）
   const summary = useMemo(() => {
     if (!rows || !links) return null
-    const isLinked = (row: ReachRow) => {
-      const key = patientLinkKey(row.name, row.phone)
-      if (key && links.some((l) => l.key === key)) return true
-      const karte = karteOf(row)
-      return Boolean(karte && linkFor(karte))
-    }
+    const isLinked = (row: ReachRow) => matchLinkForReservation(row, patients, links).linked
     return buildReachSummary(rows, isLinked, mode, nowLocal())
-  }, [rows, links, mode, karteOf, linkFor])
+  }, [rows, links, mode, patients])
 
   function toggleCalled(no: string) {
     setCalled(toggleCalledMark(no))
@@ -158,6 +155,8 @@ export default function ReminderReachPanel() {
     const karte = karteOf(item)
     const tel = telHref(item.phone)
     const done = Boolean(called[item.reservationNo])
+    // カルテと LINE は結びついているのに、予約からは決められない（同じお名前のカルテが2つ・お名前の字がちがう）→ 理由と直し方を出す
+    const near = links ? nearMissFor(item, patients, links) : null
     return (
       <li key={item.reservationNo} className={cn('rounded-lg border px-3 py-2', done ? 'border-slate-200 bg-slate-50' : 'border-amber-300 bg-amber-50/50')}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -169,7 +168,7 @@ export default function ReminderReachPanel() {
           ) : (
             <span className="text-sm font-bold text-slate-900">{item.name} 様</span>
           )}
-          <span className="text-xs text-slate-600">{REACH_LABELS[item.reach]}</span>
+          <span className="text-xs text-slate-600">{near && item.reach !== 'line_paused' ? 'カルテのLINEはあるが、自動では届かない' : REACH_LABELS[item.reach]}</span>
           <span className="ml-auto flex items-center gap-2">
             {opts.call && tel && (
               <a href={tel} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50 max-lg:min-h-10">
@@ -185,6 +184,18 @@ export default function ReminderReachPanel() {
             )}
           </span>
         </div>
+        {near && (
+          <p className="mt-1.5 text-xs leading-relaxed text-amber-900">
+            {nearMissText(near)}
+            {near.kartes
+              .filter((k) => k.id)
+              .map((k) => (
+                <Link key={k.id} href={`/patients/${k.id}?tab=overview`} className="ml-2 whitespace-nowrap font-bold underline underline-offset-2">
+                  {k.name} 様のカルテ
+                </Link>
+              ))}
+          </p>
+        )}
       </li>
     )
   }

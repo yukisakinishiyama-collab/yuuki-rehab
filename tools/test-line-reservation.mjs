@@ -376,9 +376,22 @@ try {
     assert.deepEqual([own.linked, own.delivered], [true, true], '電話でわかったカルテ（p4）に結びついた LINE')
     assert.equal(pushes.at(-1).to, SABURO)
 
+    // 予約システムへの返事に、見つけた道すじ・見つからなかった理由（お名前などは入らない）
+    assert.equal(noPhone.why, 'karte_id')
+    assert.equal(karteKey.why, 'karte_phone')
+    assert.equal(twoSame.why, 'karte_ambiguous')
+    assert.match(twoSame.note, /同じお名前のカルテが2つ以上/)
+    assert.equal(theOther.why, 'karte_not_linked')
+    const stranger = await rsv.confirmClinicReservation({ reservationNo: 'Q106', name: '初めて 花子', phone: '080-0000-9999', date: day, time: '17:00' }, { now: NOW })
+    assert.deepEqual([stranger.linked, stranger.why], [false, 'no_karte'])
+    // 表計算で先頭の 0 が落ちた電話でも、同じ番号として見つける
+    const noZero = await rsv.confirmClinicReservation({ reservationNo: 'Q107', name: '田村三郎', phone: '8044440001', date: day, time: '17:30' }, { now: NOW })
+    assert.deepEqual([noZero.linked, noZero.delivered], [true, true])
+    assert.equal(pushes.at(-1).to, SABURO)
+
     // 毎朝の前日のお知らせでも同じように見つける（何人分も続けて探す）
     const remind = await rsv.remindLinkedReservations({ date: '2030-01-11', rows: [{ reservationNo: 'Q200', name: '鈴木一郎', phone: '', time: '10:00' }, { reservationNo: 'Q201', name: '高橋 次郎', phone: '', time: '10:30' }] }, { now: at(8) })
-    assert.deepEqual(remind.map((r) => r.linked), [true, true])
+    assert.deepEqual(remind.map((r) => [r.linked, r.why]), [[true, 'karte_id'], [true, 'karte_phone']])
   })
 } finally {
   globalThis.fetch = realFetch

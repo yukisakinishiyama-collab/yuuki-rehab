@@ -30,7 +30,8 @@
  */
 import { kvDelete, kvGet, kvList, kvSet } from './kv-store-server'
 import { getLineLink, listLineLinks } from '@/lib/line-link-server'
-import { patientLinkKey, nameNoSpace, phoneDigits, type LineLink } from '@/lib/line-link'
+import { patientLinkKey, type LineLink } from '@/lib/line-link'
+import { LINK_MISS_TEXT, matchLinkForReservation, type LinkMatchHow, type LinkMatchMiss } from '@/lib/line-link-match'
 import { unsealUserId } from '@/lib/liff-ticket'
 import { lineMark } from './consent-store-server'
 import { getRule, markSent } from './automation-store-server'
@@ -99,56 +100,41 @@ async function cloudPatients(cache: LinkFinderCache): Promise<NonNullable<LinkFi
   return cache.patients
 }
 
+/** 見つけた道すじ・見つからなかった理由（お名前などは入れない。予約システムへの返事と記録に使う） */
+export type LinkWhy = LinkMatchHow | LinkMatchMiss | 'error'
+
+/** 見つからなかった理由を、記録むけの短い言葉に */
+export const linkWhyText = (why: LinkWhy): string => (why in LINK_MISS_TEXT ? LINK_MISS_TEXT[why as LinkMatchMiss] : why === 'error' ? 'カルテ・LINE連携を読めませんでした' : '')
+
 /**
- * 予約の方の LINE 連携を探す。
- * 1. 予約の電話＋お名前（連携のキーそのもの）
- * 2. 無ければ、クラウドのカルテから同じ方を1人に決めて（お名前が同じカルテが1人だけ、または電話も同じ方が1人だけ）、
- *    a. そのカルテの画面のQRコードで結びついた LINE（連携にカルテの ID が残っている。新しいものを使う）
- *    b. そのカルテの電話＋お名前で結びついた LINE（予約の電話がカルテとちがう・予約に電話が無いとき）
- *    c. カルテと連携の「お名前＋生年月日」が同じ LINE（今までどおり）
- * 2026-11-25：QRコードで結びついた方に、院で入れた予約の「確定しました」が届かなかった（予約に電話が無い・カルテに生年月日が無いと、
- * 1 と 2c では見つからない）ので、2a・2b を足した。同じお名前のカルテが2人以上で決められないときは、今までどおり送らない
+ * 予約の方の LINE 連携を探す。決まりは lib/line-link-match.ts（院内アプリの画面と同じ決まり）：
+ * 予約の電話＋お名前 → 無ければ、クラウドのカルテから同じ方を決めて、そのカルテの LINE
+ * （カルテの画面のQRコード＝カルテの ID → カルテの電話＋お名前 → お名前＋生年月日）。
+ * 2026-11-25：QRコードで結びついた方に、院で入れた予約の「確定しました」が届かなかった（予約に電話が無い・カルテに生年月日が無いと
+ * 見つけられなかった）。同じ日に、画面と同じ決まりにそろえ、見つからない理由（why）も返すようにした。
+ * 同じお名前のカルテが2人以上で決められないとき・電話だけ同じでお名前がちがうカルテは、送らない
  */
-export async function findLinkForPerson(name: string, phone: string, cache: LinkFinderCache = {}): Promise<LineLink | null> {
+export async function resolveLinkForPerson(name: string, phone: string, cache: LinkFinderCache = {}): Promise<{ link: LineLink | null; why: LinkWhy }> {
+  // いちばん多い形（予約の電話＋お名前がそのまま連携のキー）は、一覧を読まずに決める
   const key = patientLinkKey(name, phone)
   if (key) {
     const direct = await getLineLink(key)
-    if (direct) return direct
+    if (direct) return { link: direct, why: 'direct' }
   }
-  const compact = nameNoSpace(name).normalize('NFKC')
-  const digits = phoneDigits(phone)
-  if (!compact) return null
   try {
     const patients = await cloudPatients(cache)
-    if (patients.length === 0) return null
-    const same = patients.filter((p) => nameNoSpace(p.name ?? '').normalize('NFKC') === compact)
-    // 同じお名前のカルテが1人だけ（または電話も同じ方が1人だけ）のときに使う
-    const byPhone = digits ? same.filter((p) => phoneDigits(p.phone ?? '') === digits) : []
-    const karte = byPhone.length === 1 ? byPhone[0] : same.length === 1 ? same[0] : null
-    if (!karte) return null
     if (!cache.links) cache.links = await listLineLinks()
-    // a. カルテの画面のQRコードで結びついた LINE（一覧は新しい順）
-    const karteId = String(karte.id ?? '')
-    if (karteId) {
-      const byId = cache.links.find((l) => l.patientId === karteId)
-      if (byId) {
-        const link = await getLineLink(byId.key)
-        if (link) return link
-      }
-    }
-    // b. カルテの電話＋お名前で結びついた LINE
-    const karteKey = patientLinkKey(karte.name ?? '', karte.phone ?? '')
-    if (karteKey && karteKey !== key) {
-      const viaKarte = await getLineLink(karteKey)
-      if (viaKarte) return viaKarte
-    }
-    // c. お名前＋生年月日
-    if (!karte.birthDate) return null
-    const hit = cache.links.filter((l) => l.birthDate === karte.birthDate && nameNoSpace(l.name).normalize('NFKC') === compact)
-    return hit.length === 1 ? getLineLink(hit[0].key) : null
+    const m = matchLinkForReservation({ name, phone }, patients, cache.links)
+    if (!m.linked) return { link: null, why: m.why }
+    const link = await getLineLink(m.link.key)
+    return link ? { link, why: m.how } : { link: null, why: 'karte_not_linked' }
   } catch {
-    return null
+    return { link: null, why: 'error' }
   }
+}
+
+export async function findLinkForPerson(name: string, phone: string, cache: LinkFinderCache = {}): Promise<LineLink | null> {
+  return (await resolveLinkForPerson(name, phone, cache)).link
 }
 
 /** この予約に「確定しました」を送ったか（予約システムから・この仕組みから・「LINEで送る」ボタンから） */
@@ -184,8 +170,9 @@ export async function onNewReservation(
   const date = String(body.date ?? '')
   const time = hhmm(body.time)
   if (!NO_RE.test(no) || !DATE_RE.test(date) || !time) return '予約番号・日時が読めません'
-  const link = await findLinkForPerson(String(body.name ?? ''), String(body.phone ?? ''))
-  if (!link) return 'LINE連携していない方'
+  const { link, why } = await resolveLinkForPerson(String(body.name ?? ''), String(body.phone ?? ''))
+  // 近いカルテがあるのに決められなかったとき（同じお名前が2人以上）は、記録に理由を残す（お名前は入れない）
+  if (!link) return why === 'karte_ambiguous' || why === 'error' ? `LINE連携していない方（${linkWhyText(why)}）` : 'LINE連携していない方'
   const secret = process.env.RESERVATION_NOTIFY_SECRET ?? ''
   const userId = unsealUserId(link.sealed, secret)
   if (!userId) return 'LINEの宛先を開けません'
@@ -232,6 +219,8 @@ export interface LinkedNotice {
   /** ご本人が「予約のお知らせ停止」と送っている（メールにも切り替えない） */
   optedOut?: boolean
   result?: PushResult['result'] | 'not_linked' | 'invalid'
+  /** LINE 連携を見つけた道すじ・見つからなかった理由（lib/line-link-match.ts。お名前などは入らない） */
+  why?: LinkWhy | 'seal'
   note: string
 }
 
@@ -249,11 +238,11 @@ export async function confirmClinicReservation(
   const date = String(body.date ?? '')
   const time = hhmm(body.time)
   if (!NO_RE.test(no) || !DATE_RE.test(date) || !time) return { reservationNo: no, linked: false, delivered: false, result: 'invalid', note: '予約番号・日時が読めません' }
-  const link = await findLinkForPerson(String(body.name ?? ''), String(body.phone ?? ''))
-  if (!link) return { reservationNo: no, linked: false, delivered: false, result: 'not_linked', note: 'LINE連携していない方' }
+  const { link, why } = await resolveLinkForPerson(String(body.name ?? ''), String(body.phone ?? ''))
+  if (!link) return { reservationNo: no, linked: false, delivered: false, result: 'not_linked', why, note: `LINE連携していない方（${linkWhyText(why)}）` }
   const userId = unsealUserId(link.sealed, process.env.RESERVATION_NOTIFY_SECRET ?? '')
-  if (!userId) return { reservationNo: no, linked: false, delivered: false, result: 'not_linked', note: 'LINEの宛先を開けません' }
-  if (date < jstParts(opts.now).date) return { reservationNo: no, linked: true, delivered: false, result: 'skipped', note: '過ぎた日の予約' }
+  if (!userId) return { reservationNo: no, linked: false, delivered: false, result: 'not_linked', why: 'seal', note: 'LINEの宛先を開けません' }
+  if (date < jstParts(opts.now).date) return { reservationNo: no, linked: true, delivered: false, result: 'skipped', why, note: '過ぎた日の予約' }
   const r = await pushToPatient({
     automation: 'reservation_confirm',
     userId,
@@ -266,7 +255,7 @@ export async function confirmClinicReservation(
     const sent: SentRecord = { reservationNo: no, key: link.key, date, time, sentAt: new Date().toISOString() }
     await kvSet(`${SENT_PREFIX}${no}`, sent)
   }
-  return { reservationNo: no, linked: true, delivered: r.delivered, result: r.result, note: r.reason ?? r.result }
+  return { reservationNo: no, linked: true, delivered: r.delivered, result: r.result, why, note: r.reason ?? r.result }
 }
 
 /**
@@ -293,10 +282,10 @@ export async function remindLinkedReservations(
       results.push({ reservationNo: no, linked: false, delivered: false, result: 'invalid', note: '予約番号・時刻が読めません' })
       continue
     }
-    const link = await findLinkForPerson(String(row.name ?? ''), String(row.phone ?? ''), cache)
+    const { link, why } = await resolveLinkForPerson(String(row.name ?? ''), String(row.phone ?? ''), cache)
     const userId = link ? unsealUserId(link.sealed, secret) : null
     if (!link || !userId) {
-      results.push({ reservationNo: no, linked: false, delivered: false, result: 'not_linked', note: 'LINE連携していない方' })
+      results.push({ reservationNo: no, linked: false, delivered: false, result: 'not_linked', why: link ? 'seal' : why, note: link ? 'LINEの宛先を開けません' : `LINE連携していない方（${linkWhyText(why)}）` })
       continue
     }
     const r = await pushToPatient({
@@ -314,6 +303,7 @@ export async function remindLinkedReservations(
       delivered: r.delivered,
       optedOut: r.result === 'opted_out' || undefined,
       result: r.result,
+      why,
       note: r.reason ?? r.result,
     })
   }
