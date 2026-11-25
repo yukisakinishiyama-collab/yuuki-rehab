@@ -79,6 +79,12 @@ try {
     assert.ok(KV_PREFIXES.includes('linesent:'))
   })
 
+  await test('見張り：予約システムの毎朝の依頼を、まだ一度も受けていないときは知らせない（予約システムが古い）', async () => {
+    const r = await rsv.watchReminderHeartbeat(at(11))
+    assert.deepEqual([r.ok, r.alerted], [true, false])
+    assert.equal(pushes.length, 0)
+  })
+
   await test('予約が入った：電話＋お名前で連携の方には「確定しました」を1通。控えも残す', async () => {
     assert.equal((await getRule('reservation_confirm')).mode, 'on')
     const r = await rsv.onNewReservation({ reservationNo: 'R100', name: '山田 花子', phone: '090-1111-2222', date: TOMORROW, time: '10:30' }, fast)
@@ -392,6 +398,40 @@ try {
     // 毎朝の前日のお知らせでも同じように見つける（何人分も続けて探す）
     const remind = await rsv.remindLinkedReservations({ date: '2030-01-11', rows: [{ reservationNo: 'Q200', name: '鈴木一郎', phone: '', time: '10:00' }, { reservationNo: 'Q201', name: '高橋 次郎', phone: '', time: '10:30' }] }, { now: at(8) })
     assert.deepEqual(remind.map((r) => [r.linked, r.why]), [[true, 'karte_id'], [true, 'karte_phone']])
+  })
+
+  // ── 2026-11-25：予約システムの外への接続の許可が外れて、確定・前日のお知らせが止まっていたが、だれも気づけなかった
+  await test('見張り：毎朝の依頼が届いた日は何もしない。届いていない日は、10時から院長のLINEへ1日1回', async () => {
+    const before = pushes.length
+    // 今日（1/10）の朝に、明日（1/11）の分の依頼は届いている
+    assert.deepEqual(await rsv.watchReminderHeartbeat(at(11)), { ok: true, alerted: false })
+    assert.equal(pushes.length, before)
+    // 次の日（1/11）。明後日（1/12）の分の依頼が届いていない
+    const next = (jstHour) => new Date(at(jstHour).getTime() + 24 * 3600e3)
+    const early = await rsv.watchReminderHeartbeat(next(9))
+    assert.deepEqual([early.ok, early.alerted], [true, false], '予約システムは8時台に動く。10時までは待つ')
+    assert.equal(pushes.length, before)
+    // 院長のLINEへ送れなかったら、次の回にもう一度
+    lineFails = true
+    const failed = await rsv.watchReminderHeartbeat(next(10))
+    lineFails = false
+    assert.deepEqual([failed.ok, failed.alerted], [false, false])
+    const alert = await rsv.watchReminderHeartbeat(next(11))
+    assert.deepEqual([alert.ok, alert.alerted], [false, true])
+    assert.equal(pushes.length, before + 1)
+    assert.equal(pushes.at(-1).to, OWNER)
+    assert.match(pushes.at(-1).text, /予約システムからの毎朝の連絡が、今日は届いていません/)
+    assert.doesNotMatch(pushes.at(-1).text, /山田|佐藤|090|080/, 'お名前・電話は入れない')
+    // 同じ日はもう知らせない
+    const again = await rsv.watchReminderHeartbeat(next(15))
+    assert.deepEqual([again.ok, again.alerted], [false, false])
+    assert.equal(pushes.length, before + 1)
+    // あとから依頼が届いたら（手で動かした など）、元どおり
+    await rsv.remindLinkedReservations({ date: '2030-01-12', rows: [] }, { now: next(16) })
+    assert.deepEqual(await rsv.watchReminderHeartbeat(next(17)), { ok: true, alerted: false })
+    // 定期実行（jobs/run）から呼ぶ
+    const job = fs.readFileSync(new URL('src/app/api/marketing/jobs/run/route.ts', root), 'utf8')
+    assert.match(job, /watchReminderHeartbeat\(\)/)
   })
 } finally {
   globalThis.fetch = realFetch

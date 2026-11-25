@@ -27,6 +27,8 @@
  *
  * 控えに持つのは、予約番号・日付・時刻・LINE連携のキー（連携の記録 linelink: と同じ「電話番号|お名前」）だけ。
  * LINE の宛先は持たない（送るときに連携の記録の封印から開く）。
+ * 8. 見張り（2026-11-25）：10時を過ぎても、予約システムの毎朝の依頼（7.）が届いていなければ、院長の LINE へ1日1回知らせる
+ *    （予約システムの許可が外れるなどで、確定・前日のお知らせが止まったことに気づけるように）
  */
 import { kvDelete, kvGet, kvList, kvSet } from './kv-store-server'
 import { getLineLink, listLineLinks } from '@/lib/line-link-server'
@@ -308,6 +310,42 @@ export async function remindLinkedReservations(
     })
   }
   return results
+}
+
+/** 見張りの知らせを出した日の印（linesent:_remindwatch:<今日>） */
+const watchKey = (today: string) => `${SENT_PREFIX}_remindwatch:${today}`
+
+/** 見張りの知らせの文（院長の LINE へ） */
+export const HEARTBEAT_ALERT_TEXT = [
+  '⚠️ 予約システムからの毎朝の連絡が、今日は届いていません。',
+  '',
+  'LINE連携の方への「予約が確定しました」「前日のお知らせ」が止まっているおそれがあります。',
+  '',
+  '・明日のご予約の方には、院内アプリの控えにある分だけ、このあと前日のお知らせをお送りします',
+  '・院の画面で入れた予約の「確定しました」は、直るまで届きません',
+  '',
+  '予約システム（Apps Script）の実行ログの確認が必要です。システムの担当（Claude）へ「予約システムからの連絡が止まっている」とお伝えください。',
+].join('\n')
+
+/**
+ * 8. 見張り：予約システムの毎朝の依頼（7.）が今日は届いていない → 院長の LINE へ1日1回（投稿ジョブの定期実行から）
+ * 2026-11-25：予約システム（Apps Script）の外への接続の許可が外れ、院で入れた予約の確定と毎朝の前日のお知らせが止まっていたが、
+ * だれも気づけなかった（予約システムは、失敗しても画面に出さず次へ進む）。
+ * 予約システム v3.27〜は、毎朝8時に、明日の予約が無い日も1回は依頼してくる（remindRunKey の印が付く）。
+ * 10時を過ぎても明日の分の印が無ければ、予約システムから院内アプリへの連絡が止まっているとみて知らせる。
+ * 一度も依頼を受けたことが無い（予約システムが古い）ときは知らせない。知らせを送れなかったら、次の回にもう一度
+ */
+export async function watchReminderHeartbeat(now = new Date()): Promise<{ ok: boolean; alerted: boolean; reason?: string }> {
+  const { date: today, hour } = jstParts(now)
+  if (hour < REMIND_FROM_HOUR || hour >= REMIND_TO_HOUR) return { ok: true, alerted: false, reason: '見る時間外' }
+  if (await kvGet(remindRunKey(jstTomorrow(now)))) return { ok: true, alerted: false }
+  if (await kvGet(watchKey(today))) return { ok: false, alerted: false, reason: '今日は知らせ済み' }
+  const everRan = (await kvList(`${SENT_PREFIX}_remindrun:`)).length > 0
+  if (!everRan) return { ok: true, alerted: false, reason: '予約システムからの毎朝の依頼を、まだ受けたことがない' }
+  const { notifyOwner } = await import('./owner-notify')
+  const r = await notifyOwner([HEARTBEAT_ALERT_TEXT])
+  if (r.delivered) await kvSet(watchKey(today), { at: now.toISOString() })
+  return { ok: false, alerted: r.delivered, reason: r.delivered ? undefined : r.reason }
 }
 
 /**
