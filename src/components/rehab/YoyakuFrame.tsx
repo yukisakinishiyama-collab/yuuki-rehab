@@ -11,14 +11,19 @@
 // （見ていないとき・しばらく離れて戻ってきたときはだまって、見ている最中は「読み直す」ボタンで。lib/yoyaku-ticket.ts）。
 // 上の切りかえで「来院予定（日にち）」＝時間を決めない来院予定の一覧（VisitPlansPanel。2026-11-24）も開ける。
 // そちらを見ている間も予約の画面は捨てず、隠すだけ（予約システムには「見えていない」と知らせる）。
+// 予約システム v3.29〜は、予約表（この日の表）の右に「時間未定」の欄を出す（2026-11-25）。中身は同じ来院予定で、
+// 院内アプリが合図（postMessage）で渡す。欄で「＋ 入れる」・来院予定を押すと、院内アプリが小さな画面を出す
+// （lib/yoyaku-lane.ts・VisitPlanDialog）。
 // ──────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { preconnect } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { CalendarCheck, CalendarClock, ExternalLink, Loader2, RefreshCw } from 'lucide-react'
-import VisitPlansPanel, { useTodayPlanCount } from '@/components/clinic/VisitPlansPanel'
+import VisitPlansPanel, { usePlans, useTodayPlanCount } from '@/components/clinic/VisitPlansPanel'
+import VisitPlanDialog, { type PlanDialogState } from '@/components/clinic/VisitPlanDialog'
+import { KARTE_HELLO_ACK, LANE_SYNC_INTERVAL_MS, lanePlansMessage, parseLaneRequest } from '@/lib/yoyaku-lane'
 import { getYoyakuView, setYoyakuView, subscribeYoyakuView } from '@/lib/yoyaku-view'
-import { getPatients, initPatientStore } from '@/lib/patient-store'
+import { getPatients, getVisitPlans, initPatientStore } from '@/lib/patient-store'
 import { matchKartePatients } from '@/lib/karte-link'
 import { adminFrameAge, adminFrameNotice, shouldAutoRefresh, type AdminFrameAge } from '@/lib/yoyaku-ticket'
 import {
@@ -83,6 +88,10 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
   // 予約の画面の中（予約システムのページ）。「院内アプリの中です」の合図が届いたときに控え、見えているかを知らせる
   const frameWindowRef = useRef<{ win: Window; origin: string } | null>(null)
   const router = useRouter()
+  // 予約表の「時間未定」の欄：予約の画面がいま見ている日と、欄から開く小さな画面（入れる／来院予定）
+  const laneDateRef = useRef('')
+  const [planDialog, setPlanDialog] = useState<PlanDialogState | null>(null)
+  const [plans] = usePlans()
 
   // 予約の画面へ「いま見えているか」を知らせる（見えていないあいだは、予約システムが20秒ごとの読み直しを止める）
   const postFrameVisible = useCallback(() => {
@@ -94,6 +103,40 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
       // 送れなくても、予約の画面は今までどおり動く（読み直しが止まらないだけ）
     }
   }, [])
+
+  // 予約の画面の「時間未定」の欄へ、いま見ている日の来院予定を渡す（お名前・メモ・状態だけ）
+  const postLanePlans = useCallback(() => {
+    const target = frameWindowRef.current
+    const date = laneDateRef.current
+    if (!target || !date) return
+    try {
+      target.win.postMessage(lanePlansMessage(date, getVisitPlans()), { targetOrigin: target.origin })
+    } catch {
+      // 送れなくても、予約の画面は今までどおり動く（欄が「読み込み中」のままになるだけ）
+    }
+  }, [])
+
+  // 来院予定が変わったら（この端末で入れた・ほかの端末の分を取り込んだ）、欄へ渡し直す
+  useEffect(() => {
+    postLanePlans()
+  }, [plans, postLanePlans])
+
+  // 予約表を見ている間は、ほかの端末で入れた来院予定を1分ごとに取り込む（欄に出すため）
+  useEffect(() => {
+    if (!frameShown) return
+    let stop: (() => void) | null = null
+    let cancelled = false
+    initPatientStore()
+    import('@/lib/sync-service').then(({ startLiveSync, syncNow, isSyncEnabled }) => {
+      if (cancelled || !isSyncEnabled()) return
+      void syncNow()
+      stop = startLiveSync(LANE_SYNC_INTERVAL_MS)
+    })
+    return () => {
+      cancelled = true
+      stop?.()
+    }
+  }, [frameShown])
 
   // もらったURLで予約の画面を開く（iframe の行き先が変わるので、新しい管理チケットで読み直される）。
   // 取れなかったとき：最初は今までどおり（パスワードを入力）。読み直しのときは、今の画面をそのままにする
@@ -230,15 +273,31 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
       const data = event.data as { type?: string; name?: string; phone?: string } | null
       if (!data || typeof data.type !== 'string') return
       if (data.type === 'yuuki:karte-hello') {
-        // 「院内アプリの中にいます」と返す（予約画面はこれで、別タブではなくアプリ内でカルテを開く）
+        // 「院内アプリの中にいます」と返す（予約画面はこれで、別タブではなくアプリ内でカルテを開く）。
+        // visitPlans … 「時間未定」の欄を出せる（予約システム v3.29〜が見る）
         const source = event.source as Window | null
-        source?.postMessage({ type: 'yuuki:karte-hello-ack' }, { targetOrigin: event.origin })
+        source?.postMessage(KARTE_HELLO_ACK, { targetOrigin: event.origin })
+        // 読み直した予約の画面は、見ている日をあらためて知らせてくる
+        laneDateRef.current = ''
         // 予約画面の中身が動きはじめた合図でもある
         markReady()
         // 見えているかを知らせる先として控える（読み直しで iframe ができ直しても、そのたびに合図が来る）
         if (source) {
           frameWindowRef.current = { win: source, origin: event.origin }
           postFrameVisible()
+        }
+        return
+      }
+      // 予約表の「時間未定」の欄から（見ている日・「＋ 入れる」・来院予定を押した）
+      const lane = parseLaneRequest(data)
+      if (lane) {
+        if (lane.kind === 'watch') {
+          laneDateRef.current = lane.date
+          postLanePlans()
+        } else if (lane.kind === 'add') {
+          setPlanDialog({ mode: 'add', date: lane.date })
+        } else {
+          setPlanDialog({ mode: 'plan', id: lane.id })
         }
         return
       }
@@ -253,7 +312,9 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [router, markReady, postFrameVisible])
+  }, [router, markReady, postFrameVisible, postLanePlans])
+
+  const closePlanDialog = useCallback(() => setPlanDialog(null), [])
 
   if (!mounted) return null
   const openUrl = adminUrl || RESERVATION_ADMIN_URL
@@ -372,6 +433,9 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
           画面が表示されない・ログインがうまくいかない場合は「新しいタブで開く」をご利用ください。
         </p>
       )}
+
+      {/* 予約表の「時間未定」の欄から開く小さな画面（入れる／来院した・来なかった・日にちを変える・取り消す） */}
+      {visible && planDialog && <VisitPlanDialog key={planDialog.mode === 'add' ? `add-${planDialog.date}` : planDialog.id} state={planDialog} onClose={closePlanDialog} />}
     </div>
   )
 }

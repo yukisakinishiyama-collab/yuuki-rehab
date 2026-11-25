@@ -6,6 +6,7 @@ import {
   planDateLabel, plansOn, visitPlanProblem,
 } from '../src/lib/visit-plans.ts'
 import { getYoyakuView, setYoyakuView, subscribeYoyakuView } from '../src/lib/yoyaku-view.ts'
+import fs from 'node:fs'
 
 let passed = 0
 function test(name, fn) {
@@ -115,6 +116,60 @@ test('予約の画面の切りかえ（今日の画面から「来院予定を�
   off()
   setYoyakuView('slots')
   assert.equal(calls, 1)
+})
+
+// ── 2026-11-25 院長「予約管理画面で院長、スタッフと別にその日の時間を定めない予約欄を作成してください」
+// 予約システム v3.29〜の「時間未定」の欄と、合図（postMessage）でやりとりする（lib/yoyaku-lane.ts）
+const lane = await import('../src/lib/yoyaku-lane.ts')
+const readSrc = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
+
+test('「時間未定」の欄へ渡す来院予定：その日の分だけ・まだの方を上に・お名前とメモと状態だけ', () => {
+  const plans = [
+    plan('a', TODAY, '山田 太郎', { patientId: 'p1', kana: 'やまだ たろう', note: '夕方ごろ', status: 'visited' }),
+    plan('b', TODAY, '佐藤 花子', { kana: 'さとう はなこ' }),
+    plan('c', TODAY, '青木 次郎', { status: 'no_show' }),
+    plan('d', TODAY, '井上 三郎', { kana: 'いのうえ さぶろう' }),
+    plan('e', addDaysYmd(TODAY, 1), '明日 来る'),
+  ]
+  const msg = lane.lanePlansMessage(TODAY, plans)
+  assert.equal(msg.type, 'yuuki:visit-plans')
+  assert.equal(msg.date, TODAY)
+  assert.deepEqual(msg.plans.map((p) => [p.id, p.status]), [['d', 'planned'], ['b', 'planned'], ['a', 'visited'], ['c', 'no_show']])
+  assert.deepEqual(Object.keys(msg.plans[2]).sort(), ['id', 'name', 'note', 'status'], 'カルテの番号・ふりがな・入れた人などは渡さない')
+  assert.deepEqual(msg.plans[2], { id: 'a', name: '山田 太郎', note: '夕方ごろ', status: 'visited' })
+  assert.equal(msg.plans[0].note, '')
+  // 人数の上限
+  const many = Array.from({ length: 60 }, (_, i) => plan(`m${i}`, TODAY, `架空 ${String(i).padStart(2, '0')}`))
+  assert.equal(lane.lanePlans(many, TODAY).length, lane.LANE_MAX_PLANS)
+  assert.deepEqual(lane.lanePlans(plans, '2026-12-31'), [])
+})
+
+test('予約の画面から届く合図：形が合うものだけ読む', () => {
+  assert.deepEqual(lane.parseLaneRequest({ type: 'yuuki:visit-plans-watch', date: TODAY }), { kind: 'watch', date: TODAY })
+  assert.deepEqual(lane.parseLaneRequest({ type: 'yuuki:visit-plan-add', date: TODAY }), { kind: 'add', date: TODAY })
+  assert.deepEqual(lane.parseLaneRequest({ type: 'yuuki:visit-plan-open', id: 'V1StGXR8_Z5jdHi6B-myT', date: TODAY }), { kind: 'open', id: 'V1StGXR8_Z5jdHi6B-myT' })
+  assert.equal(lane.parseLaneRequest({ type: 'yuuki:visit-plans-watch', date: '11/25' }), null)
+  assert.equal(lane.parseLaneRequest({ type: 'yuuki:visit-plan-add' }), null)
+  assert.equal(lane.parseLaneRequest({ type: 'yuuki:visit-plan-open', id: '<script>' }), null)
+  assert.equal(lane.parseLaneRequest({ type: 'yuuki:visit-plan-open', id: 'x'.repeat(65) }), null)
+  assert.equal(lane.parseLaneRequest({ type: 'yuuki:open-karte', name: '山田' }), null, 'ほかの合図は今までどおり')
+  assert.equal(lane.parseLaneRequest(null), null)
+  assert.equal(lane.parseLaneRequest('yuuki:visit-plan-add'), null)
+  assert.deepEqual(lane.KARTE_HELLO_ACK, { type: 'yuuki:karte-hello-ack', visitPlans: true })
+})
+
+test('予約の画面（YoyakuFrame）：予約システムのページからの合図だけ読み、返事はそのページあてに送る', () => {
+  const frame = readSrc('src/components/rehab/YoyakuFrame.tsx')
+  const handler = frame.slice(frame.indexOf('const onMessage = (event: MessageEvent) => {'), frame.indexOf("window.addEventListener('message', onMessage)"))
+  assert.ok(handler.indexOf('if (!isReservationOrigin(event.origin)) return') < handler.indexOf('parseLaneRequest(data)'), '出どころを確かめてから読む')
+  assert.match(handler, /source\?\.postMessage\(KARTE_HELLO_ACK, \{ targetOrigin: event\.origin \}\)/)
+  assert.match(frame, /target\.win\.postMessage\(lanePlansMessage\(date, getVisitPlans\(\)\), \{ targetOrigin: target\.origin \}\)/)
+  assert.match(frame, /startLiveSync\(LANE_SYNC_INTERVAL_MS\)/, '予約表を見ている間は、ほかの端末の分を取り込む')
+  assert.match(frame, /<VisitPlanDialog /)
+  // 小さな画面は「来院予定（日にち）」と同じ部品・同じ記録
+  const dialog = readSrc('src/components/clinic/VisitPlanDialog.tsx')
+  assert.match(dialog, /import \{ PlanAddForm, PlanRow, usePlans \} from '\.\/VisitPlansPanel'/)
+  assert.match(dialog, /<PlanAddForm initialDate=\{state\.date\}/)
 })
 
 console.log(`\n${passed} 件、すべて通りました`)
