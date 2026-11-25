@@ -82,7 +82,7 @@ function jstParts(now = new Date()): { date: string; hour: number } {
 
 /** LINE 連携を探すときに一度だけ読むもの（前日のお知らせのように、何人分も続けて探すときに使い回す） */
 export interface LinkFinderCache {
-  patients?: Array<{ name?: string; phone?: string; birthDate?: string }>
+  patients?: Array<{ id?: string; name?: string; phone?: string; birthDate?: string }>
   links?: Awaited<ReturnType<typeof listLineLinks>>
 }
 
@@ -99,7 +99,16 @@ async function cloudPatients(cache: LinkFinderCache): Promise<NonNullable<LinkFi
   return cache.patients
 }
 
-/** 予約の方の LINE 連携を探す（電話＋お名前 → 無ければ、クラウドのカルテの「お名前＋生年月日」） */
+/**
+ * 予約の方の LINE 連携を探す。
+ * 1. 予約の電話＋お名前（連携のキーそのもの）
+ * 2. 無ければ、クラウドのカルテから同じ方を1人に決めて（お名前が同じカルテが1人だけ、または電話も同じ方が1人だけ）、
+ *    a. そのカルテの画面のQRコードで結びついた LINE（連携にカルテの ID が残っている。新しいものを使う）
+ *    b. そのカルテの電話＋お名前で結びついた LINE（予約の電話がカルテとちがう・予約に電話が無いとき）
+ *    c. カルテと連携の「お名前＋生年月日」が同じ LINE（今までどおり）
+ * 2026-11-25：QRコードで結びついた方に、院で入れた予約の「確定しました」が届かなかった（予約に電話が無い・カルテに生年月日が無いと、
+ * 1 と 2c では見つからない）ので、2a・2b を足した。同じお名前のカルテが2人以上で決められないときは、今までどおり送らない
+ */
 export async function findLinkForPerson(name: string, phone: string, cache: LinkFinderCache = {}): Promise<LineLink | null> {
   const key = patientLinkKey(name, phone)
   if (key) {
@@ -116,8 +125,25 @@ export async function findLinkForPerson(name: string, phone: string, cache: Link
     // 同じお名前のカルテが1人だけ（または電話も同じ方が1人だけ）のときに使う
     const byPhone = digits ? same.filter((p) => phoneDigits(p.phone ?? '') === digits) : []
     const karte = byPhone.length === 1 ? byPhone[0] : same.length === 1 ? same[0] : null
-    if (!karte?.birthDate) return null
+    if (!karte) return null
     if (!cache.links) cache.links = await listLineLinks()
+    // a. カルテの画面のQRコードで結びついた LINE（一覧は新しい順）
+    const karteId = String(karte.id ?? '')
+    if (karteId) {
+      const byId = cache.links.find((l) => l.patientId === karteId)
+      if (byId) {
+        const link = await getLineLink(byId.key)
+        if (link) return link
+      }
+    }
+    // b. カルテの電話＋お名前で結びついた LINE
+    const karteKey = patientLinkKey(karte.name ?? '', karte.phone ?? '')
+    if (karteKey && karteKey !== key) {
+      const viaKarte = await getLineLink(karteKey)
+      if (viaKarte) return viaKarte
+    }
+    // c. お名前＋生年月日
+    if (!karte.birthDate) return null
     const hit = cache.links.filter((l) => l.birthDate === karte.birthDate && nameNoSpace(l.name).normalize('NFKC') === compact)
     return hit.length === 1 ? getLineLink(hit[0].key) : null
   } catch {

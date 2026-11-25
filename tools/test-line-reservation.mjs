@@ -324,6 +324,62 @@ try {
     assert.equal(pushes.length, before + 1)
     await assert.rejects(rsv.remindLinkedReservations({ date: '明日', rows: [] }))
   })
+
+  // ── 2026-11-25：カルテの画面のQRコードで結びついた方に、院で入れた予約の「確定しました」が届かなかった
+  // （予約に電話が無い・予約の電話が連携の電話とちがう・カルテに生年月日が無いと、見つけられなかった）
+  await test('QRコードで結びついた方：予約に電話が無くても・電話がちがっても、カルテの ID で見つけて送る', async () => {
+    const ICHIRO = 'Ucccccccccccccccccccccccccccccccc'
+    const JIRO = 'Udddddddddddddddddddddddddddddddd'
+    const SABURO = 'Ueeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+    await saveRule('reservation_confirm', { mode: 'on', dailyLimit: 60 })
+    // カルテ：鈴木さん（予約から作ったので電話・生年月日なし）・高橋さん（電話はあるが生年月日なし）・同じお名前の田村さんが2人
+    await kvSet('sync:clinic', {
+      payload: {
+        pt_patients: JSON.stringify([
+          { id: 'p1', name: '佐藤 太郎', phone: '070-5555-6666', birthDate: '2012-05-06' },
+          { id: 'p2', name: '鈴木 一郎', phone: '' },
+          { id: 'p3', name: '高橋 次郎', phone: '070-1111-2222' },
+          { id: 'p4', name: '田村 三郎', phone: '080-4444-0001' },
+          { id: 'p5', name: '田村 三郎', phone: '080-4444-0002' },
+        ]),
+      },
+      updatedAt: '2030-01-03T00:00:00Z',
+    })
+    // 鈴木さん：カルテのQRコードで結びついた（電話は患者さんが LINE で入れたもの）
+    await saveLineLink({ key: '08012345678|鈴木一郎', name: '鈴木 一郎', phone: '08012345678', sealed: sealUserId(ICHIRO, 'notify-secret'), linkedAt: '2030-01-03T00:00:00Z', via: 'karte-qr', patientId: 'p2' })
+    // 高橋さん：カルテの電話＋お名前で結びついた（カルテの ID は残っていない）
+    await saveLineLink({ key: '07011112222|高橋次郎', name: '高橋次郎', phone: '07011112222', sealed: sealUserId(JIRO, 'notify-secret'), linkedAt: '2030-01-03T00:00:00Z', via: 'liff-link' })
+    // 田村さん（p4）：カルテのQRコードで結びついた。電話は患者さんが入れた別の番号
+    await saveLineLink({ key: '09077778888|田村三郎', name: '田村 三郎', phone: '09077778888', sealed: sealUserId(SABURO, 'notify-secret'), linkedAt: '2030-01-03T00:00:00Z', via: 'karte-qr', patientId: 'p4' })
+
+    const day = '2030-01-15'
+    const noPhone = await rsv.confirmClinicReservation({ reservationNo: 'Q100', name: '鈴木一郎', phone: '', date: day, time: '11:00' }, { now: NOW })
+    assert.deepEqual([noPhone.linked, noPhone.delivered], [true, true], '予約に電話が無い')
+    assert.equal(pushes.at(-1).to, ICHIRO)
+    assert.match(pushes.at(-1).text, /鈴木 一郎 様/)
+    const otherPhone = await rsv.confirmClinicReservation({ reservationNo: 'Q101', name: '鈴木 一郎', phone: '090-0000-1111', date: day, time: '12:00' }, { now: NOW })
+    assert.deepEqual([otherPhone.linked, otherPhone.delivered], [true, true], '予約の電話が連携の電話とちがう')
+    assert.equal(pushes.at(-1).to, ICHIRO)
+
+    const karteKey = await rsv.confirmClinicReservation({ reservationNo: 'Q102', name: '高橋次郎', phone: '', date: day, time: '13:00' }, { now: NOW })
+    assert.deepEqual([karteKey.linked, karteKey.delivered], [true, true], 'カルテの電話＋お名前で結びついた方')
+    assert.equal(pushes.at(-1).to, JIRO)
+
+    // 同じお名前のカルテが2人：決められないときは送らない。電話で決まった方が別のカルテなら、その方の LINE は無いので送らない
+    const before = pushes.length
+    const twoSame = await rsv.confirmClinicReservation({ reservationNo: 'Q103', name: '田村三郎', phone: '', date: day, time: '14:00' }, { now: NOW })
+    assert.equal(twoSame.linked, false, '同じお名前が2人で決められない')
+    const theOther = await rsv.confirmClinicReservation({ reservationNo: 'Q104', name: '田村三郎', phone: '080-4444-0002', date: day, time: '15:00' }, { now: NOW })
+    assert.equal(theOther.linked, false, '電話でわかったのは結びついていない方のカルテ（p5）')
+    assert.equal(pushes.length, before)
+    const own = await rsv.confirmClinicReservation({ reservationNo: 'Q105', name: '田村三郎', phone: '080-4444-0001', date: day, time: '16:00' }, { now: NOW })
+    assert.deepEqual([own.linked, own.delivered], [true, true], '電話でわかったカルテ（p4）に結びついた LINE')
+    assert.equal(pushes.at(-1).to, SABURO)
+
+    // 毎朝の前日のお知らせでも同じように見つける（何人分も続けて探す）
+    const remind = await rsv.remindLinkedReservations({ date: '2030-01-11', rows: [{ reservationNo: 'Q200', name: '鈴木一郎', phone: '', time: '10:00' }, { reservationNo: 'Q201', name: '高橋 次郎', phone: '', time: '10:30' }] }, { now: at(8) })
+    assert.deepEqual(remind.map((r) => r.linked), [true, true])
+  })
 } finally {
   globalThis.fetch = realFetch
   for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
