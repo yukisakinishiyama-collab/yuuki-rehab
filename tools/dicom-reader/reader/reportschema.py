@@ -1,6 +1,7 @@
-"""AIが書く out/report.json の形を確かめて整える（rt.py check と読影プログラムの両方で使う）。
+"""AIが書く out/report.json（読影）と out/consult.json（院長の気づきの見直し）の形を確かめて整える。
+rt.py check と読影プログラムの両方で使う。
 
-AIの作業フォルダには rtcheck.py という名前で写して置く。
+AIの作業フォルダには rtcheck.py という名前で写して置く。見直しの作業フォルダには consult.md がある。
 """
 from __future__ import annotations
 
@@ -9,6 +10,10 @@ import re
 from pathlib import Path
 
 BLOCK_TYPES = ("p", "h3", "figure", "table", "list", "box", "note", "series_table", "estimates")
+# 見直し（相談）の答えで使えるブロック（撮像の表・見積もりの表は読影のレポートにだけ入れる）
+CONSULT_BLOCK_TYPES = ("p", "h3", "figure", "table", "list", "box", "note")
+# 見直しの見立て → 画面・PDFに出す言葉
+VERDICTS = {"seen": "気づいた所見を確認", "partly": "一部を確認", "not_seen": "確認できず", "cannot_judge": "この画像では判断できない"}
 FIG_RE = re.compile(r"^figures/[A-Za-z0-9_-]{1,40}\.jpg$")
 _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -75,8 +80,28 @@ def validate(data, work: Path) -> tuple[dict, list[str]]:
     if not isinstance(secs, list) or not secs:
         p.append("sections（本文の章のリスト）がありません")
         secs = []
-    out_secs = []
     used_figs: set[str] = set()
+    out_secs, has_series_table, has_est_block = _sections(secs, work, p, used_figs, BLOCK_TYPES)
+    if out_secs and not has_series_table:
+        out_secs[0]["blocks"].insert(0, {"type": "series_table"})
+    if out_est and not has_est_block:
+        out_secs.append({"heading": "考えられる状態と、確からしさの見積もり", "blocks": [{"type": "estimates"}]})
+    out["sections"] = out_secs
+    out["unused_figures"] = _unused(work, used_figs)
+    if not used_figs:
+        p.append("図が1枚もありません（主な所見は図で示してください）")
+    return out, p
+
+
+def _unused(work: Path, used_figs: set[str]) -> list[str]:
+    figs = sorted(str(x.relative_to(work)).replace("\\", "/") for x in (Path(work) / "figures").glob("*.jpg")) \
+        if (Path(work) / "figures").exists() else []
+    return [f for f in figs if f not in used_figs]
+
+
+def _sections(secs: list, work: Path, p: list[str], used_figs: set[str], allowed: tuple[str, ...]) -> tuple[list[dict], bool, bool]:
+    """本文の章（heading と blocks）を確かめる。(整えた章, 撮像の表があったか, 見積もりの表があったか)"""
+    out_secs = []
     has_series_table = has_est_block = False
     for i, s in enumerate(secs[:14]):
         if not isinstance(s, dict):
@@ -89,8 +114,8 @@ def validate(data, work: Path) -> tuple[dict, list[str]]:
             blocks = []
         for j, b in enumerate(blocks[:40]):
             w = f"sections[{i}].blocks[{j}]"
-            if not isinstance(b, dict) or b.get("type") not in BLOCK_TYPES:
-                p.append(f"{w}.type は {', '.join(BLOCK_TYPES)} のどれかにしてください")
+            if not isinstance(b, dict) or b.get("type") not in allowed:
+                p.append(f"{w}.type は {', '.join(allowed)} のどれかにしてください")
                 continue
             t = b["type"]
             nb: dict = {"type": t}
@@ -149,17 +174,63 @@ def validate(data, work: Path) -> tuple[dict, list[str]]:
                 has_est_block = True
             sec["blocks"].append(nb)
         out_secs.append(sec)
-    if out_secs and not has_series_table:
-        out_secs[0]["blocks"].insert(0, {"type": "series_table"})
-    if out_est and not has_est_block:
-        out_secs.append({"heading": "考えられる状態と、確からしさの見積もり", "blocks": [{"type": "estimates"}]})
-    out["sections"] = out_secs
-    figs = sorted(str(x.relative_to(work)).replace("\\", "/") for x in (Path(work) / "figures").glob("*.jpg")) \
-        if (Path(work) / "figures").exists() else []
-    out["unused_figures"] = [f for f in figs if f not in used_figs]
-    if not used_figs:
-        p.append("図が1枚もありません（主な所見は図で示してください）")
+    return out_secs, has_series_table, has_est_block
+
+
+def validate_consult(data, work: Path) -> tuple[dict, list[str]]:
+    """院長の気づきの見直し（out/consult.json）を確かめる。(整えた内容, 問題のリスト)"""
+    p: list[str] = []
+    if not isinstance(data, dict):
+        return {}, ["consult.json の中身がオブジェクト（{...}）ではありません"]
+    verdict = data.get("verdict")
+    if verdict not in VERDICTS:
+        p.append(f"verdict は {'・'.join(VERDICTS)} のどれかにしてください")
+        verdict = "cannot_judge"
+    out: dict = {"verdict": verdict, "verdict_label": VERDICTS[verdict], "headline": _text(data.get("headline"), 60, "headline", p)}
+    ans = data.get("answer")
+    if not isinstance(ans, list) or not ans:
+        p.append("answer（答えの段落のリスト）がありません")
+        ans = []
+    if len(ans) > 6:
+        p.append("answer は6段落までにしてください")
+    out["answer"] = [_text(s, 600, f"answer[{i}]", p) for i, s in enumerate(ans[:6])]
+    nxt = data.get("next") or []
+    if not isinstance(nxt, list):
+        p.append("next はリストにしてください")
+        nxt = []
+    out["next"] = [x for x in (_text(s, 300, f"next[{i}]", p, required=False) for i, s in enumerate(nxt[:8])) if x]
+    refs = data.get("references") or []
+    out["references"] = [_text(r, 400, f"references[{i}]", p) for i, r in enumerate(refs[:10])] if isinstance(refs, list) else []
+    secs = data.get("sections") or []
+    if not isinstance(secs, list):
+        p.append("sections はリストにしてください")
+        secs = []
+    used_figs: set[str] = set()
+    out["sections"], _, _ = _sections(secs, work, p, used_figs, CONSULT_BLOCK_TYPES)
+    out["unused_figures"] = _unused(work, used_figs)
+    if verdict != "cannot_judge" and not used_figs:
+        p.append("図が1枚もありません（見直した所を図で示してください）")
     return out, p
+
+
+def _read_json(f: Path) -> tuple[object | None, str | None]:
+    try:
+        return json.loads(f.read_text(encoding="utf-8-sig")), None
+    except Exception as e:  # noqa: BLE001
+        return None, f"{f.parent.name}/{f.name} を読めません（JSONの書き方の誤り）: {e}"
+
+
+def check_consult_file(work: Path) -> tuple[dict, list[str]]:
+    f = Path(work) / "out" / "consult.json"
+    if not f.exists():
+        return {}, ["out/consult.json がまだありません"]
+    data, err = _read_json(f)
+    return ({}, [err]) if err else validate_consult(data, work)
+
+
+def check_work(work: Path) -> tuple[dict, list[str]]:
+    """rt.py check：見直し（consult.md がある）なら consult.json、読影なら report.json を確かめる"""
+    return check_consult_file(work) if (Path(work) / "consult.md").exists() else check_file(work)
 
 
 def check_file(work: Path) -> tuple[dict, list[str]]:

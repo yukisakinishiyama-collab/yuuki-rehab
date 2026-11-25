@@ -34,6 +34,8 @@ def main():
     assert "試験" not in case and "HANAKO" not in case and "0099887766" not in case and "架空病院" not in case, "氏名などがAIに渡っている"
     assert not list(Path(".").rglob("*.dcm")) and not Path("job.json").exists()
     Path("out").mkdir(exist_ok=True)
+    if Path("consult.md").exists():
+        return consult(prompt, mode)
     if "直す所が残っています" in prompt:
         r = json.loads(Path("out/report.json").read_text(encoding="utf-8"))
         r["headline"] = "骨折を示す所見なし。前方に少量の液体"
@@ -90,6 +92,43 @@ def main():
         time.sleep(30)
     emit({"type": "result", "subtype": "success", "is_error": False, "result": "完了", "num_turns": 9, "total_cost_usd": 0.5,
           "usage": {"input_tokens": 10, "output_tokens": 20, "cache_creation_input_tokens": 30, "cache_read_input_tokens": 40}})
+    return 0
+
+
+def consult(prompt, mode):
+    """院長の気づきの見直し（相談）のまね"""
+    assert "CONSULT.md" in prompt and Path("CONSULT.md").exists()
+    note = Path("consult.md").read_text(encoding="utf-8")
+    assert "試験" not in note and "0099887766" not in note and "架空病院" not in note, "氏名などがAIに渡っている"
+    assert "外側の骨に高信号" in note and "s02 の 4〜6枚目" in note and "前回のAIの読影" in note and "骨折を示す所見なし" in note, note
+    if "直す所が残っています" in prompt:
+        r = json.loads(Path("out/consult.json").read_text(encoding="utf-8"))
+        r["verdict"] = "partly"
+        Path("out/consult.json").write_text(json.dumps(r, ensure_ascii=False), encoding="utf-8")
+        tool("python rt.py check")
+        emit({"type": "result", "subtype": "success", "is_error": False, "result": "完了", "num_turns": 2, "total_cost_usd": 0.01})
+        return 0
+    tool("python rt.py list")
+    tool("python rt.py strip s02 4-6 --box 50,90,20,70")
+    emit({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "views/s02_strip_01.png"}}]}})
+    Path("out/fig1.json").write_text(json.dumps({"out": "fig1", "rows": [[
+        {"series": "s02", "k": k, "box": [50, 90, 20, 70], "label": f"#{k}", "marks": [{"type": "arrow", "from": [55, 25], "to": [66, 40]}]}
+        for k in (4, 5, 6)]]}, ensure_ascii=False), encoding="utf-8")
+    tool("python rt.py figure out/fig1.json")
+    answer = {
+        "verdict": "maybe" if mode == "needs_repair" else "partly",
+        "headline": "外側に淡い高信号。骨折線は追えない",
+        "answer": ["**外側の骨に淡い高信号があります。** STIR #4〜#6 で連続して見えます。<script>alert(1)</script>",
+                   "T1 の同じ所に骨折線は追えません。前回の読影では触れていませんでした。"],
+        "sections": [{"heading": "見直した所", "blocks": [{"type": "figure", "file": "figures/fig1.jpg", "caption": "図1 矢状断 STIR #4〜#6"},
+                                                       {"type": "p", "text": "同じ枠で並べています。"}]}],
+        "next": ["外側の圧痛を確かめる", "腫れが増えるときは医師の再診を"],
+    }
+    Path("out/consult.json").write_text(json.dumps(answer, ensure_ascii=False), encoding="utf-8")
+    emit({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Write", "input": {"file_path": "out/consult.json"}}]}})
+    chk = tool("python rt.py check")
+    assert ("OK" in chk.stdout) == (mode != "needs_repair"), chk.stdout
+    emit({"type": "result", "subtype": "success", "is_error": False, "result": "完了", "num_turns": 6, "total_cost_usd": 0.2})
     return 0
 
 

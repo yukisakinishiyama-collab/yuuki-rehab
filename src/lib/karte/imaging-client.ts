@@ -7,14 +7,17 @@
  *
  * 読影プログラムはそのパソコンでしか動かないので、スマホやほかのパソコンでは「読み取り」は出せない
  * （提出済みのレポートを見るのは、どの端末でもできる）。
+ * 院長が気づいたことの見直し（相談。読影プログラム v1.1.0〜）も同じ流れ：CDを読み直し → AIが原画像のその場所を見直す → PDF。
  */
-import type { CdPatient, ReaderResult } from './imaging'
+import type { CdPatient, ReaderConsultResult, ReaderResult } from './imaging'
 
 export const READER_URL = 'http://127.0.0.1:8791'
 
 export interface ReaderHealth {
   ok: boolean
   version: string
+  /** できること（v1.1.0〜：['read', 'consult']。古い版は無い） */
+  features?: string[]
   /** Claude Code が入っているか・ログインしているか（null は確かめられなかった） */
   claude: boolean
   loggedIn: boolean | null
@@ -64,6 +67,8 @@ export type ReaderJobStatus = 'queued' | 'running' | 'done' | 'error' | 'cancell
 
 export interface ReaderJob {
   id: string
+  /** read＝読影／consult＝院長の気づきの見直し（古い版は無い＝読影） */
+  kind?: 'read' | 'consult'
   status: ReaderJobStatus
   stage?: string
   created: string
@@ -71,9 +76,18 @@ export interface ReaderJob {
   /** 読影のときに伝えた主訴 */
   complaint?: string
   error?: string | null
-  result?: ReaderResult | null
+  result?: ReaderResult | ReaderConsultResult | null
   log?: string[]
   warnings?: string[]
+  /** 見直しのとき：どの画像レポートについてか・院長が気づいたこと・場所 */
+  reportId?: string
+  observation?: string
+  location?: string
+}
+
+/** 見直し（相談）の結果か */
+export function isConsultResult(result: ReaderJob['result']): result is ReaderConsultResult {
+  return Boolean(result && 'kind' in result && result.kind === 'consult')
 }
 
 /**
@@ -136,6 +150,21 @@ export function readerStart(input: {
   confirmedNoText: boolean
 }): Promise<ReaderJob> {
   return reader<ReaderJob>('/jobs', { method: 'POST', body: JSON.stringify(input) })
+}
+
+/** 院長が気づいたことを、AIに原画像で見直してもらう（CDをもう一度読む。5〜15分） */
+export function readerStartConsult(input: {
+  path: string
+  studies: string[]
+  patient: { id: string; name: string; birthDate: string; gender: string }
+  complaint: string
+  confirmedNoText: boolean
+  reportId: string
+  observation: string
+  location: string
+  prior: { region: string; headline: string; summary: string[]; estimates: Array<{ condition: string; percent: number }> }
+}): Promise<ReaderJob> {
+  return reader<ReaderJob>('/jobs', { method: 'POST', body: JSON.stringify({ ...input, kind: 'consult', question: '' }) })
 }
 
 export async function readerJobs(patientId: string): Promise<ReaderJob[]> {

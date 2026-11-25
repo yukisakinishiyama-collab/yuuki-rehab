@@ -1,6 +1,7 @@
 """院のパソコンで動く小さな常駐プログラム（127.0.0.1 だけで待つ）。
 
 院内アプリのカルテ（ブラウザ）から呼ばれて、CDのDICOMを読み、Claude Code に読影させ、PDFを作る。
+提出済みのレポートについて院長が気づいたことを、CDをもう一度読んで原画像で見直させることもできる（kind: consult）。
 - 呼べるのは、決めたアドレス（院内アプリ）のページだけ（Origin を確かめる）
 - 氏名・患者ID・施設名・日付はAIに渡さない。PDFの見出しにだけ使う
 - 同時に動かせる読影は1件。下書き（PDF・画像の配列）はこのパソコンに置き、カルテに保存したら消す
@@ -23,12 +24,14 @@ from urllib.parse import parse_qs, urlparse
 
 from . import agent, dicomio, render, reportschema
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
+# この版でできること（院内アプリが、読影プログラムを新しくする必要があるかを見分ける）
+FEATURES = ["read", "consult"]
 HERE = Path(__file__).resolve().parent
 DEFAULT_ORIGINS = ["https://yuuki-rehab.vercel.app", "https://shimonoseki-yuuki.com", "https://www.shimonoseki-yuuki.com",
                    "http://localhost:3000", "http://127.0.0.1:3000"]
 DEFAULTS = {"port": 8791, "origins": DEFAULT_ORIGINS, "folders": [], "model": None, "effort": None, "claude_cmd": None,
-            "browser": None, "max_pdf_bytes": 3_800_000, "keep_days": 7, "timeout_min": 45}
+            "browser": None, "max_pdf_bytes": 3_800_000, "keep_days": 7, "timeout_min": 45, "consult_timeout_min": 25}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 SEX_JA = {"F": "女性", "M": "男性", "female": "女性", "male": "男性"}
 
@@ -121,9 +124,12 @@ class Jobs:
             if self.running:
                 raise RuntimeError("ほかの読影が動いています。終わってからもう一度お試しください。")
             jid = dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
-            job = {"id": jid, "status": "queued", "stage": "準備しています", "created": dt.datetime.now().isoformat(timespec="seconds"),
+            job = {"id": jid, "kind": req.get("kind") or "read", "status": "queued", "stage": "準備しています",
+                   "created": dt.datetime.now().isoformat(timespec="seconds"),
                    "patient": req["patient"], "complaint": req["complaint"], "question": req["question"], "path": req["path"],
                    "studies": req["studies"], "log": []}
+            if job["kind"] == "consult":
+                job.update(reportId=req["reportId"], observation=req["observation"], location=req["location"], prior=req["prior"])
             self.save(job)
             self.running = jid
         threading.Thread(target=self._run, args=(jid,), daemon=True).start()
@@ -146,10 +152,22 @@ class Jobs:
             sex_ja = SEX_JA.get(hd.get("sex") or "", "") or SEX_JA.get(pat.get("gender") or "", "")
             idents = sorted(set(got["identifiers"]) | {x for x in re.split(r"[\s　]+", pat.get("name") or "") if len(x) >= 2}
                             | ({pat["name"].replace(" ", "").replace("　", "")} if pat.get("name") else set()), key=len, reverse=True)
+            consult = job.get("kind") == "consult"
             dicomio.write_case(work, got["series"], age_text, sex_ja, dicomio.scrub(job["complaint"], idents),
-                               dicomio.scrub(job["question"], idents))
-            for src, dst in (("workspace/rt.py", "rt.py"), ("workspace/INSTRUCTIONS.md", "INSTRUCTIONS.md"),
-                             ("imaging.py", "rtlib.py"), ("reportschema.py", "rtcheck.py")):
+                               "" if consult else dicomio.scrub(job["question"], idents))
+            files = [("workspace/rt.py", "rt.py"), ("workspace/INSTRUCTIONS.md", "INSTRUCTIONS.md"),
+                     ("imaging.py", "rtlib.py"), ("reportschema.py", "rtcheck.py")]
+            if consult:
+                files.append(("workspace/CONSULT.md", "CONSULT.md"))
+                prior = job.get("prior") or {}
+                dicomio.write_consult(work, dicomio.scrub(job["observation"], idents), dicomio.scrub(job.get("location") or "", idents), {
+                    "region": dicomio.scrub(prior.get("region") or "", idents),
+                    "headline": dicomio.scrub(prior.get("headline") or "", idents),
+                    "summary": [dicomio.scrub(x, idents) for x in prior.get("summary") or []],
+                    "estimates": [{"condition": dicomio.scrub(e.get("condition") or "", idents), "percent": e.get("percent", 0)}
+                                  for e in prior.get("estimates") or []],
+                })
+            for src, dst in files:
                 shutil.copyfile(HERE / src, work / dst)
             job["series"] = got["series"]
             job["header"] = {"name": pat.get("name") or hd.get("dicom_name") or "", "patient_id": hd.get("patient_id") or "",
@@ -163,7 +181,6 @@ class Jobs:
             claude = agent.find_claude(cfg.get("claude_cmd"))
             if not claude:
                 raise RuntimeError("このパソコンに Claude Code が見つかりません。")
-            self.log(job, "AIが読影を始めました（10〜25分ほどかかります）")
             holder = self.procs.setdefault(jid, {})
             acfg = {"model": cfg.get("model"), "effort": cfg.get("effort"), "python_dir": str(Path(sys.executable).parent)}
 
@@ -171,6 +188,10 @@ class Jobs:
                 if job.get("stage") != text:
                     self.log(job, text)
 
+            if consult:
+                self._consult(job, jid, work, got, claude, acfg, on_stage, holder, cfg, t0)
+                return
+            self.log(job, "AIが読影を始めました（10〜25分ほどかかります）")
             res = agent.run(claude, work, acfg, agent.PROMPT, on_stage, holder, timeout=int(cfg["timeout_min"]) * 60)
             job["usage"] = [{k: res.get(k) for k in ("turns", "cost_usd", "seconds", "tokens", "images_read")}]
             if jid in self.cancelled:
@@ -222,10 +243,56 @@ class Jobs:
                     self.running = None
 
 
+    def _consult(self, job: dict, jid: str, work: Path, got: dict, claude: list[str], acfg: dict, on_stage, holder: dict,
+                 cfg: dict, t0: float) -> None:
+        """院長の気づきの見直し（相談）。CDの読み込みまでは読影と同じ。終わったら out/report.pdf に見直しのPDF"""
+        self.log(job, "AIが画像を見直しています（5〜15分ほどかかります）")
+        res = agent.run(claude, work, acfg, agent.CONSULT_PROMPT, on_stage, holder, timeout=int(cfg["consult_timeout_min"]) * 60)
+        job["usage"] = [{k: res.get(k) for k in ("turns", "cost_usd", "seconds", "tokens", "images_read")}]
+        if jid in self.cancelled:
+            raise InterruptedError
+        consult, problems = reportschema.check_consult_file(work)
+        if res["kind"] in ("limit", "login") and (not consult or problems):
+            raise RuntimeError(res["message"].replace("「読影を始める」", "「AIに見直してもらう」"))
+        if problems and res["kind"] != "timeout":
+            self.log(job, "答えの形を整えています")
+            res2 = agent.run(claude, work, acfg, agent.CONSULT_REPAIR_PROMPT, on_stage, holder, timeout=600)
+            job["usage"].append({k: res2.get(k) for k in ("turns", "cost_usd", "seconds", "tokens", "images_read")})
+            consult, problems = reportschema.check_consult_file(work)
+        if not consult.get("answer") or not consult.get("headline"):
+            detail = res["message"] if not res["ok"] else " / ".join(problems[:3])
+            raise RuntimeError(f"答えを作れませんでした：{detail}"[:400])
+        job["warnings"] = problems[:8]
+        if jid in self.cancelled:
+            raise InterruptedError
+        self.log(job, "PDFにまとめています")
+        region = (job.get("prior") or {}).get("region") or ""
+        render.make_pdf_with(lambda fig_bytes: render.build_consult_html(
+            consult, job["header"], got["series"], work, job["observation"], job.get("location") or "", region, fig_bytes),
+            self.path(jid) / "out", int(cfg["max_pdf_bytes"]), cfg.get("browser"))
+        pdf = self.path(jid) / "out" / "report.pdf"
+        sid = re.sub(r"[^0-9A-Za-z]", "", job["header"]["patient_id"])[:20]
+        job["result"] = {
+            "kind": "consult", "verdict": consult["verdict"], "verdict_label": consult["verdict_label"],
+            "headline": consult["headline"], "answer": consult["answer"], "next": consult["next"], "title_region": region,
+            "modalities": list(job["header"]["counts"].keys()), "counts": job["header"]["counts"],
+            "study_date": job["header"]["study_date"], "institution": job["header"]["institution"], "bytes": pdf.stat().st_size,
+            "file_name": f"画像の見直し_{sid or 'ID'}_{dt.date.today().strftime('%Y%m%d')}.pdf",
+            "minutes": round((time.time() - t0) / 60, 1),
+        }
+        job["status"] = "done"
+        self.log(job, f"できました（{job['result']['minutes']}分）。内容を確かめて、カルテに残してください")
+        # 画素の配列は大きいので、できあがったら消す（図と文は残す）
+        shutil.rmtree(work / "series", ignore_errors=True)
+        shutil.rmtree(work / "views", ignore_errors=True)
+
+
 def public_job(j: dict, detail: bool = False) -> dict:
-    out = {"id": j["id"], "status": j["status"], "stage": j.get("stage"), "created": j.get("created"),
+    out = {"id": j["id"], "kind": j.get("kind") or "read", "status": j["status"], "stage": j.get("stage"), "created": j.get("created"),
            "patientId": (j.get("patient") or {}).get("id"), "complaint": j.get("complaint") or "", "error": j.get("error"),
            "result": j.get("result")}
+    if j.get("kind") == "consult":
+        out.update(reportId=j.get("reportId"), observation=j.get("observation") or "", location=j.get("location") or "")
     if detail:
         out.update(log=j.get("log") or [], warnings=j.get("warnings") or [], usage=j.get("usage") or [])
     return out
@@ -347,8 +414,9 @@ class Handler(BaseHTTPRequestHandler):
         if claude and (not c or time.time() - c.get("at", 0) > 90):
             c.clear()
             c.update(agent.login_status(claude), at=time.time())
-        return {"ok": True, "version": VERSION, "claude": bool(claude), "loggedIn": c.get("logged_in") if claude else None,
-                "pdf": bool(render.find_browser(cfg.get("browser"))), "running": self.jobs.running}
+        return {"ok": True, "version": VERSION, "features": FEATURES, "claude": bool(claude),
+                "loggedIn": c.get("logged_in") if claude else None, "pdf": bool(render.find_browser(cfg.get("browser"))),
+                "running": self.jobs.running}
 
     def _allowed_path(self, path: str) -> str:
         """読めるのは、CD・USB と、設定で決めたフォルダの中だけ"""
@@ -367,10 +435,27 @@ class Handler(BaseHTTPRequestHandler):
         if b.get("confirmedNoText") is not True:
             raise ValueError("画像に氏名などの文字が写っていないことの確認が要ります")
         studies = [str(s) for s in (b.get("studies") or [])][:20]
-        return {"path": self._allowed_path(str(b.get("path") or "")), "studies": studies,
-                "patient": {"id": str(pat["id"]), "name": str(pat.get("name") or "")[:60], "birthDate": str(pat.get("birthDate") or "")[:10],
-                            "gender": str(pat.get("gender") or "")[:10]},
-                "complaint": str(b.get("complaint") or "")[:600], "question": str(b.get("question") or "")[:600]}
+        req = {"path": self._allowed_path(str(b.get("path") or "")), "studies": studies,
+               "patient": {"id": str(pat["id"]), "name": str(pat.get("name") or "")[:60], "birthDate": str(pat.get("birthDate") or "")[:10],
+                           "gender": str(pat.get("gender") or "")[:10]},
+               "complaint": str(b.get("complaint") or "")[:600], "question": str(b.get("question") or "")[:600]}
+        if b.get("kind") == "consult":
+            observation = str(b.get("observation") or "").strip()[:600]
+            if not observation:
+                raise ValueError("気づいたことを書いてください")
+            if not ID_RE.match(str(b.get("reportId") or "")):
+                raise ValueError("どの画像レポートについての相談かが分かりません")
+            prior = b.get("prior") if isinstance(b.get("prior"), dict) else {}
+            txt = lambda v, n: str(v or "")[:n]  # noqa: E731
+            est = prior.get("estimates") if isinstance(prior.get("estimates"), list) else []
+            summ = prior.get("summary") if isinstance(prior.get("summary"), list) else []
+            req.update(kind="consult", reportId=str(b["reportId"]), observation=observation, location=txt(b.get("location"), 200).strip(),
+                       prior={"region": txt(prior.get("region"), 40), "headline": txt(prior.get("headline"), 80),
+                              "summary": [txt(x, 500) for x in summ[:8]],
+                              "estimates": [{"condition": txt((e or {}).get("condition"), 80),
+                                             "percent": max(0, min(100, int(float((e or {}).get("percent") or 0))))}
+                                            for e in est[:10] if isinstance(e, dict)]})
+        return req
 
 
 def main() -> None:

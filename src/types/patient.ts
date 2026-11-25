@@ -469,6 +469,39 @@ export interface ImagingReport {
   /** カルテに提出した日時・提出した人 */
   submittedAt: string
   submittedBy?: string
+  /** 院長が気づいたことを、AIに原画像で見直してもらった記録（古い順） */
+  consults?: ImagingConsult[]
+}
+
+/** AIの見直しの見立て：気づいた所見を確認／一部を確認／確認できず／この画像では判断できない */
+export type ImagingConsultVerdict = 'seen' | 'partly' | 'not_seen' | 'cannot_judge'
+
+/**
+ * 画像レポートについての相談（2026-11-23 院長の依頼）。
+ * 院長が気づいたことを、院のパソコンの読影プログラムがCDを読み直し、AIが原画像のその場所を見直して答えたもの（参考意見）。
+ * PDF は画像レポートと同じクラウドの非公開の場所（patientId/id.pdf）。
+ */
+export interface ImagingConsult {
+  id: string
+  /** 院長が気づいたこと */
+  observation: string
+  /** 場所（シリーズ・スライス・部位。任意） */
+  location?: string
+  verdict: ImagingConsultVerdict
+  /** 一行 */
+  headline: string
+  /** 答え（段落ごと。**…** は強調） */
+  answer: string[]
+  /** 次に確かめること */
+  next: string[]
+  storagePath: string
+  fileName: string
+  bytes: number
+  /** 見直した者（例：Claude（AI）） */
+  author: string
+  /** カルテに残した日時・残した人 */
+  askedAt: string
+  askedBy?: string
 }
 
 // ──────────────────────────────────────────────
