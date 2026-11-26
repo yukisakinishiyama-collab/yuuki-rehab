@@ -1,32 +1,34 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { loginWithQRToken, initStore } from '@/lib/rehab-store'
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
 
 export default function QRAutoLogin() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const rawToken = searchParams.get('qr')
   const token = rawToken ? decodeURIComponent(rawToken) : null
-  const [status, setStatus] = useState<'checking' | 'success' | 'failed' | 'none'>('none')
+  // QR の番号があれば、はじめから「認証中」（effect の中ですぐ書きかえない）
+  const [status, setStatus] = useState<'checking' | 'success' | 'failed'>('checking')
 
   useEffect(() => {
     if (!token) return
-    setStatus('checking')
     initStore()
     // Small delay so initStore can hydrate localStorage
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       const ok = loginWithQRToken(token)
       if (ok) {
         setStatus('success')
+        // 前からの動きのまま、アプリ全体を読み直して開く（端末に入れたログインを読み直すため）
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         setTimeout(() => { window.location.href = '/dashboard' }, 800)
       } else {
         setStatus('failed')
       }
     }, 200)
-  }, [token, router])
+    return () => clearTimeout(timer)
+  }, [token])
 
   if (!token) return null
 

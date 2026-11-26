@@ -7,11 +7,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Save, Trash2, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { getPatient } from '@/lib/patient-store'
-import { getScores, getScoresByType, saveScore, deleteScore } from '@/lib/outcome-score-store'
+import { getScores, saveScore, deleteScore } from '@/lib/outcome-score-store'
 import { SCORE_DEFS, REGION_SCORES } from '@/data/outcome-score-defs'
 import type { ScoreId, OutcomeScoreRecord } from '@/types/outcome-scores'
 import type { Patient, BodyRegion } from '@/types/patient'
-import { BODY_REGION_LABELS } from '@/types/patient'
 import { ClearTextButton, CLEARABLE_PADDING } from '@/components/rehab-management/shared'
 import { jstToday } from '@/lib/contracts/member'
 import { unansweredItems } from '@/lib/outcome-score-answers'
@@ -54,6 +53,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     const p = getPatient(patientId)
     if (!p) { router.replace('/patients'); return }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末のカルテを最初に1回読むだけ
     setPatient(p)
     // 患者の主訴部位に合わせてデフォルトタブを設定
     const r = p.bodyRegion as BodyRegion
@@ -66,6 +66,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
   }, [patientId, router])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末の記録を最初に1回読むだけ
     setHistory(getScores(patientId))
   }, [patientId])
 
@@ -506,7 +507,7 @@ export default function OutcomeScoresPage({ params }: { params: Promise<{ id: st
             <div className="px-4 py-4 border-t border-gray-100">
               <h4 className="text-xs font-bold text-gray-500 mb-3">スコア推移</h4>
               <div className="flex items-end gap-2 h-16">
-                {[...historyForScore].reverse().map((rec, i) => {
+                {[...historyForScore].reverse().map((rec) => {
                   const pct = (rec.totalScore / scoreDef.maxScore) * 100
                   const effPct = scoreDef.higherIsBetter ? pct : 100 - pct
                   const c = rec.interpretationColor

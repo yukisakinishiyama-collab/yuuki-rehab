@@ -505,14 +505,18 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null)
   const [days, setDays] = useState(30)
 
-  const refresh = useCallback(async (d: number) => {
-    const res = await fetch(`/api/marketing/analytics?days=${d}`)
-    setData(await res.json())
-  }, [])
-
   useEffect(() => {
-    refresh(days)
-  }, [days, refresh])
+    // 期間をすぐに切りかえたとき、前の期間の答えがあとから届いて上書きしないように
+    let current = true
+    fetch(`/api/marketing/analytics?days=${days}`)
+      .then((res) => res.json())
+      .then((json: Analytics) => {
+        if (current) setData(json)
+      })
+    return () => {
+      current = false
+    }
+  }, [days])
 
   if (!data) return <p className="text-sm text-slate-500">読み込み中…</p>
 

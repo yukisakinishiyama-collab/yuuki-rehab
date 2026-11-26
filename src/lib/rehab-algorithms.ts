@@ -4,11 +4,7 @@
 import type {
   RehabPhase,
   RiskLevel,
-  ROMRecord,
-  StrengthRecord,
   SpecialTestRecord,
-  ProgressRecord,
-  AttendanceRecord,
   ImprovementScoreResult,
   RehabRecommendation,
   BodyRegion,
@@ -257,7 +253,6 @@ export function determineRehabPhase(params: {
     specialTestPositive,
     adlDifficulty,
     sportsDifficulty,
-    weeksFromOnset,
   } = params
 
   // Phase 1: 急性期 - 痛みを落ち着かせる
@@ -396,9 +391,6 @@ export function recommendExercises(params: {
     painNrs,
     restPain,
     swelling,
-    romLimitation,
-    strengthDeficit,
-    specialTestPositive,
     instability,
     sportReturn,
     contraindications,

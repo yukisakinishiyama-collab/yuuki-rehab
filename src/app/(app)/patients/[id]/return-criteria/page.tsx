@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo, use } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ClearTextButton, CLEARABLE_PADDING } from '@/components/rehab-management/shared'
 import {
@@ -598,7 +597,6 @@ export default function ReturnCriteriaPage({
   params: Promise<{ id: string }>
 }) {
   const { id: patientId } = use(params)
-  const router = useRouter()
   const patient = getPatient(patientId)
   // 初期値は患者の登録部位から推定するが、手動で切り替え可能
   const AUTO_REGIONS: AssessmentRegion[] = ['knee', 'hip', 'shoulder', 'ankle', 'lumbar']
@@ -702,12 +700,6 @@ export default function ReturnCriteriaPage({
     if (!confirm('この評価記録を削除しますか？')) return
     deleteAssessment(id)
     setHistory(getAssessments(patientId))
-  }
-
-  function lsiOf(inv: number, uni: number, invert = false) {
-    if (!inv || !uni) return '—'
-    const v = invert ? (uni / inv) * 100 : (inv / uni) * 100
-    return `${Math.min(100, Math.round(v))}%`
   }
 
   // セクション開閉

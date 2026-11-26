@@ -247,7 +247,8 @@ function QuickMemoTab({ patient, memos, specialTests, onUpdate }: {
   function toggleMonth(ym: string) {
     setCollapsedMonths(prev => {
       const next = new Set(prev)
-      next.has(ym) ? next.delete(ym) : next.add(ym)
+      if (next.has(ym)) next.delete(ym)
+      else next.add(ym)
       return next
     })
   }
@@ -929,6 +930,7 @@ export default function PatientDetail({ patient }: Props) {
 
   useEffect(() => {
     reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いている方が変わったときだけ読み直す（reload は毎回作り直すので入れない）
   }, [patient.id])
 
   // ほかの端末で書いた記録を取り込んだら、一覧を読み直す（入力中のフォームはそのまま）
@@ -981,10 +983,6 @@ export default function PatientDetail({ patient }: Props) {
   const firstEval = evaluations[0]
   const latestSoap = soapNotes[0]
   const currentPhase = latestSoap?.currentPhase ?? 1
-
-  const romImprovement = firstEval
-    ? calculateROMImprovement(firstEval.painNrs, latestEval?.painNrs ?? null, latestEval?.painNrs ?? null, 10)
-    : null
 
   const improvementScore = latestEval
     ? calculateImprovementScore({

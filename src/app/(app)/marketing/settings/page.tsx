@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末の控えを最初に1回読むだけ
     setProfile(loadClinicProfile())
     setAudit(loadAuditLog())
   }, [])

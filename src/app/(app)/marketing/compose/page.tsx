@@ -68,6 +68,7 @@ function ComposeInner() {
     if (projectIdFromUrl) {
       const found = findProject(projectIdFromUrl)
       if (found) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 開いた投稿を、端末の控えから最初に1回読むだけ
         setProject(found)
         setObjective(found.objective)
         setTheme(found.theme)
@@ -185,7 +186,8 @@ function ComposeInner() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || '生成に失敗しました')
 
-      const next: ContentProject = project ?? {
+      // 画面の中身（project）は書きかえず、新しい入れ物を作る
+      const base: ContentProject = project ?? {
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -194,15 +196,18 @@ function ComposeInner() {
         channels,
         variants: [],
       }
-      next.objective = objective as ContentProject['objective']
-      next.theme = theme
-      next.channels = channels
-      Object.assign(next, detail)
       // 既存の同一媒体バリアントは置き換え（承認済み以降は保持）
-      const keep = next.variants.filter(
+      const keep = base.variants.filter(
         (v) => !data.variants.some((nv: ContentVariant) => nv.channel === v.channel) || v.status !== 'draft',
       )
-      next.variants = [...keep, ...data.variants]
+      const next: ContentProject = {
+        ...base,
+        objective: objective as ContentProject['objective'],
+        theme,
+        channels,
+        ...detail,
+        variants: [...keep, ...data.variants],
+      }
       saveProject(next)
       appendAudit('AI生成を実行', next.id, `${channels.length}媒体 / ${data.mode}`)
       setProject({ ...next })

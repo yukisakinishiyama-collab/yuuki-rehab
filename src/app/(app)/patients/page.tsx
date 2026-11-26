@@ -98,6 +98,7 @@ export default function PatientsPage() {
   useEffect(() => {
     initPatientStore()
     const list = getPatients()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末のカルテと開いたときのアドレスを最初に1回読むだけ
     setPatients(list)
     setPins(getPinnedIds())
     setRecentIds(getRecentViews().map(v => v.id))
@@ -277,7 +278,7 @@ export default function PatientsPage() {
       pinned: sorted.filter(p => pins.includes(p.id)),
       others: sorted.filter(p => !pins.includes(p.id)),
     }
-  }, [patients, search, filter, sortKey, pins, riskByPatient, notesByPatient, reevalByPatient])
+  }, [patients, search, filter, sortKey, pins, riskByPatient, notesByPatient, reevalByPatient, linkFor])
 
   // 最近閲覧（現在の患者リストに存在するもののみ）
   const recentPatients = useMemo(() => {

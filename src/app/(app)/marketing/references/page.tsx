@@ -29,6 +29,7 @@ export default function ReferencesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末の控えを最初に1回読むだけ
   useEffect(() => setReferences(loadReferences()), [])
   const refresh = () => setReferences(loadReferences())
 

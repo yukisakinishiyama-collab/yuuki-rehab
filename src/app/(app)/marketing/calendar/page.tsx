@@ -15,6 +15,7 @@ export default function CalendarPage() {
   const [filter, setFilter] = useState<PostStatus | 'all'>('all')
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末の控えを最初に1回読むだけ
     setRows(loadProjects().flatMap((project) => project.variants.map((variant) => ({ project, variant }))))
   }, [])
 

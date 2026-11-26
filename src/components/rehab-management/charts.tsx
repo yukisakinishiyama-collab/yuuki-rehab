@@ -58,7 +58,6 @@ export function ImprovementChart({ data }: { data: { date: string; score: number
 // ── ROM推移グラフ ──
 export function ROMChart({
   data,
-  movement,
   normalValue,
 }: {
   data: { date: string; active: number | null; passive: number | null }[]
