@@ -74,6 +74,7 @@ const AUTOMATION_LABELS: Record<AutomationRun['automation'], string> = {
   cancel_story: 'キャンセルの空き枠ストーリー',
   birthday: '誕生日のご挨拶',
   daily_openings: '今日の空き（毎日）',
+  followup: 'ご来院が空いている方へのご連絡（院長が承認）',
 }
 
 const MODE_BADGE: Record<AutomationMode, 'success' | 'warning' | 'secondary'> = { on: 'success', test: 'warning', off: 'secondary' }
@@ -698,7 +699,11 @@ export default function AutomationPage() {
             <Link href="/marketing/line/richmenu" className={cn(buttonVariants({ variant: 'link' }), 'mx-1 h-auto p-0 text-xs font-bold')}>
               LINEのメニュー
             </Link>
-            で変えられます。
+            で変えられます。ご来院が空いている方へのご連絡（院長が選んだ方にだけ・自動では送りません）は
+            <Link href="/marketing/line/followup" className={cn(buttonVariants({ variant: 'link' }), 'mx-1 h-auto p-0 text-xs font-bold')}>
+              ご来院が空いている方へ（LINE）
+            </Link>
+            から。
           </p>
         </>
       )}
