@@ -9,6 +9,8 @@ import type { Metadata } from 'next'
  * 合わせること。使うサービスが変わったら、ここも直す。
  * 2026-11-19：問診票の写真の読み取り（院内アプリの「問診票を撮って登録」。お名前などが写った写真を Anthropic へ送る。
  * 院長の判断）を足した。紹介状の下書きなど、お名前が要らない機能では、今までどおりお名前を送らない。
+ * 2026-11-26：ご来院から間があいた方への、公式LINEでのご様子うかがい（院長が選んで承認した方にだけ送る。
+ *   lib/followup-line.ts）を「利用する目的」に足した。止め方（「配信停止」）も書く
  */
 export const metadata: Metadata = {
   title: 'プライバシーポリシー',
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 
 const ESTABLISHED = '2026年10月29日'
 /** 最後に直した日（外部サービスの一覧などを変えたら、ここも直す） */
-const REVISED = '2026年11月19日'
+const REVISED = '2026年11月26日'
 
 type Section = { title: string; body?: string[]; items?: string[]; after?: string[] }
 
@@ -42,6 +44,7 @@ const sections: Section[] = [
       '療養費の請求など、保険に関する事務',
       '医療機関へのご紹介と、紹介状の作成',
       '公式LINEでのお知らせ（ご予約、患者番号の連携、休みのご案内など）',
+      'ご来院から間があいた方への、公式LINEでのご様子うかがい（不要な方は、公式LINEで「配信停止」と送ると止まります）',
       '院の運営の見直し（個人が分からない形に集計してから使います）',
     ],
   },

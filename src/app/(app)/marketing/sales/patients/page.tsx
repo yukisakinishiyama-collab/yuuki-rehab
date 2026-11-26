@@ -139,7 +139,9 @@ export default function PatientMovementPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-bold text-slate-900">声かけの候補（2〜8週間空いていて、2回以上来られた方）</h2>
         <p className="text-xs text-slate-500">
-          早いうちの声かけほど戻りやすいので、空いて間もない順です。文面は<Link href="/dashboard" className="underline">今日</Link>の「声かけ文」が使えます。LINE連携済みの方には、次の段階でLINEからも送れるようにします。
+          早いうちの声かけほど戻りやすいので、空いて間もない順です。文面は<Link href="/dashboard" className="underline">今日</Link>の「声かけ文」が使えます。LINE連携済みの方には、
+          <Link href="/marketing/line/followup" className="font-bold underline">ご来院が空いている方へのご連絡（LINE）</Link>
+          から、院長が選んだ方にだけ LINE で送れます。
         </p>
         {candidates.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">いまは候補がいません。</p>

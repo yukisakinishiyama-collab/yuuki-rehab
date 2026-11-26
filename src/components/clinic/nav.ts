@@ -121,7 +121,10 @@ export const NAV: NavSection[] = [
         href: '/marketing/automation',
         label: '自動化設定',
         icon: Workflow,
-        pages: [{ href: '/marketing/line/richmenu', label: 'LINEのメニュー' }],
+        pages: [
+          { href: '/marketing/line/richmenu', label: 'LINEのメニュー' },
+          { href: '/marketing/line/followup', label: 'ご来院が空いている方へ（LINE）' },
+        ],
       },
     ],
   },

@@ -320,6 +320,11 @@ function KartePanel() {
               <p className="text-sm font-bold text-slate-800">気にかけたい方</p>
               <p className="mb-1.5 text-xs text-slate-600">
                 しばらく記録がない・離脱リスクが高い方。「声かけ文」で、LINEや電話の前に使えるていねいな文を写せます（送るのはご自身で）。
+                LINE 連携の方へは、
+                <Link href="/marketing/line/followup" className="font-bold text-teal-800 underline underline-offset-2">
+                  ご来院が空いている方へのご連絡（LINE）
+                </Link>
+                から、院長が選んだ方にだけ送れます。
               </p>
               <ul className="divide-y divide-slate-100">
                 {watch.slice(0, 5).map((r) => (
