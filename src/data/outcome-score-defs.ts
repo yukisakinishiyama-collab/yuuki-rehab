@@ -155,7 +155,7 @@ const ikdc: ScoreDef = {
     const vasScore17 = (q17 / 10) * 10  // max10
     const radioKeys = ['q1','q2','q4','q5','q6','q7','q8','q9','q10','q11','q12','q13','q14','q15','q16']
     const maxRadio = [4,4,3,4,1,4,4,4,4,4,4,4,4,4,4].reduce((s,v)=>s+v,0) // 57
-    const radioSum = radioKeys.reduce((s,k,i) => s + (a[k]??0), 0)
+    const radioSum = radioKeys.reduce((s,k) => s + (a[k]??0), 0)
     const rawTotal = radioSum + vasScore3 + vasScore17
     const maxTotal = maxRadio + 10 + 10 // 77
     const total = Math.round((rawTotal / maxTotal) * 100)

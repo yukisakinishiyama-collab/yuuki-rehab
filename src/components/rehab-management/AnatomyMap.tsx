@@ -84,7 +84,8 @@ function AnatomyViews({ joint, views, mirror, selected, onChange, readOnly, mark
     if (key === 'bone') return
     setHiddenLayers(prev => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }

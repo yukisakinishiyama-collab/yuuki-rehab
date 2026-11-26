@@ -36,6 +36,7 @@ export default function QRLoginModal({ onClose }: Props) {
 
   useEffect(() => {
     const local = isPrivateHost(window.location.hostname)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 開いたときに、ブラウザのアドレスと端末の控えを1回読むだけ
     setIsLocalNetwork(local)
     // 開発時（localhost）はスマホから到達できないため、同一LAN内のPCのIPに置き換える。
     // 本番公開URL（Vercelなど）はそのまま使えば既にどこからでもアクセス可能。
@@ -47,7 +48,7 @@ export default function QRLoginModal({ onClose }: Props) {
     setNgrokUrl(saved)
     if (saved) setShowNgrok(true)
     generate()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   // カウントダウン
   useEffect(() => {

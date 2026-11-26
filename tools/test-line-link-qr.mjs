@@ -49,7 +49,7 @@ globalThis.fetch = async (url, init) => {
 try {
   const Q = await imp('src/lib/line-link-qr.ts')
   const S = await imp('src/lib/line-link-qr-server.ts')
-  const { KV_PREFIXES, kvGet, kvList, kvSet } = await imp('src/lib/marketing/kv-store-server.ts')
+  const { KV_PREFIXES, kvGet } = await imp('src/lib/marketing/kv-store-server.ts')
   const { listLineLinks, getLineLink } = await imp('src/lib/line-link-server.ts')
   const { issueTicket, unsealUserId } = await imp('src/lib/liff-ticket.ts')
   const route = await imp('src/app/api/liff/link/route.ts')

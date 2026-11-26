@@ -42,6 +42,7 @@ export default function AuthGuard({ children }: Props) {
       }
       u = AUTO_LOGIN_USER
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末のログインを最初に1回読むだけ（サーバーでは読めないため、開いたあとに読む）
     setUser(u)
     setChecked(true)
   }, [])

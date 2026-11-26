@@ -89,7 +89,7 @@ const REGS: Reg[] = [
 ]
 
 // 人体シルエット（前面・背面共通の基本形）
-function BodySilhouette({ view }: { view: View }) {
+function BodySilhouette() {
   return (
     <g opacity={0.12} fill="#64748b">
       {/* 頭 */}
@@ -205,7 +205,7 @@ export default function BodyMap({ selected, onChange, readOnly = false, marks, o
             style={pen.svgStyle}
             {...pen.handlers}
           >
-            <BodySilhouette view={view} />
+            <BodySilhouette />
             <g pointerEvents={pen.drawMode ? 'none' : undefined}>
               {visibleRegs.map(reg => (
                 <RegionShape

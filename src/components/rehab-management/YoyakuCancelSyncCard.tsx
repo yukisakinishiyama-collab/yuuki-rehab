@@ -11,7 +11,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarX, RefreshCw, Check, CircleCheck, X, ChevronDown, ChevronUp, Undo2 } from 'lucide-react'
 import type { CancellationKind, Patient } from '@/types/patient'
 import { CANCELLATION_KINDS, CANCELLATION_SHORT_LABELS } from '@/types/patient'
-import { nanoid } from 'nanoid'
 import { getPatients, initPatientStore, savePatient } from '@/lib/patient-store'
 import { buildPatientFromReservation } from '@/lib/karte-auto-create'
 import {

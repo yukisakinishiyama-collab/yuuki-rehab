@@ -18,6 +18,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     initPatientStore()
     const p = getPatient(id)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 端末のカルテを最初に1回読むだけ
     setPatient(p ?? null)
     setLoading(false)
     // 患者一覧の「最近閲覧」用に閲覧履歴を記録

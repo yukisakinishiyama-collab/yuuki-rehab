@@ -5,7 +5,7 @@
  * チャネル未接続でも、シミュレーターで友だち追加〜予約誘導まで全シナリオを検証できる。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { CONTACT_TAGS, INTENT_LABELS, type BotReply, type IntentKey, type LineContact } from '@/lib/marketing/line-types'
+import { CONTACT_TAGS, INTENT_LABELS, type BotReply, type LineContact } from '@/lib/marketing/line-types'
 import KarteLinkCard from '@/components/clinic/KarteLinkCard'
 import BirthdayCard from '@/components/clinic/BirthdayCard'
 
@@ -28,6 +28,7 @@ export default function LinePage() {
   useEffect(() => {
     // 問い合わせの画面の「会話を見る」から来たときは、その方を開いておく（?user=…）
     const fromInquiry = new URLSearchParams(window.location.search).get('user')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 開いたときのアドレスを1回読むだけ
     if (fromInquiry) setSelectedId(fromInquiry)
     refresh()
     fetch('/api/marketing/line/webhook')
