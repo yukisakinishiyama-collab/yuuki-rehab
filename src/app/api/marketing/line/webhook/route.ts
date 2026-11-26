@@ -16,6 +16,7 @@ import { getContact, saveContact } from '@/lib/marketing/line-store-server'
 import { recordEvent } from '@/lib/marketing/analytics-store-server'
 import type { BotReply, LineChatMessage } from '@/lib/marketing/line-types'
 import { isOwnerLineUser, replyOwner } from '@/lib/marketing/owner-notify'
+import { FOLLOWUP_POSTBACK_PREFIX } from '@/lib/followup-approval'
 import { handleOwnerPostback } from '@/lib/marketing/autopilot-server'
 import { getRule, recordAudit, recordRun } from '@/lib/marketing/automation-store-server'
 import { CONSENT_PURPOSE_LABELS, consentReply, parseConsentCommand, type ConsentCommand } from '@/lib/marketing/consent'
@@ -329,6 +330,22 @@ export async function POST(request: NextRequest) {
           } catch (error) {
             console.error('自動投稿ボタンの処理に失敗:', error instanceof Error ? error.message : error)
             if (replyToken) await replyOwner(replyToken, ['処理に失敗しました。承認画面から操作してください。'])
+          }
+        }
+        continue
+      }
+      // ご来院が空いている方へのご連絡の、承認のボタン（2026-11-26 院長「承認は私のlineに一度送って」）。
+      // 院長本人からのときだけ処理し、それ以外の人から届いても何もしない（会話シナリオにも流さない）
+      if (data.startsWith(FOLLOWUP_POSTBACK_PREFIX)) {
+        if (isOwnerLineUser(userId)) {
+          const replyToken = event.replyToken as string | undefined
+          try {
+            const { handleFollowupPostback } = await import('@/lib/marketing/followup-approval-server')
+            const replies = await handleFollowupPostback(data)
+            if (replyToken) await replyOwner(replyToken, replies)
+          } catch (error) {
+            console.error('ご連絡の承認の処理に失敗:', error instanceof Error ? error.message : error)
+            if (replyToken) await replyOwner(replyToken, ['処理に失敗しました（だれにも送っていません）。もう一度押すか、院内アプリから操作してください。'])
           }
         }
         continue
