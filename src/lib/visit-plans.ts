@@ -2,7 +2,10 @@
  * 来院予定（日にちだけ。時間を決めない）の決まり（2026-11-24 院長の依頼）
  *
  * 「金曜に行きます」のように、時間を決めずに来る日だけ聞いた方を、院で書いておく一覧。
- * 予約システム（時間の枠）とは別で、予約表の空きは減らさない。患者さんには何も送らない。
+ * 予約システム（時間の枠）とは別で、予約表の空きは減らさない。
+ * LINE 連携の方には、入れたとき・日にちを変えたときに「ご来院の予定を承りました」、前日に「明日のご来院予定のお知らせ」を
+ * LINE で送る（2026-11-26 院長「時間指定のない予約もlineが入るようにしてください」。文は lib/visit-plan-message.ts、
+ * 送るのはサーバー lib/marketing/visit-plan-line-server.ts）。LINE 連携の無い方には何も送らない。
  * 記録は端末の pt_visit_plans（ほかのカルテの記録と同じく /api/sync でクラウドとそろう）。
  * 画面は 予約 →「来院予定（日にち）」（VisitPlansPanel）と、今日の画面の「今日の来院予定」。
  */
@@ -29,6 +32,47 @@ export interface VisitPlan {
   createdAt: string
   updatedAt: string
   createdBy?: string
+  /** この予定は LINE で知らせない（入れるときにチェックを外した。入れたとき・日にちを変えたとき・前日のどれも送らない） */
+  lineOff?: boolean
+  /** 「ご来院の予定を承りました」の LINE をどうしたか（date＝そのときの予定の日。日にちを変えたら送り直す） */
+  line?: VisitPlanLine
+}
+
+/** LINE のお知らせの結果（一覧の小さな印に使う） */
+export type VisitPlanLineResult = 'sent' | 'test' | 'off' | 'not_linked' | 'error'
+
+export interface VisitPlanLine {
+  date: string
+  at: string
+  result: VisitPlanLineResult
+}
+
+export const VISIT_PLAN_LINE_LABEL: Record<VisitPlanLineResult, string> = {
+  sent: 'LINE 送信済み',
+  test: 'LINE テスト中（送っていません）',
+  off: 'LINE 停止中（送っていません）',
+  not_linked: 'LINE 連携なし',
+  error: 'LINE 送れず',
+}
+
+/** 一覧に出す印（いまの日にちに送った記録だけ。日にちを変えたあとの古い記録は出さない） */
+export function planLineBadge(plan: Pick<VisitPlan, 'date' | 'line' | 'lineOff'>): { result: VisitPlanLineResult; label: string } | null {
+  if (plan.lineOff) return { result: 'off', label: 'LINE お知らせなし' }
+  if (!plan.line || plan.line.date !== plan.date) return null
+  return { result: plan.line.result, label: VISIT_PLAN_LINE_LABEL[plan.line.result] }
+}
+
+/** サーバーの返事（lib/marketing/visit-plan-line-server.ts の PlanNotice）を、記録の形に。記録しないとき（過ぎた日など）は null */
+export function planLineResult(notice: { linked?: boolean; delivered?: boolean; result?: string } | null | undefined): VisitPlanLineResult | null {
+  if (!notice) return 'error'
+  if (notice.result === 'past' || notice.result === 'invalid') return null
+  if (notice.result === 'not_linked' || notice.linked === false) return 'not_linked'
+  // 送った（同じお知らせを前に送ってあるときも「送信済み」）
+  if (notice.delivered) return 'sent'
+  // テストの見本（院長の LINE へ）。前に見本を送ってあるときも同じ
+  if (notice.result === 'test' || notice.result === 'duplicate') return 'test'
+  if (notice.result === 'skipped') return 'off'
+  return 'error'
 }
 
 export const VISIT_PLAN_STATUS_LABEL: Record<VisitPlanStatus, string> = {
@@ -64,6 +108,8 @@ export interface VisitPlanInput {
   patientId?: string
   kana?: string
   note?: string
+  /** LINE で知らせない */
+  lineOff?: boolean
 }
 
 /** 入れる前の確かめ。問題があれば画面に出す文、無ければ null */
@@ -89,6 +135,7 @@ export function newVisitPlan(input: VisitPlanInput, id: string, nowIso: string, 
     createdAt: nowIso,
     updatedAt: nowIso,
     ...(by ? { createdBy: by } : {}),
+    ...(input.lineOff ? { lineOff: true } : {}),
   }
 }
 

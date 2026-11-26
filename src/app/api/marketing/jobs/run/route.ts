@@ -126,6 +126,15 @@ async function run() {
     console.error('前日のお知らせに失敗:', error instanceof Error ? error.message : error)
   }
 
+  // 来院予定（時間を決めない予定）の前日のお知らせ（2026-11-26 院長「時間指定のない予約もlineが入るように」。時間外・送り済みはすぐ終わる）
+  let visitPlanReminders: unknown = null
+  try {
+    const { runVisitPlanReminders } = await import('@/lib/marketing/visit-plan-line-server')
+    visitPlanReminders = await runVisitPlanReminders()
+  } catch (error) {
+    console.error('来院予定の前日のお知らせに失敗:', error instanceof Error ? error.message : error)
+  }
+
   // 見張り：予約システムの毎朝の依頼が届いていなければ、院長のLINEへ1日1回（2026-11-25。許可が外れて止まったことに気づけるように）
   let reminderHeartbeat: unknown = null
   try {
@@ -154,7 +163,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, reminderHeartbeat, buffer, google, approvals, aiVideos }
+  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, visitPlanReminders, reminderHeartbeat, buffer, google, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

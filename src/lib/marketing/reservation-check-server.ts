@@ -15,7 +15,7 @@ import type { LineLink } from '@/lib/line-link'
 import type { MatchKarte } from '@/lib/line-link-match'
 import { unsealUserId } from '@/lib/liff-ticket'
 import { reservationChangeUrl } from '@/lib/reservation-change-link'
-import { pickReservationsForLine, reservationCheckText, type CheckReply, type UpcomingRow } from '@/lib/reservation-check'
+import { pickPlansForLine, pickReservationsForLine, reservationCheckText, type CheckReply, type UpcomingRow } from '@/lib/reservation-check'
 
 /** 何日先までの予約を返すか */
 export const RESERVATION_CHECK_DAYS = 90
@@ -59,14 +59,23 @@ export async function fetchUpcomingReservations(now = new Date()): Promise<Upcom
   }
 }
 
-/** クラウドのカルテ（お名前・電話・生年月日・ID だけを使う） */
-async function cloudKartes(): Promise<MatchKarte[]> {
+type CloudPlan = { id?: string; date?: string; status?: string; patientId?: string; name?: string }
+
+/** クラウドのカルテ（お名前・電話・生年月日・ID だけを使う）と、来院予定（時間を決めない予定） */
+async function cloudKarteData(): Promise<{ kartes: MatchKarte[]; plans: CloudPlan[] }> {
+  const parse = <T>(raw: string | undefined): T[] => {
+    try {
+      const list = raw ? (JSON.parse(raw) as T[]) : []
+      return Array.isArray(list) ? list : []
+    } catch {
+      return []
+    }
+  }
   try {
     const record = await kvGet<{ payload?: Record<string, string> }>('sync:clinic')
-    const raw = record?.payload?.pt_patients
-    return raw ? (JSON.parse(raw) as MatchKarte[]) : []
+    return { kartes: parse<MatchKarte>(record?.payload?.pt_patients), plans: parse<CloudPlan>(record?.payload?.pt_visit_plans) }
   } catch {
-    return []
+    return { kartes: [], plans: [] }
   }
 }
 
@@ -80,19 +89,22 @@ export async function resolveReservationCheck(userId: string, now = new Date()):
     .filter((v): v is LineLink => Boolean(v && v.key && v.sealed) && unsealUserId(v.sealed, secret) === userId)
   const upcoming = await fetchUpcomingReservations(now)
   if (!upcoming) return { kind: 'error' }
-  const [kartes, links] = await Promise.all([cloudKartes(), listLineLinks()])
+  const [{ kartes, plans: cloudPlans }, links] = await Promise.all([cloudKarteData(), listLineLinks()])
+  const myKeys = new Set(mine.map((l) => l.key))
   const items = pickReservationsForLine(
     upcoming.rows,
     { today: upcoming.today, time: upcoming.now },
     kartes,
     links,
-    new Set(mine.map((l) => l.key)),
+    myKeys,
     (lineKey) => unsealUserId(lineKey, secret) === userId,
   )
-  if (items.length > 0) {
+  // 時間を決めない来院予定（院内アプリの「来院予定」。2026-11-26。LINE で知らせた予定を「ありません」と返さないように）
+  const plans = pickPlansForLine(cloudPlans, upcoming.today, kartes, links, myKeys, items)
+  if (items.length > 0 || plans.length > 0) {
     const changeUrls: Record<string, string> = {}
     for (const item of items) changeUrls[item.reservationNo] = reservationChangeUrl(item.reservationNo)
-    return { kind: 'found', items, changeUrls }
+    return { kind: 'found', items, changeUrls, ...(plans.length > 0 ? { plans } : {}) }
   }
   if (mine.length > 0) return { kind: 'none', names: [...new Set(mine.map((l) => l.name))] }
   return { kind: 'unknown' }
@@ -106,7 +118,7 @@ export async function answerReservationCheck(userId: string, now = new Date()): 
   } catch {
     reply = { kind: 'error' }
   }
-  console.log('[reservation-check]', reply.kind, reply.kind === 'found' ? `${reply.items.length}件` : '')
+  console.log('[reservation-check]', reply.kind, reply.kind === 'found' ? `予約${reply.items.length}件・来院予定${reply.plans?.length ?? 0}件` : '')
   return reservationCheckText(reply, {
     clinicName: DEFAULT_CLINIC_PROFILE.name,
     phone: DEFAULT_CLINIC_PROFILE.phone,

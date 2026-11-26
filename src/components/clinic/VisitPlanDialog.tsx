@@ -59,7 +59,7 @@ export default function VisitPlanDialog({ state, onClose }: { state: PlanDialogS
         </div>
         {state.mode === 'add' ? (
           <>
-            <p className="mb-3 text-sm text-slate-600">予約表の空きは減りません。患者さんには何も送りません。</p>
+            <p className="mb-3 text-sm text-slate-600">予約表の空きは減りません。LINE 連携の方には、LINE でお知らせします。</p>
             <PlanAddForm initialDate={state.date} autoFocus onAdded={onClose} />
           </>
         ) : plan ? (

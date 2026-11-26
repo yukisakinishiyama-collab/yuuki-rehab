@@ -116,6 +116,21 @@ export function matchLinkForReservation<L extends MatchLink>(row: { name?: strin
 }
 
 /**
+ * 来院予定（時間を決めない予定。lib/visit-plans.ts）の方の LINE 連携を探す（2026-11-26）。
+ * - カルテから選んだ予定（patientId）… そのカルテの LINE（カルテの画面の「LINE連携済み」と同じ見分け方）
+ * - お名前だけの予定 … 予約と同じ決まりで、お名前が同じカルテが1つだけのとき、そのカルテの LINE（電話は無いので、2つ以上あれば送らない）
+ * カルテがまだクラウドに無い（入れたばかり）ときも、お名前で探す
+ */
+export function matchLinkForPlan<L extends MatchLink>(plan: { patientId?: string; name?: string }, kartes: MatchKarte[], links: L[]): LinkMatch<L> {
+  const karte = plan.patientId ? kartes.find((k) => String(k.id ?? '') === plan.patientId) : undefined
+  if (karte) {
+    const hit = linkForKartes([karte], links)
+    return hit ? { linked: true, link: hit.link, how: hit.how } : { linked: false, why: 'karte_not_linked' }
+  }
+  return matchLinkForReservation({ name: plan.name }, kartes, links)
+}
+
+/**
  * 予約からは LINE を決められないが、「近いカルテ」には LINE がある（＝院長は連携したつもりなのに、自動のお知らせは届かない）。
  * - ambiguous  … 同じお名前のカルテが2つ以上あって決められない。そのうち LINE と結びついたカルテ
  * - other_name … 予約の電話と同じ電話のカルテ（お名前がちがう）が LINE と結びついている（字のちがい、または同じ電話のご家族）
