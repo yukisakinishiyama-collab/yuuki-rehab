@@ -135,6 +135,16 @@ async function run() {
     console.error('来院予定の前日のお知らせに失敗:', error instanceof Error ? error.message : error)
   }
 
+  // ご来院が空いている方へのご連絡（院長の LINE で承認した方にだけ。2026-11-26）：
+  // 夜に承認した分を朝に送る・毎週（月曜の朝）の候補を院長の LINE へ送る。承認が無い方には送らない
+  let followups: unknown = null
+  try {
+    const { proposeWeeklyFollowups, runFollowupQueue } = await import('@/lib/marketing/followup-approval-server')
+    followups = { queue: await runFollowupQueue(), weekly: await proposeWeeklyFollowups() }
+  } catch (error) {
+    console.error('ご連絡の承認の処理に失敗:', error instanceof Error ? error.message : error)
+  }
+
   // 見張り：予約システムの毎朝の依頼が届いていなければ、院長のLINEへ1日1回（2026-11-25。許可が外れて止まったことに気づけるように）
   let reminderHeartbeat: unknown = null
   try {
@@ -163,7 +173,7 @@ async function run() {
     console.error('AI動画の処理に失敗:', error instanceof Error ? error.message : error)
   }
 
-  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, visitPlanReminders, reminderHeartbeat, buffer, google, approvals, aiVideos }
+  return { ok: true, processed: results.length, results, dailyOpenings, recruitStory, nudged, lineReminders, visitPlanReminders, followups, reminderHeartbeat, buffer, google, approvals, aiVideos }
 }
 
 export async function GET(request: NextRequest) {

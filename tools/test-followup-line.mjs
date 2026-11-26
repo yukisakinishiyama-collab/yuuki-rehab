@@ -265,20 +265,21 @@ try {
   })
 
   console.log('しくみ')
-  await test('自動では送らない：定期実行（jobs/run）からは呼ばない。送るのは院長だけの API から', () => {
-    assert.ok(!/followup/i.test(read('src/app/api/marketing/jobs/run/route.ts')))
-    assert.ok(!/followup/i.test(fs.readFileSync(new URL('vercel.json', root), 'utf8')))
+  await test('患者さんへ直接送る API は無い（院長の LINE での承認を通す）。API は院長だけ', () => {
     const route = read('src/app/api/marketing/line/followup/route.ts')
-    assert.equal((route.match(/requireAdmin\(request\)/g) ?? []).length, 2, 'GET・POST とも院長だけ')
+    assert.equal((route.match(/requireAdmin\(request\)/g) ?? []).length, 3, 'GET・POST・PUT とも院長だけ')
+    assert.ok(!/sendFollowups/.test(route), 'API から患者さんへ直接送らない')
+    assert.ok(!/action === 'send'/.test(route))
+    assert.match(route, /action === 'request'/)
     assert.match(read('src/proxy.ts'), /'\/api\/marketing\/:path\*'/)
   })
-  await test('画面：初めはだれも選ばれていない・選んだ方のお名前を出してから「承認して送る」・院長だけ', () => {
+  await test('画面：初めはだれも選ばれていない・選んだ方のお名前を出してから、院長の LINE へ承認のお願い・院長だけ', () => {
     const page = read('src/app/(app)/marketing/line/followup/page.tsx')
     assert.match(page, /useState<Set<string>>\(new Set\(\)\)/)
-    assert.match(page, /次の \{chosen\.length\}人の LINE に送ります。よろしいですか？/)
-    assert.match(page, /承認して送る（\{chosen\.length\}人）/)
+    assert.match(page, /院長の LINE に承認のお願いを送る（\{chosen\.length\}人）/)
+    assert.match(page, /action: 'request'/)
+    assert.ok(!/action: 'send'/.test(page))
     assert.match(page, /if \(!isAdmin\) return/)
-    assert.match(page, /自動では送りません。/)
     assert.ok(read('src/components/clinic/nav.ts').includes("'/marketing/line/followup'"))
   })
 } finally {
