@@ -651,6 +651,13 @@ async function publishLineBroadcast(content: GeneratedContent): Promise<PublishO
       manualUrl: 'https://manager.line.biz/',
     }
   }
+  // 歯止め（2026-11-26 院長「公式lineをブロックしにくい設計に」）：友だち全員への配信は、30日に2回まで・7日あける。
+  // 超えるときは自動では配信しない（どうしても送るときは、LINE の管理画面から手で）
+  const { checkBroadcastAllowed, noteBroadcast } = await import('./line-touch-server')
+  const blocked = await checkBroadcastAllowed()
+  if (blocked) {
+    return { kind: 'action_required', reason: `${blocked}今回は自動では配信しません。`, manualUrl: 'https://manager.line.biz/' }
+  }
   try {
     const res = await fetch('https://api.line.me/v2/bot/message/broadcast', {
       method: 'POST',
@@ -661,6 +668,7 @@ async function publishLineBroadcast(content: GeneratedContent): Promise<PublishO
       const data = await res.json().catch(() => ({}))
       throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`)
     }
+    await noteBroadcast()
     return { kind: 'published', message: 'LINE友だちへ配信しました' }
   } catch (error) {
     return { kind: 'error', message: `LINE配信エラー: ${error instanceof Error ? error.message : '不明'}` }

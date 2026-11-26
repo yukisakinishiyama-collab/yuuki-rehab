@@ -11,6 +11,7 @@
 import { markSent, recordRun, getRule, sentToday, wasSent } from './automation-store-server'
 import { TEST_SAMPLES_PER_DAY, type AutomationKey, type RunResult } from './automation-types'
 import { checkConsent } from './consent-store-server'
+import { noteLinePush } from './line-touch-server'
 
 export interface PushResult {
   /** 患者さんに届いた（テストの見本は false） */
@@ -103,6 +104,8 @@ export async function pushToPatient(opts: {
     return { delivered: false, result: 'error', reason: r.error }
   }
   await recordRun({ automation, result: test ? 'test' : 'sent', note })
+  // ブロックの直前に何が届いていたかを数えるための記録（LINE の ID は残さない。lib/marketing/line-touch-server.ts）
+  if (!test && automation !== 'line_auto_reply') await noteLinePush(userId, automation)
   if (opts.dedupe) await markSent(opts.dedupe.day, mark)
   return { delivered: !test, result: test ? 'test' : 'sent' }
 }

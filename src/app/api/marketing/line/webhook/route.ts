@@ -17,6 +17,7 @@ import { recordEvent } from '@/lib/marketing/analytics-store-server'
 import type { BotReply, LineChatMessage } from '@/lib/marketing/line-types'
 import { isOwnerLineUser, replyOwner } from '@/lib/marketing/owner-notify'
 import { FOLLOWUP_POSTBACK_PREFIX } from '@/lib/followup-approval'
+import { noticeSettingsReply, parseNoticeSettings } from '@/lib/line-block-guard'
 import { handleOwnerPostback } from '@/lib/marketing/autopilot-server'
 import { getRule, recordAudit, recordRun } from '@/lib/marketing/automation-store-server'
 import { CONSENT_PURPOSE_LABELS, consentReply, parseConsentCommand, type ConsentCommand } from '@/lib/marketing/consent'
@@ -265,7 +266,9 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('ブロックの記録に失敗:', error instanceof Error ? error.message : error)
       }
-      await recordEvent('line_unfollow', {}, userId)
+      // 直前に届いていたお知らせの種類と「どのくらい前か」だけを残す（何がブロックにつながるかを数えるため。お名前・ID は入らない）
+      const { blockAttribution } = await import('@/lib/marketing/line-touch-server')
+      await recordEvent('line_unfollow', await blockAttribution(userId), userId)
       continue
     }
 
@@ -295,6 +298,28 @@ export async function POST(request: NextRequest) {
             if (replyToken) await replyToLine(replyToken, replies)
           } catch (error) {
             console.error('お知らせの受け取りの処理に失敗:', error instanceof Error ? error.message : error)
+          }
+          continue
+        }
+        // 「お知らせ設定」：いまの受け取りと、止める・再開するボタンを返す（ブロックの手前で、自分で止められるように。
+        // 2026-11-26 院長「公式lineをブロックしにくい設計に」。lib/line-block-guard.ts）
+        if (parseNoticeSettings(message.text ?? '')) {
+          const replyToken = event.replyToken as string | undefined
+          try {
+            const { getConsent } = await import('@/lib/marketing/consent-store-server')
+            const reply = noticeSettingsReply(await getConsent(userId).catch(() => null), DEFAULT_CLINIC_PROFILE.name)
+            if (replyToken && ACCESS_TOKEN) {
+              await fetch('https://api.line.me/v2/bot/message/reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
+                body: JSON.stringify({
+                  replyToken,
+                  messages: [{ type: 'text', text: reply.text, quickReply: { items: reply.buttons.map((b) => ({ type: 'action', action: { type: 'message', label: b, text: b } })) } }],
+                }),
+              })
+            }
+          } catch (error) {
+            console.error('お知らせ設定の返事に失敗:', error instanceof Error ? error.message : error)
           }
           continue
         }

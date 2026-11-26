@@ -79,17 +79,24 @@ export function checkHandoff(text: string): string | null {
 
 // ── 定型メッセージ ──────────────────────────────────────────────
 
+/**
+ * 友だち追加のあいさつに添える一言（何が届くか・減らし方）。2026-11-26 院長「公式lineをブロックしにくい設計に」。
+ * 何が届くかを最初に伝え、止めたい方がブロックの手前で止められる入口（「お知らせ設定」）を知らせる
+ */
+export const FOLLOW_NOTICE_NOTE =
+  '\n\nこのLINEからお送りするのは、ご予約の確認や前日のお知らせなど、ご本人あてのご連絡です。お知らせを減らしたいときは「お知らせ設定」と送ってください。'
+
 export function intentMenu(menu: LineMenuVariant = 'classic'): BotReply {
   if (menu === 'three') {
     return {
       type: 'buttons',
-      text: '友だち追加ありがとうございます😊\nゆうき整骨院です。\n\nご用件に近いものを選んでください。\nそれ以外のご相談は、このままメッセージでどうぞ（スタッフがお返事します）。',
+      text: `友だち追加ありがとうございます😊\nゆうき整骨院です。\n\nご用件に近いものを選んでください。\nそれ以外のご相談は、このままメッセージでどうぞ（スタッフがお返事します）。${FOLLOW_NOTICE_NOTE}`,
       buttons: THREE_MENU.map((m) => ({ label: m.label, data: `intent:${m.intent}` })),
     }
   }
   return {
     type: 'buttons',
-    text: '友だち追加ありがとうございます😊\nゆうき整骨院です。\n\nご相談内容に近いものを選択してください。',
+    text: `友だち追加ありがとうございます😊\nゆうき整骨院です。\n\nご相談内容に近いものを選択してください。${FOLLOW_NOTICE_NOTE}`,
     buttons: (Object.keys(INTENT_LABELS) as IntentKey[]).map((key) => ({
       label: INTENT_LABELS[key],
       data: `intent:${key}`,

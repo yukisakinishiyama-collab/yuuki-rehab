@@ -11,6 +11,7 @@
  * - まだ作っていない自動化（週次レポート）は「未実装」と出す。動いているように見せない
  * - 前日のお知らせ・空き枠のお知らせは、予約システム（GAS）から頼まれて送る。予約システムがまだ頼んでこない間は、そう出す
  */
+import { LineBlockPanel } from '@/components/clinic/LineBlockPanel'
 import Link from 'next/link'
 import { useState, type ReactNode } from 'react'
 import { BellOff, History, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
@@ -693,6 +694,8 @@ export default function AutomationPage() {
               </ul>
             )}
           </Panel>
+
+          <LineBlockPanel />
 
           <p className="text-xs text-slate-500">
             LINE のメニュー（リッチメニュー）は

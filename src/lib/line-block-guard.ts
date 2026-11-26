@@ -92,7 +92,7 @@ export function broadcastProblem(sentAts: string[], now: Date): string | null {
 export const NOTICE_SETTINGS_KEYWORD = 'お知らせ設定'
 
 const SETTINGS_PATTERNS = [
-  /^(?:お知らせ|通知|配信|受け取り|受信)(?:の)?(?:設定|受け取り設定)(?:を)?(?:確認|変更|変えたい|したい|見たい)?$/,
+  /^(?:お知らせ|通知|配信|受け取り|受信)(?:の)?(?:設定|受け取り設定)(?:を)?(?:確認|変更|変えたい|見たい)?(?:したい)?$/,
   /^(?:お知らせ|通知|配信)(?:を)?(?:減らしたい|へらしたい|少なくしたい|止めたい|とめたい|やめたい)$/,
 ]
 
