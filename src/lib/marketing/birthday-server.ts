@@ -15,6 +15,7 @@ import type { LineLink } from '@/lib/line-link'
 import { DEFAULT_CLINIC_PROFILE } from './clinic'
 import { checkConsent } from './consent-store-server'
 import { recordRun } from './automation-store-server'
+import { noteLinePush } from './line-touch-server'
 
 export const BIRTHDAY_KEY = 'keiei:birthday'
 const LOG_KEY = 'keiei:birthday-log'
@@ -129,6 +130,7 @@ export async function runBirthday(now = new Date()): Promise<RunResult> {
       continue
     }
     const r = await push(userId, render(settings.template, l.name))
+    if (r.ok) await noteLinePush(userId, 'birthday')
     if (r.ok) {
       result.sent += 1
       log.sentYear[l.key] = year

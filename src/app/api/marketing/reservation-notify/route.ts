@@ -492,6 +492,11 @@ export async function POST(request: NextRequest) {
       )
     }
     if (isPatientPush) await recordRun({ automation, result: testRun ? 'test' : 'sent', note: patientNote })
+    // ブロックの直前に何が届いていたかを数えるための記録（LINE の ID は残さない）
+    if (isPatientPush && !testRun && to && automation !== 'line_auto_reply') {
+      const { noteLinePush } = await import('@/lib/marketing/line-touch-server')
+      await noteLinePush(to, automation)
+    }
     if (sentMark) await markSent(sentMark.day, sentMark.mark)
     // 予約システムが本人へ「確定しました」を送った → カルテ連携の方への自動の確定を二重に送らない
     if (patientKind === 'patient-confirm' && !testRun && to) {

@@ -27,6 +27,17 @@ import {
 import { recordAudit, recordRun } from './automation-store-server'
 import { checkConsent } from './consent-store-server'
 import { fetchUpcomingReservations } from './reservation-check-server'
+import { noteLinePush } from './line-touch-server'
+import { LIFF_RESERVE_URL } from './clinic'
+import { CONSENT_KEYWORDS } from './consent'
+
+/** ご連絡の文の下に出す、すぐ押せるボタン（予約する／配信停止。押すと「配信停止」と送られ、その場で止まる） */
+export const FOLLOWUP_QUICK_REPLY = {
+  items: [
+    { type: 'action', action: { type: 'uri', label: '予約する', uri: LIFF_RESERVE_URL } },
+    { type: 'action', action: { type: 'message', label: CONSENT_KEYWORDS.stopMarketing, text: CONSENT_KEYWORDS.stopMarketing } },
+  ],
+}
 
 const LOG_KEY = 'keiei:followup-log'
 
@@ -47,14 +58,14 @@ const jstDate = (at: Date = new Date()): string => new Date(at.getTime() + 9 * 3
 // LINE_API_BASE_URL は動作確認用（ふだんは設定しない）
 const pushUrl = () => `${(process.env.LINE_API_BASE_URL ?? 'https://api.line.me').replace(/\/$/, '')}/v2/bot/message/push`
 
-async function push(to: string, text: string): Promise<{ ok: boolean; error?: string }> {
+async function push(to: string, text: string, quickReply?: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
   if (!token) return { ok: false, error: 'LINEの設定がありません' }
   try {
     const res = await fetch(pushUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
+      body: JSON.stringify({ to, messages: [{ type: 'text', text, ...(quickReply ? { quickReply } : {}) }] }),
       signal: AbortSignal.timeout(20_000),
     })
     if (res.ok) return { ok: true }
@@ -216,7 +227,9 @@ export async function sendFollowups(people: FollowupPerson[], template: string, 
     }
     seen.add(r.userId)
     const name = r.linkName ?? ''
-    const sentResult = await push(r.userId, followupText(template, name))
+    // 文の下に、すぐ押せるボタン（ブロックの手前で「止める」を選べるように。lib/line-block-guard.ts）
+    const sentResult = await push(r.userId, followupText(template, name), FOLLOWUP_QUICK_REPLY)
+    if (sentResult.ok) await noteLinePush(r.userId, 'followup')
     const at = new Date().toISOString()
     log.recent.unshift({ at, name, ok: sentResult.ok, ...(sentResult.error ? { error: sentResult.error.slice(0, 120) } : {}) })
     if (sentResult.ok) {

@@ -52,7 +52,8 @@ function ComposeInner() {
   const [project, setProject] = useState<ContentProject | null>(null)
   const [objective, setObjective] = useState<string>(OBJECTIVES[0])
   const [theme, setTheme] = useState('')
-  const [channels, setChannels] = useState<Channel[]>(['instagram_feed', 'google_business', 'line_broadcast'])
+  // 公式LINE配信（友だち全員へ）は、初めから選ばない（2026-11-26。ブロックの理由で多いのは「不要な情報が多い」「配信が多い」）
+  const [channels, setChannels] = useState<Channel[]>(['instagram_feed', 'google_business'])
   const [detail, setDetail] = useState({ audience: '', keyMessage: '', evidence: '', cta: '', tone: '', notes: '' })
   const [showDetail, setShowDetail] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -322,6 +323,7 @@ function ComposeInner() {
                 <button
                   key={channel}
                   type="button"
+                  aria-pressed={on}
                   onClick={() => setChannels((prev) => (on ? prev.filter((c) => c !== channel) : [...prev, channel]))}
                   className={`rounded-full border px-3 py-1.5 text-sm font-medium max-lg:min-h-10 ${
                     on ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-300 bg-white text-slate-600'
@@ -332,6 +334,11 @@ function ComposeInner() {
               )
             })}
           </div>
+          {channels.includes('line_broadcast') && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+              公式LINE配信は、友だち全員に届きます。ブロックの理由で多いのは「不要な情報が多い」「配信が多い」です。30日に2回まで・前の配信から7日あけます（超えるときは、自動では配信しません）。
+            </p>
+          )}
         </div>
 
         <button type="button" onClick={() => setShowDetail(!showDetail)} className="text-sm font-medium text-teal-700 max-lg:min-h-10">
