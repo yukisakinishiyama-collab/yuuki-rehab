@@ -89,7 +89,7 @@ export interface LinkFinderCache {
   links?: Awaited<ReturnType<typeof listLineLinks>>
 }
 
-async function cloudPatients(cache: LinkFinderCache): Promise<NonNullable<LinkFinderCache['patients']>> {
+export async function cloudPatients(cache: LinkFinderCache): Promise<NonNullable<LinkFinderCache['patients']>> {
   if (!cache.patients) {
     try {
       const record = await kvGet<{ payload?: Record<string, string> }>('sync:clinic')

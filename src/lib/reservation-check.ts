@@ -8,15 +8,20 @@
  * - 予約の一覧は予約システム（v3.30〜の ?api=upcoming）から、そのつど取る（控えは持たない＝院の画面での変更・キャンセルもすぐ反映）
  * ここは、言葉の見分け・予約の選び方・返事の文（純粋な関数）。サーバーの動きは lib/marketing/reservation-check-server.ts
  */
-import { matchLinkForReservation, type MatchKarte, type MatchLink } from '@/lib/line-link-match'
+import { matchLinkForPlan, matchLinkForReservation, type MatchKarte, type MatchLink } from '@/lib/line-link-match'
 import { normalizeCommand } from '@/lib/marketing/consent'
+import { addDaysYmd } from '@/lib/reeval/schedule'
 import { formatDateJa, safeChangeUrl, safeName, safeReservationNo } from '@/lib/reservation-message'
+import { VISIT_PLAN_TIME_TEXT } from '@/lib/visit-plan-message'
 
 /** 患者さんが送る言葉（LINE のメニューのボタンから同じ言葉を送らせてもよい） */
 export const RESERVATION_CHECK_KEYWORD = '予約確認'
 
 /** いちどに返す予約の数の上限（それより多い分は「ほか◯件」） */
 export const RESERVATION_CHECK_MAX = 8
+/** いちどに返す来院予定（時間を決めない予定）の数の上限・何日先まで出すか */
+export const RESERVATION_CHECK_MAX_PLANS = 5
+export const RESERVATION_CHECK_PLAN_DAYS = 90
 
 const CHECK_PATTERNS = [
   // 予約確認・予約の確認・予約を確認したい・次の予約の日時の確認
@@ -91,8 +96,43 @@ export function pickReservationsForLine<L extends MatchLink>(
   return out.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
 }
 
+/** 返事に出す来院予定1件（時間を決めない予定。院内アプリの「来院予定」。2026-11-26） */
+export interface CheckPlan {
+  name: string
+  date: string
+}
+
+/**
+ * その LINE に届く来院予定（時間を決めない予定）を選ぶ。だれの予定かは、LINE で知らせるときと同じ決まり（matchLinkForPlan）。
+ * 「予定」のままの、今日から RESERVATION_CHECK_PLAN_DAYS 日先までのもの。同じ方・同じ日に時間の予約があれば、そちらだけを出す
+ */
+export function pickPlansForLine<L extends MatchLink>(
+  plans: Array<{ id?: string; date?: string; status?: string; patientId?: string; name?: string }>,
+  today: string,
+  kartes: MatchKarte[],
+  links: L[],
+  myLinkKeys: Set<string>,
+  items: CheckItem[] = [],
+): CheckPlan[] {
+  if (myLinkKeys.size === 0) return []
+  const until = addDaysYmd(today, RESERVATION_CHECK_PLAN_DAYS)
+  const out: CheckPlan[] = []
+  const seen = new Set(items.map((i) => `${i.name}|${i.date}`))
+  for (const plan of plans) {
+    const date = String(plan?.date ?? '')
+    if (!plan || plan.status !== 'planned' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > until) continue
+    const m = matchLinkForPlan({ patientId: plan.patientId, name: plan.name }, kartes, links)
+    if (!m.linked || !myLinkKeys.has(m.link.key)) continue
+    const name = safeName(m.link.name)
+    if (seen.has(`${name}|${date}`)) continue
+    seen.add(`${name}|${date}`)
+    out.push({ name, date })
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date)).slice(0, RESERVATION_CHECK_MAX_PLANS)
+}
+
 export type CheckReply =
-  | { kind: 'found'; items: CheckItem[]; changeUrls?: Record<string, string> }
+  | { kind: 'found'; items: CheckItem[]; changeUrls?: Record<string, string>; plans?: CheckPlan[] }
   /** その LINE と結びついた方はいるが、これからの予約が無い */
   | { kind: 'none'; names: string[] }
   /** その LINE では、予約を見つけられない（カルテと結びついていない・LINE から予約した分も無い） */
@@ -142,16 +182,22 @@ export function reservationCheckText(reply: CheckReply, opts: CheckTextOptions):
   }
   const shown = reply.items.slice(0, RESERVATION_CHECK_MAX)
   const rest = reply.items.length - shown.length
-  const names = [...new Set(shown.map((i) => i.name))]
+  const plans = reply.plans ?? []
+  // 時間の予約の方 → 来院予定だけの方 の順
+  const names = [...new Set([...shown.map((i) => i.name), ...plans.map((p) => p.name)])]
   const lines: string[] = []
   if (names.length === 1) lines.push(`${names[0]} 様`, '')
-  lines.push(`${opts.clinicName}です。これからのご予約は、次のとおりです。`)
+  lines.push(`${opts.clinicName}です。これからの${plans.length > 0 ? 'ご予約・ご来院の予定' : 'ご予約'}は、次のとおりです。`)
   for (const name of names) {
     if (names.length > 1) lines.push('', `■ ${name} 様`)
     for (const item of shown.filter((i) => i.name === name)) {
       const url = safeChangeUrl(reply.changeUrls?.[item.reservationNo])
       lines.push('', `📅 ${formatDateJa(item.date)} ${item.time}〜`, `🎫 予約番号：${item.reservationNo}`)
       if (url) lines.push('日時の変更・キャンセルは、こちらから（入力はいりません）', url)
+    }
+    // 時間を決めない来院予定（予約番号・変更のリンクは無い。変更はトーク・お電話で）
+    for (const plan of plans.filter((p) => p.name === name)) {
+      lines.push('', `📅 ${formatDateJa(plan.date)} ご来院の予定（時間は${VISIT_PLAN_TIME_TEXT}）`)
     }
   }
   if (rest > 0) lines.push('', `ほかに ${rest} 件のご予約があります。`)

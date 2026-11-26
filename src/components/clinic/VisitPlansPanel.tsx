@@ -4,7 +4,10 @@
 //
 // - VisitPlansPanel … 予約の画面の「来院予定（日にち）」。入れる・一覧（今日から先／記録がまだの過去の分）・来院した／来なかった・日にちを変える・取り消す
 // - TodayVisitPlans … 今日の画面の「今日の来院予定」。今日来る予定の方と、来院した／来なかった
-// 予約システムの時間の枠とは別（予約表の空きは減らさない）。患者さんには何も送らない。
+// 予約システムの時間の枠とは別（予約表の空きは減らさない）。
+// LINE 連携の方には、入れたとき・日にちを変えたときに「ご来院の予定を承りました」を LINE で送る（2026-11-26 院長
+// 「時間指定のない予約もlineが入るようにしてください」。/api/line-link/visit-plan。前日のお知らせはサーバーが送る）。
+// 送った結果は予定の記録（line）に残し、一覧に小さな印で出す
 // 記録は pt_visit_plans（ほかのカルテの記録と同じく、クラウドとそろう）。決まりは lib/visit-plans.ts
 // ──────────────────────────────────────────────
 import { useEffect, useId, useMemo, useState, useSyncExternalStore, type FormEvent } from 'react'
@@ -19,8 +22,8 @@ import { SYNCED_EVENT } from '@/lib/sync-service'
 import { setYoyakuView } from '@/lib/yoyaku-view'
 import {
   MAX_PLAN_NAME_CHARS, MAX_PLAN_NOTE_CHARS, PAST_UNMARKED_DAYS, VISIT_PLAN_STATUS_LABEL, addDaysYmd, duplicatePlan, findPatientsForPlan,
-  groupVisitPlans, jstToday, newVisitPlan, planDateLabel, plansOn, visitPlanProblem,
-  type VisitPlan, type VisitPlanStatus,
+  groupVisitPlans, jstToday, newVisitPlan, planDateLabel, planLineBadge, planLineResult, plansOn, visitPlanProblem,
+  type VisitPlan, type VisitPlanLineResult, type VisitPlanStatus,
 } from '@/lib/visit-plans'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -61,6 +64,41 @@ export function usePlans(): [VisitPlan[], () => void] {
   return [plans, notifyPlansChanged]
 }
 
+const LINE_TONE: Record<VisitPlanLineResult, string> = {
+  sent: 'bg-green-50 text-green-800 ring-green-200',
+  test: 'bg-slate-50 text-slate-600 ring-slate-200',
+  off: 'bg-slate-50 text-slate-600 ring-slate-200',
+  not_linked: 'bg-white text-slate-500 ring-slate-200',
+  error: 'bg-amber-50 text-amber-900 ring-amber-200',
+}
+
+/**
+ * LINE 連携の方へ「ご来院の予定を承りました」を頼み、結果を予定の記録に残す（入れたとき・日にちを変えたとき）。
+ * 画面を閉じても続くように、部品の外に置く。過ぎた日・「予定」でないものには頼まない
+ */
+async function notifyPlanLine(plan: VisitPlan): Promise<void> {
+  if (plan.lineOff || plan.status !== 'planned' || plan.date < jstToday()) return
+  let result: VisitPlanLineResult | null
+  try {
+    const res = await fetch('/api/line-link/visit-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: plan.id, date: plan.date, patientId: plan.patientId, name: plan.name }),
+    })
+    const data = (await res.json().catch(() => null)) as { ok?: boolean; linked?: boolean; delivered?: boolean; result?: string } | null
+    result = res.ok && data?.ok ? planLineResult(data) : 'error'
+  } catch {
+    result = 'error'
+  }
+  if (!result) return
+  // いまの記録に重ねる（頼んでいる間に取り消した・日にちを変えたときは、残さない）
+  const latest = getVisitPlans().find(p => p.id === plan.id)
+  if (!latest || latest.date !== plan.date) return
+  const at = new Date().toISOString()
+  saveVisitPlan({ ...latest, line: { date: plan.date, at, result }, updatedAt: at })
+  notifyPlansChanged()
+}
+
 function setStatus(plan: VisitPlan, status: VisitPlanStatus): void {
   saveVisitPlan({ ...plan, status, updatedAt: new Date().toISOString() })
 }
@@ -89,10 +127,15 @@ export function PlanRow({ plan, today, onChange, compact = false, showDate = fal
       setMoving(false)
       return
     }
-    saveVisitPlan({ ...plan, date: moveTo, status: 'planned', updatedAt: new Date().toISOString() })
+    const moved: VisitPlan = { ...plan, date: moveTo, status: 'planned', updatedAt: new Date().toISOString() }
+    saveVisitPlan(moved)
+    // 新しい日にちを、LINE 連携の方へ知らせる（同じ日にちには1通だけ）
+    void notifyPlanLine(moved)
     setMoving(false)
     onChange()
   }
+
+  const line = planLineBadge(plan)
 
   function remove() {
     if (!window.confirm(`${planDateLabel(plan.date, today)} の ${plan.name} さんの来院予定を取り消しますか？`)) return
@@ -109,6 +152,11 @@ export function PlanRow({ plan, today, onChange, compact = false, showDate = fal
           <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1', STATUS_TONE[plan.status])}>
             {VISIT_PLAN_STATUS_LABEL[plan.status]}
           </span>
+          {line && (
+            <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1', LINE_TONE[line.result])}>
+              {line.label}
+            </span>
+          )}
         </p>
         {plan.note && <p className="mt-0.5 text-sm text-slate-700">{plan.note}</p>}
         {moving && (
@@ -156,6 +204,7 @@ export function PlanAddForm({ initialDate, onAdded, autoFocus = false }: { initi
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<Patient | null>(null)
   const [note, setNote] = useState('')
+  const [lineOn, setLineOn] = useState(true)
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
   const [patients, setPatients] = useState<Patient[]>([])
 
@@ -168,8 +217,8 @@ export function PlanAddForm({ initialDate, onAdded, autoFocus = false }: { initi
   function add(e: FormEvent) {
     e.preventDefault()
     const input = picked
-      ? { date, name: picked.name, patientId: picked.id, kana: picked.kana, note }
-      : { date, name: query, note }
+      ? { date, name: picked.name, patientId: picked.id, kana: picked.kana, note, lineOff: !lineOn }
+      : { date, name: query, note, lineOff: !lineOn }
     const problem = visitPlanProblem(input, today)
     if (problem) {
       setMessage({ tone: 'error', text: problem })
@@ -187,6 +236,8 @@ export function PlanAddForm({ initialDate, onAdded, autoFocus = false }: { initi
     setPicked(null)
     setNote('')
     setMessage({ tone: 'ok', text: `${planDateLabel(plan.date, today)} に ${plan.name} さんを入れました` })
+    // LINE 連携の方へ「ご来院の予定を承りました」（結果は一覧の印に出る。画面を閉じても続く。チェックを外した予定には送らない）
+    void notifyPlanLine(plan)
     onAdded?.(plan)
   }
 
@@ -255,7 +306,16 @@ export function PlanAddForm({ initialDate, onAdded, autoFocus = false }: { initi
         <label htmlFor={`${uid}-note`} className="mb-1 block text-sm font-medium text-slate-700">メモ（任意）</label>
         <input id={`${uid}-note`} value={note} onChange={e => setNote(e.target.value)} maxLength={MAX_PLAN_NOTE_CHARS}
           placeholder="例：夕方ごろ・部活のあと・テーピングだけ" className={fieldClass} />
+        <p className="mt-1 text-xs text-slate-500">メモは院内だけで見ます（患者さんには送りません）。</p>
       </div>
+
+      <label className="flex min-h-10 items-start gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={lineOn} onChange={e => setLineOn(e.target.checked)} className="mt-1 h-4 w-4 shrink-0" />
+        <span>
+          LINE でお知らせする（LINE 連携の方だけ。入れたときの「ご来院の予定を承りました」と、前日のお知らせ）
+          {!lineOn && <span className="block text-xs text-slate-500">チェックを外すと、この予定は LINE でお知らせしません（入れたとき・前日とも）。</span>}
+        </span>
+      </label>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" className="h-11 rounded-lg font-bold">来院予定に入れる</Button>
@@ -297,7 +357,7 @@ export default function VisitPlansPanel({ shown }: { shown: boolean }) {
     <div className="space-y-4">
       <Panel title="来院予定を入れる（日にちだけ）" icon={CalendarDays}>
         <p className="mb-3 text-sm text-slate-600">
-          時間を決めずに「◯日に行きます」と聞いた方を書いておく一覧です。予約表の空きは減りません。患者さんには何も送りません。予約表の「時間未定」の欄にも、同じ予定が出ます。
+          時間を決めずに「◯日に行きます」と聞いた方を書いておく一覧です。予約表の空きは減りません。LINE 連携の方には、入れたときと前日に LINE でお知らせします。予約表の「時間未定」の欄にも、同じ予定が出ます。
         </p>
         <PlanAddForm />
       </Panel>
