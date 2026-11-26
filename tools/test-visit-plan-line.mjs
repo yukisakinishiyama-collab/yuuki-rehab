@@ -325,6 +325,8 @@ try {
     assert.match(panel, /fetch\('\/api\/line-link\/visit-plan'/)
     assert.match(panel, /void notifyPlanLine\(plan\)/)
     assert.match(panel, /void notifyPlanLine\(moved\)/)
+    // チェックは1人ごとに初め（あり）に戻す
+    assert.match(panel, /setNote\(''\)\n[^\n]*\n\s*setLineOn\(true\)/)
     assert.match(panel, /if \(plan\.lineOff \|\| plan\.status !== 'planned' \|\| plan\.date < jstToday\(\)\) return/)
     // メモは送らない（API へ渡すのは、予定の ID・日にち・カルテの ID・お名前だけ）
     assert.match(panel, /body: JSON\.stringify\(\{ id: plan\.id, date: plan\.date, patientId: plan\.patientId, name: plan\.name \}\)/)

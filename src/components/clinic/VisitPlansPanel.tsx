@@ -235,6 +235,8 @@ export function PlanAddForm({ initialDate, onAdded, autoFocus = false }: { initi
     setQuery('')
     setPicked(null)
     setNote('')
+    // 「LINE でお知らせする」は、1人ごとに初め（チェックあり）に戻す（外したまま、次の方にも送らないことが無いように）
+    setLineOn(true)
     setMessage({ tone: 'ok', text: `${planDateLabel(plan.date, today)} に ${plan.name} さんを入れました` })
     // LINE 連携の方へ「ご来院の予定を承りました」（結果は一覧の印に出る。画面を閉じても続く。チェックを外した予定には送らない）
     void notifyPlanLine(plan)
