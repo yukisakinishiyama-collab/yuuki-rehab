@@ -37,7 +37,7 @@ export interface CompareRow {
   trend: 'better' | 'worse' | 'same' | null
 }
 
-const GROUP_ORDER = ['痛み', '可動域', '筋力', '筋力・LSI', '機能スコア', 'ホップ', 'バランス・競技動作', '機能評価', '復帰基準']
+const GROUP_ORDER = ['痛み', '腫れ', '可動域', '筋力', '筋力・LSI', '機能スコア', 'ホップ', 'バランス・競技動作', '機能評価', '復帰基準']
 
 function fmt(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1)

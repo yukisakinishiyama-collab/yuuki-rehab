@@ -3,27 +3,33 @@
  * アウトカム（評価・測定 → アウトカム）
  * 痛み（NRS）・可動域・機能スコア・筋力（LSI）・ホップ・バランスを、その場で ＋／− で記録し、指標ごとにグラフで経過を見る。
  * 競技（野球・サッカー・陸上・バスケ/バレー・ACL術後）をえらぶと、その競技でよく使う指標が上に並び、目安とのまとめが出る。
+ * 疾患（足関節捻挫・ハムストリング／ふくらはぎ／太もも前の肉離れ）も別にえらべる（2026-11-27 院長「捻挫や肉離れのようにそれぞれの疾患に伴うアウトカム評価も」）。
+ * 両方えらんだときは疾患の評価を先に並べる。疾患によっては、別の研究の目安の線を出さない（metricForCondition）。
  * 左右を入れる指標は LSI・左右差を、肩の内旋・外旋は GIRD と TRM 差を自動で出す。
- * 記録は pt_outcomes、競技の設定は pt_outcome_settings（カルテの同期で、ほかの端末にも15秒ほどで出る）。
+ * 記録は pt_outcomes、競技・疾患の設定は pt_outcome_settings（カルテの同期で、ほかの端末にも15秒ほどで出る）。
  */
 import { useMemo, useState } from 'react'
 import { nanoid } from 'nanoid'
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Patient } from '@/types/patient'
-import type { OutcomeRecord, SportKey } from '@/types/contracts'
+import type { ConditionKey, OutcomeRecord, SportKey } from '@/types/contracts'
 import {
+  CONDITION_SETS,
   OUTCOME_GROUPS,
   OUTCOME_METRICS,
   SPORT_SETS,
   TRM_CAUTION,
   WILK_SOURCE,
   getOutcomeMetric,
+  getConditionSet,
   getSportSet,
+  metricForCondition,
+  suggestCondition,
   suggestSport,
   type OutcomeMetric,
 } from '@/data/outcome-metrics'
-import { addOutcome, deleteOutcome, setOutcomeSport } from '@/lib/contracts/store'
+import { addOutcome, deleteOutcome, setOutcomeCondition, setOutcomeSport } from '@/lib/contracts/store'
 import { jstToday } from '@/lib/contracts/member'
 import { buildOutcomeValues, judgeTarget, latestByMetric, outcomeInputProblem, trmOver, type OutcomeInput, type RotationInput } from '@/lib/outcomes/calc'
 
@@ -129,7 +135,11 @@ function TargetBadge({ metric, record }: { metric: OutcomeMetric; record: Outcom
   const badges: { text: string; tone: 'ok' | 'warn' | 'info' }[] = []
   if (j.state === 'reached') badges.push({ text: '目安に届いている', tone: 'ok' })
   if (j.state === 'notyet') badges.push({ text: `目安まであと ${fmt(j.gap)}${metric.unit}`, tone: 'warn' })
-  if (j.state === 'over') badges.push({ text: metric.rotation ? 'GIRD が注意の区切り以上' : '注意の区切りを超えている', tone: 'warn' })
+  if (j.state === 'over')
+    badges.push({
+      text: metric.rotation ? 'GIRD が注意の区切り以上' : metric.better === 'high' ? `注意の区切り（${metric.target?.label ?? ''}）に入っている` : '注意の区切りを超えている',
+      tone: 'warn',
+    })
   if (j.state === 'within') badges.push({ text: metric.rotation ? 'GIRD は区切りの内側' : '区切りの内側', tone: 'ok' })
   if (j.state === 'reference')
     badges.push({ text: j.gap > 0 ? `参考の値まであと ${fmt(j.gap)}${metric.unit}` : '参考の値と同じくらい以上', tone: 'info' })
@@ -156,6 +166,7 @@ export default function OutcomeQuickTab({
   patient,
   outcomes,
   sport,
+  condition = null,
   suggestText = '',
   onUpdate,
 }: {
@@ -163,16 +174,25 @@ export default function OutcomeQuickTab({
   outcomes: OutcomeRecord[]
   /** えらんである競技（まだえらんでいなければ null） */
   sport: SportKey | null
+  /** えらんである疾患（まだえらんでいなければ null） */
+  condition?: ConditionKey | null
   /** 競技のおすすめを出すための文（傷病名・主訴・問診の運動歴など） */
   suggestText?: string
   onUpdate: () => void
 }) {
   const set = getSportSet(sport ?? 'none')
+  const cond = getConditionSet(condition ?? 'none')
   const suggested = sport === null ? suggestSport(suggestText) : null
   const suggestedSet = suggested ? getSportSet(suggested) : null
+  const suggestedCondKey = condition === null ? suggestCondition(suggestText) : null
+  const suggestedCond = suggestedCondKey ? getConditionSet(suggestedCondKey) : null
+  /** 疾患・競技のセットの指標（疾患が先。重なりは1つに） */
+  const setMetrics = useMemo(() => [...new Set([...cond.metrics, ...set.metrics])], [cond.metrics, set.metrics])
+  const setTitle = [cond.key !== 'none' ? cond.label : '', set.key !== 'none' ? set.label : ''].filter(Boolean).join('・')
 
-  const [metricKey, setMetricKey] = useState<OutcomeMetric['key']>(() => outcomes.at(-1)?.metric ?? set.metrics[0] ?? 'nrs')
-  const metric = getOutcomeMetric(metricKey) ?? OUTCOME_METRICS[0]
+  const [metricKey, setMetricKey] = useState<OutcomeMetric['key']>(() => outcomes.at(-1)?.metric ?? setMetrics[0] ?? 'nrs')
+  // 疾患によっては、別の研究の目安の線を出さない
+  const metric = metricForCondition(getOutcomeMetric(metricKey) ?? OUTCOME_METRICS[0], cond)
   const series = useMemo(() => outcomes.filter((o) => o.metric === metric.key), [outcomes, metric.key])
   const latestMap = useMemo(() => latestByMetric(outcomes), [outcomes])
 
@@ -210,6 +230,16 @@ export default function OutcomeQuickTab({
   function chooseSport(key: SportKey) {
     setOutcomeSport(patient.id, key)
     const next = getSportSet(key)
+    if (next.metrics.length > 0 && !next.metrics.includes(metric.key) && !cond.metrics.includes(metric.key)) {
+      const m = getOutcomeMetric(next.metrics[0])
+      if (m) choose(m)
+    }
+    onUpdate()
+  }
+
+  function chooseCondition(key: ConditionKey) {
+    setOutcomeCondition(patient.id, key)
+    const next = getConditionSet(key)
     if (next.metrics.length > 0 && !next.metrics.includes(metric.key)) {
       const m = getOutcomeMetric(next.metrics[0])
       if (m) choose(m)
@@ -268,7 +298,7 @@ export default function OutcomeQuickTab({
     return [Math.max(metric.min, Math.floor((lo - pad) / unit) * unit), Math.min(metric.max, Math.ceil((hi + pad) / unit) * unit)] as [number, number]
   }, [chartData, metric])
 
-  const otherMetrics = set.metrics.length > 0 ? OUTCOME_METRICS.filter((m) => !set.metrics.includes(m.key)) : OUTCOME_METRICS
+  const otherMetrics = setMetrics.length > 0 ? OUTCOME_METRICS.filter((m) => !setMetrics.includes(m.key)) : OUTCOME_METRICS
 
   function chip(m: OutcomeMetric) {
     return (
@@ -301,10 +331,26 @@ export default function OutcomeQuickTab({
 
   return (
     <div className="space-y-4">
-      {/* 競技の評価セット */}
+      {/* 評価セット（疾患・競技。両方えらべる） */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-bold text-slate-700">競技の評価セット</span>
+          <span className="w-full text-sm font-bold text-slate-700 sm:w-28">疾患の評価セット</span>
+          {CONDITION_SETS.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => chooseCondition(c.key)}
+              aria-pressed={cond.key === c.key}
+              className={`min-h-10 rounded-full border px-3 text-sm ${
+                cond.key === c.key ? 'border-teal-700 bg-teal-700 font-bold text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="w-full text-sm font-bold text-slate-700 sm:w-28">競技の評価セット</span>
           {SPORT_SETS.map((s) => (
             <button
               key={s.key}
@@ -320,8 +366,18 @@ export default function OutcomeQuickTab({
           ))}
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          {set.key === 'none' ? 'えらぶと、その競技でよく使う評価が上に並び、目安とのまとめが出ます。' : `${set.label}：${set.who}。`}
+          {setMetrics.length === 0
+            ? 'えらぶと、その疾患・競技でよく使う評価が上に並び、目安とのまとめが出ます（疾患と競技は両方えらべます）。'
+            : [cond.key !== 'none' ? `${cond.label}：${cond.who}。` : '', set.key !== 'none' ? `${set.label}：${set.who}。` : ''].filter(Boolean).join(' ')}
         </p>
+        {suggestedCond && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <span>カルテの内容から「{suggestedCond.label}」の評価が合いそうです。</span>
+            <button type="button" onClick={() => chooseCondition(suggestedCond.key)} className="min-h-10 rounded-lg bg-sky-800 px-3 font-bold text-white hover:bg-sky-900">
+              このセットにする
+            </button>
+          </div>
+        )}
         {suggestedSet && (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
             <span>カルテの内容から「{suggestedSet.label}」が合いそうです。</span>
@@ -333,13 +389,14 @@ export default function OutcomeQuickTab({
       </section>
 
       {/* セットのまとめ（最新の値と目安） */}
-      {set.metrics.length > 0 && (
+      {setMetrics.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="font-bold text-slate-900">{set.label} のまとめ（最新の値）</h3>
+          <h3 className="font-bold text-slate-900">{setTitle} のまとめ（最新の値）</h3>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {set.metrics.map((key) => {
-              const m = getOutcomeMetric(key)
-              if (!m) return null
+            {setMetrics.map((key) => {
+              const base = getOutcomeMetric(key)
+              if (!base) return null
+              const m = metricForCondition(base, cond)
               const r = latestMap.get(key)
               return (
                 <button
@@ -369,21 +426,43 @@ export default function OutcomeQuickTab({
             })}
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            目安・区切りは論文で使われた値を参考に出しています。これだけで復帰を決めるものではありません。痛み・動き・練習の様子とあわせて判断します。
+            目安・区切りは論文で使われた値を参考に出しています。これだけで復帰を決めるものではありません。痛み・動き・練習の様子とあわせて判断し、医師の指示がある方はそちらを優先してください。
           </p>
+          {cond.refs && cond.refs.length > 0 && (
+            <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <p className="font-bold text-slate-700">{cond.label}の評価で参考にした論文</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                {cond.refs.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              {cond.noTarget && cond.noTarget.length > 0 && (
+                <p className="mt-1">
+                  {cond.noTarget.map((k) => getOutcomeMetric(k)?.label).filter(Boolean).join('・')}
+                  は、ほかのケガの研究の目安の線（LSI 90%）を、この疾患では出していません。
+                </p>
+              )}
+            </div>
+          )}
         </section>
       )}
 
       {/* 指標をえらぶ */}
       <div className="space-y-2">
+        {cond.metrics.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-24 shrink-0 text-xs font-bold text-teal-800">この疾患の評価</span>
+            {cond.metrics.map((k) => getOutcomeMetric(k)).filter((m): m is OutcomeMetric => !!m).map(chip)}
+          </div>
+        )}
         {set.metrics.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-24 shrink-0 text-xs font-bold text-teal-800">この競技の評価</span>
-            {set.metrics.map((k) => getOutcomeMetric(k)).filter((m): m is OutcomeMetric => !!m).map(chip)}
+            {set.metrics.filter((k) => !cond.metrics.includes(k)).map((k) => getOutcomeMetric(k)).filter((m): m is OutcomeMetric => !!m).map(chip)}
           </div>
         )}
-        {set.metrics.length > 0 ? (
-          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2" open={!set.metrics.includes(metric.key)}>
+        {setMetrics.length > 0 ? (
+          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2" open={!setMetrics.includes(metric.key)}>
             <summary className="flex min-h-10 cursor-pointer items-center text-sm font-bold text-slate-700">ほかの指標</summary>
             <div className="mt-2 space-y-2">{groupRows(otherMetrics)}</div>
           </details>

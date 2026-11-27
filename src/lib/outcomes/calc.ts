@@ -132,8 +132,10 @@ export function judgeTarget(metric: OutcomeMetric, value: number): TargetJudge {
   if (!t || !Number.isFinite(value)) return { state: 'none' }
   if (t.type === 'reach') return value >= t.value ? { state: 'reached', gap: 0 } : { state: 'notyet', gap: round1(t.value - value) }
   if (t.type === 'caution') {
-    // GIRD は「20°以上」、それ以外（Yバランス）は「4cm を超える」
-    const over = metric.key === 'gird' ? value >= t.value : value > t.value
+    // 注意の側は「悪い向き」：小さいほど良い指標は区切りより大きい側（GIRD は 20° 以上＝inclusive、Yバランスは 4cm を超える）、
+    // 大きいほど良い指標は区切りより小さい側（CAIT は 25 点以下＝inclusive）
+    const over =
+      metric.better === 'low' ? (t.inclusive ? value >= t.value : value > t.value) : t.inclusive ? value <= t.value : value < t.value
     return { state: over ? 'over' : 'within' }
   }
   return { state: 'reference', gap: round1(t.value - value) }

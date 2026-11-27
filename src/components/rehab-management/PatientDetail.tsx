@@ -64,9 +64,9 @@ import ReferralLetterModal from './ReferralLetterModal'
 import SyncNowButton from '@/components/rehab/SyncNowButton'
 import ContractsTab, { MemberStatusBadge } from './ContractsTab'
 import OutcomeQuickTab from './OutcomeQuickTab'
-import { getAllContracts, getContracts, getOutcomeSport, getOutcomes } from '@/lib/contracts/store'
+import { getAllContracts, getContracts, getOutcomeCondition, getOutcomeSport, getOutcomes } from '@/lib/contracts/store'
 import { jstToday, memberStatusForPatient } from '@/lib/contracts/member'
-import type { ContractRecord, OutcomeRecord, SportKey } from '@/types/contracts'
+import type { ConditionKey, ContractRecord, OutcomeRecord, SportKey } from '@/types/contracts'
 import { useKarteSynced } from '@/lib/use-karte-sync'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -926,6 +926,7 @@ export default function PatientDetail({ patient }: Props) {
   const [allContracts, setAllContracts] = useState<ContractRecord[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeRecord[]>([])
   const [outcomeSport, setOutcomeSportState] = useState<SportKey | null>(null)
+  const [outcomeCondition, setOutcomeConditionState] = useState<ConditionKey | null>(null)
 
   useEffect(() => {
     reload()
@@ -956,6 +957,7 @@ export default function PatientDetail({ patient }: Props) {
     setAllContracts(getAllContracts())
     setOutcomes(getOutcomes(patient.id))
     setOutcomeSportState(getOutcomeSport(patient.id))
+    setOutcomeConditionState(getOutcomeCondition(patient.id))
     setReevalPlan(getReevalPlan(patient.id))
     setOutcomeScores(getOutcomeScores(patient.id))
   }
@@ -1863,6 +1865,7 @@ export default function PatientDetail({ patient }: Props) {
             patient={patient}
             outcomes={outcomes}
             sport={outcomeSport}
+            condition={outcomeCondition}
             suggestText={[patient.diagnosisLabel, patient.mainComplaint, ...evaluations.map((e) => e.sportType), ...intakes.map((i) => i.sportsActivity)].filter(Boolean).join(' ')}
             onUpdate={reload}
           />

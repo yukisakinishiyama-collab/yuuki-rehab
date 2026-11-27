@@ -122,14 +122,29 @@ export type OutcomeMetricKey =
   | 'ybal_ant'
   | 'run_minutes'
   | 'throw_distance'
+  // 2026-11-27 疾患ごとの評価セット（足関節捻挫・肉離れ）で足した指標
+  | 'cait'
+  | 'swelling_f8'
+  | 'wblt'
+  | 'side_hop'
+  | 'aslr'
+  | 'slhb'
+  | 'sprint_pct'
+  | 'kick_nrs'
 
 /** 競技ごとの評価セット（患者さんごとに1つ選ぶ） */
 export type SportKey = 'none' | 'baseball' | 'soccer' | 'running' | 'jump' | 'acl'
 
+/** 疾患ごとの評価セット（患者さんごとに1つ選ぶ。競技のセットとは別に、両方えらべる。2026-11-27） */
+export type ConditionKey = 'none' | 'ankle_sprain' | 'ham_strain' | 'calf_strain' | 'quad_strain'
+
 /** 患者さんごとのアウトカムの設定（pt_outcome_settings。id は患者さんの ID） */
 export interface OutcomeSetting {
   id: string
-  sport: SportKey
+  /** 競技のセット（まだえらんでいなければ無い） */
+  sport?: SportKey
+  /** 疾患のセット（まだえらんでいなければ無い） */
+  condition?: ConditionKey
   updatedAt: string
 }
 
