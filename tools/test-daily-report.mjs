@@ -186,6 +186,11 @@ test('売上の CSV：院長が経営を開いているときだけ、日報の�
   const ui = read('src/components/clinic/DailyReport.tsx')
   // 売上を入れる入口（NOAH の日報の PDF・CSV）は、院長が経営を開いているときだけ・紙には出さない
   assert.match(ui, /\{showSales && \(\s*<div className="space-y-3 print:hidden">/)
+  // PDF は日報のいちばん上（見出しより前）。院長には上の「NOAH の PDF を入れる」ボタン（経営が閉じていれば開いて、そこへ移る）
+  assert.match(ui, /\{showSales && \(\s*<div id=\{PDF_IMPORT_ID\} className="scroll-mt-20 print:hidden">\s*<NoahDailyPdfImport/)
+  assert.ok(ui.indexOf('<NoahDailyPdfImport') < ui.indexOf('{/* 見出し（画面と紙） */}'), 'PDF の欄は見出しより上')
+  assert.match(ui, /\{isAdmin && \(\s*<Button[^>]*onClick=\{goToPdfImport\}>/)
+  assert.match(ui, /if \(!keieiOpen\) openKeiei\(\)/)
   assert.match(ui, /\{noah && !noah\.error && <KeieiCsvImport storeMonths=\{noah\.store\?\.months \?\? \[\]\} onSaved=\{\(\) => setTick\(\(t\) => t \+ 1\)\} \/>\}/)
   assert.match(ui, /\}, \[salesAllowed, tick\]\)/, '読み直す（tick）で NOAH も読み直す')
   // 入れる先は、経営の「CSVを入れて最新にする」と同じ（院長だけの API）

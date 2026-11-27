@@ -13,13 +13,13 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Printer, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileUp, Printer, RefreshCw } from 'lucide-react'
 import { getCancellations, getPatients, getSOAPNotes, getVisitPlans, initPatientStore } from '@/lib/patient-store'
 import { SYNCED_EVENT } from '@/lib/sync-service'
 import { addDaysYmd, isYmd, jstToday } from '@/lib/reeval/schedule'
 import { toDateKey, type YoyakuFeed } from '@/lib/yoyaku-cancel-sync'
 import { useMarketingRole } from '@/lib/marketing/use-role'
-import { useKeieiOpen } from '@/lib/clinic/keiei-mode'
+import { openKeiei, useKeieiOpen } from '@/lib/clinic/keiei-mode'
 import { monthPoints, yen } from '@/lib/marketing/noah-analysis'
 import type { NoahStore } from '@/lib/marketing/noah-types'
 import {
@@ -103,6 +103,9 @@ interface FeedState {
   at: string
 }
 
+/** 日報の画面の「NOAH の日報（PDF）を入れる」の欄 */
+const PDF_IMPORT_ID = 'noah-pdf-import'
+
 export default function DailyReport({ initialDate }: { initialDate: string }) {
   const today = useMemo(() => jstToday(), [])
   const [date, setDate] = useState(isYmd(initialDate) ? initialDate : today)
@@ -112,6 +115,22 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
   const salesAllowed = isAdmin && keieiOpen
   const [includeSales, setIncludeSales] = useState(true)
   const showSales = salesAllowed && includeSales
+  // 「NOAH の PDF を入れる」：経営が閉じていれば開き、PDF を入れる欄までスクロールする
+  // （2026-11-27 院長「一緒に印刷をしたいのでどこでPDFをいれるのかがわかりません」。欄は経営を開いたときだけ出るため）
+  const [jumpToPdf, setJumpToPdf] = useState(false)
+  useEffect(() => {
+    if (!jumpToPdf || !showSales) return
+    const id = window.requestAnimationFrame(() => {
+      document.getElementById(PDF_IMPORT_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setJumpToPdf(false)
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [jumpToPdf, showSales])
+  const goToPdfImport = () => {
+    if (!keieiOpen) openKeiei()
+    setIncludeSales(true)
+    setJumpToPdf(true)
+  }
 
   // カルテの記録（端末の控え）。クラウドから新しい記録が届いたら読み直す
   const [stamp, setStamp] = useState(0)
@@ -292,11 +311,17 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
             今日にもどす
           </Button>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <Button type="button" variant="outline" className="gap-1 px-2.5 font-bold" onClick={() => setTick((t) => t + 1)} disabled={feedLoading}>
             <RefreshCw className={cn('h-4 w-4', feedLoading && 'animate-spin')} aria-hidden />
             読み直す
           </Button>
+          {isAdmin && (
+            <Button type="button" variant="outline" className="gap-1 px-2.5 font-bold" onClick={goToPdfImport}>
+              <FileUp className="h-4 w-4" aria-hidden />
+              NOAH の PDF を入れる
+            </Button>
+          )}
           <Button type="button" className="gap-1 px-3 font-bold" onClick={() => window.print()} disabled={feedLoading}>
             <Printer className="h-4 w-4" aria-hidden />
             印刷する
@@ -309,6 +334,19 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
           </label>
         )}
       </div>
+
+      {/* NOAH の来院者日報（PDF）を入れる：日報のいちばん上（院長・経営を開いているときだけ。紙には出さない）
+          2026-11-27 院長「一緒に印刷をしたいのでどこでPDFをいれるのかがわかりません」「日報の場所にも入れてください」 */}
+      {showSales && (
+        <div id={PDF_IMPORT_ID} className="scroll-mt-20 print:hidden">
+          <NoahDailyPdfImport
+            onSaved={(dates) => {
+              setTick((t) => t + 1)
+              if (dates.length === 1 && dates[0] !== date) go(dates[0])
+            }}
+          />
+        </div>
+      )}
 
       {/* 見出し（画面と紙） */}
       <header className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-slate-800 pb-1">
@@ -375,7 +413,7 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
           ) : (
             <Empty>
               <span className="mr-1 font-bold">窓口（来院者日報）</span>
-              {!sheet ? '読み込み中…' : sheet.error || 'この日の NOAH の日報は、まだ入っていません（下の「NOAH の日報（PDF）を入れる」から）。'}
+              {!sheet ? '読み込み中…' : sheet.error || 'この日の NOAH の日報は、まだ入っていません（上の「NOAH の日報（PDF）を入れる」から）。'}
             </Empty>
           )}
           {/* 金額分析（保険の請求分も含めた金額） */}
@@ -409,12 +447,6 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
       )}
       {showSales && (
         <div className="space-y-3 print:hidden">
-          <NoahDailyPdfImport
-            onSaved={(dates) => {
-              setTick((t) => t + 1)
-              if (dates.length === 1 && dates[0] !== date) go(dates[0])
-            }}
-          />
           {noah && !noah.error && <KeieiCsvImport storeMonths={noah.store?.months ?? []} onSaved={() => setTick((t) => t + 1)} />}
         </div>
       )}
