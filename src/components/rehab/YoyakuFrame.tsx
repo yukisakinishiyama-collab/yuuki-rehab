@@ -17,8 +17,9 @@
 // ──────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { preconnect } from 'react-dom'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarCheck, CalendarClock, ExternalLink, Loader2, RefreshCw } from 'lucide-react'
+import { CalendarCheck, CalendarClock, ExternalLink, FileText, Loader2, RefreshCw } from 'lucide-react'
 import VisitPlansPanel, { usePlans, useTodayPlanCount } from '@/components/clinic/VisitPlansPanel'
 import VisitPlanDialog, { type PlanDialogState } from '@/components/clinic/VisitPlanDialog'
 import { KARTE_HELLO_ACK, LANE_SYNC_INTERVAL_MS, lanePlansMessage, parseLaneRequest } from '@/lib/yoyaku-lane'
@@ -331,7 +332,15 @@ export default function YoyakuFrame({ visible }: { visible: boolean }) {
             予約表・空きの確認・予約の登録・キャンセル（予約管理表と連動）
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 日報（1日分の予約などのまとめ・印刷。2026-11-27 院長の依頼。components/clinic/DailyReport.tsx） */}
+          <Link
+            href="/yoyaku/daily"
+            className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 max-lg:min-h-10"
+          >
+            <FileText size={13} aria-hidden />
+            日報・印刷
+          </Link>
           <a
             href={RESERVATION_PATIENT_URL}
             target="_blank"
