@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * 月の売上の目標（はじめは300万円）への道すじ — 院長のみ・経営メニュー（隠しモード）の中
+ * 月の売上の目標（はじめは200万円。2026-11-27 院長が 300万円 から変更）への道すじ — 院長のみ・経営メニュー（隠しモード）の中
  *
  * 4つのタブに分ける（ChatGPT とのデザイン相談をふまえた形。2026-10-23）
  *   現在地 … 今月の着地見込み・目標との差・今週いちばんにやること（最初の1画面で分かる）
@@ -13,6 +13,7 @@
  * 「実績」と「見込み（予測）」「試算」は、ラベルで必ず分けて見せる。
  * 計算は src/lib/marketing/goal-plan.ts（架空の数字で単体テストあり）。データは院長だけが読めるAPIから取る。
  */
+import { migrateSavedGoal } from '@/lib/marketing/goal-local'
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -58,6 +59,8 @@ const extraOf = (e?: ExtraMonth) => (e ? e.subscription + Math.max(0, e.cashless
 // ── この端末に覚えておく小さな設定（目標の金額・チェックした打ち手）とタブ ──────────────
 
 const GOAL_KEY = 'keiei:goal'
+// 前の初めの値（300万円）のまま覚えている端末は、1回だけ 200万円 に直す（lib/marketing/goal-local.ts）
+if (typeof window !== 'undefined') migrateSavedGoal()
 const CHECK_KEY = 'keiei:goal-checks'
 const LS_EVENT = 'keiei:local'
 

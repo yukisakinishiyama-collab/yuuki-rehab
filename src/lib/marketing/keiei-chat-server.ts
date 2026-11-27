@@ -18,6 +18,8 @@ import { DECISION_LABELS, METRICS } from './pdca'
 import { sourceLabel } from './booking-stats-labels'
 import type { NoahMonth } from './noah-types'
 import type { ExtraMonth } from '@/app/api/marketing/keiei-extra/route'
+import { strategyContextLines } from './keiei-strategy'
+import { getStrategyProgress } from './keiei-strategy-server'
 
 export const CHAT_KEY = 'keiei:chat'
 const MAX_MESSAGES = 80
@@ -68,11 +70,12 @@ function sumMonth(m: NoahMonth) {
  */
 export async function buildContext(goal?: number | null): Promise<string> {
   const today = jstParts(new Date()).date
-  const [noah, stats, pdca, extra] = await Promise.all([
+  const [noah, stats, pdca, extra, strategy] = await Promise.all([
     getNoahStore().catch(() => null),
     fetchHubStatsFast(30).catch(() => null),
     listWithChecks().catch(() => null),
     kvGet<{ months: Record<string, ExtraMonth> }>('keiei:extra').catch(() => null),
+    getStrategyProgress().catch(() => null),
   ])
   const lines: string[] = [`今日: ${today}`]
 
@@ -143,6 +146,8 @@ export async function buildContext(goal?: number | null): Promise<string> {
   }
 
   if (goal && goal > 0) lines.push('', `【今月の売上目標】${yen(goal)}`)
+  // 院長が登録した経営方針（90日計画。src/data/keiei-strategy.ts）と進み具合
+  if (strategy) lines.push('', ...strategyContextLines(strategy, today, goal && goal > 0 ? goal : null))
   return lines.filter((l) => l !== undefined).join('\n')
 }
 
@@ -156,6 +161,7 @@ const SYSTEM = [
   '- 患者さんの個人情報は扱わない（名前などを聞かれても使わない）。',
   '- 数字は渡された院の集計だけを根拠にする。分からないことは分からないと言う。税務・法務の判断は専門家の確認をすすめる。',
   '- 先に結論、次に理由、最後に次の一手（1つ）。',
+  '- 院長が登録した経営方針（90日計画）があれば、それに沿って答える。方針と数字が合わないとき・方針を変えたほうがよいと思うときは、はっきり指摘する。',
 ].join('\n')
 
 export interface ChatReply {
