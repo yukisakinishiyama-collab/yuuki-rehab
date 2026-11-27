@@ -131,12 +131,37 @@ export type OutcomeMetricKey =
   | 'slhb'
   | 'sprint_pct'
   | 'kick_nrs'
+  // 2026-11-27 疾患のセットを足したときの指標（膝蓋腱・オスグッド・すね・疲労骨折・腰・かかと）
+  | 'decline_squat_nrs'
+  | 'koos_qol'
+  | 'hbd'
+  | 'tender_length'
+  | 'hop_nrs'
+  | 'walk_nrs'
+  | 'bony_tender'
+  | 'ext_nrs'
+  | 'odi'
+  | 'firststep_nrs'
 
 /** 競技ごとの評価セット（患者さんごとに1つ選ぶ） */
 export type SportKey = 'none' | 'baseball' | 'soccer' | 'running' | 'jump' | 'acl'
 
 /** 疾患ごとの評価セット（患者さんごとに1つ選ぶ。競技のセットとは別に、両方えらべる。2026-11-27） */
-export type ConditionKey = 'none' | 'ankle_sprain' | 'ham_strain' | 'calf_strain' | 'quad_strain'
+export type ConditionKey =
+  | 'none'
+  | 'ankle_sprain'
+  | 'ham_strain'
+  | 'calf_strain'
+  | 'quad_strain'
+  | 'achilles'
+  | 'plantar_heel'
+  | 'mtss'
+  | 'bone_stress'
+  | 'patellar_tendinopathy'
+  | 'osgood'
+  | 'meniscus'
+  | 'groin'
+  | 'low_back'
 
 /** 患者さんごとのアウトカムの設定（pt_outcome_settings。id は患者さんの ID） */
 export interface OutcomeSetting {
