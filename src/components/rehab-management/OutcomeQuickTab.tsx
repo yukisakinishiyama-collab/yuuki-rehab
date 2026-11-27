@@ -32,6 +32,8 @@ import {
 } from '@/data/outcome-metrics'
 import { addOutcome, deleteOutcome, setOutcomeCondition, setOutcomeSport } from '@/lib/contracts/store'
 import { jstToday } from '@/lib/contracts/member'
+import { useMarketingRole } from '@/lib/marketing/use-role'
+import MethodImageHint from './MethodImageHint'
 import { buildOutcomeValues, judgeTarget, latestByMetric, outcomeInputProblem, trmOver, type OutcomeInput, type RotationInput } from '@/lib/outcomes/calc'
 
 function fmt(v: number) {
@@ -181,6 +183,7 @@ export default function OutcomeQuickTab({
   suggestText?: string
   onUpdate: () => void
 }) {
+  const { isAdmin } = useMarketingRole()
   const set = getSportSet(sport ?? 'none')
   const cond = getConditionSet(condition ?? 'none')
   const suggested = sport === null ? suggestSport(suggestText) : null
@@ -488,6 +491,7 @@ export default function OutcomeQuickTab({
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p className="font-bold text-slate-900">{metric.label}</p>
         {(metric.pair?.hint || metric.hint) && <p className="mt-0.5 text-xs text-slate-600">{metric.pair?.hint ?? metric.hint}</p>}
+        <MethodImageHint key={metric.key} metricKey={metric.key} isAdmin={isAdmin} />
 
         <div className="mt-3 flex flex-wrap items-end gap-4">
           {metric.rotation ? (
