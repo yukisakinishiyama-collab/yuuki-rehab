@@ -21,7 +21,7 @@ const TABLE = 'marketing_line_contacts'
 // backup: / backupidx: … 院内アプリの毎月の控えとその一覧（backup/backup-server.ts）
 // gbpseo: … Google検索向けの投稿の週ごとの予定と出した順（gbp-seo-server.ts）。gbp:perf … Googleの成果のとっておき
 // khand: … 契約書・同意書をパソコンから iPad へ渡して記入してもらうときの受け渡し（1時間だけ。karte/handoff-server.ts）
-export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'linersv:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:', 'kcdoc:', 'backup:', 'backupidx:', 'gbpseo:', 'promo:', 'yt:', 'buffer:', 'khand:', 'lqr:'] as const
+export const KV_PREFIXES = ['job:', 'analytics:', 'sync:', 'ig:', 'ill:', 'monshin:', 'autopilot:', 'noah:', 'keiei:', 'linelink:', 'linesent:', 'linersv:', 'gbp:', 'mkt:', 'kphoto:', 'hpstat:', 'kcdoc:', 'backup:', 'backupidx:', 'gbpseo:', 'promo:', 'yt:', 'buffer:', 'khand:', 'lqr:', 'omimg:'] as const
 
 function filePath(): string {
   const local = path.join(process.cwd(), '.data')
