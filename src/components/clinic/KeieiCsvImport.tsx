@@ -23,7 +23,8 @@ import {
   summarizeAlpha,
   type AlphaPayment,
 } from '@/lib/marketing/keiei-csv'
-import { DEFAULT_GOAL, baseline, insights, simDefaults } from '@/lib/marketing/goal-plan'
+import { baseline, insights, simDefaults } from '@/lib/marketing/goal-plan'
+import { goalOrDefault } from '@/lib/marketing/goal-local'
 import { mergeMonths } from '@/lib/marketing/noah-analysis'
 import { cn } from '@/lib/utils'
 
@@ -61,12 +62,7 @@ const sumSales = (m: NoahMonth) => m.days.reduce((s, d) => s + d[2], 0)
 
 /** この端末に覚えてある目標（目標の画面と同じ置き場所） */
 function savedGoal(): number {
-  try {
-    const n = Number(window.localStorage.getItem('keiei:goal'))
-    return n > 0 ? n : DEFAULT_GOAL
-  } catch {
-    return DEFAULT_GOAL
-  }
+  return goalOrDefault()
 }
 
 export default function KeieiCsvImport({ storeMonths, onSaved }: { storeMonths: NoahMonth[]; onSaved: () => void }) {

@@ -6,6 +6,7 @@
  * 患者さんの個人情報は渡さない。渡している数字は「AIに渡している数字」でそのまま見られる。
  * 1往復ごとに Anthropic の API の料金がかかる（数円〜十数円ほどの目安）。
  */
+import { goalOrDefault } from '@/lib/marketing/goal-local'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff, RefreshCcw, Send, Sparkles, Trash2 } from 'lucide-react'
@@ -17,8 +18,6 @@ interface Msg {
   at: string
 }
 
-const GOAL_KEY = 'keiei:goal'
-
 const STARTERS = [
   '今月の売上は目標に届きそう？足りないなら、何を優先すればいい？',
   '来院が少ない曜日に人を増やすには、費用をかけずに何ができる？',
@@ -27,13 +26,9 @@ const STARTERS = [
   'いま動いているPDCAは続ける？直す？数字から判断して',
 ]
 
-function readGoal(): number | null {
-  try {
-    const v = Number(window.localStorage.getItem(GOAL_KEY))
-    return Number.isFinite(v) && v > 0 ? v : null
-  } catch {
-    return null
-  }
+/** 目標（この端末に覚えてある値。無ければ初めの値 200万円＝月の目標への道すじと同じ） */
+function readGoal(): number {
+  return goalOrDefault()
 }
 
 function timeLabel(iso: string): string {

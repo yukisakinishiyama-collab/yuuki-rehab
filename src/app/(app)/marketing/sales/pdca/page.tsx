@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ChevronDown, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useMarketingRole } from '@/lib/marketing/use-role'
+import { goalOrDefault } from '@/lib/marketing/goal-local'
 import { man } from '@/lib/marketing/goal-plan'
 import { SOURCE_LABELS } from '@/lib/marketing/booking-stats-labels'
 import {
@@ -649,13 +650,8 @@ export default function PdcaPage() {
     setConsulting(true)
     setMessage('')
     try {
-      let goal: number | undefined
-      try {
-        const g = Number(window.localStorage.getItem('keiei:goal'))
-        goal = g > 0 ? g : undefined
-      } catch {
-        goal = undefined
-      }
+      // 目標（この端末に覚えてある値。無ければ初めの値 200万円）
+      const goal: number | undefined = goalOrDefault()
       const res = await fetch('/api/marketing/pdca/consult', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

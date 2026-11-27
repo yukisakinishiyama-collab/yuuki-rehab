@@ -11,27 +11,7 @@
  * 今までの集客の画面は URL を変えずに、各タブの下（pages）に入れた。開いているときはそのタブが光り、
  * 上の見出しにはその画面の名前が出る。
  */
-import {
-  CalendarCheck,
-  CalendarX,
-  CalendarClock,
-  ChartColumn,
-  ChartLine,
-  ClipboardList,
-  Gauge,
-  House,
-  Inbox,
-  Megaphone,
-  Mountain,
-  PenLine,
-  RefreshCcw,
-  Settings,
-  Sparkles,
-  Users,
-  Wallet,
-  Workflow,
-  type LucideIcon,
-} from 'lucide-react'
+import { CalendarCheck, CalendarClock, CalendarX, ChartColumn, ChartLine, ClipboardList, Compass, Gauge, House, Inbox, Megaphone, Mountain, PenLine, RefreshCcw, Settings, Sparkles, Users, Wallet, Workflow, type LucideIcon } from 'lucide-react'
 
 /** タブの下に入れた画面（切り替えのボタンには出さない） */
 export interface NavPage {
@@ -77,6 +57,7 @@ export const NAV: NavSection[] = [
     secret: true,
     children: [
       { href: '/marketing/sales', label: '売上・来院', icon: ChartColumn },
+      { href: '/marketing/sales/strategy', label: '経営方針（90日計画）', icon: Compass },
       { href: '/marketing/sales/monthly', label: '月次レポート', icon: CalendarCheck },
       { href: '/marketing/sales/patients', label: '患者さんの動き', icon: Users },
       { href: '/marketing/sales/cancellations', label: 'キャンセル分析', icon: CalendarX },
