@@ -3,7 +3,7 @@
  * アウトカム（評価・測定 → アウトカム）
  * 痛み（NRS）・可動域・機能スコア・筋力（LSI）・ホップ・バランスを、その場で ＋／− で記録し、指標ごとにグラフで経過を見る。
  * 競技（野球・サッカー・陸上・バスケ/バレー・ACL術後）をえらぶと、その競技でよく使う指標が上に並び、目安とのまとめが出る。
- * 疾患（足関節捻挫・ハムストリング／ふくらはぎ／太もも前の肉離れ）も別にえらべる（2026-11-27 院長「捻挫や肉離れのようにそれぞれの疾患に伴うアウトカム評価も」）。
+ * 疾患（足関節捻挫・肉離れ・アキレス腱症・かかとの痛み・シンスプリント・疲労骨折・膝蓋腱炎・オスグッド・半月板・鼠径部痛・腰痛）も別にえらべる（2026-11-27 院長「捻挫や肉離れのようにそれぞれの疾患に伴うアウトカム評価も」）。
  * 両方えらんだときは疾患の評価を先に並べる。疾患によっては、別の研究の目安の線を出さない（metricForCondition）。
  * 左右を入れる指標は LSI・左右差を、肩の内旋・外旋は GIRD と TRM 差を自動で出す。
  * 記録は pt_outcomes、競技・疾患の設定は pt_outcome_settings（カルテの同期で、ほかの端末にも15秒ほどで出る）。
@@ -15,6 +15,7 @@ import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContai
 import type { Patient } from '@/types/patient'
 import type { ConditionKey, OutcomeRecord, SportKey } from '@/types/contracts'
 import {
+  CONDITION_AREAS,
   CONDITION_SETS,
   OUTCOME_GROUPS,
   OUTCOME_METRICS,
@@ -329,24 +330,36 @@ export default function OutcomeQuickTab({
     })
   }
 
+  function condChip(c: (typeof CONDITION_SETS)[number]) {
+    return (
+      <button
+        key={c.key}
+        type="button"
+        onClick={() => chooseCondition(c.key)}
+        aria-pressed={cond.key === c.key}
+        className={`min-h-10 rounded-full border px-3 text-sm ${
+          cond.key === c.key ? 'border-teal-700 bg-teal-700 font-bold text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+        }`}
+      >
+        {c.label}
+      </button>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* 評価セット（疾患・競技。両方えらべる） */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="w-full text-sm font-bold text-slate-700 sm:w-28">疾患の評価セット</span>
-          {CONDITION_SETS.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => chooseCondition(c.key)}
-              aria-pressed={cond.key === c.key}
-              className={`min-h-10 rounded-full border px-3 text-sm ${
-                cond.key === c.key ? 'border-teal-700 bg-teal-700 font-bold text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              {c.label}
-            </button>
+          {condChip(CONDITION_SETS[0])}
+        </div>
+        <div className="mt-1 space-y-1.5 sm:pl-30">
+          {CONDITION_AREAS.map((area) => (
+            <div key={area} className="flex flex-wrap items-center gap-2">
+              <span className="w-28 shrink-0 text-xs font-bold text-slate-500">{area}</span>
+              {CONDITION_SETS.filter((c) => c.area === area).map(condChip)}
+            </div>
           ))}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
