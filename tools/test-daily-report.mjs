@@ -184,7 +184,9 @@ test('売上（NOAH）は、渡されたときだけ載せる（院長が経営�
 
 test('売上の CSV：院長が経営を開いているときだけ、日報の画面からも入れられる。保存したら売上を読み直す（紙には出さない）', () => {
   const ui = read('src/components/clinic/DailyReport.tsx')
-  assert.match(ui, /\{showSales && noah && !noah\.error && \(\s*<div className="print:hidden">\s*<KeieiCsvImport storeMonths=\{noah\.store\?\.months \?\? \[\]\} onSaved=\{\(\) => setTick\(\(t\) => t \+ 1\)\} \/>/)
+  // 売上を入れる入口（NOAH の日報の PDF・CSV）は、院長が経営を開いているときだけ・紙には出さない
+  assert.match(ui, /\{showSales && \(\s*<div className="space-y-3 print:hidden">/)
+  assert.match(ui, /\{noah && !noah\.error && <KeieiCsvImport storeMonths=\{noah\.store\?\.months \?\? \[\]\} onSaved=\{\(\) => setTick\(\(t\) => t \+ 1\)\} \/>\}/)
   assert.match(ui, /\}, \[salesAllowed, tick\]\)/, '読み直す（tick）で NOAH も読み直す')
   // 入れる先は、経営の「CSVを入れて最新にする」と同じ（院長だけの API）
   assert.match(read('src/components/clinic/KeieiCsvImport.tsx'), /\/api\/marketing\/noah\/import/)

@@ -8,6 +8,8 @@
  * 日報そのものは何も保存しない（今ある記録を読んで並べるだけ）。電話番号は載せない。
  * 院長が経営を開いているときは、売上の CSV（経営の「CSVを入れて最新にする」と同じ。NOAH の金額分析・アルファノート）を
  * この画面からも入れられる。保存したら売上の欄を読み直す（2026-11-27 院長「売り上げ日報もCSVで登録保存、反映できるように」）。
+ * NOAH の「来院者日報」（PDF）も入れられる（同じ日「NOAHの日報をのせます」「PDFでした」）。PDF はこのブラウザの中で読み、
+ * その日の合計の数字だけを保存して、売上の欄の「窓口（来院者日報）」に出す（components/clinic/NoahDailyPdfImport.tsx）。
  */
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -34,6 +36,8 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import KeieiCsvImport from '@/components/clinic/KeieiCsvImport'
+import NoahDailyPdfImport from '@/components/clinic/NoahDailyPdfImport'
+import { NOAH_DAILY_AMOUNT_KEYS, NOAH_DAILY_LABELS, type NoahDailySheet } from '@/lib/marketing/noah-daily'
 
 const FEED_KEY_STORAGE = 'yoyaku_feed_key'
 
@@ -189,6 +193,25 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
       alive = false
     }
   }, [salesAllowed, tick])
+  // NOAH の来院者日報（PDF から入れた、その日の合計）
+  const [dailySheet, setDailySheet] = useState<{ date: string; sheet: NoahDailySheet | null; error: string } | null>(null)
+  useEffect(() => {
+    if (!salesAllowed) return
+    let alive = true
+    const day = date
+    fetch(`/api/marketing/noah/daily?date=${day}`, { cache: 'no-store' })
+      .then(async (r) => {
+        const d = (await r.json().catch(() => null)) as { ok?: boolean; sheet?: NoahDailySheet | null } | null
+        if (!r.ok || !d?.ok) throw new Error(`HTTP ${r.status}`)
+        if (alive) setDailySheet({ date: day, sheet: d.sheet ?? null, error: '' })
+      })
+      .catch(() => alive && setDailySheet({ date: day, sheet: null, error: 'NOAH の日報を読めませんでした' }))
+    return () => {
+      alive = false
+    }
+  }, [salesAllowed, date, tick])
+  const sheet = dailySheet && dailySheet.date === date ? dailySheet : null
+
   const noahDay = useMemo((): { day: NoahDayLike | null; note: string } => {
     if (!noah) return { day: null, note: '読み込み中…' }
     if (noah.error) return { day: null, note: noah.error }
@@ -335,14 +358,35 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
 
       {/* 売上（院長・経営を開いているときだけ） */}
       {showSales && (
-        <Section title="売上（NOAH）" meta="保険の請求分も含めた金額（NOAH の金額分析）">
+        <Section title="売上（NOAH）">
+          {/* 窓口（NOAH の来院者日報） */}
+          {sheet?.sheet ? (
+            <p className="text-sm text-slate-800 print:text-[9.5pt]">
+              <span className="mr-1 font-bold text-slate-600 print:text-slate-800">窓口（来院者日報）</span>
+              来院 <span className="font-black">{sheet.sheet.visits}人</span>・窓口領収 <span className="font-black">{yen(sheet.sheet.window)}</span>
+              <span className="text-slate-600 print:text-slate-800">
+                （
+                {NOAH_DAILY_AMOUNT_KEYS.filter((k) => k !== 'window')
+                  .map((k) => `${NOAH_DAILY_LABELS[k]} ${yen(sheet.sheet![k])}`)
+                  .join('・')}
+                ）
+              </span>
+            </p>
+          ) : (
+            <Empty>
+              <span className="mr-1 font-bold">窓口（来院者日報）</span>
+              {!sheet ? '読み込み中…' : sheet.error || 'この日の NOAH の日報は、まだ入っていません（下の「NOAH の日報（PDF）を入れる」から）。'}
+            </Empty>
+          )}
+          {/* 金額分析（保険の請求分も含めた金額） */}
           {noah?.store?.latest && (
-            <p className="mb-1 text-xs text-slate-500 print:hidden">
-              NOAH の集計は {shortDateLabel(noah.store.latest.asOf)} まで（入れた日時 {noah.store.latest.exportedAt.replace('T', ' ')}）
+            <p className="mt-2 mb-1 text-xs text-slate-500 print:hidden">
+              金額分析の集計は {shortDateLabel(noah.store.latest.asOf)} まで（入れた日時 {noah.store.latest.exportedAt.replace('T', ' ')}）
             </p>
           )}
           {report.noah ? (
             <p className="text-sm text-slate-800 print:text-[9.5pt]">
+              <span className="mr-1 font-bold text-slate-600 print:text-slate-800">金額分析</span>
               来院 <span className="font-black">{report.noah.visits}人</span>・売上 <span className="font-black">{yen(report.noah.sales)}</span>
               <span className="text-slate-600 print:text-slate-800">
                 （
@@ -353,13 +397,25 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
               </span>
             </p>
           ) : (
-            <Empty>{noahDay.note}</Empty>
+            <Empty>
+              <span className="mr-1 font-bold">金額分析</span>
+              {noahDay.note}
+            </Empty>
           )}
+          <p className="mt-1 text-xs text-slate-500 print:text-[8pt] print:text-slate-700">
+            窓口＝その日に窓口でいただいた金額（NOAH の来院者日報）。金額分析＝保険の請求分も含めた金額（NOAH の金額分析）。
+          </p>
         </Section>
       )}
-      {showSales && noah && !noah.error && (
-        <div className="print:hidden">
-          <KeieiCsvImport storeMonths={noah.store?.months ?? []} onSaved={() => setTick((t) => t + 1)} />
+      {showSales && (
+        <div className="space-y-3 print:hidden">
+          <NoahDailyPdfImport
+            onSaved={(dates) => {
+              setTick((t) => t + 1)
+              if (dates.length === 1 && dates[0] !== date) go(dates[0])
+            }}
+          />
+          {noah && !noah.error && <KeieiCsvImport storeMonths={noah.store?.months ?? []} onSaved={() => setTick((t) => t + 1)} />}
         </div>
       )}
 
@@ -480,7 +536,7 @@ export default function DailyReport({ initialDate }: { initialDate: string }) {
         ) : !report.reservationsLoaded ? (
           <Empty>予約を読めないので、記録がまだの方は出せません。</Empty>
         ) : report.karte.missing.length === 0 ? (
-          <Empty>予約のあった方は、みなさん、この日の SOAP があります。</Empty>
+          <Empty>{report.reservations.length === 0 ? 'この日の予約が無いので、確かめる方はいません。' : '予約のあった方は、みなさん、この日の SOAP があります。'}</Empty>
         ) : (
           <div className="text-sm print:text-[9.5pt]">
             <p className="text-slate-700">
