@@ -72,6 +72,79 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
   { key: 'throw_nrs', label: '投げるときの痛み NRS', group: '痛み', unit: '', min: 0, max: 10, step: 1, better: 'low', start: 3 },
   { key: 'run_nrs', label: '走るときの痛み NRS', group: '痛み', unit: '', min: 0, max: 10, step: 1, better: 'low', start: 3 },
   { key: 'kick_nrs', label: 'ボールを蹴るときの痛み NRS', group: '痛み', unit: '', min: 0, max: 10, step: 1, better: 'low', start: 3 },
+  {
+    key: 'decline_squat_nrs',
+    label: '片脚デクラインスクワットの痛み NRS',
+    group: '痛み',
+    unit: '',
+    min: 0,
+    max: 10,
+    step: 1,
+    better: 'low',
+    start: 4,
+    hint: '前が下がった台の上で片脚しゃがみをしたときの膝のお皿の下の痛み（0〜10）。Rio 2015 で膝蓋腱の痛みの指標に使われた',
+  },
+  { key: 'ext_nrs', label: '腰を反らすときの痛み NRS', group: '痛み', unit: '', min: 0, max: 10, step: 1, better: 'low', start: 3 },
+  {
+    key: 'firststep_nrs',
+    label: '朝の一歩目の痛み NRS',
+    group: '痛み',
+    unit: '',
+    min: 0,
+    max: 10,
+    step: 1,
+    better: 'low',
+    start: 5,
+    hint: '朝起きて最初の数歩のかかとの痛み（0〜10）。Salehi 2023 で足底腱膜炎の結果の指標に使われた',
+  },
+  {
+    key: 'hop_nrs',
+    label: '片脚でその場ホップしたときの痛み NRS',
+    group: '痛み',
+    unit: '',
+    min: 0,
+    max: 10,
+    step: 1,
+    better: 'low',
+    start: 2,
+    hint: '痛い側の片脚で、その場で軽く数回とんだときの痛み（0〜10）。Milgrom 2021 では、すねの痛み・押した痛みに加えてホップで痛む方に疲労骨折が多かった',
+  },
+  {
+    key: 'walk_nrs',
+    label: '歩くときの痛み NRS',
+    group: '痛み',
+    unit: '',
+    min: 0,
+    max: 10,
+    step: 1,
+    better: 'low',
+    start: 2,
+    target: { value: 0, type: 'reach', label: '痛みなく歩ける', source: 'George 2024（すねの疲労骨折から走り始める前の条件のまとめ）：痛みなく歩けること' },
+  },
+  {
+    key: 'bony_tender',
+    label: '骨を押したときの痛み NRS',
+    group: '痛み',
+    unit: '',
+    min: 0,
+    max: 10,
+    step: 1,
+    better: 'low',
+    start: 3,
+    target: { value: 0, type: 'reach', label: '押して痛みなし', source: 'George 2024（すねの疲労骨折から走り始める前の条件のまとめ）：骨を押した痛みが消えていること' },
+  },
+  {
+    key: 'tender_length',
+    label: 'すねの押して痛む範囲の長さ',
+    group: '痛み',
+    unit: 'cm',
+    min: 0,
+    max: 40,
+    step: 1,
+    better: 'low',
+    start: 6,
+    hint: 'すねの内側を上下に押して、痛む範囲の長さ。シンスプリントは 5cm 以上にわたって押して痛むもの（Winters 2020）。10cm 以下の狭い範囲で、ホップでも痛むときは疲労骨折を疑う（Milgrom 2021）',
+  },
 
   // ── 腫れ ──
   {
@@ -146,16 +219,52 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     start: 10,
     pair: { calc: 'absdiff', labels: ['患側', '健側'], unit: '°', step: 1, min: 0, max: 150, start: [60, 75], hint: '仰向けで膝を伸ばしたまま、自分の力で脚を上げた角度' },
   },
+  {
+    key: 'hbd',
+    label: 'かかととお尻の距離（うつ伏せ・痛い側）',
+    group: '可動域',
+    unit: 'cm',
+    min: 0,
+    max: 50,
+    step: 1,
+    better: 'low',
+    start: 10,
+    hint: 'うつ伏せで膝を曲げて、かかととお尻のあいだの距離（太ももの前の硬さを見る。0 に近いほどやわらかい）。Ladenhauf 2020 で、太もも前（大腿直筋）の硬さがオスグッドの危険因子にあげられた',
+  },
   { key: 'rom_other', label: 'その他の可動域', group: '可動域', unit: '°', min: -90, max: 180, step: 5, better: 'high', start: 90 },
 
   // ── 機能スコア（質問票は合計点を入れる） ──
   { key: 'koos', label: 'KOOS', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60 },
+  {
+    key: 'koos_qol',
+    label: 'KOOS 生活の質（QoL）',
+    group: '機能スコア',
+    unit: '点',
+    min: 0,
+    max: 100,
+    step: 1,
+    better: 'high',
+    start: 50,
+    hint: 'KOOS のうち「生活の質」の点（0〜100）。Djurtoft 2023 で、成長期の膝の痛み（オスグッドなど）の方の生活の質を見るのに使われた',
+  },
+  {
+    key: 'odi',
+    label: 'ODI（腰の機能障害）',
+    group: '機能スコア',
+    unit: '%',
+    min: 0,
+    max: 100,
+    step: 1,
+    better: 'low',
+    start: 30,
+    hint: '腰の質問票の点（0〜100%。小さいほど良い）。Fairbank 2000 のまとめで、腰の状態を見る代表の質問票とされた。質問票はアウトカムスコアの「ODI」でも記入できる',
+  },
   { key: 'lysholm', label: 'Lysholm', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60 },
   { key: 'ikdc', label: 'IKDC', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60 },
   { key: 'acl_rsi', label: 'ACL-RSI', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 50, hint: '復帰への気持ちの準備（0〜100）' },
   { key: 'kjoc', label: 'KJOC（投げる選手の肩・肘）', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 70, hint: 'Alberta 2010 の質問票。合計点（0〜100）' },
-  { key: 'hagos_sport', label: 'HAGOS スポーツ', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60, hint: '股関節・鼠径部の質問票のうち「スポーツ」の点' },
-  { key: 'hagos_pain', label: 'HAGOS 痛み', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60, hint: '「痛み」の点（高いほど痛みが少ない）' },
+  { key: 'hagos_sport', label: 'HAGOS スポーツ', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60, hint: '股関節・鼠径部の質問票のうち「スポーツ」の点。1人の変化が 18〜34点より小さいときは、答え方のぶれのこともある（Thorborg 2011）' },
+  { key: 'hagos_pain', label: 'HAGOS 痛み', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60, hint: '「痛み」の点（高いほど痛みが少ない）。1人の変化が 18〜34点より小さいときは、答え方のぶれのこともある（Thorborg 2011）' },
   {
     key: 'visa_a',
     label: 'VISA-A（アキレス腱）',
@@ -168,7 +277,18 @@ export const OUTCOME_METRICS: OutcomeMetric[] = [
     start: 60,
     target: { value: 96, type: 'reference', label: '健康な人の平均 96', source: 'Robinson 2001（VISA-A をつくった研究）の健康な人の平均' },
   },
-  { key: 'visa_p', label: 'VISA-P（膝蓋腱）', group: '機能スコア', unit: '点', min: 0, max: 100, step: 1, better: 'high', start: 60 },
+  {
+    key: 'visa_p',
+    label: 'VISA-P（膝蓋腱）',
+    group: '機能スコア',
+    unit: '点',
+    min: 0,
+    max: 100,
+    step: 1,
+    better: 'high',
+    start: 60,
+    target: { value: 95, type: 'reference', label: '健康な人の平均 95', source: 'Zwerver 2009（VISA-P の研究）の健康な学生の平均。膝蓋腱の痛みのある方の平均は 58' },
+  },
   {
     key: 'cait',
     label: 'CAIT（足首の不安定感）',
@@ -468,9 +588,15 @@ export function suggestSport(text: string): SportKey | null {
 // noTarget … この疾患では、指標についている目安の線を出さない（その線は別の疾患の研究の値で、この疾患では合意が無いため）
 // refs … このセットで参考にした論文（画面のまとめの下に出す。どれも PubMed で抄録を読んだ範囲）
 
+/** 疾患のセットを画面でまとめて並べる部位 */
+export type ConditionArea = '足首・足' | 'すね・ふくらはぎ' | '太もも' | '膝' | '股関節・腰'
+export const CONDITION_AREAS: ConditionArea[] = ['足首・足', 'すね・ふくらはぎ', '太もも', '膝', '股関節・腰']
+
 export interface ConditionSet {
   key: ConditionKey
   label: string
+  /** 画面で並べる部位（えらばない は無し） */
+  area?: ConditionArea
   /** どんな方に使うか */
   who: string
   metrics: OutcomeMetricKey[]
@@ -483,6 +609,7 @@ export const CONDITION_SETS: ConditionSet[] = [
   {
     key: 'ankle_sprain',
     label: '足関節捻挫',
+    area: '足首・足',
     who: '足首のねんざ（くり返す不安定感も）',
     metrics: ['nrs', 'swelling_f8', 'wblt', 'cait', 'ybal_ant', 'side_hop', 'lsi_hop', 'lsi_calf'],
     refs: [
@@ -496,6 +623,7 @@ export const CONDITION_SETS: ConditionSet[] = [
   {
     key: 'ham_strain',
     label: 'ハムストリングの肉離れ',
+    area: '太もも',
     who: '太ももの裏',
     metrics: ['nrs', 'aslr', 'lsi_ham', 'slhb', 'sprint_pct'],
     noTarget: ['lsi_ham'],
@@ -508,6 +636,7 @@ export const CONDITION_SETS: ConditionSet[] = [
   {
     key: 'calf_strain',
     label: 'ふくらはぎの肉離れ',
+    area: 'すね・ふくらはぎ',
     who: 'ふくらはぎ（腓腹筋・ヒラメ筋）',
     metrics: ['nrs', 'lsi_calf', 'wblt', 'run_nrs', 'run_minutes', 'lsi_hop'],
     refs: [
@@ -519,10 +648,112 @@ export const CONDITION_SETS: ConditionSet[] = [
   {
     key: 'quad_strain',
     label: '太もも前の肉離れ',
+    area: '太もも',
     who: '大腿四頭筋（大腿直筋など）',
     metrics: ['nrs', 'kick_nrs', 'lsi_quad', 'rom_knee_flex', 'sprint_pct'],
     noTarget: ['lsi_quad'],
     refs: ['Lempainen 2022（太もも前のケガの手引き：股関節を曲げる・膝を伸ばすときの痛みと腫れ）'],
+  },
+  // ── 2026-11-27 同じ日「他にも入れてください」で足した 9 つ ──
+  {
+    key: 'achilles',
+    label: 'アキレス腱症',
+    area: '足首・足',
+    who: 'アキレス腱の痛み（断裂ではない）',
+    metrics: ['nrs', 'visa_a', 'lsi_calf', 'run_nrs', 'run_minutes'],
+    refs: [
+      'Robinson 2001（VISA-A：健康な人の平均 96）',
+      'Hanlon 2023（症状・脚の働き・腱の状態・気持ちを分けて経過を見た研究）',
+      'Sleeswijk Visser 2025（片脚のかかと上げの回数：一般の方の真ん中は 25回ほど）',
+    ],
+  },
+  {
+    key: 'plantar_heel',
+    label: 'かかとの痛み（足底腱膜炎）',
+    area: '足首・足',
+    who: '朝の一歩目に痛むかかとの痛み',
+    metrics: ['firststep_nrs', 'nrs', 'wblt', 'lsi_calf'],
+    refs: [
+      'Koc 2023（かかとの痛みの理学療法の診療ガイドライン 2023年版）',
+      'Salehi 2023（朝の一歩目の痛みを結果の指標にした研究）',
+      'Powden 2015（ランジテストのぶれ 1.6〜1.9cm）',
+    ],
+  },
+  {
+    key: 'mtss',
+    label: 'シンスプリント',
+    area: 'すね・ふくらはぎ',
+    who: 'すねの内側の痛み（走る・跳ぶ）',
+    metrics: ['run_nrs', 'tender_length', 'hop_nrs', 'run_minutes'],
+    refs: [
+      'Winters 2020（シンスプリントの決まり：運動でのすねの内側の痛みと、5cm 以上にわたる押した痛み）',
+      'Milgrom 2021（狭い範囲〈10cm 以下〉の押した痛みに加えてホップで痛むときは、疲労骨折が多い）',
+    ],
+  },
+  {
+    key: 'bone_stress',
+    label: '疲労骨折（骨のストレス障害）',
+    area: 'すね・ふくらはぎ',
+    who: 'すね・足の骨の疲労骨折（医療機関の画像の確認が要る場所がある）',
+    metrics: ['nrs', 'bony_tender', 'walk_nrs', 'hop_nrs', 'run_minutes'],
+    refs: [
+      'George 2024（すねの疲労骨折から走り始める前の5つ：骨の押した痛みが消える・痛みなく歩ける・治りにくい場所は画像で治りを確認・筋力と動きのテスト・原因の見直し）',
+      'Hoenig 2022（場所によって治りやすさがちがい、治りにくい場所は固定などが要ることがある）',
+      'Milgrom 2021（すねの疲労骨折の見分け：押した痛みの範囲とホップテスト）',
+    ],
+  },
+  {
+    key: 'patellar_tendinopathy',
+    label: '膝蓋腱炎（ジャンパー膝）',
+    area: '膝',
+    who: '膝のお皿の下の痛み（跳ぶ・しゃがむ）',
+    metrics: ['nrs', 'decline_squat_nrs', 'visa_p', 'lsi_quad', 'lsi_hop'],
+    noTarget: ['lsi_quad', 'lsi_hop'],
+    refs: ['Zwerver 2009（VISA-P：健康な学生の平均 95・膝蓋腱の痛みのある方の平均 58）', 'Rio 2015（片脚デクラインスクワットの痛みを指標にした研究）'],
+  },
+  {
+    key: 'osgood',
+    label: 'オスグッド病',
+    area: '膝',
+    who: '成長期の膝のお皿の下の骨の出っぱりの痛み',
+    metrics: ['nrs', 'run_nrs', 'hbd', 'koos_qol', 'run_minutes'],
+    refs: [
+      'Ladenhauf 2020（オスグッドのまとめ：太もも前の硬さ・筋力などが危険因子）',
+      'Neuhaus 2021（保存療法の研究のまとめ：比べた研究がまだ少ない）',
+      'Djurtoft 2023（成長期の膝の痛みの方の生活の質を KOOS で見た研究）',
+    ],
+  },
+  {
+    key: 'meniscus',
+    label: '半月板損傷',
+    area: '膝',
+    who: '膝の半月板のケガ（手術のあとも）',
+    metrics: ['nrs', 'koos', 'lysholm', 'rom_knee_flex', 'rom_knee_ext', 'lsi_quad', 'lsi_hop'],
+    noTarget: ['lsi_quad', 'lsi_hop'],
+    refs: ['Roos 1998（KOOS を半月板・前十字靱帯・軟骨のケガの方で確かめた研究）'],
+  },
+  {
+    key: 'groin',
+    label: '鼠径部痛（グロインペイン）',
+    area: '股関節・腰',
+    who: '足のつけ根の痛み（内転筋・腸腰筋・鼠径部・恥骨）',
+    metrics: ['hagos_sport', 'hagos_pain', 'add_squeeze', 'lsi_hip_add', 'lsi_hip_abd'],
+    refs: [
+      'Thorborg 2011（HAGOS をつくった研究：1人の変化の見分けは 18〜34点）',
+      'Weir 2015（ドーハの合意：鼠径部痛を内転筋・腸腰筋・鼠径部・恥骨・股関節に分ける）',
+    ],
+  },
+  {
+    key: 'low_back',
+    label: '腰痛（成長期の分離症も）',
+    area: '股関節・腰',
+    who: '腰の痛み（成長期で反らすと痛むときは、医療機関の画像で分離症の確認を）',
+    metrics: ['nrs', 'ext_nrs', 'odi', 'run_minutes'],
+    refs: [
+      'Fairbank 2000（ODI のまとめ：腰の状態を見る代表の質問票）',
+      'Chung 2021（腰椎分離症のまとめ：問診・診察・画像でほかの腰痛と見分ける）',
+      'Choi 2022（成長期の運動選手の分離症 201人の保存療法の経過）',
+    ],
   },
 ]
 
@@ -543,6 +774,15 @@ export function suggestCondition(text: string): ConditionKey | null {
   if (strain && /ふくらはぎ|下腿三頭|腓腹|ヒラメ|下腿後/.test(t)) return 'calf_strain'
   if (strain && /大腿前|太もも前|太ももの前|大腿四頭|大腿直筋/.test(t)) return 'quad_strain'
   if (/(足関節|足首|前距腓|ATFL)/i.test(t) && /捻挫|ねんざ|靱帯|靭帯|不安定/.test(t)) return 'ankle_sprain'
+  if (/疲労骨折|骨ストレス/.test(t)) return 'bone_stress'
+  if (/シンスプリント|脛骨過労性骨膜炎|過労性脛部痛/.test(t)) return 'mtss'
+  if (/アキレス腱/.test(t) && !/断裂/.test(t)) return 'achilles'
+  if (/足底腱膜|足底筋膜|かかとの痛み|踵の痛み|踵骨部痛/.test(t)) return 'plantar_heel'
+  if (/オスグッド/.test(t)) return 'osgood'
+  if (/膝蓋腱|ジャンパー膝/.test(t)) return 'patellar_tendinopathy'
+  if (/半月板/.test(t)) return 'meniscus'
+  if (/鼠径部|鼡径部|グロイン|恥骨結合/.test(t)) return 'groin'
+  if (/腰椎分離|分離症|腰痛/.test(t)) return 'low_back'
   return null
 }
 

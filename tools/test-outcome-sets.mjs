@@ -126,12 +126,17 @@ await test('カルテの言葉から競技セットをすすめる', () => {
 // ── 疾患ごとの評価セット（2026-11-27 院長「アウトカムで捻挫や肉離れのようにそれぞれの疾患に伴うアウトカム評価も」） ──
 
 await test('疾患のセット：足関節捻挫・肉離れ3部位。どのセットの指標も一覧にあり、指標の key は保存値なので変えない', () => {
-  assert.deepEqual(CONDITION_SETS.map((c) => c.key), ['none', 'ankle_sprain', 'ham_strain', 'calf_strain', 'quad_strain'])
+  assert.deepEqual(CONDITION_SETS.map((c) => c.key), [
+    'none', 'ankle_sprain', 'ham_strain', 'calf_strain', 'quad_strain',
+    'achilles', 'plantar_heel', 'mtss', 'bone_stress', 'patellar_tendinopathy', 'osgood', 'meniscus', 'groin', 'low_back',
+  ])
+  for (const c of CONDITION_SETS) if (c.key !== 'none') assert.ok(data.CONDITION_AREAS.includes(c.area), `${c.key} の部位`)
   for (const c of CONDITION_SETS) {
     for (const k of c.metrics) assert.ok(getOutcomeMetric(k), `${c.key} の ${k}`)
     for (const k of c.noTarget ?? []) assert.ok(c.metrics.includes(k), `${c.key} の noTarget ${k}`)
   }
-  for (const k of ['cait', 'swelling_f8', 'wblt', 'side_hop', 'aslr', 'slhb', 'sprint_pct', 'kick_nrs']) assert.ok(getOutcomeMetric(k), k)
+  for (const k of ['cait', 'swelling_f8', 'wblt', 'side_hop', 'aslr', 'slhb', 'sprint_pct', 'kick_nrs',
+    'decline_squat_nrs', 'koos_qol', 'hbd', 'tender_length', 'hop_nrs', 'walk_nrs', 'bony_tender', 'ext_nrs', 'odi', 'firststep_nrs']) assert.ok(getOutcomeMetric(k), k)
   assert.equal(getConditionSet('unknown').key, 'none')
   assert.deepEqual(getConditionSet('ankle_sprain').metrics, ['nrs', 'swelling_f8', 'wblt', 'cait', 'ybal_ant', 'side_hop', 'lsi_hop', 'lsi_calf'])
 })
@@ -175,6 +180,19 @@ await test('疾患のセットの参考の論文には、著者と年が書い�
   }
 })
 
+await await test('小さいほど良い指標の「目安」：痛みなく歩ける・押して痛みなし（0）＝George 2024。VISA-P は健康な人の平均 95（Zwerver 2009）', () => {
+  assert.deepEqual(judgeTarget(getOutcomeMetric('walk_nrs'), 0), { state: 'reached', gap: 0 })
+  assert.deepEqual(judgeTarget(getOutcomeMetric('walk_nrs'), 3), { state: 'notyet', gap: 3 })
+  assert.deepEqual(judgeTarget(getOutcomeMetric('bony_tender'), 1), { state: 'notyet', gap: 1 })
+  assert.match(getOutcomeMetric('walk_nrs').target.source, /George 2024/)
+  assert.deepEqual(judgeTarget(getOutcomeMetric('visa_p'), 80), { state: 'reference', gap: 15 })
+  // 大きいほど良い「目安」は今までどおり
+  assert.deepEqual(judgeTarget(getOutcomeMetric('lsi_hop'), 84.5), { state: 'notyet', gap: 5.5 })
+  // 膝蓋腱炎・半月板では ACL の研究の線を出さない
+  assert.equal(metricForCondition(getOutcomeMetric('lsi_hop'), getConditionSet('meniscus')).target, undefined)
+  assert.equal(metricForCondition(getOutcomeMetric('lsi_quad'), getConditionSet('patellar_tendinopathy')).target, undefined)
+})
+
 await test('カルテの言葉から疾患のセットをすすめる', () => {
   assert.equal(suggestCondition('右足関節捻挫'), 'ankle_sprain')
   assert.equal(suggestCondition('左足首 ねんざ（内反）'), 'ankle_sprain')
@@ -185,8 +203,18 @@ await test('カルテの言葉から疾患のセットをすすめる', () => {
   assert.equal(suggestCondition('ふくらはぎの肉離れ（テニスレッグ）'), 'calf_strain')
   assert.equal(suggestCondition('左大腿直筋 肉離れ'), 'quad_strain')
   assert.equal(suggestCondition('肉離れ'), null, '場所が分からないときはすすめない')
-  assert.equal(suggestCondition('腰痛'), null)
-  assert.equal(suggestCondition('右膝 捻挫'), null, '足首でない捻挫はすすめない')
+    assert.equal(suggestCondition('右膝 捻挫'), null, '足首でない捻挫はすすめない')
+  assert.equal(suggestCondition('右アキレス腱炎'), 'achilles')
+  assert.equal(suggestCondition('左アキレス腱断裂 術後'), null, '断裂はアキレス腱症のセットにしない')
+  assert.equal(suggestCondition('右足底腱膜炎'), 'plantar_heel')
+  assert.equal(suggestCondition('両側シンスプリント'), 'mtss')
+  assert.equal(suggestCondition('右脛骨疲労骨折'), 'bone_stress')
+  assert.equal(suggestCondition('右膝蓋腱炎（ジャンパー膝）'), 'patellar_tendinopathy')
+  assert.equal(suggestCondition('左オスグッド'), 'osgood')
+  assert.equal(suggestCondition('右膝内側半月板損傷'), 'meniscus')
+  assert.equal(suggestCondition('サッカー 鼠径部痛'), 'groin')
+  assert.equal(suggestCondition('腰椎分離症（L5）'), 'low_back')
+  assert.equal(suggestCondition('腰痛 デスクワーク'), 'low_back')
 })
 
 await test('患者さんごとの設定：競技と疾患は別々に残る（片方を変えても、もう片方は消えない）', async () => {
