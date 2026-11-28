@@ -227,7 +227,8 @@ await test('画面と API：院長だけ。PDF はブラウザの中で読み、
   assert.match(ui, /body: JSON\.stringify\(\{ sheets \}\)/, '送るのは合計（sheets）だけ')
   assert.ok(!/FormData|file\b.*fetch\(/.test(ui), 'PDF そのものは送らない')
   const report = read('src/components/clinic/DailyReport.tsx')
-  assert.match(report, /\{showSales && \(\s*<div className="space-y-3 print:hidden">\s*<NoahDailyPdfImport/)
+  // 2026-11-27（PR #145）：PDF の欄は日報のいちばん上へ（院長・経営を開いているときだけ・紙には出さない）
+  assert.match(report, /\{showSales && \(\s*<div id=\{PDF_IMPORT_ID\} className="scroll-mt-20 print:hidden">\s*<NoahDailyPdfImport/)
   assert.match(report, /fetch\(`\/api\/marketing\/noah\/daily\?date=\$\{day\}`/)
   assert.match(report, /窓口（来院者日報）/)
 })
