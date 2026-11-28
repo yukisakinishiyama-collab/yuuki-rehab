@@ -81,7 +81,8 @@ export default function ContractDocument({
           title={title}
           placeholder={locked ? '下の欄で入れます' : undefined}
           className={common}
-          style={{ width: `${Math.max(5, p.width, Math.min(16, (inputs[p.i] ?? '').length + 1))}em`, maxWidth: '100%' }}
+          // 長い文（推奨しない理由など）は書いた分だけ広げる（行の幅まで。2026-11-28）
+          style={{ width: `${Math.max(5, p.width, Math.min(40, (inputs[p.i] ?? '').length + 1))}em`, maxWidth: '100%' }}
           aria-label={name}
         />
       )

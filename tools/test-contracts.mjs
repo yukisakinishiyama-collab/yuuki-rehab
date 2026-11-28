@@ -23,8 +23,8 @@ function test(name, fn) {
   console.log(`  ✓ ${name}`)
 }
 
-test('7種類のひな形が読める（題名・チェック・記入欄の数）', () => {
-  assert.equal(CONTRACT_TEMPLATES.length, 7)
+test('8種類のひな形が読める（題名・チェック・記入欄の数）', () => {
+  assert.equal(CONTRACT_TEMPLATES.length, 8)
   for (const t of CONTRACT_TEMPLATES) {
     const p = parseTemplate(t.body)
     assert.equal(p.blocks[0].type, 'title', t.id)

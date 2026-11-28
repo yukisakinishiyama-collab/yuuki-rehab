@@ -28,6 +28,8 @@ export interface CheckInfo {
   i: number
   /** □ のうしろの文字（次の □ か記入欄まで） */
   after: string
+  /** 同じ行の頭の文字（「推奨しない活動：□ 練習参加 □ …」の「推奨しない活動」。行の頭が □ なら空） */
+  lead: string
   row: string
   section: string
 }
@@ -64,6 +66,8 @@ export function describeTemplate(parsed: ParsedTemplate): { blanks: BlankInfo[];
 
   const walk = (parts: Part[], row: string) => {
     let before = ''
+    const firstToken = parts.findIndex((p) => p.t !== 'text')
+    const lead = (firstToken < 0 ? '' : textOf(parts.slice(0, firstToken))).replace(/[：:\s　]+$/u, '').trim()
     for (let k = 0; k < parts.length; k++) {
       const p = parts[k]
       if (p.t === 'text') {
@@ -76,7 +80,7 @@ export function describeTemplate(parsed: ParsedTemplate): { blanks: BlankInfo[];
       } else {
         let after = ''
         for (let j = k + 1; j < parts.length && parts[j].t === 'text'; j++) after += (parts[j] as { v: string }).v
-        checks.push({ i: p.i, after: after.trim(), row, section })
+        checks.push({ i: p.i, after: after.trim(), lead, row, section })
       }
       before = ''
     }
@@ -139,9 +143,24 @@ export function addMonthsYmd(ymd: string, n: number): string {
 // ── カルテから入れるもの ─────────────────────────
 
 export interface AutofillPatient {
+  name?: string
+  birthDate?: string
+  onsetDate?: string
   mainComplaint?: string
   diagnosisLabel?: string
   occupation?: string
+  /** 競技（問診の「スポーツ・運動」。治癒前の競技復帰の意思確認書の「競技・所属」に使う） */
+  sports?: string
+  /** 受傷日（問診の受傷日。無ければ onsetDate） */
+  injuryDate?: string
+}
+
+/** 競技・所属（問診の競技＋学校名。どちらも無ければ空） */
+export function sportOf(p: AutofillPatient | null | undefined): string {
+  const sport = String(p?.sports ?? '').replace(/\s+/g, ' ').trim()
+  const school = schoolOf(p)
+  const v = sport && school && !sport.includes(school) ? `${sport}（${school}）` : sport || school
+  return v.length > 60 ? `${v.slice(0, 59)}…` : v
 }
 
 const SCHOOL = /学校|小学|中学|高校|高等|大学|高専|学園|学院|附属|付属/
@@ -224,6 +243,16 @@ export function autofillContract(parsed: ParsedTemplate, ctx: AutofillContext): 
         else if (b.label === '解約届の提出日') v = { value: jaDate(ctx.today), source: 'today' }
         else if (b.label === '契約終了日') v = fromMember(jaDate(end))
         else if (b.label === '最後の決済月') v = fromMember(jaMonth(end.slice(0, 7)))
+        break
+      }
+      case 'return-to-sport': {
+        // 2026-11-28：患者さんの欄はカルテ・問診から（希望する復帰日は、ご本人に書いていただく）
+        const inj = [ctx.patient.injuryDate, ctx.patient.onsetDate].find((d) => d && YMD.test(d)) ?? ''
+        if (b.row === '患者氏名') v = karte(String(ctx.patient.name ?? '').trim())
+        else if (b.row === '生年月日') v = ctx.patient.birthDate && YMD.test(ctx.patient.birthDate) ? karte(ctx.patient.birthDate) : null
+        else if (b.row === '競技・所属') v = karte(sportOf(ctx.patient))
+        else if (b.row === '受傷日') v = karte(inj)
+        else if (b.row.startsWith('傷病名')) v = karte(purposeOf(ctx.patient))
         break
       }
       case 'visit-frequency':

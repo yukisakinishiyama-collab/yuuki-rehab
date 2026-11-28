@@ -2,7 +2,7 @@
 /**
  * カルテの「契約・同意書」タブ
  *
- * 1. 書類をえらぶ（7種類。署名済みのものには日付が出る）
+ * 1. 書類をえらぶ（8種類。署名済みのものには日付が出る）
  * 2. 文面をいっしょに読み、□ をタップ（チェックは患者様ご自身で）。記入欄は、署名のほかはカルテ・今日の日付・
  *    会員の手続きの欄から自動で入る（緑の欄。lib/contracts/autofill.ts）
  * 3. 患者さん（未成年なら保護者も）と担当者が指で署名 →「署名して完了する」
@@ -56,7 +56,7 @@ import {
   PAIR_PLAN,
   type MemberInput,
 } from '@/lib/contracts/member'
-import { getPatient, getPatients } from '@/lib/patient-store'
+import { getIntakes, getPatient, getPatients } from '@/lib/patient-store'
 import { printPages, printSigned, signatureBlockHtml, copyPage } from '@/lib/contracts/print'
 import { addContract, voidContract } from '@/lib/contracts/store'
 import { fingerprint } from '@/lib/sync-merge'
@@ -775,18 +775,26 @@ export function SignFlow({
   )
   /** 手続きの前の状態（紙の入会申込書の方の解約届なら、紙の内容から。最低利用期間・利用開始日・ご契約内容の枠に使う） */
   const before = useMemo(() => (covered?.via ? status : statusBeforeOf(tpl.member, member, status, today)), [covered, tpl.member, member, status, today])
+  /** 自動入力に使うカルテの値（治癒前の競技復帰の意思確認書は、問診の競技・受傷日も使う） */
+  const autoPatient = useMemo(() => {
+    if (tpl.id !== 'return-to-sport') return patient
+    const intakes = getIntakes(patient.id).sort((a, b) => String(b.intakeDate).localeCompare(String(a.intakeDate)))
+    const sports = intakes.find((x) => String(x.sportsActivity ?? '').trim())?.sportsActivity ?? ''
+    const injuryDate = intakes.find((x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x.injuryDate ?? '')))?.injuryDate ?? ''
+    return { ...patient, sports, injuryDate }
+  }, [tpl.id, patient])
   const auto = useMemo(
     () =>
       autofillContract(parsed, {
         docId: tpl.id,
         today,
-        patient,
+        patient: autoPatient,
         member: tpl.member ? member : undefined,
         status: before,
         partnerPatient,
         inputs,
       }),
-    [parsed, tpl.id, tpl.member, today, patient, member, before, partnerPatient, inputs],
+    [parsed, tpl.id, tpl.member, today, autoPatient, member, before, partnerPatient, inputs],
   )
   const values = useMemo(() => effectiveInputs(inputs, auto), [inputs, auto])
   const edited = useMemo(() => inputs.map((v) => v !== null), [inputs])
@@ -834,7 +842,8 @@ export function SignFlow({
   if (!sigStaff) missing.push({ id: 'cf-sig-staff', text: `${tpl.staffLabel}の署名` })
   if (memberCheck && !memberCheck.ok) missing.push({ id: 'cf-member', text: memberCheck.error })
   // 説明および同意書：「同意します」にチェック、「追加説明を希望」はチェックなし、のときだけ署名できる
-  const consent = consentProblem(tpl.id, described.checks, checks)
+  // 治癒前の競技復帰の意思確認書：当院の見解・説明したリスク・ご本人の確認がそろったときだけ（lib/contracts/consent.ts）
+  const consent = consentProblem(tpl.id, described.checks, checks, described.blanks, values)
   if (consent) missing.push({ id: 'cf-doc', text: consent })
   if (checkedPlans.length > 1) missing.push({ id: 'cf-doc', text: '文面の「申し込む」のチェックが2つ以上あります。申し込むプランを1つにしてください。' })
   else if (checkedPlans.length === 1 && checkedPlans[0] !== member.plan)
